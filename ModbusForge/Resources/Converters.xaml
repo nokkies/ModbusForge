@@ -1,6 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:converters="clr-namespace:ModbusForge.Converters;assembly=ModbusForge">
+                    xmlns:converters="clr-namespace:ModbusForge.Converters">
     <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
     <converters:BooleanToConnectedConverter x:Key="BooleanToConnectedConverter"/>
 </ResourceDictionary>

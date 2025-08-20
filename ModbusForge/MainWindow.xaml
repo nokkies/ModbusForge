@@ -7,7 +7,15 @@
         xmlns:viewmodels="clr-namespace:ModbusForge.ViewModels"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="450" Width="800">
-    
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Converters.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -15,7 +23,7 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        
+
         <Menu Grid.Row="0">
             <MenuItem Header="_File">
                 <MenuItem Header="_Exit" Click="MenuItem_Exit_Click"/>
@@ -33,24 +41,31 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="60"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="60"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                
+
                 <TextBlock Text="Server:" VerticalAlignment="Center" Margin="5,0"/>
                 <TextBox Grid.Column="1" Text="{Binding ServerAddress, UpdateSourceTrigger=PropertyChanged}" 
                          IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
                          Margin="0,0,5,0"/>
-                
+
                 <TextBlock Text="Port:" Grid.Column="2" VerticalAlignment="Center" Margin="5,0"/>
                 <TextBox Grid.Column="3" Text="{Binding Port}" 
                          IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
                          Margin="0,0,5,0"/>
-                
-                <Button Grid.Column="4" Content="Connect" Command="{Binding ConnectCommand}" 
+
+                <TextBlock Text="Unit ID:" Grid.Column="4" VerticalAlignment="Center" Margin="5,0"/>
+                <TextBox Grid.Column="5" Text="{Binding UnitId}" 
+                         IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
+                         Margin="0,0,5,0"/>
+
+                <Button Grid.Column="6" Content="Connect" Command="{Binding ConnectCommand}" 
                         IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
                         Width="80" Margin="0,0,5,0"/>
-                        
-                <Button Grid.Column="5" Content="Disconnect" Command="{Binding DisconnectCommand}" 
+
+                <Button Grid.Column="7" Content="Disconnect" Command="{Binding DisconnectCommand}" 
                         IsEnabled="{Binding IsConnected}"
                         Width="80"/>
             </Grid>
@@ -58,23 +73,135 @@
 
         <TabControl Grid.Row="2" Margin="5">
             <TabItem Header="Registers">
-                <Grid>
-                    <!-- We'll add register monitoring controls here -->
-                    <TextBlock Text="Register monitoring will be implemented here" 
-                               HorizontalAlignment="Center" VerticalAlignment="Center"
-                               FontStyle="Italic" Foreground="Gray"/>
+                <Grid Margin="5">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
+                        <TextBlock Text="Start:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Width="80" Text="{Binding RegisterStart}" Margin="0,0,10,0"/>
+                        <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Width="80" Text="{Binding RegisterCount}" Margin="0,0,10,0"/>
+                        <Button Content="Read" Command="{Binding ReadRegistersCommand}" Width="80" Margin="0,0,10,0"/>
+                        <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                        <ComboBox Width="120" SelectedItem="{Binding RegistersGlobalType}" ItemsSource="{x:Static viewmodels:TypeOptions.All}"/>
+                    </StackPanel>
+
+                    <DataGrid x:Name="HoldingRegistersGrid" Grid.Row="1" ItemsSource="{Binding HoldingRegisters}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="HoldingRegistersGrid_CellEditEnding">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"/>
+                            <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{x:Static viewmodels:TypeOptions.All}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Input Registers">
+                <Grid Margin="5">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
+                        <TextBlock Text="Start:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Width="80" Text="{Binding InputRegisterStart}" Margin="0,0,10,0"/>
+                        <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Width="80" Text="{Binding InputRegisterCount}" Margin="0,0,10,0"/>
+                        <Button Content="Read" Command="{Binding ReadInputRegistersCommand}" Width="80" Margin="0,0,10,0"/>
+                        <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                        <ComboBox Width="120" SelectedItem="{Binding InputRegistersGlobalType}" ItemsSource="{x:Static viewmodels:TypeOptions.All}"/>
+                    </StackPanel>
+
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding InputRegisters}" AutoGenerateColumns="False" IsReadOnly="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
+                            <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"/>
+                            <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </Grid>
             </TabItem>
             <TabItem Header="Coils">
-                <Grid>
-                    <!-- We'll add coil monitoring controls here -->
-                    <TextBlock Text="Coil monitoring will be implemented here" 
-                               HorizontalAlignment="Center" VerticalAlignment="Center"
-                               FontStyle="Italic" Foreground="Gray"/>
+                <Grid Margin="5">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
+                        <TextBlock Text="Start:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Width="80" Text="{Binding CoilStart}" Margin="0,0,10,0"/>
+                        <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Width="80" Text="{Binding CoilCount}" Margin="0,0,10,0"/>
+                        <Button Content="Read" Command="{Binding ReadCoilsCommand}" Width="80"/>
+                    </StackPanel>
+
+                    <DataGrid x:Name="CoilsGrid" Grid.Row="1" ItemsSource="{Binding Coils}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="CoilsGrid_CellEditEnding" CurrentCellChanged="CoilsGrid_CurrentCellChanged">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
+                            <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Discrete Inputs">
+                <Grid Margin="5">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
+                        <TextBlock Text="Start:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Width="80" Text="{Binding DiscreteInputStart}" Margin="0,0,10,0"/>
+                        <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Width="80" Text="{Binding DiscreteInputCount}" Margin="0,0,10,0"/>
+                        <Button Content="Read" Command="{Binding ReadDiscreteInputsCommand}" Width="80"/>
+                    </StackPanel>
+
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding DiscreteInputs}" AutoGenerateColumns="False" IsReadOnly="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
+                            <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Custom">
+                <Grid Margin="5">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
+                        <Button Content="Add Row" Width="100" Command="{Binding AddCustomEntryCommand}"/>
+                        <TextBlock Text="  Add a row with Address/Type/Value. Tick 'Cont.' to write periodically." Margin="10,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <DataGrid x:Name="CustomGrid" Grid.Row="1" ItemsSource="{Binding CustomEntries}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="CustomGrid_CellEditEnding" CurrentCellChanged="CustomGrid_CurrentCellChanged">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
+                            <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{x:Static viewmodels:TypeOptions.All}" Width="*"/>
+                            <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="2*"/>
+                            <DataGridCheckBoxColumn Header="Cont." Binding="{Binding Continuous}" Width="Auto"/>
+                            <DataGridTextColumn Header="Period (ms)" Binding="{Binding PeriodMs}" Width="*"/>
+                            <DataGridTemplateColumn Header="Actions" Width="Auto">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="Write" Padding="8,2" Command="{Binding DataContext.WriteCustomNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </Grid>
             </TabItem>
         </TabControl>
-        
+
         <StatusBar Grid.Row="3">
             <StatusBarItem>
                 <TextBlock Text="{Binding StatusMessage}" FontWeight="SemiBold"/>

@@ -1,27 +1,27 @@
-using FluentModbus;
 using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using FluentModbus;
 using Microsoft.Extensions.Logging;
 
 namespace ModbusForge.Services
 {
-    public class ModbusTcpService : IModbusService, IDisposable
+    public class ModbusService : IModbusService, IDisposable
     {
+        private readonly ILogger<ModbusService> _logger;
         private readonly ModbusTcpClient _client;
         private bool _disposed = false;
-        private readonly ILogger<ModbusTcpService> _logger;
 
-        public ModbusTcpService(ILogger<ModbusTcpService> logger)
+        public ModbusService(ILogger<ModbusService> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _client = new ModbusTcpClient();
             _logger.LogInformation("Modbus TCP client created");
         }
 
-        public async Task<ushort[]> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
+        public Task<ushort[]> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
         {
             if (!_client.IsConnected)
                 throw new InvalidOperationException("Not connected to Modbus server");
@@ -29,9 +29,10 @@ namespace ModbusForge.Services
             try
             {
                 _logger.LogDebug($"Reading {count} input registers starting at {startAddress} (Unit ID: {unitId})");
-                return await Task.Run(() =>
+                return Task.Run(() =>
                 {
                     var span = _client.ReadInputRegisters<ushort>(unitId, (ushort)startAddress, (ushort)count);
+                    _logger.LogDebug($"Successfully read {span.Length} input registers");
                     return span.ToArray();
                 });
             }
@@ -42,7 +43,7 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task<bool[]> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
+        public Task<bool[]> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
         {
             if (!_client.IsConnected)
                 throw new InvalidOperationException("Not connected to Modbus server");
@@ -50,10 +51,12 @@ namespace ModbusForge.Services
             try
             {
                 _logger.LogDebug($"Reading {count} discrete inputs starting at {startAddress} (Unit ID: {unitId})");
-                return await Task.Run(() =>
+
+                return Task.Run(() =>
                 {
                     var bytes = _client.ReadDiscreteInputs(unitId, startAddress, count);
                     var result = new bool[count];
+
                     int bitIndex = 0;
                     for (int i = 0; i < bytes.Length && bitIndex < count; i++)
                     {
@@ -63,6 +66,7 @@ namespace ModbusForge.Services
                             result[bitIndex++] = (b & (1 << bit)) != 0;
                         }
                     }
+
                     return result;
                 });
             }
@@ -81,12 +85,18 @@ namespace ModbusForge.Services
             {
                 try
                 {
+                    if (_client.IsConnected)
+                    {
+                        _client.Disconnect();
+                    }
+
+                    _logger.LogInformation($"Connecting to Modbus server at {ipAddress}:{port}");
                     var endpoint = new IPEndPoint(IPAddress.Parse(ipAddress), port);
                     _client.Connect(endpoint, ModbusEndianness.BigEndian);
-                    _logger.LogInformation($"Connected to Modbus server at {ipAddress}:{port}");
+                    _logger.LogInformation($"Connected to Modbus server: {_client.IsConnected}");
                     return _client.IsConnected;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is SocketException || ex is FormatException)
                 {
                     _logger.LogError(ex, "Failed to connect to Modbus server");
                     return false;
@@ -96,24 +106,14 @@ namespace ModbusForge.Services
 
         public Task DisconnectAsync()
         {
-            try
+            return Task.Run(() =>
             {
-                if (_client.IsConnected)
-                {
-                    _logger.LogInformation("Disconnecting from Modbus server");
-                    _client.Disconnect();
-                    _logger.LogInformation("Successfully disconnected from Modbus server");
-                }
-                return Task.CompletedTask;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error disconnecting from Modbus server");
-                throw;
-            }
+                _logger.LogInformation("Disconnecting from Modbus server");
+                _client.Disconnect();
+            });
         }
 
-        public async Task<ushort[]> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count)
+        public Task<ushort[]> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count)
         {
             if (!_client.IsConnected)
                 throw new InvalidOperationException("Not connected to Modbus server");
@@ -122,10 +122,11 @@ namespace ModbusForge.Services
             {
                 _logger.LogDebug($"Reading {count} holding registers starting at {startAddress} (Unit ID: {unitId})");
                 
-                return await Task.Run(() => 
+                return Task.Run(() =>
                 {
-                    var registers = _client.ReadHoldingRegisters<ushort>(unitId, (ushort)startAddress, (ushort)count);
-                    return registers.ToArray();
+                    var span = _client.ReadHoldingRegisters<ushort>(unitId, (ushort)startAddress, (ushort)count);
+                    _logger.LogDebug($"Successfully read {span.Length} registers");
+                    return span.ToArray();
                 });
             }
             catch (Exception ex)
@@ -135,20 +136,29 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
+        public Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
         {
             if (!_client.IsConnected)
                 throw new InvalidOperationException("Not connected to Modbus server");
 
-            await Task.Run(() =>
+            return Task.Run(() =>
             {
-                // Convert ushort to short for FluentModbus
-                short signedValue = (short)value;
-                _client.WriteSingleRegister(unitId, (ushort)registerAddress, signedValue);
+                try
+                {
+                    _logger.LogDebug($"Writing value {value} to register {registerAddress} (Unit ID: {unitId})");
+                    short signed = unchecked((short)value);
+                    _client.WriteSingleRegister(unitId, (ushort)registerAddress, signed);
+                    _logger.LogDebug("Successfully wrote to register");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error writing to register");
+                    throw;
+                }
             });
         }
 
-        public async Task<bool[]> ReadCoilsAsync(byte unitId, int startAddress, int count)
+        public Task<bool[]> ReadCoilsAsync(byte unitId, int startAddress, int count)
         {
             if (!_client.IsConnected)
                 throw new InvalidOperationException("Not connected to Modbus server");
@@ -157,9 +167,8 @@ namespace ModbusForge.Services
             {
                 _logger.LogDebug($"Reading {count} coils starting at {startAddress} (Unit ID: {unitId})");
 
-                return await Task.Run(() =>
+                return Task.Run(() =>
                 {
-                    // Read packed bytes where LSB of first byte is first coil
                     var bytes = _client.ReadCoils(unitId, startAddress, count);
                     var result = new bool[count];
 
@@ -183,24 +192,25 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)
+        public Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)
         {
             if (!_client.IsConnected)
                 throw new InvalidOperationException("Not connected to Modbus server");
 
-            try
+            return Task.Run(() =>
             {
-                _logger.LogDebug($"Writing coil at {coilAddress} = {value} (Unit ID: {unitId})");
-                await Task.Run(() =>
+                try
                 {
+                    _logger.LogDebug($"Writing coil at {coilAddress} = {value} (Unit ID: {unitId})");
                     _client.WriteSingleCoil(unitId, coilAddress, value);
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error writing single coil");
-                throw;
-            }
+                    _logger.LogDebug("Successfully wrote coil");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error writing single coil");
+                    throw;
+                }
+            });
         }
 
         public void Dispose()
@@ -215,15 +225,11 @@ namespace ModbusForge.Services
             {
                 if (disposing)
                 {
+                    _logger.LogInformation("Disposing Modbus client");
                     _client?.Dispose();
                 }
                 _disposed = true;
             }
-        }
-
-        ~ModbusTcpService()
-        {
-            Dispose(false);
         }
     }
 }

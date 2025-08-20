@@ -1,10 +1,15 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using ModbusForge.Services;
 using ModbusForge.ViewModels;
 using System;
 using System.IO;
+using System.Globalization;
 using System.Windows;
+using System.Windows.Data;
+using Microsoft.Extensions.Options;
+using ModbusForge.Configuration;
 
 namespace ModbusForge
 {
@@ -18,17 +23,19 @@ namespace ModbusForge
 
         public App()
         {
+            InitializeComponent();
             // Configure services
             var services = new ServiceCollection();
             ConfigureServices(services);
             ServiceProvider = services.BuildServiceProvider();
         }
-        +        private void Application_Startup(object sender, StartupEventArgs e)
-+        {
-+            // Create main window with MainViewModel from DI container
-+            var mainWindow = new MainWindow(ServiceProvider.GetRequiredService<MainViewModel>());
-+            mainWindow.Show();
-+        }
+
+        private void Application_Startup(object sender, StartupEventArgs e)
+        {
+            // Create and show the main window
+            var mainWindow = new MainWindow(ServiceProvider.GetRequiredService<MainViewModel>());
+            mainWindow.Show();
+        }
 
         private void ConfigureServices(IServiceCollection services)
         {
@@ -40,10 +47,35 @@ namespace ModbusForge
             Configuration = builder.Build();
             services.AddSingleton(Configuration);
 
-            // Services
-            services.AddSingleton<IModbusService, ModbusTcpService>();
+            // Options
+            services.AddOptions();
+            services.Configure<ServerSettings>(Configuration.GetSection("ServerSettings"));
 
-            // ViewModels
+            // Configure logging
+            services.AddLogging(configure => 
+            {
+                configure.AddConsole();
+                configure.AddDebug();
+                configure.SetMinimumLevel(LogLevel.Debug);
+            });
+
+            // Register services
+            services.AddSingleton<IModbusService>(sp =>
+            {
+                var settings = sp.GetRequiredService<IOptions<ServerSettings>>().Value;
+                if (string.Equals(settings.Mode, "Server", StringComparison.OrdinalIgnoreCase))
+                {
+                    var logger = sp.GetRequiredService<ILogger<ModbusServerService>>();
+                    return new ModbusServerService(logger);
+                }
+                else
+                {
+                    var logger = sp.GetRequiredService<ILogger<ModbusTcpService>>();
+                    return new ModbusTcpService(logger);
+                }
+            });
+            
+            // Register ViewModels
             services.AddTransient<MainViewModel>();
         }
 
