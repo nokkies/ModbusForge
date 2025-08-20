@@ -1,0 +1,39 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ModbusForge.Avalonia.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="ModbusForge.Avalonia.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="ModbusForge.Avalonia">
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <TabControl>
+        <TabItem Header="Client">
+            <TextBlock Text="Modbus Client Controls" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </TabItem>
+        <TabItem Header="Server">
+            <TextBlock Text="Modbus Server Controls" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </TabItem>
+        <TabItem Header="Custom">
+            <TextBlock Text="Custom Register/Coil Configuration" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </TabItem>
+        <TabItem Header="Debug">
+            <TextBlock Text="Debug View" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </TabItem>
+        <TabItem Header="Simulation">
+            <TextBlock Text="Simulation View" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </TabItem>
+        <TabItem Header="About">
+            <TextBlock Text="About Information" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </TabItem>
+    </TabControl>
+
+</Window>
