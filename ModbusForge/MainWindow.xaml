@@ -210,8 +210,8 @@
                     <DataGrid x:Name="CustomGrid" Grid.Row="1" ItemsSource="{Binding CustomEntries}" AutoGenerateColumns="False" IsReadOnly="False" CanUserAddRows="False" CellEditEnding="CustomGrid_CellEditEnding" CurrentCellChanged="CustomGrid_CurrentCellChanged">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
-                            <DataGridComboBoxColumn Header="Area" SelectedItemBinding="{Binding Area}" ItemsSource="{x:Static viewmodels:AreaOptions.All}" Width="*"/>
-                            <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{x:Static viewmodels:TypeOptions.All}" Width="*"/>
+                            <DataGridComboBoxColumn Header="Area" SelectedItemBinding="{Binding Area}" ItemsSource="{x:static viewmodels:AreaOptions.All}" Width="*"/>
+                            <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{x:static viewmodels:TypeOptions.All}" Width="*"/>
                             <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="2*"/>
                             <DataGridCheckBoxColumn Header="Cont." Binding="{Binding Continuous}" Width="Auto"/>
                             <DataGridTextColumn Header="Period (ms)" Binding="{Binding PeriodMs}" Width="*"/>
@@ -230,6 +230,22 @@
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
+            </TabItem>
+            <TabItem Header="Server">
+                <Grid Margin="5">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Port:" VerticalAlignment="Center" Margin="5,0"/>
+                            <TextBox Grid.Column="1" Text="{Binding ServerPort}" IsEnabled="{Binding IsServerRunning, Converter={StaticResource InverseBooleanConverter}}" Width="60" Margin="0,0,5,0"/>
+                            <Button Grid.Column="2" Content="Start Server" Command="{Binding StartServerCommand}" IsEnabled="{Binding IsServerRunning, Converter={StaticResource InverseBooleanConverter}}" Width="80" Margin="5,0"/>
+                            <Button Grid.Column="3" Content="Stop Server" Command="{Binding StopServerCommand}" IsEnabled="{Binding IsServerRunning}" Width="80" Margin="5,0"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding ServerStatusMessage}" VerticalAlignment="Center" Margin="5,10,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Server Log">
+                <TextBox Text="{Binding ServerLog}" IsReadOnly="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas"/>
             </TabItem>
         </TabControl>
 

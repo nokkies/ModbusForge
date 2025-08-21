@@ -9,7 +9,7 @@ using System.IO;
 
 namespace ModbusForge.Services
 {
-    public class ModbusTcpService : IModbusService, IDisposable
+    public class ModbusTcpService : IModbusClient, IDisposable
     {
         private readonly ModbusTcpClient _client;
         private bool _disposed = false;

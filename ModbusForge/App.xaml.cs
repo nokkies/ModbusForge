@@ -60,20 +60,8 @@ namespace ModbusForge
             });
 
             // Register services
-            services.AddSingleton<IModbusService>(sp =>
-            {
-                var settings = sp.GetRequiredService<IOptions<ServerSettings>>().Value;
-                if (string.Equals(settings.Mode, "Server", StringComparison.OrdinalIgnoreCase))
-                {
-                    var logger = sp.GetRequiredService<ILogger<ModbusServerService>>();
-                    return new ModbusServerService(logger);
-                }
-                else
-                {
-                    var logger = sp.GetRequiredService<ILogger<ModbusTcpService>>();
-                    return new ModbusTcpService(logger);
-                }
-            });
+            services.AddSingleton<IModbusClient, ModbusTcpService>();
+            services.AddSingleton<IModbusServer, ModbusServerService>();
             
             // Register ViewModels
             services.AddTransient<MainViewModel>();

@@ -98,6 +98,10 @@ If you encounter build issues:
 4. Add comprehensive error handling and user feedback
 5. Add unit and integration tests
 
+## Libraries Used
+
+*   [FluentModbus](https://github.com/Apollo3zehn/FluentModbus) - A modern, easy-to-use, and efficient Modbus library for .NET.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

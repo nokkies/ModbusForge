@@ -20,16 +20,19 @@ using System.Linq;
 using System.Text.Json;
 using Microsoft.Win32;
 using System.IO;
+using System.Reflection;
 
 namespace ModbusForge.ViewModels
 {
     public partial class MainViewModel : ViewModelBase, IDisposable
     {
-        private readonly IModbusService _modbusService;
+        private readonly IModbusClient _modbusClient;
+        private readonly IModbusServer _modbusServer;
         private bool _disposed = false;
 
         public MainViewModel() : this(
-            App.ServiceProvider.GetRequiredService<IModbusService>(),
+            App.ServiceProvider.GetRequiredService<IModbusClient>(),
+            App.ServiceProvider.GetRequiredService<IModbusServer>(),
             App.ServiceProvider.GetRequiredService<ILogger<MainViewModel>>(),
             App.ServiceProvider.GetRequiredService<IOptions<ServerSettings>>())
         {
@@ -63,11 +66,15 @@ namespace ModbusForge.ViewModels
         protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-        public MainViewModel(IModbusService modbusService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options)
+        public MainViewModel(IModbusClient modbusClient, IModbusServer modbusServer, ILogger<MainViewModel> logger, IOptions<ServerSettings> options)
         {
-            _modbusService = modbusService ?? throw new ArgumentNullException(nameof(modbusService));
+            _modbusClient = modbusClient ?? throw new ArgumentNullException(nameof(modbusClient));
+            _modbusServer = modbusServer ?? throw new ArgumentNullException(nameof(modbusServer));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             var settings = options?.Value ?? new ServerSettings();
+
+            var version = Assembly.GetExecutingAssembly().GetName().Version;
+            Title = $"ModbusForge v{version?.Major}.{version?.Minor}.{version?.Build}";
             
             // Initialize commands
             ConnectCommand = new RelayCommand(async () => await ConnectAsync(), CanConnect);
@@ -78,12 +85,15 @@ namespace ModbusForge.ViewModels
             WriteCoilCommand = new RelayCommand(async () => await WriteCoilAsync(), () => IsConnected);
             ReadInputRegistersCommand = new RelayCommand(async () => await ReadInputRegistersAsync(), () => IsConnected);
             ReadDiscreteInputsCommand = new RelayCommand(async () => await ReadDiscreteInputsAsync(), () => IsConnected);
+
+            StartServerCommand = new RelayCommand(async () => await StartServerAsync(), () => !IsServerRunning);
+            StopServerCommand = new RelayCommand(async () => await StopServerAsync(), () => IsServerRunning);
             
             // Initialize DisconnectCommand property
             DisconnectCommand = _disconnectCommand;
             
             // Set initial state
-            IsConnected = _modbusService.IsConnected;
+            IsConnected = _modbusClient.IsConnected;
             StatusMessage = IsConnected ? "Connected" : "Disconnected";
 
             // Load defaults from configuration
@@ -108,6 +118,8 @@ namespace ModbusForge.ViewModels
             _monitorTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             _monitorTimer.Tick += MonitorTimer_Tick;
             _monitorTimer.Start();
+
+            ServerLog += $"[{DateTime.Now:HH:mm:ss}] Welcome to ModbusForge! Server is ready to start.\n";
         }
 
         [ObservableProperty]
@@ -210,6 +222,10 @@ namespace ModbusForge.ViewModels
         public IRelayCommand ReadInputRegistersCommand { get; }
         public IRelayCommand ReadDiscreteInputsCommand { get; }
 
+        // Server commands
+        public ICommand StartServerCommand { get; }
+        public ICommand StopServerCommand { get; }
+
         // Custom tab
         public ObservableCollection<CustomEntry> CustomEntries { get; } = new();
         public ICommand AddCustomEntryCommand { get; }
@@ -224,6 +240,21 @@ namespace ModbusForge.ViewModels
 
         [ObservableProperty]
         private bool _customReadMonitorEnabled = false;
+
+        // Server properties
+        [ObservableProperty]
+        private int _serverPort = 502;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(StartServerCommand))]
+        [NotifyCanExecuteChangedFor(nameof(StopServerCommand))]
+        private bool _isServerRunning = false;
+
+        [ObservableProperty]
+        private string _serverStatusMessage = "Server stopped";
+
+        [ObservableProperty]
+        private string _serverLog = "";
 
         // Monitoring toggles and periods
         [ObservableProperty]
@@ -257,7 +288,7 @@ namespace ModbusForge.ViewModels
             try
             {
                 StatusMessage = "Connecting...";
-                var success = await _modbusService.ConnectAsync(ServerAddress, Port);
+                var success = await _modbusClient.ConnectAsync(ServerAddress, Port);
                 
                 if (success)
                 {
@@ -269,7 +300,7 @@ namespace ModbusForge.ViewModels
                     try
                     {
                         // minimal read to test unit id presence
-                        await _modbusService.ReadHoldingRegistersAsync(UnitId, 0, 1);
+                        await _modbusClient.ReadHoldingRegistersAsync(UnitId, 0, 1);
                     }
                     catch (Exception ex)
                     {
@@ -301,7 +332,7 @@ namespace ModbusForge.ViewModels
             try
             {
                 _logger.LogInformation("Disconnecting from Modbus server");
-                await _modbusService.DisconnectAsync();
+                await _modbusClient.DisconnectAsync();
                 IsConnected = false;
                 StatusMessage = "Disconnected";
                 _logger.LogInformation("Successfully disconnected from Modbus server");
@@ -320,7 +351,7 @@ namespace ModbusForge.ViewModels
             try
             {
                 StatusMessage = "Reading registers...";
-                var values = await _modbusService.ReadHoldingRegistersAsync(UnitId, RegisterStart, RegisterCount);
+                var values = await _modbusClient.ReadHoldingRegistersAsync(UnitId, RegisterStart, RegisterCount);
                 // Preserve per-address Type if rows already exist
                 var typeByAddress = HoldingRegisters.ToDictionary(r => r.Address, r => r.Type);
 
@@ -403,7 +434,7 @@ namespace ModbusForge.ViewModels
             try
             {
                 StatusMessage = "Reading input registers...";
-                var values = await _modbusService.ReadInputRegistersAsync(UnitId, InputRegisterStart, InputRegisterCount);
+                var values = await _modbusClient.ReadInputRegistersAsync(UnitId, InputRegisterStart, InputRegisterCount);
                 InputRegisters.Clear();
                 for (int i = 0; i < values.Length; i++)
                 {
@@ -430,7 +461,7 @@ namespace ModbusForge.ViewModels
             try
             {
                 StatusMessage = "Writing register...";
-                await _modbusService.WriteSingleRegisterAsync(UnitId, WriteRegisterAddress, WriteRegisterValue);
+                await _modbusClient.WriteSingleRegisterAsync(UnitId, WriteRegisterAddress, WriteRegisterValue);
                 StatusMessage = "Register written";
                 // Optionally refresh
                 await ReadRegistersAsync();
@@ -449,7 +480,7 @@ namespace ModbusForge.ViewModels
             try
             {
                 StatusMessage = "Reading coils...";
-                var states = await _modbusService.ReadCoilsAsync(UnitId, CoilStart, CoilCount);
+                var states = await _modbusClient.ReadCoilsAsync(UnitId, CoilStart, CoilCount);
                 Coils.Clear();
                 for (int i = 0; i < states.Length; i++)
                 {
@@ -475,7 +506,7 @@ namespace ModbusForge.ViewModels
             try
             {
                 StatusMessage = "Reading discrete inputs...";
-                var states = await _modbusService.ReadDiscreteInputsAsync(UnitId, DiscreteInputStart, DiscreteInputCount);
+                var states = await _modbusClient.ReadDiscreteInputsAsync(UnitId, DiscreteInputStart, DiscreteInputCount);
                 DiscreteInputs.Clear();
                 for (int i = 0; i < states.Length; i++)
                 {
@@ -501,7 +532,7 @@ namespace ModbusForge.ViewModels
             try
             {
                 StatusMessage = "Writing coil...";
-                await _modbusService.WriteSingleCoilAsync(UnitId, WriteCoilAddress, WriteCoilState);
+                await _modbusClient.WriteSingleCoilAsync(UnitId, WriteCoilAddress, WriteCoilState);
                 StatusMessage = "Coil written";
                 // Optionally refresh
                 await ReadCoilsAsync();
@@ -524,7 +555,7 @@ namespace ModbusForge.ViewModels
         // Helper methods for inline editing from the view
         public async Task WriteRegisterAtAsync(int address, ushort value)
         {
-            await _modbusService.WriteSingleRegisterAsync(UnitId, address, value);
+            await _modbusClient.WriteSingleRegisterAsync(UnitId, address, value);
         }
 
         // Write a 32-bit float (IEEE754) across two consecutive 16-bit registers at the given address using Big-Endian word/byte order.
@@ -538,8 +569,8 @@ namespace ModbusForge.ViewModels
             ushort high = (ushort)((bytes[0] << 8) | bytes[1]);
             ushort low  = (ushort)((bytes[2] << 8) | bytes[3]);
 
-            await _modbusService.WriteSingleRegisterAsync(UnitId, address, high);
-            await _modbusService.WriteSingleRegisterAsync(UnitId, address + 1, low);
+            await _modbusClient.WriteSingleRegisterAsync(UnitId, address, high);
+            await _modbusClient.WriteSingleRegisterAsync(UnitId, address + 1, low);
         }
 
         // Write an ASCII string across consecutive 16-bit registers.
@@ -558,13 +589,13 @@ namespace ModbusForge.ViewModels
             for (int i = 0; i < bytes.Length; i += 2)
             {
                 ushort reg = (ushort)((bytes[i] << 8) | bytes[i + 1]);
-                await _modbusService.WriteSingleRegisterAsync(UnitId, address + (i / 2), reg);
+                await _modbusClient.WriteSingleRegisterAsync(UnitId, address + (i / 2), reg);
             }
         }
 
         public async Task WriteCoilAtAsync(int address, bool state)
         {
-            await _modbusService.WriteSingleCoilAsync(UnitId, address, state);
+            await _modbusClient.WriteSingleCoilAsync(UnitId, address, state);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -584,11 +615,12 @@ namespace ModbusForge.ViewModels
                     try
                     {
                         // Attempt a graceful disconnect to avoid in-flight I/O errors
-                        _modbusService?.DisconnectAsync().GetAwaiter().GetResult();
+                        _modbusClient?.DisconnectAsync().GetAwaiter().GetResult();
                         IsConnected = false;
                     }
                     catch { }
-                    _modbusService?.Dispose();
+                    _modbusClient?.Dispose();
+                    _modbusServer?.Dispose();
                 }
                 _disposed = true;
             }
@@ -628,6 +660,68 @@ namespace ModbusForge.ViewModels
                 _logger.LogWarning("UnitId {Original} is out of range. Clamping to {Clamped}.", value, clamped);
                 // Reassign to trigger update only when necessary
                 UnitId = clamped;
+            }
+        }
+
+        private async Task StartServerAsync()
+        {
+            try
+            {
+                ServerStatusMessage = "Starting server...";
+                ServerLog += $"[{DateTime.Now:HH:mm:ss}] Starting server on port {ServerPort}...\n";
+                await _modbusServer.StartAsync(ServerPort);
+                IsServerRunning = _modbusServer.IsRunning;
+                if (IsServerRunning)
+                {
+                    ServerStatusMessage = $"Server running on port {ServerPort}";
+                    ServerLog += $"[{DateTime.Now:HH:mm:ss}] {ServerStatusMessage}\n";
+                    _logger.LogInformation(ServerStatusMessage);
+                }
+                else
+                {
+                    ServerStatusMessage = "Failed to start server";
+                    ServerLog += $"[{DateTime.Now:HH:mm:ss}] {ServerStatusMessage}\n";
+                    _logger.LogWarning(ServerStatusMessage);
+                }
+            }
+            catch (Exception ex)
+            {
+                ServerStatusMessage = $"Error: {ex.Message}";
+                ServerLog += $"[{DateTime.Now:HH:mm:ss}] Error starting server: {ex.Message}\n";
+                _logger.LogError(ex, "Error starting Modbus server");
+                MessageBox.Show($"Failed to start server: {ex.Message}", "Server Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task StopServerAsync()
+        {
+            try
+            {
+                ServerStatusMessage = "Stopping server...";
+                ServerLog += $"[{DateTime.Now:HH:mm:ss}] Stopping server...\n";
+                await _modbusServer.StopAsync();
+                IsServerRunning = _modbusServer.IsRunning;
+                if (!IsServerRunning)
+                {
+                    ServerStatusMessage = "Server stopped";
+                    ServerLog += $"[{DateTime.Now:HH:mm:ss}] {ServerStatusMessage}\n";
+                    _logger.LogInformation(ServerStatusMessage);
+                }
+                else
+                {
+                    ServerStatusMessage = "Failed to stop server";
+                    ServerLog += $"[{DateTime.Now:HH:mm:ss}] {ServerStatusMessage}\n";
+                    _logger.LogWarning(ServerStatusMessage);
+                }
+            }
+            catch (Exception ex)
+            {
+                ServerStatusMessage = $"Error: {ex.Message}";
+                ServerLog += $"[{DateTime.Now:HH:mm:ss}] Error stopping server: {ex.Message}\n";
+                _logger.LogError(ex, "Error stopping Modbus server");
+                MessageBox.Show($"Failed to stop server: {ex.Message}", "Server Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }
@@ -826,7 +920,7 @@ namespace ModbusForge.ViewModels
                         var t = (entry.Type ?? "uint").ToLowerInvariant();
                         if (t == "real")
                         {
-                            var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 2);
+                            var regs = await _modbusClient.ReadHoldingRegistersAsync(UnitId, entry.Address, 2);
                             ushort high = regs[0];
                             ushort low = regs[1];
                             byte[] b = new byte[4]
@@ -842,14 +936,14 @@ namespace ModbusForge.ViewModels
                         }
                         else if (t == "int")
                         {
-                            var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
+                            var regs = await _modbusClient.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
                             short sv = unchecked((short)regs[0]);
                             entry.Value = sv.ToString(CultureInfo.InvariantCulture);
                             StatusMessage = $"Read INT {entry.Value} from HR {entry.Address}";
                         }
                         else if (t == "string")
                         {
-                            var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
+                            var regs = await _modbusClient.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
                             char c1 = (char)(regs[0] >> 8);
                             char c2 = (char)(regs[0] & 0xFF);
                             var s = new string(new[] { c1, c2 }).TrimEnd('\0');
@@ -858,7 +952,7 @@ namespace ModbusForge.ViewModels
                         }
                         else // uint
                         {
-                            var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
+                            var regs = await _modbusClient.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
                             entry.Value = regs[0].ToString(CultureInfo.InvariantCulture);
                             StatusMessage = $"Read UINT {entry.Value} from HR {entry.Address}";
                         }
@@ -869,7 +963,7 @@ namespace ModbusForge.ViewModels
                         var t = (entry.Type ?? "uint").ToLowerInvariant();
                         if (t == "real")
                         {
-                            var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 2);
+                            var regs = await _modbusClient.ReadInputRegistersAsync(UnitId, entry.Address, 2);
                             ushort high = regs[0];
                             ushort low = regs[1];
                             byte[] b = new byte[4]
@@ -885,14 +979,14 @@ namespace ModbusForge.ViewModels
                         }
                         else if (t == "int")
                         {
-                            var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
+                            var regs = await _modbusClient.ReadInputRegistersAsync(UnitId, entry.Address, 1);
                             short sv = unchecked((short)regs[0]);
                             entry.Value = sv.ToString(CultureInfo.InvariantCulture);
                             StatusMessage = $"Read INT {entry.Value} from IR {entry.Address}";
                         }
                         else if (t == "string")
                         {
-                            var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
+                            var regs = await _modbusClient.ReadInputRegistersAsync(UnitId, entry.Address, 1);
                             char c1 = (char)(regs[0] >> 8);
                             char c2 = (char)(regs[0] & 0xFF);
                             var s = new string(new[] { c1, c2 }).TrimEnd('\0');
@@ -901,7 +995,7 @@ namespace ModbusForge.ViewModels
                         }
                         else // uint
                         {
-                            var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
+                            var regs = await _modbusClient.ReadInputRegistersAsync(UnitId, entry.Address, 1);
                             entry.Value = regs[0].ToString(CultureInfo.InvariantCulture);
                             StatusMessage = $"Read UINT {entry.Value} from IR {entry.Address}";
                         }
@@ -909,14 +1003,14 @@ namespace ModbusForge.ViewModels
                     }
                     case "coil":
                     {
-                        var states = await _modbusService.ReadCoilsAsync(UnitId, entry.Address, 1);
+                        var states = await _modbusClient.ReadCoilsAsync(UnitId, entry.Address, 1);
                         entry.Value = states[0] ? "1" : "0";
                         StatusMessage = $"Read COIL {entry.Value} from {entry.Address}";
                         break;
                     }
                     case "discreteinput":
                     {
-                        var states = await _modbusService.ReadDiscreteInputsAsync(UnitId, entry.Address, 1);
+                        var states = await _modbusClient.ReadDiscreteInputsAsync(UnitId, entry.Address, 1);
                         entry.Value = states[0] ? "1" : "0";
                         StatusMessage = $"Read DI {entry.Value} from {entry.Address}";
                         break;
