@@ -15,44 +15,29 @@ using Microsoft.Extensions.Options;
 using ModbusForge.Configuration;
 using System.Collections.ObjectModel;
 using System.Windows.Threading;
+using ModbusForge.Models;
 
 namespace ModbusForge.ViewModels
 {
     public partial class MainViewModel : ViewModelBase, IDisposable
     {
         private readonly IModbusService _modbusService;
+        private readonly IDialogService _dialogService;
         private bool _disposed = false;
 
         public MainViewModel() : this(
             App.ServiceProvider.GetRequiredService<IModbusService>(),
             App.ServiceProvider.GetRequiredService<ILogger<MainViewModel>>(),
-            App.ServiceProvider.GetRequiredService<IOptions<ServerSettings>>())
+            App.ServiceProvider.GetRequiredService<IOptions<ServerSettings>>(),
+            App.ServiceProvider.GetRequiredService<IDialogService>())
         {
         }
 
-    public class CustomEntry : INotifyPropertyChanged
-    {
-        private int _address;
-        private string _type = "uint"; // uint,int,real
-        private string _value = "0";
-        private bool _continuous = false;
-        private int _periodMs = 1000;
-        internal DateTime _lastWriteUtc = DateTime.MinValue;
-
-        public int Address { get => _address; set { if (_address != value) { _address = value; OnPropertyChanged(nameof(Address)); } } }
-        public string Type { get => _type; set { if (_type != value) { _type = value; OnPropertyChanged(nameof(Type)); } } }
-        public string Value { get => _value; set { if (_value != value) { _value = value; OnPropertyChanged(nameof(Value)); } } }
-        public bool Continuous { get => _continuous; set { if (_continuous != value) { _continuous = value; OnPropertyChanged(nameof(Continuous)); } } }
-        public int PeriodMs { get => _periodMs; set { if (_periodMs != value) { _periodMs = value; OnPropertyChanged(nameof(PeriodMs)); } } }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-        public MainViewModel(IModbusService modbusService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options)
+        public MainViewModel(IModbusService modbusService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, IDialogService dialogService)
         {
             _modbusService = modbusService ?? throw new ArgumentNullException(nameof(modbusService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
             var settings = options?.Value ?? new ServerSettings();
             
             // Initialize commands
@@ -213,7 +198,7 @@ namespace ModbusForge.ViewModels
                         var msg = $"Connected, but Unit ID {UnitId} did not respond to a test read. Please check the Unit ID.";
                         StatusMessage = msg;
                         _logger.LogWarning(ex, msg);
-                        MessageBox.Show(msg + "\n" + ex.Message, "Unit ID Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        _dialogService.ShowMessageBox(msg + "\n" + ex.Message, "Unit ID Warning", DialogButton.OK, DialogImage.Warning);
                     }
                 }
                 else
@@ -226,8 +211,30 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = $"Error: {ex.Message}";
                 _logger.LogError(ex, "Error connecting to Modbus server");
-                MessageBox.Show($"Failed to connect: {ex.Message}", "Connection Error", 
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.ShowMessageBox($"Failed to connect: {ex.Message}", "Connection Error",
+                    DialogButton.OK, DialogImage.Error);
+            }
+        }
+
+        private async Task ReadDataAsync<TEntry>(Func<Task<TEntry[]>> fetch, ObservableCollection<TEntry> collection, string successMessage)
+        {
+            try
+            {
+                StatusMessage = $"Reading {typeof(TEntry).Name}...";
+                var items = await fetch();
+                collection.Clear();
+                foreach (var item in items)
+                {
+                    collection.Add(item);
+                }
+                StatusMessage = $"{successMessage} {items.Length}";
+            }
+            catch (Exception ex)
+            {
+                var typeName = typeof(TEntry).Name.Replace("Entry", "");
+                StatusMessage = $"Error reading {typeName}s: {ex.Message}";
+                _logger.LogError(ex, $"Error reading {typeName}s");
+                _dialogService.ShowMessageBox($"Failed to read {typeName}s: {ex.Message}", "Read Error", DialogButton.OK, DialogImage.Error);
             }
         }
 
@@ -247,63 +254,55 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = $"Error disconnecting: {ex.Message}";
                 _logger.LogError(ex, "Error disconnecting from Modbus server");
-                MessageBox.Show($"Failed to disconnect: {ex.Message}", "Disconnection Error", 
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.ShowMessageBox($"Failed to disconnect: {ex.Message}", "Disconnection Error",
+                    DialogButton.OK, DialogImage.Error);
             }
         }
 
         private async Task ReadRegistersAsync()
         {
-            try
-            {
-                StatusMessage = "Reading registers...";
-                var values = await _modbusService.ReadHoldingRegistersAsync(UnitId, RegisterStart, RegisterCount);
-                HoldingRegisters.Clear();
-                for (int i = 0; i < values.Length; i++)
+            await ReadDataAsync(
+                async () =>
                 {
-                    HoldingRegisters.Add(new RegisterEntry
+                    var values = await _modbusService.ReadHoldingRegistersAsync(UnitId, RegisterStart, RegisterCount);
+                    var entries = new RegisterEntry[values.Length];
+                    for (int i = 0; i < values.Length; i++)
                     {
-                        Address = RegisterStart + i,
-                        Value = values[i],
-                        Type = RegistersGlobalType
-                    });
-                }
-                StatusMessage = $"Read {values.Length} registers";
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Error reading registers: {ex.Message}";
-                _logger.LogError(ex, "Error reading registers");
-                MessageBox.Show($"Failed to read registers: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+                        entries[i] = new RegisterEntry
+                        {
+                            Address = RegisterStart + i,
+                            Value = values[i],
+                            Type = RegistersGlobalType
+                        };
+                    }
+                    return entries;
+                },
+                HoldingRegisters,
+                "Read registers"
+            );
         }
 
         private async Task ReadInputRegistersAsync()
         {
-            try
-            {
-                StatusMessage = "Reading input registers...";
-                var values = await _modbusService.ReadInputRegistersAsync(UnitId, InputRegisterStart, InputRegisterCount);
-                InputRegisters.Clear();
-                for (int i = 0; i < values.Length; i++)
+            await ReadDataAsync(
+                async () =>
                 {
-                    InputRegisters.Add(new RegisterEntry
+                    var values = await _modbusService.ReadInputRegistersAsync(UnitId, InputRegisterStart, InputRegisterCount);
+                    var entries = new RegisterEntry[values.Length];
+                    for (int i = 0; i < values.Length; i++)
                     {
-                        Address = InputRegisterStart + i,
-                        Value = values[i],
-                        Type = InputRegistersGlobalType
-                    });
-                }
-                StatusMessage = $"Read {values.Length} input registers";
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Error reading input registers: {ex.Message}";
-                _logger.LogError(ex, "Error reading input registers");
-                MessageBox.Show($"Failed to read input registers: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+                        entries[i] = new RegisterEntry
+                        {
+                            Address = InputRegisterStart + i,
+                            Value = values[i],
+                            Type = InputRegistersGlobalType
+                        };
+                    }
+                    return entries;
+                },
+                InputRegisters,
+                "Read input registers"
+            );
         }
 
         private async Task WriteRegisterAsync()
@@ -320,61 +319,53 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = $"Error writing register: {ex.Message}";
                 _logger.LogError(ex, "Error writing register");
-                MessageBox.Show($"Failed to write register: {ex.Message}", "Write Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.ShowMessageBox($"Failed to write register: {ex.Message}", "Write Error",
+                    DialogButton.OK, DialogImage.Error);
             }
         }
 
         private async Task ReadCoilsAsync()
         {
-            try
-            {
-                StatusMessage = "Reading coils...";
-                var states = await _modbusService.ReadCoilsAsync(UnitId, CoilStart, CoilCount);
-                Coils.Clear();
-                for (int i = 0; i < states.Length; i++)
+            await ReadDataAsync(
+                async () =>
                 {
-                    Coils.Add(new CoilEntry
+                    var values = await _modbusService.ReadCoilsAsync(UnitId, CoilStart, CoilCount);
+                    var entries = new CoilEntry[values.Length];
+                    for (int i = 0; i < values.Length; i++)
                     {
-                        Address = CoilStart + i,
-                        State = states[i]
-                    });
-                }
-                StatusMessage = $"Read {states.Length} coils";
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Error reading coils: {ex.Message}";
-                _logger.LogError(ex, "Error reading coils");
-                MessageBox.Show($"Failed to read coils: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+                        entries[i] = new CoilEntry
+                        {
+                            Address = CoilStart + i,
+                            State = values[i]
+                        };
+                    }
+                    return entries;
+                },
+                Coils,
+                "Read coils"
+            );
         }
 
         private async Task ReadDiscreteInputsAsync()
         {
-            try
-            {
-                StatusMessage = "Reading discrete inputs...";
-                var states = await _modbusService.ReadDiscreteInputsAsync(UnitId, DiscreteInputStart, DiscreteInputCount);
-                DiscreteInputs.Clear();
-                for (int i = 0; i < states.Length; i++)
+            await ReadDataAsync(
+                async () =>
                 {
-                    DiscreteInputs.Add(new CoilEntry
+                    var values = await _modbusService.ReadDiscreteInputsAsync(UnitId, DiscreteInputStart, DiscreteInputCount);
+                    var entries = new CoilEntry[values.Length];
+                    for (int i = 0; i < values.Length; i++)
                     {
-                        Address = DiscreteInputStart + i,
-                        State = states[i]
-                    });
-                }
-                StatusMessage = $"Read {states.Length} discrete inputs";
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Error reading discrete inputs: {ex.Message}";
-                _logger.LogError(ex, "Error reading discrete inputs");
-                MessageBox.Show($"Failed to read discrete inputs: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+                        entries[i] = new CoilEntry
+                        {
+                            Address = DiscreteInputStart + i,
+                            State = values[i]
+                        };
+                    }
+                    return entries;
+                },
+                DiscreteInputs,
+                "Read discrete inputs"
+            );
         }
 
         private async Task WriteCoilAsync()
@@ -391,8 +382,8 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = $"Error writing coil: {ex.Message}";
                 _logger.LogError(ex, "Error writing coil");
-                MessageBox.Show($"Failed to write coil: {ex.Message}", "Write Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.ShowMessageBox($"Failed to write coil: {ex.Message}", "Write Error",
+                    DialogButton.OK, DialogImage.Error);
             }
         }
 
@@ -482,60 +473,6 @@ namespace ModbusForge.ViewModels
                 UnitId = clamped;
             }
         }
-    }
-
-    public class RegisterEntry : INotifyPropertyChanged
-    {
-        private int _address;
-        private ushort _value;
-        private string _type = "uint";
-
-        public int Address
-        {
-            get => _address;
-            set { if (_address != value) { _address = value; OnPropertyChanged(nameof(Address)); } }
-        }
-
-        public ushort Value
-        {
-            get => _value;
-            set { if (_value != value) { _value = value; OnPropertyChanged(nameof(Value)); } }
-        }
-
-        public string Type
-        {
-            get => _type;
-            set { if (_type != value) { _type = value; OnPropertyChanged(nameof(Type)); } }
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-    public class CoilEntry : INotifyPropertyChanged
-    {
-        private int _address;
-        private bool _state;
-
-        public int Address
-        {
-            get => _address;
-            set { if (_address != value) { _address = value; OnPropertyChanged(nameof(Address)); } }
-        }
-
-        public bool State
-        {
-            get => _state;
-            set { if (_state != value) { _state = value; OnPropertyChanged(nameof(State)); } }
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-    public static class TypeOptions
-    {
-        public static readonly string[] All = new[] { "uint", "int", "real", "string" };
     }
 
     // Extensions to support the Custom tab logic within the ViewModel partial class

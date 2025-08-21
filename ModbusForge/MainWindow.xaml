@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ModbusForge"
         xmlns:viewmodels="clr-namespace:ModbusForge.ViewModels"
+        xmlns:models="clr-namespace:ModbusForge.Models"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="450" Width="800">
 
@@ -86,14 +87,14 @@
                         <TextBox Width="80" Text="{Binding RegisterCount}" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadRegistersCommand}" Width="80" Margin="0,0,10,0"/>
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                        <ComboBox Width="120" SelectedItem="{Binding RegistersGlobalType}" ItemsSource="{x:Static viewmodels:TypeOptions.All}"/>
+                        <ComboBox Width="120" SelectedItem="{Binding RegistersGlobalType}" ItemsSource="{x:Static models:TypeOptions.All}"/>
                     </StackPanel>
 
                     <DataGrid x:Name="HoldingRegistersGrid" Grid.Row="1" ItemsSource="{Binding HoldingRegisters}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="HoldingRegistersGrid_CellEditEnding">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"/>
-                            <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{x:Static viewmodels:TypeOptions.All}" Width="*"/>
+                            <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{x:Static models:TypeOptions.All}" Width="*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -112,7 +113,7 @@
                         <TextBox Width="80" Text="{Binding InputRegisterCount}" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadInputRegistersCommand}" Width="80" Margin="0,0,10,0"/>
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                        <ComboBox Width="120" SelectedItem="{Binding InputRegistersGlobalType}" ItemsSource="{x:Static viewmodels:TypeOptions.All}"/>
+                        <ComboBox Width="120" SelectedItem="{Binding InputRegistersGlobalType}" ItemsSource="{x:Static models:TypeOptions.All}"/>
                     </StackPanel>
 
                     <DataGrid Grid.Row="1" ItemsSource="{Binding InputRegisters}" AutoGenerateColumns="False" IsReadOnly="True">
@@ -185,7 +186,7 @@
                     <DataGrid x:Name="CustomGrid" Grid.Row="1" ItemsSource="{Binding CustomEntries}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="CustomGrid_CellEditEnding" CurrentCellChanged="CustomGrid_CurrentCellChanged">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
-                            <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{x:Static viewmodels:TypeOptions.All}" Width="*"/>
+                            <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{x:Static models:TypeOptions.All}" Width="*"/>
                             <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="2*"/>
                             <DataGridCheckBoxColumn Header="Cont." Binding="{Binding Continuous}" Width="Auto"/>
                             <DataGridTextColumn Header="Period (ms)" Binding="{Binding PeriodMs}" Width="*"/>

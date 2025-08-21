@@ -74,6 +74,8 @@ namespace ModbusForge
                     return new ModbusTcpService(logger);
                 }
             });
+
+            services.AddSingleton<IDialogService, DialogService>();
             
             // Register ViewModels
             services.AddTransient<MainViewModel>();

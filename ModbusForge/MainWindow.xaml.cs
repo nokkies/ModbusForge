@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using ModbusForge.Models;
 using ModbusForge.ViewModels;
 
 namespace ModbusForge
