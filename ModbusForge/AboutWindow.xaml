@@ -1,0 +1,40 @@
+<Window x:Class="ModbusForge.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="About ModbusForge" SizeToContent="WidthAndHeight" WindowStartupLocation="CenterOwner"
+        Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png">
+    <Border Padding="16" Background="White">
+        <StackPanel>
+            <Image Source="Resources/ModbusForgeLOGO.png" Height="80" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+            <TextBlock Text="ModbusForge" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
+            <TextBlock Text="A WPF Modbus client/server tool." Margin="0,6,0,12" HorizontalAlignment="Center"/>
+
+            <TextBlock TextWrapping="Wrap">
+                Created by <Run Text="Reinach van Nieuwenhuizen"/>. Visit:
+            </TextBlock>
+
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                <TextBlock Text="LinkedIn: "/>
+                <TextBlock>
+                    <Hyperlink NavigateUri="https://www.linkedin.com/in/nokkies/" RequestNavigate="Hyperlink_RequestNavigate">
+                        https://www.linkedin.com/in/nokkies/
+                    </Hyperlink>
+                </TextBlock>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Margin="0,2,0,12">
+                <TextBlock Text="GitHub: "/>
+                <TextBlock>
+                    <Hyperlink NavigateUri="https://github.com/nokkies/ModbusForge" RequestNavigate="Hyperlink_RequestNavigate">
+                        https://github.com/nokkies/ModbusForge
+                    </Hyperlink>
+                </TextBlock>
+            </StackPanel>
+
+            <Button Content="Close" Width="80" HorizontalAlignment="Right" IsDefault="True" Click="Close_Click"/>
+        </StackPanel>
+    </Border>
+</Window>

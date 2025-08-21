@@ -6,7 +6,8 @@
         xmlns:local="clr-namespace:ModbusForge"
         xmlns:viewmodels="clr-namespace:ModbusForge.ViewModels"
         mc:Ignorable="d"
-        Title="{Binding Title}" Height="450" Width="800">
+        Title="{Binding Title}" Height="450" Width="800"
+        Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png">
 
     <Window.Resources>
         <ResourceDictionary>
@@ -26,10 +27,13 @@
 
         <Menu Grid.Row="0">
             <MenuItem Header="_File">
+                <MenuItem Header="_Load Custom..." Command="{Binding LoadCustomCommand}"/>
+                <MenuItem Header="_Save Custom..." Command="{Binding SaveCustomCommand}"/>
+                <Separator/>
                 <MenuItem Header="_Exit" Click="MenuItem_Exit_Click"/>
             </MenuItem>
             <MenuItem Header="_Help">
-                <MenuItem Header="_About"/>
+                <MenuItem Header="_About" Click="MenuItem_About_Click"/>
             </MenuItem>
         </Menu>
 
@@ -87,12 +91,16 @@
                         <Button Content="Read" Command="{Binding ReadRegistersCommand}" Width="80" Margin="0,0,10,0"/>
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <ComboBox Width="120" SelectedItem="{Binding RegistersGlobalType}" ItemsSource="{x:Static viewmodels:TypeOptions.All}"/>
+                        <Separator Width="10" Opacity="0"/>
+                        <CheckBox Content="Monitor" IsChecked="{Binding HoldingMonitorEnabled}" VerticalAlignment="Center"/>
+                        <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                        <TextBox Width="80" Text="{Binding HoldingMonitorPeriodMs}"/>
                     </StackPanel>
 
                     <DataGrid x:Name="HoldingRegistersGrid" Grid.Row="1" ItemsSource="{Binding HoldingRegisters}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="HoldingRegistersGrid_CellEditEnding">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"/>
+                            <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="*"/>
                             <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{x:Static viewmodels:TypeOptions.All}" Width="*"/>
                         </DataGrid.Columns>
                     </DataGrid>
@@ -113,6 +121,10 @@
                         <Button Content="Read" Command="{Binding ReadInputRegistersCommand}" Width="80" Margin="0,0,10,0"/>
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <ComboBox Width="120" SelectedItem="{Binding InputRegistersGlobalType}" ItemsSource="{x:Static viewmodels:TypeOptions.All}"/>
+                        <Separator Width="10" Opacity="0"/>
+                        <CheckBox Content="Monitor" IsChecked="{Binding InputRegistersMonitorEnabled}" VerticalAlignment="Center"/>
+                        <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                        <TextBox Width="80" Text="{Binding InputRegistersMonitorPeriodMs}"/>
                     </StackPanel>
 
                     <DataGrid Grid.Row="1" ItemsSource="{Binding InputRegisters}" AutoGenerateColumns="False" IsReadOnly="True">
@@ -137,6 +149,10 @@
                         <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <TextBox Width="80" Text="{Binding CoilCount}" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadCoilsCommand}" Width="80"/>
+                        <Separator Width="10" Opacity="0"/>
+                        <CheckBox Content="Monitor" IsChecked="{Binding CoilsMonitorEnabled}" VerticalAlignment="Center"/>
+                        <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                        <TextBox Width="80" Text="{Binding CoilsMonitorPeriodMs}"/>
                     </StackPanel>
 
                     <DataGrid x:Name="CoilsGrid" Grid.Row="1" ItemsSource="{Binding Coils}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="CoilsGrid_CellEditEnding" CurrentCellChanged="CoilsGrid_CurrentCellChanged">
@@ -160,6 +176,10 @@
                         <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <TextBox Width="80" Text="{Binding DiscreteInputCount}" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadDiscreteInputsCommand}" Width="80"/>
+                        <Separator Width="10" Opacity="0"/>
+                        <CheckBox Content="Monitor" IsChecked="{Binding DiscreteInputsMonitorEnabled}" VerticalAlignment="Center"/>
+                        <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                        <TextBox Width="80" Text="{Binding DiscreteInputsMonitorPeriodMs}"/>
                     </StackPanel>
 
                     <DataGrid Grid.Row="1" ItemsSource="{Binding DiscreteInputs}" AutoGenerateColumns="False" IsReadOnly="True">
@@ -179,20 +199,31 @@
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
                         <Button Content="Add Row" Width="100" Command="{Binding AddCustomEntryCommand}"/>
-                        <TextBlock Text="  Add a row with Address/Type/Value. Tick 'Cont.' to write periodically." Margin="10,0,0,0" VerticalAlignment="Center"/>
+                        <Button Content="Save" Width="80" Margin="10,0,0,0" Command="{Binding SaveCustomCommand}"/>
+                        <Button Content="Load" Width="80" Margin="5,0,0,0" Command="{Binding LoadCustomCommand}"/>
+                        <Separator Width="10" Opacity="0"/>
+                        <CheckBox Content="Monitor" IsChecked="{Binding CustomMonitorEnabled}" VerticalAlignment="Center"/>
+                        <CheckBox Content="Monitor Reads" IsChecked="{Binding CustomReadMonitorEnabled}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        <TextBlock Text="  Add a row with Address/Type/Value. Tick 'Cont.' to write periodically or 'Mon.' to read periodically." Margin="10,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <DataGrid x:Name="CustomGrid" Grid.Row="1" ItemsSource="{Binding CustomEntries}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="CustomGrid_CellEditEnding" CurrentCellChanged="CustomGrid_CurrentCellChanged">
+                    <DataGrid x:Name="CustomGrid" Grid.Row="1" ItemsSource="{Binding CustomEntries}" AutoGenerateColumns="False" IsReadOnly="False" CanUserAddRows="False" CellEditEnding="CustomGrid_CellEditEnding" CurrentCellChanged="CustomGrid_CurrentCellChanged">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
+                            <DataGridComboBoxColumn Header="Area" SelectedItemBinding="{Binding Area}" ItemsSource="{x:Static viewmodels:AreaOptions.All}" Width="*"/>
                             <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{x:Static viewmodels:TypeOptions.All}" Width="*"/>
                             <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="2*"/>
                             <DataGridCheckBoxColumn Header="Cont." Binding="{Binding Continuous}" Width="Auto"/>
                             <DataGridTextColumn Header="Period (ms)" Binding="{Binding PeriodMs}" Width="*"/>
+                            <DataGridCheckBoxColumn Header="Mon." Binding="{Binding Monitor}" Width="Auto"/>
+                            <DataGridTextColumn Header="Read Period (ms)" Binding="{Binding ReadPeriodMs}" Width="*"/>
                             <DataGridTemplateColumn Header="Actions" Width="Auto">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Button Content="Write" Padding="8,2" Command="{Binding DataContext.WriteCustomNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Content="Write" Padding="8,2" Margin="0,0,5,0" Command="{Binding DataContext.WriteCustomNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"/>
+                                            <Button Content="Read" Padding="8,2" Command="{Binding DataContext.ReadCustomNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"/>
+                                        </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using System.Windows.Navigation;
 using ModbusForge.ViewModels;
 
 namespace ModbusForge
@@ -13,6 +14,7 @@ namespace ModbusForge
     public partial class MainWindow : Window
     {
         private readonly MainViewModel _viewModel;
+        private bool _isCommittingCustom;
 
         public MainWindow(MainViewModel viewModel)
         {
@@ -34,6 +36,15 @@ namespace ModbusForge
             Application.Current.Shutdown();
         }
 
+        private void MenuItem_About_Click(object sender, RoutedEventArgs e)
+        {
+            var about = new AboutWindow
+            {
+                Owner = this
+            };
+            about.ShowDialog();
+        }
+
         private async void HoldingRegistersGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
         {
             if (e.EditAction != DataGridEditAction.Commit)
@@ -50,49 +61,82 @@ namespace ModbusForge
 
                     if (!string.IsNullOrWhiteSpace(editedText))
                     {
+                        // Normalize decimal separator and trim
+                        var text = editedText.Trim().Replace(',', '.');
+
+                        // Heuristic: if input looks like a float (contains '.' or exponent)
+                        // prefer the 'real' path even if the Type binding hasn't committed yet
+                        bool looksLikeFloat = text.Contains('.') || text.Contains("e", StringComparison.OrdinalIgnoreCase);
+
                         switch (type)
                         {
                             case "real":
+                            {
+                                if (float.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float f))
                                 {
-                                    if (float.TryParse(editedText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float f))
-                                    {
-                                        // Write two registers for 32-bit float starting at this address
-                                        await _viewModel.WriteFloatAtAsync(entry.Address, f);
-                                        // Cancel commit to avoid binding errors (Value is ushort) then refresh
-                                        e.Cancel = true;
-                                        _viewModel.ReadRegistersCommand.Execute(null);
-                                    }
-                                    else
-                                    {
-                                        MessageBox.Show($"Invalid float value: '{editedText}'", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                                        e.Cancel = true;
-                                    }
-                                    break;
+                                    // Write two registers for 32-bit float starting at this address
+                                    await _viewModel.WriteFloatAtAsync(entry.Address, f);
+                                    // Cancel commit to avoid binding errors (Value is ushort) then refresh
+                                    e.Cancel = true;
+                                    _viewModel.ReadRegistersCommand.Execute(null);
                                 }
+                                else
+                                {
+                                    MessageBox.Show($"Invalid float value: '{editedText}'", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                    e.Cancel = true;
+                                }
+                                break;
+                            }
+                            case "string":
+                            {
+                                await _viewModel.WriteStringAtAsync(entry.Address, editedText);
+                                // Cancel commit and refresh to display resulting register bytes
+                                e.Cancel = true;
+                                _viewModel.ReadRegistersCommand.Execute(null);
+                                break;
+                            }
                             case "int":
+                            {
+                                if (int.TryParse(text, out int iv))
                                 {
-                                    if (int.TryParse(editedText, out int iv))
-                                    {
-                                        ushort raw = unchecked((ushort)iv);
-                                        await _viewModel.WriteRegisterAtAsync(entry.Address, raw);
-                                        // Cancel commit (binding to ushort would fail for negatives) then refresh
-                                        e.Cancel = true;
-                                        _viewModel.ReadRegistersCommand.Execute(null);
-                                    }
-                                    else
-                                    {
-                                        MessageBox.Show($"Invalid integer value: '{editedText}'", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                                        e.Cancel = true;
-                                    }
-                                    break;
+                                    ushort raw = unchecked((ushort)iv);
+                                    await _viewModel.WriteRegisterAtAsync(entry.Address, raw);
+                                    // Cancel commit (binding to ushort would fail for negatives) then refresh
+                                    e.Cancel = true;
+                                    _viewModel.ReadRegistersCommand.Execute(null);
                                 }
+                                else
+                                {
+                                    MessageBox.Show($"Invalid integer value: '{editedText}'", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                    e.Cancel = true;
+                                }
+                                break;
+                            }
                             default:
+                            {
+                                // If it looks like a float and parses, treat as real (covers cases where Type binding hasn't committed yet)
+                                if (looksLikeFloat && float.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float f))
                                 {
-                                    // uint/others: allow standard ushort processing via binding
-                                    await Dispatcher.Yield(DispatcherPriority.Background);
-                                    await _viewModel.WriteRegisterAtAsync(entry.Address, entry.Value);
+                                    await _viewModel.WriteFloatAtAsync(entry.Address, f);
+                                    e.Cancel = true;
+                                    _viewModel.ReadRegistersCommand.Execute(null);
                                     break;
                                 }
+                                // uint: parse and write, update entry.Value to keep ValueText in sync
+                                if (uint.TryParse(text, out uint uv) && uv <= ushort.MaxValue)
+                                {
+                                    ushort val = (ushort)uv;
+                                    await _viewModel.WriteRegisterAtAsync(entry.Address, val);
+                                    entry.Value = val; // updates ValueText via setter sync
+                                    e.Cancel = true;   // we took care of updating the model
+                                }
+                                else
+                                {
+                                    MessageBox.Show($"Invalid unsigned value: '{editedText}' (0..65535)", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                    e.Cancel = true;
+                                }
+                                break;
+                            }
                         }
                     }
                 }
@@ -136,22 +180,26 @@ namespace ModbusForge
 
         private void CustomGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
         {
+            // Do not force commits here to avoid re-entrancy.
             if (e.EditAction != DataGridEditAction.Commit)
                 return;
-
-            if (sender is DataGrid grid)
-            {
-                grid.CommitEdit(DataGridEditingUnit.Cell, true);
-                grid.CommitEdit(DataGridEditingUnit.Row, true);
-            }
         }
 
         private void CustomGrid_CurrentCellChanged(object sender, EventArgs e)
         {
+            if (_isCommittingCustom) return;
             if (sender is DataGrid grid)
             {
-                grid.CommitEdit(DataGridEditingUnit.Cell, true);
-                grid.CommitEdit(DataGridEditingUnit.Row, true);
+                try
+                {
+                    _isCommittingCustom = true;
+                    grid.CommitEdit(DataGridEditingUnit.Cell, true);
+                    grid.CommitEdit(DataGridEditingUnit.Row, true);
+                }
+                finally
+                {
+                    _isCommittingCustom = false;
+                }
             }
         }
     }

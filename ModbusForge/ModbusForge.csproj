@@ -12,10 +12,18 @@
     <RootNamespace>ModbusForge</RootNamespace>
   </PropertyGroup>
 
+  <PropertyGroup Condition="Exists('Resources\\ModbusForge.ico')">
+    <ApplicationIcon>Resources\ModbusForge.ico</ApplicationIcon>
+  </PropertyGroup>
+
   <ItemGroup>
     <Content Include="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources/ModbusForgeLOGO.png" />
   </ItemGroup>
 
   <ItemGroup>
