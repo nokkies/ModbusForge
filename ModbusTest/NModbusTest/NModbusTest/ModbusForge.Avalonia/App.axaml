@@ -4,16 +4,12 @@
              xmlns:local="using:ModbusForge.Avalonia"
              xmlns:converters="using:ModbusForge.Avalonia.Converters"
              RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
-
     <Application.DataTemplates>
         <local:ViewLocator/>
     </Application.DataTemplates>
-
     <Application.Resources>
         <converters:BoolToConnectStringConverter x:Key="BoolToConnectStringConverter"/>
     </Application.Resources>
-
     <Application.Styles>
         <FluentTheme />
     </Application.Styles>

@@ -7,35 +7,22 @@
         x:Class="ModbusForge.Avalonia.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="ModbusForge.Avalonia">
-
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainWindowViewModel/>
-    </Design.DataContext>
-
+        Title="ModbusForge">
     <TabControl>
         <TabItem Header="Client">
-          <Grid RowDefinitions="Auto,Auto,*" ColumnDefinitions="Auto,*,Auto,*" Margin="10">
-            <!-- Connection Settings -->
+          <Grid RowDefinitions="Auto,Auto,*" ColumnDefinitions="Auto,*,Auto,*,Auto" Margin="10">
             <TextBlock Grid.Row="0" Grid.Column="0" Text="IP Address:" VerticalAlignment="Center" Margin="5"/>
             <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding IpAddress}" VerticalAlignment="Center" Margin="5"/>
             <TextBlock Grid.Row="0" Grid.Column="2" Text="Port:" VerticalAlignment="Center" Margin="5"/>
             <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding Port}" VerticalAlignment="Center" Margin="5"/>
-
-            <!-- Read Operation Settings -->
             <TextBlock Grid.Row="1" Grid.Column="0" Text="Start Address:" VerticalAlignment="Center" Margin="5"/>
             <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding StartAddress}" Minimum="0" Maximum="65535" VerticalAlignment="Center" Margin="5"/>
             <TextBlock Grid.Row="1" Grid.Column="2" Text="Number of Registers:" VerticalAlignment="Center" Margin="5"/>
             <NumericUpDown Grid.Row="1" Grid.Column="3" Value="{Binding NumberOfRegisters}" Minimum="1" Maximum="125" VerticalAlignment="Center" Margin="5"/>
-
             <StackPanel Grid.Row="0" Grid.Column="4" Orientation="Horizontal">
                 <Button Content="{Binding IsConnected, Converter={StaticResource BoolToConnectStringConverter}}" Command="{Binding ConnectCommand}" Margin="5"/>
-                <Button Content="Read Data" Command="{Binding ReadDataCommand}" Margin="5"/>
+                <Button Content="Read" Command="{Binding ReadDataCommand}" IsEnabled="{Binding IsConnected}" Margin="5"/>
             </StackPanel>
-
-            <!-- Data Display -->
             <DataGrid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="5" ItemsSource="{Binding Registers}" AutoGenerateColumns="False" IsReadOnly="True" Margin="5">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Address" Binding="{Binding Address}" />
@@ -44,21 +31,10 @@
             </DataGrid>
           </Grid>
         </TabItem>
-        <TabItem Header="Server">
-            <TextBlock Text="Modbus Server Controls" HorizontalAlignment="Center" VerticalAlignment="Center" />
-        </TabItem>
-        <TabItem Header="Custom">
-            <TextBlock Text="Custom Register/Coil Configuration" HorizontalAlignment="Center" VerticalAlignment="Center" />
-        </TabItem>
-        <TabItem Header="Debug">
-            <TextBlock Text="Debug View" HorizontalAlignment="Center" VerticalAlignment="Center" />
-        </TabItem>
-        <TabItem Header="Simulation">
-            <TextBlock Text="Simulation View" HorizontalAlignment="Center" VerticalAlignment="Center" />
-        </TabItem>
-        <TabItem Header="About">
-            <TextBlock Text="About Information" HorizontalAlignment="Center" VerticalAlignment="Center" />
-        </TabItem>
+        <TabItem Header="Server"><TextBlock Text="Server UI Here"/></TabItem>
+        <TabItem Header="Custom"><TextBlock Text="Custom UI Here"/></TabItem>
+        <TabItem Header="Debug"><TextBlock Text="Debug UI Here"/></TabItem>
+        <TabItem Header="Simulation"><TextBlock Text="Simulation UI Here"/></TabItem>
+        <TabItem Header="About"><TextBlock Text="About UI Here"/></TabItem>
     </TabControl>
-
 </Window>
