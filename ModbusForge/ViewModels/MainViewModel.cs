@@ -20,16 +20,27 @@ using System.Linq;
 using System.Text.Json;
 using Microsoft.Win32;
 using System.IO;
+using System.Reflection;
+using System.Diagnostics;
 
 namespace ModbusForge.ViewModels
 {
     public partial class MainViewModel : ViewModelBase, IDisposable
     {
-        private readonly IModbusService _modbusService;
+        private IModbusService _modbusService;
+        private readonly ModbusTcpService _clientService;
+        private readonly ModbusServerService _serverService;
         private bool _disposed = false;
+        // Mode-aware UI helpers
+
+        public bool IsServerMode => string.Equals(Mode, "Server", StringComparison.OrdinalIgnoreCase);
+        public bool ShowClientFields => !IsServerMode; // show IP/UnitId only in client mode
+        public string ConnectButtonText => IsServerMode ? "Start Server" : "Connect";
+        public string ConnectionHeader => IsServerMode ? "Modbus Connection (Server)" : "Modbus Connection (Client)";
 
         public MainViewModel() : this(
-            App.ServiceProvider.GetRequiredService<IModbusService>(),
+            App.ServiceProvider.GetRequiredService<ModbusTcpService>(),
+            App.ServiceProvider.GetRequiredService<ModbusServerService>(),
             App.ServiceProvider.GetRequiredService<ILogger<MainViewModel>>(),
             App.ServiceProvider.GetRequiredService<IOptions<ServerSettings>>())
         {
@@ -63,12 +74,36 @@ namespace ModbusForge.ViewModels
         protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-        public MainViewModel(IModbusService modbusService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options)
+        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options)
         {
-            _modbusService = modbusService ?? throw new ArgumentNullException(nameof(modbusService));
+            _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
+            _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             var settings = options?.Value ?? new ServerSettings();
-            
+            Mode = string.Equals(settings.Mode, "Server", StringComparison.OrdinalIgnoreCase) ? "Server" : "Client";
+
+            // Initialize defaults from configuration
+            try
+            {
+                if (settings.DefaultPort > 0)
+                {
+                    Port = settings.DefaultPort;
+                }
+                // In client mode, ensure a reasonable default server address if empty
+                if (!IsServerMode)
+                {
+                    if (string.IsNullOrWhiteSpace(ServerAddress))
+                    {
+                        ServerAddress = "127.0.0.1";
+                    }
+                    if (settings.DefaultUnitId >= 1 && settings.DefaultUnitId <= 247)
+                    {
+                        UnitId = (byte)settings.DefaultUnitId;
+                    }
+                }
+            }
+            catch { /* best-effort defaults from config */ }
+
             // Initialize commands
             ConnectCommand = new RelayCommand(async () => await ConnectAsync(), CanConnect);
             _disconnectCommand = new RelayCommand(async () => await DisconnectAsync(), CanDisconnect);
@@ -83,6 +118,8 @@ namespace ModbusForge.ViewModels
             DisconnectCommand = _disconnectCommand;
             
             // Set initial state
+            // Set initial service based on Mode and initialize state
+            _modbusService = IsServerMode ? _serverService : _clientService;
             IsConnected = _modbusService.IsConnected;
             StatusMessage = IsConnected ? "Connected" : "Disconnected";
 
@@ -91,6 +128,24 @@ namespace ModbusForge.ViewModels
             try { UnitId = Convert.ToByte(settings.DefaultUnitId); } catch { UnitId = 1; }
             
             _logger.LogInformation("MainViewModel initialized");
+
+            // Set window title with version from assembly file info
+            try
+            {
+                var ver = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location)?.ProductVersion ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(ver))
+                {
+                    Title = $"ModbusForge v{ver}";
+                }
+                else
+                {
+                    Title = "ModbusForge v1.0.6"; // fallback
+                }
+            }
+            catch
+            {
+                Title = "ModbusForge v1.0.6"; // fallback on any error
+            }
 
             // Custom tab commands
             AddCustomEntryCommand = new RelayCommand(AddCustomEntry);
@@ -112,6 +167,37 @@ namespace ModbusForge.ViewModels
 
         [ObservableProperty]
         private string _title = "ModbusForge";
+
+        // UI-selectable mode: "Client" or "Server"
+        [ObservableProperty]
+        private string _mode = "Client";
+
+        partial void OnModeChanged(string value)
+        {
+            try
+            {
+                // If connected, disconnect current service when switching modes
+                if (IsConnected)
+                {
+                    try { _modbusService.DisconnectAsync().GetAwaiter().GetResult(); }
+                    catch { }
+                    IsConnected = false;
+                    StatusMessage = "Disconnected";
+                }
+
+                _modbusService = IsServerMode ? _serverService : _clientService;
+
+                // Update dependent computed properties
+                OnPropertyChanged(nameof(IsServerMode));
+                OnPropertyChanged(nameof(ShowClientFields));
+                OnPropertyChanged(nameof(ConnectButtonText));
+                OnPropertyChanged(nameof(ConnectionHeader));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error switching mode to {Mode}", value);
+            }
+        }
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(DisconnectCommand))]
@@ -256,14 +342,14 @@ namespace ModbusForge.ViewModels
         {
             try
             {
-                StatusMessage = "Connecting...";
+                StatusMessage = IsServerMode ? "Starting server..." : "Connecting...";
                 var success = await _modbusService.ConnectAsync(ServerAddress, Port);
                 
                 if (success)
                 {
                     IsConnected = true;
-                    StatusMessage = "Connected to Modbus server";
-                    _logger.LogInformation("Successfully connected to Modbus server");
+                    StatusMessage = IsServerMode ? "Server started" : "Connected to Modbus server";
+                    _logger.LogInformation(IsServerMode ? "Successfully started Modbus server" : "Successfully connected to Modbus server");
 
                     // Quick probe for the configured UnitId to warn early if it's not responding
                     try
@@ -281,15 +367,15 @@ namespace ModbusForge.ViewModels
                 }
                 else
                 {
-                    StatusMessage = "Failed to connect";
-                    _logger.LogWarning("Failed to connect to Modbus server");
+                    StatusMessage = IsServerMode ? "Failed to start server" : "Failed to connect";
+                    _logger.LogWarning(IsServerMode ? "Failed to start Modbus server" : "Failed to connect to Modbus server");
                 }
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Error: {ex.Message}";
-                _logger.LogError(ex, "Error connecting to Modbus server");
-                MessageBox.Show($"Failed to connect: {ex.Message}", "Connection Error", 
+                StatusMessage = IsServerMode ? $"Server error: {ex.Message}" : $"Error: {ex.Message}";
+                _logger.LogError(ex, IsServerMode ? "Error starting Modbus server" : "Error connecting to Modbus server");
+                MessageBox.Show(IsServerMode ? $"Failed to start server: {ex.Message}" : $"Failed to connect: {ex.Message}", IsServerMode ? "Server Error" : "Connection Error", 
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -300,17 +386,17 @@ namespace ModbusForge.ViewModels
         {
             try
             {
-                _logger.LogInformation("Disconnecting from Modbus server");
+                _logger.LogInformation(IsServerMode ? "Stopping Modbus server" : "Disconnecting from Modbus server");
                 await _modbusService.DisconnectAsync();
                 IsConnected = false;
-                StatusMessage = "Disconnected";
-                _logger.LogInformation("Successfully disconnected from Modbus server");
+                StatusMessage = IsServerMode ? "Server stopped" : "Disconnected";
+                _logger.LogInformation(IsServerMode ? "Successfully stopped Modbus server" : "Successfully disconnected from Modbus server");
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Error disconnecting: {ex.Message}";
-                _logger.LogError(ex, "Error disconnecting from Modbus server");
-                MessageBox.Show($"Failed to disconnect: {ex.Message}", "Disconnection Error", 
+                StatusMessage = IsServerMode ? $"Error stopping server: {ex.Message}" : $"Error disconnecting: {ex.Message}";
+                _logger.LogError(ex, IsServerMode ? "Error stopping Modbus server" : "Error disconnecting from Modbus server");
+                MessageBox.Show(IsServerMode ? $"Failed to stop server: {ex.Message}" : $"Failed to disconnect: {ex.Message}", IsServerMode ? "Server Stop Error" : "Disconnection Error", 
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -719,6 +805,11 @@ namespace ModbusForge.ViewModels
     {
         // HoldingRegister and Coil are writable; InputRegister and DiscreteInput are read-only per Modbus spec
         public static readonly string[] All = new[] { "HoldingRegister", "Coil", "InputRegister", "DiscreteInput" };
+    }
+
+    public static class ModeOptions
+    {
+        public static readonly string[] All = new[] { "Client", "Server" };
     }
 
     // Extensions to support the Custom tab logic within the ViewModel partial class

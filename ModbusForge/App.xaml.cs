@@ -59,21 +59,9 @@ namespace ModbusForge
                 configure.SetMinimumLevel(LogLevel.Debug);
             });
 
-            // Register services
-            services.AddSingleton<IModbusService>(sp =>
-            {
-                var settings = sp.GetRequiredService<IOptions<ServerSettings>>().Value;
-                if (string.Equals(settings.Mode, "Server", StringComparison.OrdinalIgnoreCase))
-                {
-                    var logger = sp.GetRequiredService<ILogger<ModbusServerService>>();
-                    return new ModbusServerService(logger);
-                }
-                else
-                {
-                    var logger = sp.GetRequiredService<ILogger<ModbusTcpService>>();
-                    return new ModbusTcpService(logger);
-                }
-            });
+            // Register services (both Client and Server). ViewModel selects at runtime.
+            services.AddSingleton<ModbusTcpService>();
+            services.AddSingleton<ModbusServerService>();
             
             // Register ViewModels
             services.AddTransient<MainViewModel>();

@@ -37,7 +37,7 @@
             </MenuItem>
         </Menu>
 
-        <GroupBox Header="Modbus Connection" Grid.Row="1" Margin="5">
+        <GroupBox Header="{Binding ConnectionHeader}" Grid.Row="1" Margin="5">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -47,29 +47,36 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="60"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Server:" VerticalAlignment="Center" Margin="5,0"/>
+                <TextBlock Text="Server:" VerticalAlignment="Center" Margin="5,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
                 <TextBox Grid.Column="1" Text="{Binding ServerAddress, UpdateSourceTrigger=PropertyChanged}" 
                          IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
-                         Margin="0,0,5,0"/>
+                         Margin="0,0,5,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
 
                 <TextBlock Text="Port:" Grid.Column="2" VerticalAlignment="Center" Margin="5,0"/>
                 <TextBox Grid.Column="3" Text="{Binding Port}" 
                          IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
                          Margin="0,0,5,0"/>
 
-                <TextBlock Text="Unit ID:" Grid.Column="4" VerticalAlignment="Center" Margin="5,0"/>
+                <TextBlock Text="Unit ID:" Grid.Column="4" VerticalAlignment="Center" Margin="5,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
                 <TextBox Grid.Column="5" Text="{Binding UnitId}" 
                          IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
-                         Margin="0,0,5,0"/>
+                         Margin="0,0,5,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
 
-                <Button Grid.Column="6" Content="Connect" Command="{Binding ConnectCommand}" 
+                <TextBlock Text="Mode:" Grid.Column="6" VerticalAlignment="Center" Margin="5,0"/>
+                <ComboBox Grid.Column="7" SelectedItem="{Binding Mode}" ItemsSource="{x:Static viewmodels:ModeOptions.All}"
+                          IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
+                          Width="80" Margin="0,0,5,0"/>
+
+                <Button Grid.Column="8" Content="{Binding ConnectButtonText}" Command="{Binding ConnectCommand}" 
                         IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
                         Width="80" Margin="0,0,5,0"/>
 
-                <Button Grid.Column="7" Content="Disconnect" Command="{Binding DisconnectCommand}" 
+                <Button Grid.Column="9" Content="Disconnect" Command="{Binding DisconnectCommand}" 
                         IsEnabled="{Binding IsConnected}"
                         Width="80"/>
             </Grid>

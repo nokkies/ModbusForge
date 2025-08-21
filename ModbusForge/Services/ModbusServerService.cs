@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using FluentModbus;
+using System.Net.Sockets;
 
 namespace ModbusForge.Services
 {
@@ -102,6 +103,14 @@ namespace ModbusForge.Services
                         buf[i] = (short)(i * 10);
 
                     return true;
+                }
+                catch (SocketException sockEx) when (sockEx.SocketErrorCode == SocketError.AddressAlreadyInUse)
+                {
+                    _isRunning = false;
+                    int p = port == 0 ? DefaultPort : port;
+                    _logger.LogWarning(sockEx, "Port {Port} is already in use. Server could not start.", p);
+                    // Throw to surface a clear message to the UI layer
+                    throw new InvalidOperationException($"Port {p} is already in use. Choose another port (e.g., 1502) or stop the process using it.");
                 }
                 catch (Exception ex)
                 {
