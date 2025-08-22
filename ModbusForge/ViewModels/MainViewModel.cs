@@ -22,6 +22,8 @@ using Microsoft.Win32;
 using System.IO;
 using System.Reflection;
 using System.Diagnostics;
+using System.Collections.Generic;
+using System.Collections.Specialized;
 
 namespace ModbusForge.ViewModels
 {
@@ -42,7 +44,8 @@ namespace ModbusForge.ViewModels
             App.ServiceProvider.GetRequiredService<ModbusTcpService>(),
             App.ServiceProvider.GetRequiredService<ModbusServerService>(),
             App.ServiceProvider.GetRequiredService<ILogger<MainViewModel>>(),
-            App.ServiceProvider.GetRequiredService<IOptions<ServerSettings>>())
+            App.ServiceProvider.GetRequiredService<IOptions<ServerSettings>>(),
+            App.ServiceProvider.GetRequiredService<ITrendLogger>())
         {
         }
 
@@ -59,6 +62,8 @@ namespace ModbusForge.ViewModels
         private int _readPeriodMs = 1000;
         internal DateTime _lastReadUtc = DateTime.MinValue;
         private string _area = "HoldingRegister"; // HoldingRegister, Coil, InputRegister, DiscreteInput
+        // Trend selection support
+        private bool _trend = false;
 
         public int Address { get => _address; set { if (_address != value) { _address = value; OnPropertyChanged(nameof(Address)); } } }
         public string Type { get => _type; set { if (_type != value) { _type = value; OnPropertyChanged(nameof(Type)); } } }
@@ -69,16 +74,18 @@ namespace ModbusForge.ViewModels
         public bool Monitor { get => _monitor; set { if (_monitor != value) { _monitor = value; OnPropertyChanged(nameof(Monitor)); } } }
         public int ReadPeriodMs { get => _readPeriodMs; set { if (_readPeriodMs != value) { _readPeriodMs = value; OnPropertyChanged(nameof(ReadPeriodMs)); } } }
         public string Area { get => _area; set { if (_area != value) { _area = value; OnPropertyChanged(nameof(Area)); } } }
+        public bool Trend { get => _trend; set { if (_trend != value) { _trend = value; OnPropertyChanged(nameof(Trend)); } } }
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options)
+        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger)
         {
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
             _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _trendLogger = trendLogger ?? throw new ArgumentNullException(nameof(trendLogger));
             var settings = options?.Value ?? new ServerSettings();
             Mode = string.Equals(settings.Mode, "Server", StringComparison.OrdinalIgnoreCase) ? "Server" : "Client";
 
@@ -163,6 +170,15 @@ namespace ModbusForge.ViewModels
             _monitorTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             _monitorTimer.Tick += MonitorTimer_Tick;
             _monitorTimer.Start();
+
+            // Trend sampling timer aligned with logger's sample rate
+            _trendTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Math.Max(50, _trendLogger.SampleRateMs)) };
+            _trendTimer.Tick += TrendTimer_Tick;
+            _trendTimer.Start();
+
+            // Start trend logger and subscribe to CustomEntries changes
+            try { _trendLogger.Start(); } catch { }
+            SubscribeCustomEntries();
         }
 
         [ObservableProperty]
@@ -281,7 +297,10 @@ namespace ModbusForge.ViewModels
         private readonly ILogger<MainViewModel> _logger;
         private readonly DispatcherTimer _customTimer;
         private readonly DispatcherTimer _monitorTimer;
+        private readonly DispatcherTimer _trendTimer;
+        private readonly ITrendLogger _trendLogger;
         private bool _isMonitoring;
+        private bool _isTrending;
         private DateTime _lastHoldingReadUtc = DateTime.MinValue;
         private DateTime _lastInputRegReadUtc = DateTime.MinValue;
         private DateTime _lastCoilsReadUtc = DateTime.MinValue;
@@ -350,25 +369,62 @@ namespace ModbusForge.ViewModels
                     IsConnected = true;
                     StatusMessage = IsServerMode ? "Server started" : "Connected to Modbus server";
                     _logger.LogInformation(IsServerMode ? "Successfully started Modbus server" : "Successfully connected to Modbus server");
-
-                    // Quick probe for the configured UnitId to warn early if it's not responding
-                    try
-                    {
-                        // minimal read to test unit id presence
-                        await _modbusService.ReadHoldingRegistersAsync(UnitId, 0, 1);
-                    }
-                    catch (Exception ex)
-                    {
-                        var msg = $"Connected, but Unit ID {UnitId} did not respond to a test read. Please check the Unit ID.";
-                        StatusMessage = msg;
-                        _logger.LogWarning(ex, msg);
-                        MessageBox.Show(msg + "\n" + ex.Message, "Unit ID Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    }
                 }
                 else
                 {
-                    StatusMessage = IsServerMode ? "Failed to start server" : "Failed to connect";
+                    IsConnected = false;
+                    StatusMessage = IsServerMode ? "Server failed to start" : "Connection failed";
                     _logger.LogWarning(IsServerMode ? "Failed to start Modbus server" : "Failed to connect to Modbus server");
+                    var msg = IsServerMode
+                        ? $"Failed to start server on port {Port}. The port may be in use. Try another port (e.g., 1502) or stop the process using it."
+                        : "Failed to connect to Modbus server.";
+                    MessageBox.Show(msg, IsServerMode ? "Server Error" : "Connection Error",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+
+                    // If in Server mode, offer to retry automatically on alternative port 1502
+                    if (IsServerMode)
+                    {
+                        var retry = MessageBox.Show(
+                            "Would you like to retry starting the server on port 1502 now?",
+                            "Try Alternative Port",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Question);
+                        if (retry == MessageBoxResult.Yes)
+                        {
+                            int originalPort = Port;
+                            try
+                            {
+                                Port = 1502;
+                                StatusMessage = $"Retrying server on port {Port}...";
+                                var retryOk = await _modbusService.ConnectAsync(ServerAddress, Port);
+                                if (retryOk)
+                                {
+                                    IsConnected = true;
+                                    StatusMessage = "Server started";
+                                    _logger.LogInformation("Successfully started Modbus server on alternative port {AltPort}", Port);
+                                }
+                                else
+                                {
+                                    IsConnected = false;
+                                    StatusMessage = "Server failed to start";
+                                    _logger.LogWarning("Failed to start Modbus server on alternative port {AltPort}", Port);
+                                    MessageBox.Show($"Failed to start server on alternative port {Port}. The port may also be in use or blocked.",
+                                        "Server Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                    // Restore original port so user sees their intended value
+                                    Port = originalPort;
+                                }
+                            }
+                            catch (Exception rex)
+                            {
+                                // Restore original port on any unexpected error
+                                Port = originalPort;
+                                StatusMessage = $"Server error: {rex.Message}";
+                                _logger.LogError(rex, "Error retrying server start on alternative port 1502");
+                                MessageBox.Show($"Failed to start server on alternative port 1502: {rex.Message}",
+                                    "Server Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                            }
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -665,6 +721,18 @@ namespace ModbusForge.ViewModels
                         _customTimer.Tick -= CustomTimer_Tick;
                         _monitorTimer.Stop();
                         _monitorTimer.Tick -= MonitorTimer_Tick;
+                        _trendTimer.Stop();
+                        _trendTimer.Tick -= TrendTimer_Tick;
+                        try { _trendLogger.Stop(); } catch { }
+                        try
+                        {
+                            CustomEntries.CollectionChanged -= CustomEntries_CollectionChanged;
+                            foreach (var ce in CustomEntries)
+                            {
+                                ce.PropertyChanged -= CustomEntry_PropertyChanged;
+                            }
+                        }
+                        catch { }
                     }
                     catch { }
                     try
@@ -1126,6 +1194,202 @@ namespace ModbusForge.ViewModels
             }
         }
 
+        private void SubscribeCustomEntries()
+        {
+            try
+            {
+                // Detach first to avoid duplicate subscriptions if called multiple times
+                CustomEntries.CollectionChanged -= CustomEntries_CollectionChanged;
+                foreach (var ce in CustomEntries)
+                {
+                    ce.PropertyChanged -= CustomEntry_PropertyChanged;
+                }
+
+                CustomEntries.CollectionChanged += CustomEntries_CollectionChanged;
+                foreach (var ce in CustomEntries)
+                {
+                    ce.PropertyChanged += CustomEntry_PropertyChanged;
+                }
+
+                // Ensure currently existing Trend selections are registered
+                foreach (var ce in CustomEntries)
+                {
+                    if (ce.Trend)
+                    {
+                        _trendLogger.Add(GetTrendKey(ce), GetTrendDisplayName(ce));
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void CustomEntries_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems != null)
+            {
+                foreach (var obj in e.NewItems)
+                {
+                    if (obj is CustomEntry ce)
+                    {
+                        ce.PropertyChanged += CustomEntry_PropertyChanged;
+                        if (ce.Trend) _trendLogger.Add(GetTrendKey(ce), GetTrendDisplayName(ce));
+                    }
+                }
+            }
+            else if (e.Action == NotifyCollectionChangedAction.Remove && e.OldItems != null)
+            {
+                foreach (var obj in e.OldItems)
+                {
+                    if (obj is CustomEntry ce)
+                    {
+                        ce.PropertyChanged -= CustomEntry_PropertyChanged;
+                        if (ce.Trend) _trendLogger.Remove(GetTrendKey(ce));
+                    }
+                }
+            }
+        }
+
+        private void CustomEntry_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (sender is not CustomEntry ce) return;
+            if (string.Equals(e.PropertyName, nameof(CustomEntry.Trend), StringComparison.Ordinal))
+            {
+                var key = GetTrendKey(ce);
+                if (ce.Trend)
+                {
+                    _trendLogger.Add(key, GetTrendDisplayName(ce));
+                }
+                else
+                {
+                    _trendLogger.Remove(key);
+                }
+            }
+        }
+
+        private static string GetTrendKey(CustomEntry ce) => $"{(ce.Area ?? "HoldingRegister")}:{ce.Address}";
+        private static string GetTrendDisplayName(CustomEntry ce) => $"{(ce.Area ?? "HR")} {ce.Address} ({ce.Type})";
+
+        private async void TrendTimer_Tick(object? sender, EventArgs e)
+        {
+            if (_isTrending) return;
+            if (!IsConnected) return;
+
+            var snapshot = CustomEntries.Where(c => c.Trend).ToList();
+            if (snapshot.Count == 0) return;
+
+            _isTrending = true;
+            try
+            {
+                var now = DateTime.UtcNow;
+                foreach (var ce in snapshot)
+                {
+                    try
+                    {
+                        var val = await ReadValueForTrendAsync(ce);
+                        if (val.HasValue)
+                        {
+                            _trendLogger.Publish(GetTrendKey(ce), val.Value, now);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Trend read failed for {Area} {Address}", ce.Area, ce.Address);
+                    }
+                }
+            }
+            finally
+            {
+                _isTrending = false;
+            }
+        }
+
+        private async Task<double?> ReadValueForTrendAsync(CustomEntry entry)
+        {
+            var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
+            switch (area)
+            {
+                case "holdingregister":
+                {
+                    var t = (entry.Type ?? "uint").ToLowerInvariant();
+                    if (t == "real")
+                    {
+                        var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 2);
+                        ushort high = regs[0];
+                        ushort low = regs[1];
+                        byte[] b = new byte[4]
+                        {
+                            (byte)(high >> 8), (byte)(high & 0xFF),
+                            (byte)(low >> 8),  (byte)(low & 0xFF)
+                        };
+                        if (BitConverter.IsLittleEndian) Array.Reverse(b);
+                        float f = BitConverter.ToSingle(b, 0);
+                        return (double)f;
+                    }
+                    else if (t == "int")
+                    {
+                        var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
+                        short sv = unchecked((short)regs[0]);
+                        return (double)sv;
+                    }
+                    else if (t == "string")
+                    {
+                        // not a numeric trend; skip
+                        return null;
+                    }
+                    else // uint
+                    {
+                        var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
+                        return (double)regs[0];
+                    }
+                }
+                case "inputregister":
+                {
+                    var t = (entry.Type ?? "uint").ToLowerInvariant();
+                    if (t == "real")
+                    {
+                        var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 2);
+                        ushort high = regs[0];
+                        ushort low = regs[1];
+                        byte[] b = new byte[4]
+                        {
+                            (byte)(high >> 8), (byte)(high & 0xFF),
+                            (byte)(low >> 8),  (byte)(low & 0xFF)
+                        };
+                        if (BitConverter.IsLittleEndian) Array.Reverse(b);
+                        float f = BitConverter.ToSingle(b, 0);
+                        return (double)f;
+                    }
+                    else if (t == "int")
+                    {
+                        var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
+                        short sv = unchecked((short)regs[0]);
+                        return (double)sv;
+                    }
+                    else if (t == "string")
+                    {
+                        return null;
+                    }
+                    else // uint
+                    {
+                        var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
+                        return (double)regs[0];
+                    }
+                }
+                case "coil":
+                {
+                    var states = await _modbusService.ReadCoilsAsync(UnitId, entry.Address, 1);
+                    return states[0] ? 1.0 : 0.0;
+                }
+                case "discreteinput":
+                {
+                    var states = await _modbusService.ReadDiscreteInputsAsync(UnitId, entry.Address, 1);
+                    return states[0] ? 1.0 : 0.0;
+                }
+                default:
+                    return null;
+            }
+        }
+
         private async Task SaveCustomAsync()
         {
             try
@@ -1147,7 +1411,8 @@ namespace ModbusForge.ViewModels
                         e.PeriodMs,
                         e.Monitor,
                         e.ReadPeriodMs,
-                        e.Area
+                        e.Area,
+                        e.Trend
                     }).ToList();
                     var options = new JsonSerializerOptions { WriteIndented = true };
                     var json = JsonSerializer.Serialize(data, options);
@@ -1187,7 +1452,8 @@ namespace ModbusForge.ViewModels
                             PeriodMs = item.TryGetProperty("PeriodMs", out var p) ? p.GetInt32() : 1000,
                             Monitor = item.TryGetProperty("Monitor", out var mr) && mr.GetBoolean(),
                             ReadPeriodMs = item.TryGetProperty("ReadPeriodMs", out var rp) ? rp.GetInt32() : 1000,
-                            Area = item.TryGetProperty("Area", out var a) ? a.GetString() ?? "HoldingRegister" : "HoldingRegister"
+                            Area = item.TryGetProperty("Area", out var a) ? a.GetString() ?? "HoldingRegister" : "HoldingRegister",
+                            Trend = item.TryGetProperty("Trend", out var tr) && tr.GetBoolean()
                         };
                         list.Add(ce);
                     }
@@ -1195,6 +1461,9 @@ namespace ModbusForge.ViewModels
                     CustomEntries.Clear();
                     foreach (var ce in list)
                         CustomEntries.Add(ce);
+
+                    // Ensure new items are wired for Trend property changes
+                    SubscribeCustomEntries();
 
                     StatusMessage = $"Loaded {list.Count} custom entries.";
                 }

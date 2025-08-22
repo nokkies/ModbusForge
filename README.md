@@ -64,12 +64,12 @@ Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 - Configure in `ModbusForge/ModbusForge/appsettings.json` under `ServerSettings`:
   - `Mode`: `Client` or `Server`
   - `DefaultPort`, `DefaultUnitId`, etc.
-- The app selects `IModbusService` implementation based on `Mode` (client or server) via DI.
+- Both client and server services are registered; the `MainViewModel` selects the `IModbusService` implementation at runtime based on `Mode`.
 - Server start/stop from UI is planned and under active development.
 
 ## Versioning
 
-- The window title displays the application version from the assembly ProductVersion (fallback to `v1.0.2`).
+- The window title displays the application version from the assembly ProductVersion (fallback to `v1.0.6`).
 
 ## Simulation Roadmap
 
@@ -128,6 +128,19 @@ If you encounter build issues:
    ```
    dotnet build
    ```
+
+### Port already in use (10048)
+
+- When starting the Modbus server, if the configured port (default `502`) is already in use, the app will not crash. Instead, it shows a friendly message and suggests trying an alternative port (e.g., `1502`).
+- To find which process is using the port on Windows:
+  ```
+  netstat -ano | findstr :502
+  ```
+  Then locate the PID in Task Manager or with:
+  ```
+  tasklist | findstr <PID>
+  ```
+  You can either stop that process or change the server port in the UI and try again.
 
 ## Next Steps
 

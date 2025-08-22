@@ -19,7 +19,7 @@ namespace ModbusForge
     public partial class App : Application
     {
         public static IConfiguration? Configuration { get; private set; }
-        public static IServiceProvider ServiceProvider { get; private set; }
+        public static IServiceProvider ServiceProvider { get; private set; } = null!;
 
         public App()
         {
@@ -50,6 +50,7 @@ namespace ModbusForge
             // Options
             services.AddOptions();
             services.Configure<ServerSettings>(Configuration.GetSection("ServerSettings"));
+            services.Configure<LoggingSettings>(Configuration.GetSection("LoggingSettings"));
 
             // Configure logging
             services.AddLogging(configure => 
@@ -62,9 +63,11 @@ namespace ModbusForge
             // Register services (both Client and Server). ViewModel selects at runtime.
             services.AddSingleton<ModbusTcpService>();
             services.AddSingleton<ModbusServerService>();
+            services.AddSingleton<ITrendLogger, TrendLoggingService>();
             
             // Register ViewModels
             services.AddTransient<MainViewModel>();
+            services.AddTransient<TrendViewModel>();
         }
 
 

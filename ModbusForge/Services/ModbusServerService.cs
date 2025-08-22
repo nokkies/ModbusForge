@@ -109,8 +109,8 @@ namespace ModbusForge.Services
                     _isRunning = false;
                     int p = port == 0 ? DefaultPort : port;
                     _logger.LogWarning(sockEx, "Port {Port} is already in use. Server could not start.", p);
-                    // Throw to surface a clear message to the UI layer
-                    throw new InvalidOperationException($"Port {p} is already in use. Choose another port (e.g., 1502) or stop the process using it.");
+                    // Return false so the UI can present a friendly message and suggestions
+                    return false;
                 }
                 catch (Exception ex)
                 {

@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ModbusForge"
         xmlns:viewmodels="clr-namespace:ModbusForge.ViewModels"
+        xmlns:views="clr-namespace:ModbusForge.Views"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="450" Width="800"
         Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png">
@@ -14,6 +15,8 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Resources/Converters.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- Option arrays are provided via static C# providers in ModbusForge.ViewModels.*Options -->
         </ResourceDictionary>
     </Window.Resources>
 
@@ -223,19 +226,25 @@
                             <DataGridCheckBoxColumn Header="Cont." Binding="{Binding Continuous}" Width="Auto"/>
                             <DataGridTextColumn Header="Period (ms)" Binding="{Binding PeriodMs}" Width="*"/>
                             <DataGridCheckBoxColumn Header="Mon." Binding="{Binding Monitor}" Width="Auto"/>
+                            <DataGridCheckBoxColumn Header="Trend" Binding="{Binding Trend}" Width="Auto"/>
                             <DataGridTextColumn Header="Read Period (ms)" Binding="{Binding ReadPeriodMs}" Width="*"/>
                             <DataGridTemplateColumn Header="Actions" Width="Auto">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Orientation="Horizontal">
-                                            <Button Content="Write" Padding="8,2" Margin="0,0,5,0" Command="{Binding DataContext.WriteCustomNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"/>
-                                            <Button Content="Read" Padding="8,2" Command="{Binding DataContext.ReadCustomNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"/>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="Write" Padding="8,2" Margin="0,0,5,0" Command="{Binding DataContext.WriteCustomNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"/>
+                                        <Button Content="Read" Padding="8,2" Command="{Binding DataContext.ReadCustomNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </TabItem>
+            <TabItem Header="Trend">
+                <Grid Margin="5">
+                    <views:TrendView />
                 </Grid>
             </TabItem>
         </TabControl>
