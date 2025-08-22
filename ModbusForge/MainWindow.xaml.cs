@@ -5,6 +5,8 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using System.Windows.Navigation;
 using ModbusForge.ViewModels;
+using Microsoft.Win32;
+using System.IO;
 
 namespace ModbusForge
 {
@@ -43,6 +45,86 @@ namespace ModbusForge
                 Owner = this
             };
             about.ShowDialog();
+        }
+
+        private async void Trend_ExportCsv_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var trendView = this.TrendViewControl; // from XAML name
+                if (trendView?.DataContext is not TrendViewModel tvm)
+                {
+                    MessageBox.Show("Trend view is not available.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+                var dlg = new SaveFileDialog
+                {
+                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                    FileName = "trend-export.csv"
+                };
+                if (dlg.ShowDialog(this) == true)
+                {
+                    await tvm.ExportCsvAsync(dlg.FileName, tvm.SelectedSeriesItem);
+                    _viewModel.StatusMessage = $"Exported CSV: {Path.GetFileName(dlg.FileName)}";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Export CSV failed: {ex.Message}", "Trend Export", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void Trend_ExportPng_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var trendView = this.TrendViewControl;
+                if (trendView == null)
+                {
+                    MessageBox.Show("Trend view is not available.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+                var dlg = new SaveFileDialog
+                {
+                    Filter = "PNG files (*.png)|*.png|All files (*.*)|*.*",
+                    FileName = "trend-export.png"
+                };
+                if (dlg.ShowDialog(this) == true)
+                {
+                    trendView.SaveChartAsPng(dlg.FileName);
+                    _viewModel.StatusMessage = $"Exported PNG: {Path.GetFileName(dlg.FileName)}";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Export PNG failed: {ex.Message}", "Trend Export", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void Trend_ImportCsv_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var trendView = this.TrendViewControl;
+                if (trendView?.DataContext is not TrendViewModel tvm)
+                {
+                    MessageBox.Show("Trend view is not available.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+                var dlg = new OpenFileDialog
+                {
+                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*"
+                };
+                if (dlg.ShowDialog(this) == true)
+                {
+                    await tvm.ImportCsvAsync(dlg.FileName);
+                    _viewModel.StatusMessage = $"Imported CSV: {Path.GetFileName(dlg.FileName)}";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Import CSV failed: {ex.Message}", "Trend Import", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async void HoldingRegistersGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)

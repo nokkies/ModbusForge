@@ -19,13 +19,14 @@
                       DisplayMemberPath="Name"
                       />
             <Button Content="Delete" Margin="6,0,0,0" Width="80" Command="{Binding DeleteSelectedCommand}"/>
+            <Button Content="Color" Margin="6,0,0,0" Width="80" Command="{Binding ChangeColorCommand}"/>
             <Separator Width="10" Opacity="0"/>
             <Button Content="Reset" Width="80" Command="{Binding ResetViewCommand}"/>
             <Button Content="Play" Width="80" Margin="6,0,0,0" Command="{Binding PlayCommand}"/>
             <Button Content="Pause" Width="80" Margin="6,0,0,0" Command="{Binding PauseCommand}"/>
         </StackPanel>
 
-        <lvc:CartesianChart Grid.Row="1"
+        <lvc:CartesianChart x:Name="TrendChart" Grid.Row="1"
                              Series="{Binding Series}"
                              XAxes="{Binding XAxes}"
                              YAxes="{Binding YAxes}"

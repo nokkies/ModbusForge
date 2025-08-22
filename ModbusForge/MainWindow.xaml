@@ -7,7 +7,7 @@
         xmlns:viewmodels="clr-namespace:ModbusForge.ViewModels"
         xmlns:views="clr-namespace:ModbusForge.Views"
         mc:Ignorable="d"
-        Title="{Binding Title}" Height="1962" Width="1556"
+        Title="{Binding Title}" Height="1073" Width="1556"
         Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png">
 
     <Window.Resources>
@@ -34,6 +34,11 @@
                 <MenuItem Header="_Save Custom..." Command="{Binding SaveCustomCommand}"/>
                 <Separator/>
                 <MenuItem Header="_Exit" Click="MenuItem_Exit_Click"/>
+            </MenuItem>
+            <MenuItem Header="_Trend">
+                <MenuItem Header="Export _CSV..." Click="Trend_ExportCsv_Click"/>
+                <MenuItem Header="Export _PNG..." Click="Trend_ExportPng_Click"/>
+                <MenuItem Header="_Import CSV..." Click="Trend_ImportCsv_Click"/>
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_About" Click="MenuItem_About_Click"/>
@@ -244,7 +249,7 @@
         </TabItem>
             <TabItem Header="Trend">
                 <Grid Margin="5">
-                    <views:TrendView />
+                    <views:TrendView x:Name="TrendViewControl" />
                 </Grid>
             </TabItem>
         </TabControl>

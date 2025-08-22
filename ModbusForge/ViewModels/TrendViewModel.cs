@@ -10,6 +10,9 @@ using SkiaSharp;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System;
+using System.Globalization;
+using System.IO;
+using System.Linq;
 using System.Windows;
 
 namespace ModbusForge.ViewModels
@@ -18,6 +21,22 @@ namespace ModbusForge.ViewModels
     {
         private readonly ITrendLogger _loggerSvc;
         private readonly Dictionary<string, ObservableCollection<double>> _valuesByKey = new();
+        private readonly Dictionary<string, List<(DateTime ts, double v)>> _samplesByKey = new();
+        private readonly Dictionary<string, SKColor> _colorByKey = new();
+        private readonly List<SKColor> _palette = new()
+        {
+            new SKColor(33,150,243),   // blue
+            new SKColor(76,175,80),    // green
+            new SKColor(244,67,54),    // red
+            new SKColor(255,193,7),    // amber
+            new SKColor(156,39,176),   // purple
+            new SKColor(0,188,212),    // cyan
+            new SKColor(121,85,72),    // brown
+            new SKColor(63,81,181),    // indigo
+            new SKColor(255,87,34),    // deep orange
+            new SKColor(139,195,74)    // light green
+        };
+        private int _paletteCursor = 0;
         private bool _followLive;
         private int _playWindowPoints;
 
@@ -60,6 +79,7 @@ namespace ModbusForge.ViewModels
             // initialize commands and play window
             _playWindowPoints = Math.Max(1, (int)Math.Round(60_000.0 / Math.Max(1, _loggerSvc.SampleRateMs)));
             DeleteSelectedCommand = new RelayCommand(DeleteSelected, CanDeleteSelected);
+            ChangeColorCommand = new RelayCommand(ChangeColor, CanDeleteSelected);
             ResetViewCommand = new RelayCommand(ResetView);
             PlayCommand = new RelayCommand(StartFollowing);
             PauseCommand = new RelayCommand(StopFollowing);
@@ -75,9 +95,66 @@ namespace ModbusForge.ViewModels
         private TrendSeriesItem? selectedSeriesItem;
 
         public IRelayCommand DeleteSelectedCommand { get; }
+        public IRelayCommand ChangeColorCommand { get; }
         public IRelayCommand ResetViewCommand { get; }
         public IRelayCommand PlayCommand { get; }
         public IRelayCommand PauseCommand { get; }
+
+        public async System.Threading.Tasks.Task ExportCsvAsync(string path, TrendSeriesItem? item)
+        {
+            // export selected or all if null
+            var keys = item != null ? new[] { item.Key } : _samplesByKey.Keys.ToArray();
+            await System.Threading.Tasks.Task.Run(() =>
+            {
+                using var sw = new StreamWriter(path);
+                sw.WriteLine("series,timestamp_utc,value");
+                foreach (var k in keys)
+                {
+                    if (!_samplesByKey.TryGetValue(k, out var list)) continue;
+                    foreach (var (ts, v) in list)
+                    {
+                        sw.WriteLine($"{EscapeCsv(k)},{ts.ToString("o", CultureInfo.InvariantCulture)},{v.ToString(CultureInfo.InvariantCulture)}");
+                    }
+                }
+            });
+        }
+
+        public async System.Threading.Tasks.Task ImportCsvAsync(string path)
+        {
+            var key = $"Imported:{System.IO.Path.GetFileNameWithoutExtension(path)}";
+            _loggerSvc.Add(key, key);
+            var lines = await File.ReadAllLinesAsync(path);
+            foreach (var line in lines.Skip(1)) // skip header
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                var parts = SplitCsv(line);
+                if (parts.Length < 3) continue;
+                if (!DateTime.TryParse(parts[1], null, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var ts)) continue;
+                if (!double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var v)) continue;
+                _loggerSvc.Publish(key, v, ts.ToUniversalTime());
+            }
+        }
+
+        private static string EscapeCsv(string s)
+        {
+            if (s.Contains(',') || s.Contains('"'))
+                return '"' + s.Replace("\"", "\"\"") + '"';
+            return s;
+        }
+
+        private static string[] SplitCsv(string line)
+        {
+            var result = new List<string>();
+            bool inQuotes = false; var cur = new System.Text.StringBuilder();
+            foreach (var ch in line)
+            {
+                if (ch == '"') { inQuotes = !inQuotes; continue; }
+                if (ch == ',' && !inQuotes) { result.Add(cur.ToString()); cur.Clear(); }
+                else cur.Append(ch);
+            }
+            result.Add(cur.ToString());
+            return result.ToArray();
+        }
 
         private void OnAdded(string key, string displayName)
         {
@@ -86,7 +163,7 @@ namespace ModbusForge.ViewModels
                 if (_valuesByKey.ContainsKey(key)) return;
                 var values = new ObservableCollection<double>();
                 _valuesByKey[key] = values;
-                var color = new SKColor(33, 150, 243);
+                var color = AcquireColor(key);
                 var ls = new LineSeries<double>
                 {
                     Name = string.IsNullOrWhiteSpace(displayName) ? key : displayName,
@@ -97,6 +174,7 @@ namespace ModbusForge.ViewModels
                 };
                 Series.Add(ls);
                 SeriesItems.Add(new TrendSeriesItem { Key = key, Name = ls.Name ?? key });
+                _samplesByKey[key] = new List<(DateTime ts, double v)>();
             });
         }
 
@@ -104,10 +182,8 @@ namespace ModbusForge.ViewModels
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                if (_valuesByKey.TryGetValue(key, out var values))
-                {
-                    _valuesByKey.Remove(key);
-                }
+                if (_valuesByKey.ContainsKey(key)) _valuesByKey.Remove(key);
+                if (_samplesByKey.ContainsKey(key)) _samplesByKey.Remove(key);
                 // remove matching series
                 for (int i = Series.Count - 1; i >= 0; i--)
                 {
@@ -124,6 +200,7 @@ namespace ModbusForge.ViewModels
                         SeriesItems.RemoveAt(i);
                     }
                 }
+                ReleaseColor(key);
             });
         }
 
@@ -133,10 +210,19 @@ namespace ModbusForge.ViewModels
             {
                 if (!_valuesByKey.TryGetValue(key, out var values)) return;
                 values.Add(value);
+                if (_samplesByKey.TryGetValue(key, out var samples))
+                {
+                    samples.Add((timestampUtc, value));
+                }
 
                 // enforce retention window based on logger settings
                 var maxPoints = Math.Max(1, (int)Math.Round((_loggerSvc.RetentionMinutes * 60_000.0) / Math.Max(1, _loggerSvc.SampleRateMs)));
                 while (values.Count > maxPoints) values.RemoveAt(0);
+                if (_samplesByKey.TryGetValue(key, out var samples2))
+                {
+                    var cutoff = DateTime.UtcNow.AddMinutes(-_loggerSvc.RetentionMinutes);
+                    while (samples2.Count > 0 && samples2[0].ts < cutoff) samples2.RemoveAt(0);
+                }
 
                 // follow live window if enabled
                 if (_followLive && Series.Count > 0)
@@ -177,6 +263,58 @@ namespace ModbusForge.ViewModels
         private void StopFollowing()
         {
             _followLive = false;
+        }
+
+        private SKColor AcquireColor(string key)
+        {
+            // pick next unused color
+            for (int i = 0; i < _palette.Count; i++)
+            {
+                var idx = (_paletteCursor + i) % _palette.Count;
+                var c = _palette[idx];
+                if (!_colorByKey.Values.Contains(c))
+                {
+                    _paletteCursor = (idx + 1) % _palette.Count;
+                    _colorByKey[key] = c;
+                    return c;
+                }
+            }
+            // all taken, reuse next
+            var color = _palette[_paletteCursor];
+            _paletteCursor = (_paletteCursor + 1) % _palette.Count;
+            _colorByKey[key] = color;
+            return color;
+        }
+
+        private void ReleaseColor(string key)
+        {
+            if (_colorByKey.ContainsKey(key)) _colorByKey.Remove(key);
+        }
+
+        private void ChangeColor()
+        {
+            var item = SelectedSeriesItem;
+            if (item == null) return;
+            // find series
+            for (int i = 0; i < Series.Count; i++)
+            {
+                if (Series[i] is LineSeries<double> ls && (ls.Name == item.Name || ls.Name == item.Key))
+                {
+                    // assign next palette color
+                    var current = _colorByKey.TryGetValue(item.Key, out var cc) ? cc : new SKColor(33,150,243);
+                    var next = AcquireColor("__temp__"); // temp acquire to move cursor
+                    ReleaseColor("__temp__");
+                    // ensure new not equal current
+                    if (next.Equals(current))
+                    {
+                        next = _palette[(_paletteCursor + 1) % _palette.Count];
+                        _paletteCursor = (_paletteCursor + 2) % _palette.Count;
+                    }
+                    _colorByKey[item.Key] = next;
+                    ls.Stroke = new SolidColorPaint(next) { StrokeThickness = 2 };
+                    break;
+                }
+            }
         }
     }
 }
