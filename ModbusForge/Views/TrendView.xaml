@@ -6,9 +6,6 @@
              xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
              xmlns:converters="clr-namespace:ModbusForge.Converters"
              mc:Ignorable="d">
-    <UserControl.Resources>
-        <converters:LockToZoomModeConverter x:Key="LockToZoomModeConverter"/>
-    </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

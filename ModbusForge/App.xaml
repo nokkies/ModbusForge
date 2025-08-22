@@ -7,7 +7,8 @@
     <Application.Resources>
       <ResourceDictionary>
         <ResourceDictionary.MergedDictionaries>
-          <!-- Add other resource dictionaries here if needed -->
+          <!-- App-level resources so they are available during control InitializeComponent -->
+          <ResourceDictionary Source="Resources/Converters.xaml"/>
         </ResourceDictionary.MergedDictionaries>
       </ResourceDictionary>
     </Application.Resources>

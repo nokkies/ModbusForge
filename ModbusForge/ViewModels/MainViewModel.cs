@@ -49,8 +49,21 @@ namespace ModbusForge.ViewModels
         {
         }
 
+        private async Task ReadAllCustomNowAsync()
+        {
+            if (!IsConnected) return;
+            var snapshot = CustomEntries.ToList();
+            foreach (var ce in snapshot)
+            {
+                try { await ReadCustomNowAsync(ce); }
+                catch (Exception ex) { _logger.LogDebug(ex, "ReadAllCustomNow: failed for {Area} {Address}", ce.Area, ce.Address); }
+            }
+            StatusMessage = $"Read {snapshot.Count} custom entries";
+        }
+
     public class CustomEntry : INotifyPropertyChanged
     {
+        private string _name = string.Empty;
         private int _address;
         private string _type = "uint"; // uint,int,real
         private string _value = "0";
@@ -65,6 +78,7 @@ namespace ModbusForge.ViewModels
         // Trend selection support
         private bool _trend = false;
 
+        public string Name { get => _name; set { if (_name != value) { _name = value; OnPropertyChanged(nameof(Name)); } } }
         public int Address { get => _address; set { if (_address != value) { _address = value; OnPropertyChanged(nameof(Address)); } } }
         public string Type { get => _type; set { if (_type != value) { _type = value; OnPropertyChanged(nameof(Type)); } } }
         public string Value { get => _value; set { if (_value != value) { _value = value; OnPropertyChanged(nameof(Value)); } } }
@@ -156,8 +170,22 @@ namespace ModbusForge.ViewModels
 
             // Custom tab commands
             AddCustomEntryCommand = new RelayCommand(AddCustomEntry);
-            WriteCustomNowCommand = new RelayCommand<CustomEntry>(async ce => await WriteCustomNowAsync(ce));
-            ReadCustomNowCommand = new RelayCommand<CustomEntry>(async ce => await ReadCustomNowAsync(ce));
+            // Use AsyncRelayCommand<object?> to avoid strict type validation exceptions during template initialization
+            WriteCustomNowCommand = new AsyncRelayCommand<object?>(async param =>
+            {
+                if (param is CustomEntry ce)
+                {
+                    await WriteCustomNowAsync(ce);
+                }
+            });
+            ReadCustomNowCommand = new AsyncRelayCommand<object?>(async param =>
+            {
+                if (param is CustomEntry ce)
+                {
+                    await ReadCustomNowAsync(ce);
+                }
+            });
+            ReadAllCustomNowCommand = new RelayCommand(async () => await ReadAllCustomNowAsync());
             SaveCustomCommand = new RelayCommand(async () => await SaveCustomAsync());
             LoadCustomCommand = new RelayCommand(async () => await LoadCustomAsync());
 
@@ -320,6 +348,7 @@ namespace ModbusForge.ViewModels
         public ICommand AddCustomEntryCommand { get; }
         public ICommand WriteCustomNowCommand { get; }
         public ICommand ReadCustomNowCommand { get; }
+        public IRelayCommand ReadAllCustomNowCommand { get; }
         public IRelayCommand SaveCustomCommand { get; }
         public IRelayCommand LoadCustomCommand { get; }
 
@@ -329,6 +358,10 @@ namespace ModbusForge.ViewModels
 
         [ObservableProperty]
         private bool _customReadMonitorEnabled = false;
+
+        // Global continuous read toggle (gates all periodic reads including trend sampling)
+        [ObservableProperty]
+        private bool _globalMonitorEnabled = false;
 
         // Monitoring toggles and periods
         [ObservableProperty]
@@ -1106,7 +1139,6 @@ namespace ModbusForge.ViewModels
         private async void CustomTimer_Tick(object? sender, EventArgs e)
         {
             if (!IsConnected) return;
-            if (!CustomMonitorEnabled) return;
             var now = DateTime.UtcNow;
             // Iterate over a snapshot to avoid InvalidOperationException when the collection is modified during awaits
             var snapshot = CustomEntries.ToList();
@@ -1126,6 +1158,7 @@ namespace ModbusForge.ViewModels
         {
             if (_isMonitoring) return;
             if (!IsConnected) return;
+            if (!GlobalMonitorEnabled) return;
 
             _isMonitoring = true;
             try
@@ -1171,22 +1204,9 @@ namespace ModbusForge.ViewModels
                         _lastDiscreteReadUtc = now;
                     }
                 }
-
-                // Custom tab: continuous reads per row
-                if (CustomReadMonitorEnabled)
-                {
-                    var snapshot = CustomEntries.ToList();
-                    foreach (var entry in snapshot)
-                    {
-                        if (!entry.Monitor) continue;
-                        int p = entry.ReadPeriodMs <= 0 ? 1000 : entry.ReadPeriodMs;
-                        if ((now - entry._lastReadUtc).TotalMilliseconds >= p)
-                        {
-                            await ReadCustomNowAsync(entry);
-                            entry._lastReadUtc = now;
-                        }
-                    }
-                }
+                // Custom tab: per-row continuous READs are disabled.
+                // Continuous reads for Custom entries are handled exclusively by TrendTimer_Tick
+                // for rows where ce.Trend == true, gated by GlobalMonitorEnabled.
             }
             finally
             {
@@ -1267,12 +1287,18 @@ namespace ModbusForge.ViewModels
         }
 
         private static string GetTrendKey(CustomEntry ce) => $"{(ce.Area ?? "HoldingRegister")}:{ce.Address}";
-        private static string GetTrendDisplayName(CustomEntry ce) => $"{(ce.Area ?? "HR")} {ce.Address} ({ce.Type})";
+        private static string GetTrendDisplayName(CustomEntry ce)
+        {
+            var name = (ce.Name ?? string.Empty).Trim();
+            if (!string.IsNullOrEmpty(name)) return name;
+            return $"{(ce.Area ?? "HR")} {ce.Address} ({ce.Type})";
+        }
 
         private async void TrendTimer_Tick(object? sender, EventArgs e)
         {
             if (_isTrending) return;
             if (!IsConnected) return;
+            if (!GlobalMonitorEnabled) return;
 
             var snapshot = CustomEntries.Where(c => c.Trend).ToList();
             if (snapshot.Count == 0) return;
@@ -1289,6 +1315,27 @@ namespace ModbusForge.ViewModels
                         if (val.HasValue)
                         {
                             _trendLogger.Publish(GetTrendKey(ce), val.Value, now);
+                            // Also update the UI-bound value for the Custom row so the grid reflects live reads
+                            var area = (ce.Area ?? "HoldingRegister").ToLowerInvariant();
+                            var type = (ce.Type ?? "uint").ToLowerInvariant();
+                            string display;
+                            if (area == "coil" || area == "discreteinput")
+                            {
+                                display = val.Value != 0.0 ? "1" : "0";
+                            }
+                            else if (type == "real")
+                            {
+                                display = val.Value.ToString("G9", CultureInfo.InvariantCulture);
+                            }
+                            else if (type == "int")
+                            {
+                                display = ((short)val.Value).ToString(CultureInfo.InvariantCulture);
+                            }
+                            else // uint
+                            {
+                                display = ((ushort)val.Value).ToString(CultureInfo.InvariantCulture);
+                            }
+                            ce.Value = display;
                         }
                     }
                     catch (Exception ex)
@@ -1404,6 +1451,7 @@ namespace ModbusForge.ViewModels
                 {
                     var data = CustomEntries.Select(e => new
                     {
+                        e.Name,
                         e.Address,
                         e.Type,
                         e.Value,
@@ -1445,6 +1493,7 @@ namespace ModbusForge.ViewModels
                     {
                         var ce = new CustomEntry
                         {
+                            Name = item.TryGetProperty("Name", out var nm) ? nm.GetString() ?? string.Empty : string.Empty,
                             Address = item.GetProperty("Address").GetInt32(),
                             Type = item.TryGetProperty("Type", out var t) ? t.GetString() ?? "uint" : "uint",
                             Value = item.TryGetProperty("Value", out var v) ? v.GetString() ?? "0" : "0",

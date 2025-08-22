@@ -10,9 +10,9 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <AssemblyName>ModbusForge</AssemblyName>
     <RootNamespace>ModbusForge</RootNamespace>
-    <Version>1.0.7</Version>
-    <AssemblyVersion>1.0.7.0</AssemblyVersion>
-    <FileVersion>1.0.7.0</FileVersion>
+    <Version>1.0.8</Version>
+    <AssemblyVersion>1.0.8.0</AssemblyVersion>
+    <FileVersion>1.0.8.0</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="Exists('Resources\\ModbusForge.ico')">
@@ -42,6 +42,9 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
     <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.0-rc5.4" />
+    <!-- Pin SkiaSharp to stable to reduce NU1701 warnings from transitive dependencies -->
+    <PackageReference Include="SkiaSharp" Version="3.116.1" />
+    <PackageReference Include="SkiaSharp.Views.WPF" Version="3.116.1" />
   </ItemGroup>
 
   

@@ -9,8 +9,9 @@ Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 - Dependency Injection and typed configuration via `ServerSettings` (Microsoft.Extensions.Options)
 - Modbus TCP client and server services using FluentModbus
 - Connection UI, read/write for registers and coils
-- Monitoring: periodic reads for Registers, Coils, Discrete Inputs, and per-row monitoring in Custom tab
-- Custom tab: per-row area (HoldingRegister/Coil/InputRegister/DiscreteInput), data type (uint/int/real/string), on-demand Read/Write, and per-row continuous write/read with periods
+- Monitoring: periodic reads for Registers, Coils, Discrete Inputs, gated by a single global Continuous Read toggle
+- Custom tab: per-row Area (HoldingRegister/Coil/InputRegister/DiscreteInput) and Type (uint/int/real/string), on-demand Read/Write, per-row Continuous Write, and live read updates driven by Trend-enabled rows
+- Logging/Trend tab: select rows to trend, zoom/pan, CSV/PNG export, retention window 1–60 minutes
 - Persistence for Custom entries to JSON (Save/Load)
 
 ### 🚧 In Progress
@@ -51,13 +52,20 @@ Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 
 - Client and Server modes (configured via `ModbusForge/ModbusForge/appsettings.json`, section `ServerSettings.Mode`)
 - Modbus TCP client operations: read/write holding registers, read coils, discrete inputs, and input registers
-- Per-tab monitoring with configurable periods
+- Global Continuous Read toggle that gates all periodic reads
 - Custom tab with per-row:
   - Area: `HoldingRegister`, `Coil`, `InputRegister`, `DiscreteInput`
   - Type: `uint`, `int`, `real` (32-bit float across 2 registers), `string` (2 chars per 16-bit register)
   - On-demand Read/Write buttons
-  - Continuous Write and Continuous Read with per-row period
+  - Continuous Write (per-row)
+  - Live reads: when Global Continuous Read is ON, rows with `Trend` enabled are read at the trend sample rate and their `Value` updates in the grid
   - Save/Load entries to JSON (`custom-entries.json`)
+
+- Logging/Trend
+  - Add/remove trend series per Custom row (`Trend` column)
+  - Adjustable retention window (1–60 minutes)
+  - Zoom and pan controls, play/pause live window, reset axes
+  - Export/Import CSV, export PNG
 
 ## Modes: Client vs Server
 
@@ -69,7 +77,70 @@ Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 
 ## Versioning
 
-- The window title displays the application version from the assembly ProductVersion (fallback to `v1.0.7`).
+- The window title displays the application version from the assembly ProductVersion (fallback to `v1.0.8`).
+
+## Build and Release
+
+Below are PowerShell commands tested on Windows to produce a Release build and package artifacts.
+
+1. Build (Release):
+
+```powershell
+dotnet clean
+dotnet restore
+dotnet build ModbusForge.sln -c Release
+```
+
+2. Publish (framework-dependent, single-file):
+
+```powershell
+dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishTrimmed=false -o .\publish\win-x64
+```
+
+3. Publish (self-contained, single-file):
+
+```powershell
+dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o .\publish\win-x64-sc
+```
+
+4. Create a ZIP artifact:
+
+```powershell
+$version = "1.0.9"
+Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
+# or for self-contained
+Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$version-win-x64-sc.zip -Force
+```
+
+5. Tag and create a GitHub Release (optional):
+
+```powershell
+$version = "1.0.9"
+git tag v$version
+git push origin v$version
+
+# If GitHub CLI is installed
+gh release create v$version .\ModbusForge-$version-win-x64.zip -t "ModbusForge v$version" -n "See changelog in README"
+# Optionally upload self-contained ZIP as well:
+gh release upload v$version .\ModbusForge-$version-win-x64-sc.zip
+```
+
+If you don’t use the GitHub CLI, you can create a release manually on GitHub and upload the ZIP file(s).
+
+## Changelog
+
+- 1.0.9 (2025-08-23)
+  - Custom tab continuous read/trend fix: when Global Continuous Read is ON, rows with `Trend` enabled are read asynchronously by the trend timer and their `Value` updates live in the grid.
+  - Removed per-row continuous read period in Custom; live reads are driven by the Trend sampler to avoid duplicate polling.
+  - Value formatting during trend reads now matches single-read behavior for `uint`/`int`/`real`/`coil`/`discreteinput`.
+  - README updated with Global Continuous Read behavior and Build/Release commands.
+
+- 1.0.8 (2025-08-22)
+  - Fixed XAML errors (XDG0008) by removing designer-only static types and relying on XAML arrays/resources.
+  - Decoupled LiveCharts types from ViewModel; Zoom locking now handled via `LockToZoomModeConverter` using `ZoomAndPanMode` in the view.
+  - Trend tab improvements: Play/Pause live window, Reset axes, CSV export/import; PNG export draws a white background to avoid transparent/black backgrounds.
+  - Package alignment: SkiaSharp 3.116.1 + SkiaSharp.Views.WPF 3.116.1; LiveChartsCore.SkiaSharpView.WPF remains at 2.0.0-rc5.4.
+  - Minor cleanups and nullability adjustments.
 
 ## Simulation Roadmap
 

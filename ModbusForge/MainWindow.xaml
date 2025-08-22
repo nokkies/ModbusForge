@@ -101,9 +101,12 @@
                         IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
                         Width="80" Margin="0,0,5,0"/>
 
-                <Button Grid.Column="9" Content="Disconnect" Command="{Binding DisconnectCommand}" 
-                        IsEnabled="{Binding IsConnected}"
-                        Width="80"/>
+                <StackPanel Grid.Column="9" Orientation="Horizontal">
+                    <CheckBox Content="Continuous Read" IsChecked="{Binding GlobalMonitorEnabled}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <Button Content="Disconnect" Command="{Binding DisconnectCommand}" 
+                            IsEnabled="{Binding IsConnected}"
+                            Width="80"/>
+                </StackPanel>
             </Grid>
         </GroupBox>
 
@@ -229,41 +232,50 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
+                    <!-- Toolbar -->
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
-                        <Button Content="Add Row" Width="100" Command="{Binding AddCustomEntryCommand}"/>
-                        <Button Content="Save" Width="80" Margin="10,0,0,0" Command="{Binding SaveCustomCommand}"/>
-                        <Button Content="Load" Width="80" Margin="5,0,0,0" Command="{Binding LoadCustomCommand}"/>
+                        <Button Content="Add" Command="{Binding AddCustomEntryCommand}" Width="80"/>
                         <Separator Width="10" Opacity="0"/>
-                        <CheckBox Content="Monitor" IsChecked="{Binding CustomMonitorEnabled}" VerticalAlignment="Center"/>
-                        <CheckBox Content="Monitor Reads" IsChecked="{Binding CustomReadMonitorEnabled}" VerticalAlignment="Center" Margin="10,0,0,0"/>
-                        <TextBlock Text="  Add a row with Address/Type/Value. Tick 'Cont.' to write periodically or 'Mon.' to read periodically." Margin="10,0,0,0" VerticalAlignment="Center"/>
+                        <Button Content="Read All" Command="{Binding ReadAllCustomNowCommand}" Width="80"/>
+                        <Separator Width="10" Opacity="0"/>
+                        <Button Content="Save" Command="{Binding SaveCustomCommand}" Width="80"/>
+                        <Button Content="Load" Command="{Binding LoadCustomCommand}" Width="80" Margin="5,0,0,0"/>
+                        <Separator Width="20" Opacity="0"/>
+                        <TextBlock VerticalAlignment="Center" Foreground="Gray">
+                            <Run Text="Note:" FontWeight="SemiBold"/>
+                            <Run Text=" Continuous Read uses Trend-enabled rows only when the global Continuous Read is ON."/>
+                        </TextBlock>
                     </StackPanel>
 
-                    <DataGrid x:Name="CustomGrid" Grid.Row="1" ItemsSource="{Binding CustomEntries}" AutoGenerateColumns="False" IsReadOnly="False" CanUserAddRows="False" CellEditEnding="CustomGrid_CellEditEnding" CurrentCellChanged="CustomGrid_CurrentCellChanged">
+                    <!-- Custom entries grid -->
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding CustomEntries}" AutoGenerateColumns="False" IsReadOnly="False">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
                             <DataGridComboBoxColumn Header="Area" SelectedItemBinding="{Binding Area}" ItemsSource="{StaticResource AreaOptionsAll}" Width="*"/>
+                            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
                             <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{StaticResource TypeOptionsAll}" Width="*"/>
                             <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="2*"/>
                             <DataGridCheckBoxColumn Header="Cont." Binding="{Binding Continuous}" Width="Auto"/>
                             <DataGridTextColumn Header="Period (ms)" Binding="{Binding PeriodMs}" Width="*"/>
-                            <DataGridCheckBoxColumn Header="Mon." Binding="{Binding Monitor}" Width="Auto"/>
                             <DataGridCheckBoxColumn Header="Trend" Binding="{Binding Trend}" Width="Auto"/>
-                            <DataGridTextColumn Header="Read Period (ms)" Binding="{Binding ReadPeriodMs}" Width="*"/>
                             <DataGridTemplateColumn Header="Actions" Width="Auto">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Button Content="Write" Padding="8,2" Margin="0,0,5,0" Command="{Binding DataContext.WriteCustomNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"/>
-                                        <Button Content="Read" Padding="8,2" Command="{Binding DataContext.ReadCustomNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                    </DataGrid.Columns>
-                </DataGrid>
-            </Grid>
-        </TabItem>
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Content="Write" Padding="8,2" Margin="0,0,5,0"
+                                                    Command="{Binding DataContext.WriteCustomNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                    CommandParameter="{Binding ., FallbackValue={x:Null}, TargetNullValue={x:Null}}"/>
+                                            <Button Content="Read" Padding="8,2"
+                                                    Command="{Binding DataContext.ReadCustomNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                    CommandParameter="{Binding ., FallbackValue={x:Null}, TargetNullValue={x:Null}}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
             <TabItem Header="Trend">
                 <Grid Margin="5">
                     <views:TrendView x:Name="TrendViewControl" />
