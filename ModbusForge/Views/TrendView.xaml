@@ -6,10 +6,30 @@
              xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
              mc:Ignorable="d">
     <Grid>
-        <lvc:CartesianChart Series="{Binding Series}"
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
+            <TextBlock Text="Series:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <ComboBox Width="220"
+                      ItemsSource="{Binding SeriesItems}"
+                      SelectedItem="{Binding SelectedSeriesItem}"
+                      DisplayMemberPath="Name"
+                      />
+            <Button Content="Delete" Margin="6,0,0,0" Width="80" Command="{Binding DeleteSelectedCommand}"/>
+            <Separator Width="10" Opacity="0"/>
+            <Button Content="Reset" Width="80" Command="{Binding ResetViewCommand}"/>
+            <Button Content="Play" Width="80" Margin="6,0,0,0" Command="{Binding PlayCommand}"/>
+            <Button Content="Pause" Width="80" Margin="6,0,0,0" Command="{Binding PauseCommand}"/>
+        </StackPanel>
+
+        <lvc:CartesianChart Grid.Row="1"
+                             Series="{Binding Series}"
                              XAxes="{Binding XAxes}"
                              YAxes="{Binding YAxes}"
-                             ZoomMode="X"
+                             ZoomMode="Both"
                              LegendPosition="Right"
                              TooltipFindingStrategy="CompareOnlyX"
                              />

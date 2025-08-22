@@ -69,7 +69,7 @@ Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 
 ## Versioning
 
-- The window title displays the application version from the assembly ProductVersion (fallback to `v1.0.6`).
+- The window title displays the application version from the assembly ProductVersion (fallback to `v1.0.7`).
 
 ## Simulation Roadmap
 

@@ -34,6 +34,15 @@
                 </TextBlock>
             </StackPanel>
 
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <TextBlock Text="Email: "/>
+                <TextBlock>
+                    <Hyperlink NavigateUri="mailto:skordonkels@gmail.com" RequestNavigate="Hyperlink_RequestNavigate">
+                        skordonkels@gmail.com
+                    </Hyperlink>
+                </TextBlock>
+            </StackPanel>
+
             <Button Content="Close" Width="80" HorizontalAlignment="Right" IsDefault="True" Click="Close_Click"/>
         </StackPanel>
     </Border>
