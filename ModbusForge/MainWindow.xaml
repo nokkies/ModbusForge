@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:ModbusForge"
         xmlns:viewmodels="clr-namespace:ModbusForge.ViewModels"
         xmlns:views="clr-namespace:ModbusForge.Views"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="1073" Width="1556"
         Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png">
@@ -16,7 +17,23 @@
                 <ResourceDictionary Source="Resources/Converters.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- Option arrays are provided via static C# providers in ModbusForge.ViewModels.*Options -->
+            <!-- XAML option arrays to avoid designer dependency on code -->
+            <x:Array x:Key="ModeOptionsAll" Type="{x:Type sys:String}">
+                <sys:String>Client</sys:String>
+                <sys:String>Server</sys:String>
+            </x:Array>
+            <x:Array x:Key="TypeOptionsAll" Type="{x:Type sys:String}">
+                <sys:String>uint</sys:String>
+                <sys:String>int</sys:String>
+                <sys:String>real</sys:String>
+                <sys:String>string</sys:String>
+            </x:Array>
+            <x:Array x:Key="AreaOptionsAll" Type="{x:Type sys:String}">
+                <sys:String>HoldingRegister</sys:String>
+                <sys:String>Coil</sys:String>
+                <sys:String>InputRegister</sys:String>
+                <sys:String>DiscreteInput</sys:String>
+            </x:Array>
         </ResourceDictionary>
     </Window.Resources>
 
@@ -76,7 +93,7 @@
                          Margin="0,0,5,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
 
                 <TextBlock Text="Mode:" Grid.Column="6" VerticalAlignment="Center" Margin="5,0"/>
-                <ComboBox Grid.Column="7" SelectedItem="{Binding Mode}" ItemsSource="{x:Static viewmodels:ModeOptions.All}"
+                <ComboBox Grid.Column="7" SelectedItem="{Binding Mode}" ItemsSource="{StaticResource ModeOptionsAll}"
                           IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
                           Width="80" Margin="0,0,5,0"/>
 
@@ -105,7 +122,7 @@
                         <TextBox Width="80" Text="{Binding RegisterCount}" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadRegistersCommand}" Width="80" Margin="0,0,10,0"/>
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                        <ComboBox Width="120" SelectedItem="{Binding RegistersGlobalType}" ItemsSource="{x:Static viewmodels:TypeOptions.All}"/>
+                        <ComboBox Width="120" SelectedItem="{Binding RegistersGlobalType}" ItemsSource="{StaticResource TypeOptionsAll}"/>
                         <Separator Width="10" Opacity="0"/>
                         <CheckBox Content="Monitor" IsChecked="{Binding HoldingMonitorEnabled}" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
@@ -116,7 +133,7 @@
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="*"/>
-                            <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{x:Static viewmodels:TypeOptions.All}" Width="*"/>
+                            <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{StaticResource TypeOptionsAll}" Width="*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -135,7 +152,7 @@
                         <TextBox Width="80" Text="{Binding InputRegisterCount}" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadInputRegistersCommand}" Width="80" Margin="0,0,10,0"/>
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                        <ComboBox Width="120" SelectedItem="{Binding InputRegistersGlobalType}" ItemsSource="{x:Static viewmodels:TypeOptions.All}"/>
+                        <ComboBox Width="120" SelectedItem="{Binding InputRegistersGlobalType}" ItemsSource="{StaticResource TypeOptionsAll}"/>
                         <Separator Width="10" Opacity="0"/>
                         <CheckBox Content="Monitor" IsChecked="{Binding InputRegistersMonitorEnabled}" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
@@ -225,8 +242,8 @@
                     <DataGrid x:Name="CustomGrid" Grid.Row="1" ItemsSource="{Binding CustomEntries}" AutoGenerateColumns="False" IsReadOnly="False" CanUserAddRows="False" CellEditEnding="CustomGrid_CellEditEnding" CurrentCellChanged="CustomGrid_CurrentCellChanged">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
-                            <DataGridComboBoxColumn Header="Area" SelectedItemBinding="{Binding Area}" ItemsSource="{x:Static viewmodels:AreaOptions.All}" Width="*"/>
-                            <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{x:Static viewmodels:TypeOptions.All}" Width="*"/>
+                            <DataGridComboBoxColumn Header="Area" SelectedItemBinding="{Binding Area}" ItemsSource="{StaticResource AreaOptionsAll}" Width="*"/>
+                            <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{StaticResource TypeOptionsAll}" Width="*"/>
                             <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="2*"/>
                             <DataGridCheckBoxColumn Header="Cont." Binding="{Binding Continuous}" Width="Auto"/>
                             <DataGridTextColumn Header="Period (ms)" Binding="{Binding PeriodMs}" Width="*"/>

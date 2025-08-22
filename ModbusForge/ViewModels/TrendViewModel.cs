@@ -91,7 +91,14 @@ namespace ModbusForge.ViewModels
         public Axis[] YAxes { get; }
 
         [ObservableProperty]
+        private bool lockX;
+
+        [ObservableProperty]
+        private bool lockY;
+
+        [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(DeleteSelectedCommand))]
+        [NotifyCanExecuteChangedFor(nameof(ChangeColorCommand))]
         private TrendSeriesItem? selectedSeriesItem;
 
         public IRelayCommand DeleteSelectedCommand { get; }
@@ -99,6 +106,8 @@ namespace ModbusForge.ViewModels
         public IRelayCommand ResetViewCommand { get; }
         public IRelayCommand PlayCommand { get; }
         public IRelayCommand PauseCommand { get; }
+
+        // ZoomMode is now derived in the View via a converter from LockX/LockY
 
         public async System.Threading.Tasks.Task ExportCsvAsync(string path, TrendSeriesItem? item)
         {

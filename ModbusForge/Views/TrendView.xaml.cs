@@ -31,7 +31,21 @@ namespace ModbusForge.Views
             int h = height ?? (int)Math.Max(1, Math.Ceiling(double.IsNaN(TrendChart.ActualHeight) || TrendChart.ActualHeight == 0 ? 400 : TrendChart.ActualHeight));
 
             var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
-            rtb.Render(TrendChart);
+
+            // Draw a white background, then the chart visual on top to avoid black/transparent backgrounds in PNG viewers
+            var dv = new DrawingVisual();
+            using (var dc = dv.RenderOpen())
+            {
+                dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, w, h));
+                var vb = new VisualBrush(TrendChart)
+                {
+                    Stretch = Stretch.Fill,
+                    AlignmentX = AlignmentX.Left,
+                    AlignmentY = AlignmentY.Top
+                };
+                dc.DrawRectangle(vb, null, new Rect(0, 0, w, h));
+            }
+            rtb.Render(dv);
 
             var encoder = new PngBitmapEncoder();
             encoder.Frames.Add(BitmapFrame.Create(rtb));

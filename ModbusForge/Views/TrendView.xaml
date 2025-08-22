@@ -4,7 +4,11 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+             xmlns:converters="clr-namespace:ModbusForge.Converters"
              mc:Ignorable="d">
+    <UserControl.Resources>
+        <converters:LockToZoomModeConverter x:Key="LockToZoomModeConverter"/>
+    </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -24,15 +28,23 @@
             <Button Content="Reset" Width="80" Command="{Binding ResetViewCommand}"/>
             <Button Content="Play" Width="80" Margin="6,0,0,0" Command="{Binding PlayCommand}"/>
             <Button Content="Pause" Width="80" Margin="6,0,0,0" Command="{Binding PauseCommand}"/>
+            <Separator Width="10" Opacity="0"/>
+            <CheckBox Content="Lock X" Margin="6,0,0,0" VerticalAlignment="Center" IsChecked="{Binding LockX}"/>
+            <CheckBox Content="Lock Y" Margin="6,0,0,0" VerticalAlignment="Center" IsChecked="{Binding LockY}"/>
         </StackPanel>
 
         <lvc:CartesianChart x:Name="TrendChart" Grid.Row="1"
                              Series="{Binding Series}"
                              XAxes="{Binding XAxes}"
                              YAxes="{Binding YAxes}"
-                             ZoomMode="Both"
                              LegendPosition="Right"
-                             TooltipFindingStrategy="CompareOnlyX"
-                             />
+                             TooltipFindingStrategy="CompareOnlyX">
+            <lvc:CartesianChart.ZoomMode>
+                <MultiBinding Converter="{StaticResource LockToZoomModeConverter}">
+                    <Binding Path="LockX"/>
+                    <Binding Path="LockY"/>
+                </MultiBinding>
+            </lvc:CartesianChart.ZoomMode>
+        </lvc:CartesianChart>
     </Grid>
 </UserControl>

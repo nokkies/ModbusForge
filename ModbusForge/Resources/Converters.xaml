@@ -4,4 +4,5 @@
     <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
     <converters:BooleanToConnectedConverter x:Key="BooleanToConnectedConverter"/>
     <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    <converters:LockToZoomModeConverter x:Key="LockToZoomModeConverter"/>
 </ResourceDictionary>
