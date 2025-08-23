@@ -66,8 +66,9 @@ namespace ModbusForge
             services.AddSingleton<ITrendLogger, TrendLoggingService>();
             
             // Register ViewModels
-            services.AddTransient<MainViewModel>();
+            services.AddSingleton<MainViewModel>();
             services.AddTransient<TrendViewModel>();
+            services.AddTransient<DecodeViewModel>();
         }
 
 
