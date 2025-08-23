@@ -83,6 +83,9 @@ namespace ModbusForge.ViewModels
             ResetViewCommand = new RelayCommand(ResetView);
             PlayCommand = new RelayCommand(StartFollowing);
             PauseCommand = new RelayCommand(StopFollowing);
+
+            // initialize retention minutes from service
+            RetentionMinutes = _loggerSvc.RetentionMinutes;
         }
 
         public ObservableCollection<ISeries> Series { get; }
@@ -96,6 +99,10 @@ namespace ModbusForge.ViewModels
         [ObservableProperty]
         private bool lockY;
 
+        // Retention window (minutes) editable from UI (1..60)
+        [ObservableProperty]
+        private int retentionMinutes;
+
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(DeleteSelectedCommand))]
         [NotifyCanExecuteChangedFor(nameof(ChangeColorCommand))]
@@ -106,6 +113,7 @@ namespace ModbusForge.ViewModels
         public IRelayCommand ResetViewCommand { get; }
         public IRelayCommand PlayCommand { get; }
         public IRelayCommand PauseCommand { get; }
+        public IRelayCommand ApplyRetentionCommand => new RelayCommand(ApplyRetention);
 
         // ZoomMode is now derived in the View via a converter from LockX/LockY
 
@@ -272,6 +280,17 @@ namespace ModbusForge.ViewModels
         private void StopFollowing()
         {
             _followLive = false;
+        }
+
+        private void ApplyRetention()
+        {
+            var mins = RetentionMinutes;
+            if (mins < 1) mins = 1;
+            if (mins > 60) mins = 60;
+            // keep current sample rate and export folder
+            _loggerSvc.UpdateSettings(mins, _loggerSvc.SampleRateMs);
+            // property may have been clamped; reflect back
+            RetentionMinutes = _loggerSvc.RetentionMinutes;
         }
 
         private SKColor AcquireColor(string key)

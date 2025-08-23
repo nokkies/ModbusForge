@@ -106,7 +106,7 @@ dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-con
 4. Create a ZIP artifact:
 
 ```powershell
-$version = "1.0.9"
+$version = "1.1.1"
 Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
 # or for self-contained
 Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$version-win-x64-sc.zip -Force
@@ -115,7 +115,7 @@ Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$ve
 5. Tag and create a GitHub Release (optional):
 
 ```powershell
-$version = "1.0.9"
+$version = "1.1.1"
 git tag v$version
 git push origin v$version
 
@@ -128,6 +128,16 @@ gh release upload v$version .\ModbusForge-$version-win-x64-sc.zip
 If you don’t use the GitHub CLI, you can create a release manually on GitHub and upload the ZIP file(s).
 
 ## Changelog
+
+- 1.1.1 (2025-08-23)
+  - Trend: added retention window control (1–60 minutes) with Apply action.
+  - Trend: Export CSV (selected/all series), Import CSV, and Export PNG buttons added to toolbar.
+  - Minor UI polish on Trend tab; wiring with `TrendViewModel` and safe file dialogs.
+
+- 1.1.0 (2025-08-23)
+  - Version bump and Simulation scaffolding: added Simulation tab UI bindings in `MainWindow.xaml`.
+  - `MainViewModel`: simulation timer that ramps holding registers and toggles coils when in Server mode.
+  - `ModbusServerService`: helper methods for input registers and discrete inputs for simulation.
 
 - 1.0.9 (2025-08-23)
   - Custom tab continuous read/trend fix: when Global Continuous Read is ON, rows with `Trend` enabled are read asynchronously by the trend timer and their `Value` updates live in the grid.

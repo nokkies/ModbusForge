@@ -7,6 +7,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Microsoft.Win32;
 
 namespace ModbusForge.Views
 {
@@ -51,6 +52,94 @@ namespace ModbusForge.Views
             encoder.Frames.Add(BitmapFrame.Create(rtb));
             using var fs = new FileStream(path, FileMode.Create, FileAccess.Write);
             encoder.Save(fs);
+        }
+
+        private string GetDefaultExportFolder()
+        {
+            try
+            {
+                var folder = Path.GetFullPath("Exports");
+                Directory.CreateDirectory(folder);
+                return folder;
+            }
+            catch
+            {
+                return Environment.CurrentDirectory;
+            }
+        }
+
+        private async void ExportCsv_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is not TrendViewModel vm) return;
+            var dlg = new SaveFileDialog
+            {
+                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                FileName = "trend.csv",
+                InitialDirectory = GetDefaultExportFolder()
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                try
+                {
+                    await vm.ExportCsvAsync(dlg.FileName, vm.SelectedSeriesItem);
+                    var owner = Window.GetWindow(this);
+                    MessageBox.Show(owner, "CSV export complete.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    var owner = Window.GetWindow(this);
+                    MessageBox.Show(owner, $"CSV export failed: {ex.Message}", "Trend", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private async void ImportCsv_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is not TrendViewModel vm) return;
+            var dlg = new OpenFileDialog
+            {
+                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                Multiselect = false,
+                InitialDirectory = GetDefaultExportFolder()
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                try
+                {
+                    await vm.ImportCsvAsync(dlg.FileName);
+                    var owner = Window.GetWindow(this);
+                    MessageBox.Show(owner, "CSV import complete.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    var owner = Window.GetWindow(this);
+                    MessageBox.Show(owner, $"CSV import failed: {ex.Message}", "Trend", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void ExportPng_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new SaveFileDialog
+            {
+                Filter = "PNG Image (*.png)|*.png|All files (*.*)|*.*",
+                FileName = "trend.png",
+                InitialDirectory = GetDefaultExportFolder()
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                try
+                {
+                    SaveChartAsPng(dlg.FileName);
+                    var owner = Window.GetWindow(this);
+                    MessageBox.Show(owner, "PNG export complete.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    var owner = Window.GetWindow(this);
+                    MessageBox.Show(owner, $"PNG export failed: {ex.Message}", "Trend", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
         }
     }
 }

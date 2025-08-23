@@ -340,6 +340,8 @@ namespace ModbusForge.ViewModels
         private int _simHoldingPhase = 0;
         private bool _simCoilState = false;
         private bool _simDiscreteState = false;
+        private DateTime _lastSimTickUtc = DateTime.UtcNow;
+        private double _simTimeSec = 0.0;
         private DateTime _lastHoldingReadUtc = DateTime.MinValue;
         private DateTime _lastInputRegReadUtc = DateTime.MinValue;
         private DateTime _lastCoilsReadUtc = DateTime.MinValue;
@@ -422,6 +424,19 @@ namespace ModbusForge.ViewModels
         [ObservableProperty]
         private int _simHoldingMax = 100;
 
+        // Holding Registers waveform parameters
+        [ObservableProperty]
+        private string _simHoldingWaveformType = "Ramp"; // Ramp, Sine, Triangle, Square
+
+        [ObservableProperty]
+        private double _simHoldingAmplitude = 1000.0;
+
+        [ObservableProperty]
+        private double _simHoldingFrequencyHz = 0.5;
+
+        [ObservableProperty]
+        private double _simHoldingOffset = 0.0;
+
         // Coils toggle
         [ObservableProperty]
         private bool _simCoilsEnabled = false;
@@ -473,6 +488,8 @@ namespace ModbusForge.ViewModels
             _simHoldingPhase = 0;
             _simCoilState = false;
             _simDiscreteState = false;
+            _simTimeSec = 0.0;
+            _lastSimTickUtc = DateTime.UtcNow;
         }
 
         private bool CanConnect() => !IsConnected;
@@ -880,21 +897,61 @@ namespace ModbusForge.ViewModels
             _isSimulating = true;
             try
             {
-                // Holding Registers: ramp pattern across range
+                // Advance simulation time
+                var nowSim = DateTime.UtcNow;
+                double dt = (nowSim - _lastSimTickUtc).TotalSeconds;
+                if (dt < 0 || dt > 5) dt = 0; // guard against large jumps (sleep/resume, breakpoints)
+                _simTimeSec += dt;
+                _lastSimTickUtc = nowSim;
+
+                // Holding Registers: waveform or ramp across range
                 if (SimHoldingsEnabled)
                 {
                     int count = SimHoldingCount <= 0 ? 0 : SimHoldingCount;
                     int start = SimHoldingStart;
                     int min = SimHoldingMin;
                     int max = SimHoldingMax;
-                    int range = Math.Max(1, max - min + 1);
-                    _simHoldingPhase = (_simHoldingPhase + 1) % range;
-                    for (int i = 0; i < count; i++)
+                    string wf = (SimHoldingWaveformType ?? "Ramp").ToLowerInvariant();
+                    if ((wf == "sine" || wf == "triangle" || wf == "square") && SimHoldingFrequencyHz > 0)
                     {
-                        int val = min + ((_simHoldingPhase + i) % range);
-                        if (val < 0) val = 0;
-                        if (val > 65535) val = 65535;
-                        await _modbusService.WriteSingleRegisterAsync(UnitId, start + i, (ushort)val);
+                        double f = SimHoldingFrequencyHz;
+                        double x = 2.0 * Math.PI * f * _simTimeSec;
+                        double w;
+                        if (wf == "sine")
+                        {
+                            w = Math.Sin(x);
+                        }
+                        else if (wf == "triangle")
+                        {
+                            double phase = f * _simTimeSec; // cycles
+                            phase = phase - Math.Floor(phase); // [0,1)
+                            w = 4.0 * Math.Abs(phase - 0.5) - 1.0; // [-1,1]
+                        }
+                        else // square
+                        {
+                            w = Math.Sin(x) >= 0 ? 1.0 : -1.0;
+                        }
+
+                        double raw = SimHoldingOffset + (SimHoldingAmplitude * w);
+                        int iv = (int)Math.Round(raw);
+                        if (iv < 0) iv = 0;
+                        if (iv > 65535) iv = 65535;
+                        for (int i = 0; i < count; i++)
+                        {
+                            await _modbusService.WriteSingleRegisterAsync(UnitId, start + i, (ushort)iv);
+                        }
+                    }
+                    else
+                    {
+                        int range = Math.Max(1, max - min + 1);
+                        _simHoldingPhase = (_simHoldingPhase + 1) % range;
+                        for (int i = 0; i < count; i++)
+                        {
+                            int val = min + ((_simHoldingPhase + i) % range);
+                            if (val < 0) val = 0;
+                            if (val > 65535) val = 65535;
+                            await _modbusService.WriteSingleRegisterAsync(UnitId, start + i, (ushort)val);
+                        }
                     }
                 }
 

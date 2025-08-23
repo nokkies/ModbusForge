@@ -28,6 +28,19 @@
             <Separator Width="10" Opacity="0"/>
             <CheckBox Content="Lock X" Margin="6,0,0,0" VerticalAlignment="Center" IsChecked="{Binding LockX}"/>
             <CheckBox Content="Lock Y" Margin="6,0,0,0" VerticalAlignment="Center" IsChecked="{Binding LockY}"/>
+
+            <!-- Retention minutes control -->
+            <Separator Width="20" Opacity="0"/>
+            <TextBlock Text="Retention (min):" VerticalAlignment="Center"/>
+            <TextBox Width="60" Margin="6,0,0,0" VerticalAlignment="Center"
+                     Text="{Binding RetentionMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+            <Button Content="Apply" Width="70" Margin="6,0,0,0" Command="{Binding ApplyRetentionCommand}"/>
+
+            <!-- Export/Import -->
+            <Separator Width="20" Opacity="0"/>
+            <Button Content="Export CSV" Width="100" Margin="0,0,0,0" Click="ExportCsv_Click"/>
+            <Button Content="Import CSV" Width="100" Margin="6,0,0,0" Click="ImportCsv_Click"/>
+            <Button Content="Export PNG" Width="100" Margin="6,0,0,0" Click="ExportPng_Click"/>
         </StackPanel>
 
         <lvc:CartesianChart x:Name="TrendChart" Grid.Row="1"

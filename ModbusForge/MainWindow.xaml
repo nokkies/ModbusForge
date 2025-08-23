@@ -28,6 +28,12 @@
                 <sys:String>real</sys:String>
                 <sys:String>string</sys:String>
             </x:Array>
+            <x:Array x:Key="WaveformOptionsAll" Type="{x:Type sys:String}">
+                <sys:String>Ramp</sys:String>
+                <sys:String>Sine</sys:String>
+                <sys:String>Triangle</sys:String>
+                <sys:String>Square</sys:String>
+            </x:Array>
             <x:Array x:Key="AreaOptionsAll" Type="{x:Type sys:String}">
                 <sys:String>HoldingRegister</sys:String>
                 <sys:String>Coil</sys:String>
@@ -296,17 +302,33 @@
 
                     <!-- Content -->
                     <StackPanel Grid.Row="1" Orientation="Vertical" >
-                        <GroupBox Header="Holding Registers (Ramp)">
-                            <StackPanel Orientation="Horizontal" Margin="5">
-                                <CheckBox Content="Enable" IsChecked="{Binding SimHoldingsEnabled}" VerticalAlignment="Center"/>
-                                <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimHoldingStart}"/>
-                                <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimHoldingCount}"/>
-                                <TextBlock Text=" Min:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimHoldingMin}"/>
-                                <TextBlock Text=" Max:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimHoldingMax}"/>
+                        <GroupBox Header="Holding Registers (Waveform)">
+                            <StackPanel Orientation="Vertical" Margin="5">
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox Content="Enable" IsChecked="{Binding SimHoldingsEnabled}" VerticalAlignment="Center"/>
+                                    <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                    <TextBox Width="80" Text="{Binding SimHoldingStart}"/>
+                                    <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                    <TextBox Width="80" Text="{Binding SimHoldingCount}"/>
+                                    <TextBlock Text=" Min:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                    <TextBox Width="80" Text="{Binding SimHoldingMin}"/>
+                                    <TextBlock Text=" Max:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                    <TextBox Width="80" Text="{Binding SimHoldingMax}"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <TextBlock Text=" Waveform:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <ComboBox Width="100" SelectedItem="{Binding SimHoldingWaveformType}" ItemsSource="{StaticResource WaveformOptionsAll}"/>
+                                    <TextBlock Text=" Amp:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                    <TextBox Width="80" Text="{Binding SimHoldingAmplitude}"/>
+                                    <TextBlock Text=" Freq (Hz):" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                    <TextBox Width="80" Text="{Binding SimHoldingFrequencyHz}"/>
+                                    <TextBlock Text=" Offset:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                    <TextBox Width="80" Text="{Binding SimHoldingOffset}"/>
+                                </StackPanel>
+                                <TextBlock Foreground="Gray" Margin="0,4,0,0">
+                                    <Run Text="Note:" FontWeight="SemiBold"/>
+                                    <Run Text=" Ramp uses Min/Max. Sine/Triangle/Square use Amplitude/Offset (clipped to 0..65535)."/>
+                                </TextBlock>
                             </StackPanel>
                         </GroupBox>
 
