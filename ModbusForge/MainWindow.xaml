@@ -64,6 +64,7 @@
                 <MenuItem Header="_Import CSV..." Click="Trend_ImportCsv_Click"/>
             </MenuItem>
             <MenuItem Header="_Help">
+                <MenuItem Header="_Donate..." Click="MenuItem_Donate_Click"/>
                 <MenuItem Header="_About" Click="MenuItem_About_Click"/>
             </MenuItem>
         </Menu>
@@ -366,6 +367,11 @@
                             </StackPanel>
                         </GroupBox>
                     </StackPanel>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Decode">
+                <Grid Margin="5">
+                    <views:DecodeView />
                 </Grid>
             </TabItem>
             <TabItem Header="Trend">

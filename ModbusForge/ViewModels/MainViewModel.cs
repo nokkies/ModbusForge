@@ -160,12 +160,12 @@ namespace ModbusForge.ViewModels
                 }
                 else
                 {
-                    Title = "ModbusForge v1.0.6"; // fallback
+                    Title = "ModbusForge v1.1.2"; // fallback
                 }
             }
             catch
             {
-                Title = "ModbusForge v1.0.6"; // fallback on any error
+                Title = "ModbusForge v1.1.2"; // fallback on any error
             }
 
             // Custom tab commands

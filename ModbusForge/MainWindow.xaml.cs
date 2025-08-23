@@ -7,6 +7,7 @@ using System.Windows.Navigation;
 using ModbusForge.ViewModels;
 using Microsoft.Win32;
 using System.IO;
+using System.Diagnostics;
 
 namespace ModbusForge
 {
@@ -45,6 +46,19 @@ namespace ModbusForge
                 Owner = this
             };
             about.ShowDialog();
+        }
+
+        private void MenuItem_Donate_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var url = "https://www.paypal.com/donate/?hosted_button_id=ELTVNJEYLZE3W";
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Could not open browser: {ex.Message}", "Donate", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async void Trend_ExportCsv_Click(object sender, RoutedEventArgs e)

@@ -1,0 +1,200 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+          cache: true
+
+      - name: Compute version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $versionTag = '${{ github.ref_name }}'
+          if (-not $versionTag) { $versionTag = 'v0.0.0' }
+          $version = $versionTag.TrimStart('v')
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build (Release)
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          dotnet build ModbusForge.sln -c Release --no-restore -p:Version=$version -p:AssemblyVersion=$version.0 -p:FileVersion=$version.0
+
+      - name: Publish framework-dependent (single-file)
+        run: >
+          dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64
+          --self-contained false
+          -p:PublishSingleFile=true
+          -p:PublishTrimmed=false
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:AssemblyVersion=${{ steps.version.outputs.version }}.0
+          -p:FileVersion=${{ steps.version.outputs.version }}.0
+          -o .\publish\win-x64
+
+      - name: Publish self-contained (single-file)
+        run: >
+          dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:PublishTrimmed=false
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:AssemblyVersion=${{ steps.version.outputs.version }}.0
+          -p:FileVersion=${{ steps.version.outputs.version }}.0
+          -o .\publish\win-x64-sc
+
+      - name: Code sign executables (optional)
+        if: ${{ always() }}
+        shell: pwsh
+        env:
+          CODESIGN_PFX_BASE64: ${{ secrets.CODESIGN_PFX_BASE64 }}
+          CODESIGN_PFX_PASSWORD: ${{ secrets.CODESIGN_PFX_PASSWORD }}
+        run: |
+          if (-not $env:CODESIGN_PFX_BASE64 -or -not $env:CODESIGN_PFX_PASSWORD) {
+            Write-Host 'Code signing skipped (secrets missing).'
+            exit 0
+          }
+          $pfxBase64 = $env:CODESIGN_PFX_BASE64
+          $pfxPass = $env:CODESIGN_PFX_PASSWORD
+          $pfxPath = "$pwd\codesign.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($pfxBase64))
+          $timestampUrl = 'http://timestamp.digicert.com'
+          $files = @(
+            '.\publish\win-x64\ModbusForge.exe',
+            '.\publish\win-x64-sc\ModbusForge.exe'
+          )
+          foreach ($f in $files) {
+            if (Test-Path $f) {
+              signtool.exe sign /f $pfxPath /p $pfxPass /fd SHA256 /tr $timestampUrl /td SHA256 "$f"
+            }
+          }
+
+      - name: Package artifacts (ZIP)
+        shell: pwsh
+        run: |
+          $versionTag = '${{ github.ref_name }}'
+          if (-not $versionTag) { $versionTag = 'v0.0.0' }
+          $version = $versionTag.TrimStart('v')
+          Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
+          Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$version-win-x64-sc.zip -Force
+
+      - name: Generate checksums (SHA256)
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path . -Filter 'ModbusForge-*-win-x64*.zip'
+          foreach ($f in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -Path $f.FullName).Hash.ToLower()
+            $out = "$hash  $($f.Name)"
+            $out | Out-File -FilePath "$($f.FullName).sha256" -Encoding ascii -NoNewline
+          }
+
+      - name: Create MSIX package (optional)
+        if: ${{ always() }}
+        shell: pwsh
+        env:
+          MSIX_PUBLISHER: ${{ secrets.MSIX_PUBLISHER }}
+          CODESIGN_PFX_BASE64: ${{ secrets.CODESIGN_PFX_BASE64 }}
+          CODESIGN_PFX_PASSWORD: ${{ secrets.CODESIGN_PFX_PASSWORD }}
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $pub = $env:MSIX_PUBLISHER
+          if (-not $pub -or -not $env:CODESIGN_PFX_BASE64 -or -not $env:CODESIGN_PFX_PASSWORD) {
+            Write-Host 'MSIX packaging skipped (MSIX_PUBLISHER or code-signing secrets missing).'
+            exit 0
+          }
+          $msixDir = "$pwd\msix"
+          New-Item $msixDir -ItemType Directory -Force | Out-Null
+          New-Item "$msixDir\Assets" -ItemType Directory -Force | Out-Null
+          if (Test-Path '.\ModbusForge\Resources\ModbusForgeLOGO.png') {
+            Copy-Item '.\ModbusForge\Resources\ModbusForgeLOGO.png' "$msixDir\Assets\Logo.png" -Force
+          }
+          $manifestLines = @(
+            '<?xml version="1.0" encoding="utf-8"?>',
+            '<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities" IgnorableNamespaces="uap rescap">',
+            '  <Identity Name="nokkies.ModbusForge" Publisher="{{PUBLISHER}}" Version="{{VERSION}}.0" ProcessorArchitecture="x64"/>',
+            '  <Properties>',
+            '    <DisplayName>ModbusForge</DisplayName>',
+            '    <PublisherDisplayName>ModbusForge</PublisherDisplayName>',
+            '    <Logo>Assets\\Logo.png</Logo>',
+            '  </Properties>',
+            '  <Dependencies>',
+            '    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />',
+            '  </Dependencies>',
+            '  <Resources>',
+            '    <Resource Language="en-us" />',
+            '  </Resources>',
+            '  <Applications>',
+            '    <Application Id="ModbusForge" Executable="ModbusForge.exe" EntryPoint="Windows.FullTrustApplication">',
+            '      <uap:VisualElements DisplayName="ModbusForge" Description="Modbus TCP client/server" Square150x150Logo="Assets\\Logo.png" Square44x44Logo="Assets\\Logo.png" BackgroundColor="#464646"/>',
+            '    </Application>',
+            '  </Applications>',
+            '  <Capabilities>',
+            '    <rescap:Capability Name="runFullTrust" />',
+            '  </Capabilities>',
+            '</Package>'
+          )
+          $manifest = ($manifestLines -join "`n").Replace('{{PUBLISHER}}', $pub).Replace('{{VERSION}}', $version)
+          $manifest | Out-File "$msixDir\AppxManifest.xml" -Encoding utf8 -Force
+
+          Copy-Item '.\publish\win-x64-sc\*' "$msixDir" -Recurse -Force
+
+          $msixName = "ModbusForge-$version-win-x64.msix"
+          & makeappx.exe pack /d "$msixDir" /p "$msixName" /o
+
+          # Sign MSIX
+          $pfxBase64 = $env:CODESIGN_PFX_BASE64
+          $pfxPass = $env:CODESIGN_PFX_PASSWORD
+          $pfxPath = "$pwd\codesign-msix.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($pfxBase64))
+          $timestampUrl = 'http://timestamp.digicert.com'
+          signtool.exe sign /f $pfxPath /p $pfxPass /fd SHA256 /tr $timestampUrl /td SHA256 "$msixName"
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ModbusForge-${{ github.ref_name }}
+          path: |
+            ModbusForge-*-win-x64.zip
+            ModbusForge-*-win-x64-sc.zip
+            ModbusForge-*-win-x64.zip.sha256
+            ModbusForge-*-win-x64-sc.zip.sha256
+            ModbusForge-*-win-x64.msix
+          if-no-files-found: ignore
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ModbusForge ${{ github.ref_name }}
+          generate_release_notes: true
+          body: |
+            Automated release for ${{ github.ref_name }}.
+            See README.md Changelog for details.
+          files: |
+            ModbusForge-*-win-x64.zip
+            ModbusForge-*-win-x64-sc.zip
+            ModbusForge-*-win-x64.zip.sha256
+            ModbusForge-*-win-x64-sc.zip.sha256
+            ModbusForge-*-win-x64.msix
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

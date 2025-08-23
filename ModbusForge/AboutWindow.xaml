@@ -10,6 +10,7 @@
         <StackPanel>
             <Image Source="Resources/ModbusForgeLOGO.png" Height="80" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,8"/>
             <TextBlock Text="ModbusForge" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="VersionText" FontSize="12" Foreground="Gray" HorizontalAlignment="Center" Margin="0,2,0,8"/>
             <TextBlock Text="A WPF Modbus client/server tool." Margin="0,6,0,12" HorizontalAlignment="Center"/>
 
             <TextBlock TextWrapping="Wrap">
