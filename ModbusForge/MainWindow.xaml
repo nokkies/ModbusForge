@@ -102,7 +102,6 @@
                         Width="80" Margin="0,0,5,0"/>
 
                 <StackPanel Grid.Column="9" Orientation="Horizontal">
-                    <CheckBox Content="Continuous Read" IsChecked="{Binding GlobalMonitorEnabled}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <Button Content="Disconnect" Command="{Binding DisconnectCommand}" 
                             IsEnabled="{Binding IsConnected}"
                             Width="80"/>
@@ -127,7 +126,7 @@
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <ComboBox Width="120" SelectedItem="{Binding RegistersGlobalType}" ItemsSource="{StaticResource TypeOptionsAll}"/>
                         <Separator Width="10" Opacity="0"/>
-                        <CheckBox Content="Monitor" IsChecked="{Binding HoldingMonitorEnabled}" VerticalAlignment="Center"/>
+                        <CheckBox Content="Continuous Read" IsChecked="{Binding HoldingMonitorEnabled}" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding HoldingMonitorPeriodMs}"/>
                     </StackPanel>
@@ -157,7 +156,7 @@
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <ComboBox Width="120" SelectedItem="{Binding InputRegistersGlobalType}" ItemsSource="{StaticResource TypeOptionsAll}"/>
                         <Separator Width="10" Opacity="0"/>
-                        <CheckBox Content="Monitor" IsChecked="{Binding InputRegistersMonitorEnabled}" VerticalAlignment="Center"/>
+                        <CheckBox Content="Continuous Read" IsChecked="{Binding InputRegistersMonitorEnabled}" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding InputRegistersMonitorPeriodMs}"/>
                     </StackPanel>
@@ -185,7 +184,7 @@
                         <TextBox Width="80" Text="{Binding CoilCount}" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadCoilsCommand}" Width="80"/>
                         <Separator Width="10" Opacity="0"/>
-                        <CheckBox Content="Monitor" IsChecked="{Binding CoilsMonitorEnabled}" VerticalAlignment="Center"/>
+                        <CheckBox Content="Continuous Read" IsChecked="{Binding CoilsMonitorEnabled}" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding CoilsMonitorPeriodMs}"/>
                     </StackPanel>
@@ -212,7 +211,7 @@
                         <TextBox Width="80" Text="{Binding DiscreteInputCount}" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadDiscreteInputsCommand}" Width="80"/>
                         <Separator Width="10" Opacity="0"/>
-                        <CheckBox Content="Monitor" IsChecked="{Binding DiscreteInputsMonitorEnabled}" VerticalAlignment="Center"/>
+                        <CheckBox Content="Continuous Read" IsChecked="{Binding DiscreteInputsMonitorEnabled}" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding DiscreteInputsMonitorPeriodMs}"/>
                     </StackPanel>
@@ -241,9 +240,10 @@
                         <Button Content="Save" Command="{Binding SaveCustomCommand}" Width="80"/>
                         <Button Content="Load" Command="{Binding LoadCustomCommand}" Width="80" Margin="5,0,0,0"/>
                         <Separator Width="20" Opacity="0"/>
+                        <CheckBox Content="Continuous Read" IsChecked="{Binding GlobalMonitorEnabled}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <TextBlock VerticalAlignment="Center" Foreground="Gray">
                             <Run Text="Note:" FontWeight="SemiBold"/>
-                            <Run Text=" Continuous Read uses Trend-enabled rows only when the global Continuous Read is ON."/>
+                            <Run Text=" Reads Trend-enabled rows."/>
                         </TextBlock>
                     </StackPanel>
 
@@ -274,6 +274,76 @@
                             </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Simulation">
+                <Grid Margin="5">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Toolbar -->
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
+                        <CheckBox Content="Enable Simulation" IsChecked="{Binding SimulationEnabled}" VerticalAlignment="Center"/>
+                        <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                        <TextBox Width="80" Text="{Binding SimulationPeriodMs}"/>
+                        <TextBlock VerticalAlignment="Center" Foreground="Gray" Margin="10,0,0,0">
+                            <Run Text="Note:" FontWeight="SemiBold"/>
+                            <Run Text=" Server mode only."/>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- Content -->
+                    <StackPanel Grid.Row="1" Orientation="Vertical" >
+                        <GroupBox Header="Holding Registers (Ramp)">
+                            <StackPanel Orientation="Horizontal" Margin="5">
+                                <CheckBox Content="Enable" IsChecked="{Binding SimHoldingsEnabled}" VerticalAlignment="Center"/>
+                                <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                <TextBox Width="80" Text="{Binding SimHoldingStart}"/>
+                                <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                <TextBox Width="80" Text="{Binding SimHoldingCount}"/>
+                                <TextBlock Text=" Min:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                <TextBox Width="80" Text="{Binding SimHoldingMin}"/>
+                                <TextBlock Text=" Max:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                <TextBox Width="80" Text="{Binding SimHoldingMax}"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Coils (Toggle)">
+                            <StackPanel Orientation="Horizontal" Margin="5">
+                                <CheckBox Content="Enable" IsChecked="{Binding SimCoilsEnabled}" VerticalAlignment="Center"/>
+                                <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                <TextBox Width="80" Text="{Binding SimCoilStart}"/>
+                                <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                <TextBox Width="80" Text="{Binding SimCoilCount}"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Input Registers (Ramp)">
+                            <StackPanel Orientation="Horizontal" Margin="5">
+                                <CheckBox Content="Enable" IsChecked="{Binding SimInputsEnabled}" VerticalAlignment="Center"/>
+                                <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                <TextBox Width="80" Text="{Binding SimInputStart}"/>
+                                <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                <TextBox Width="80" Text="{Binding SimInputCount}"/>
+                                <TextBlock Text=" Min:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                <TextBox Width="80" Text="{Binding SimInputMin}"/>
+                                <TextBlock Text=" Max:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                <TextBox Width="80" Text="{Binding SimInputMax}"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Discrete Inputs (Toggle)">
+                            <StackPanel Orientation="Horizontal" Margin="5">
+                                <CheckBox Content="Enable" IsChecked="{Binding SimDiscreteEnabled}" VerticalAlignment="Center"/>
+                                <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                <TextBox Width="80" Text="{Binding SimDiscreteStart}"/>
+                                <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                <TextBox Width="80" Text="{Binding SimDiscreteCount}"/>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
                 </Grid>
             </TabItem>
             <TabItem Header="Trend">

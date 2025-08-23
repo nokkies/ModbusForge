@@ -207,6 +207,12 @@ namespace ModbusForge.ViewModels
             // Start trend logger and subscribe to CustomEntries changes
             try { _trendLogger.Start(); } catch { }
             SubscribeCustomEntries();
+
+            // Simulation timer
+            int simP = SimulationPeriodMs <= 0 ? 500 : SimulationPeriodMs;
+            _simulationTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Math.Max(50, simP)) };
+            _simulationTimer.Tick += SimulationTimer_Tick;
+            _simulationTimer.Start();
         }
 
         [ObservableProperty]
@@ -329,6 +335,11 @@ namespace ModbusForge.ViewModels
         private readonly ITrendLogger _trendLogger;
         private bool _isMonitoring;
         private bool _isTrending;
+        private readonly DispatcherTimer _simulationTimer;
+        private bool _isSimulating;
+        private int _simHoldingPhase = 0;
+        private bool _simCoilState = false;
+        private bool _simDiscreteState = false;
         private DateTime _lastHoldingReadUtc = DateTime.MinValue;
         private DateTime _lastInputRegReadUtc = DateTime.MinValue;
         private DateTime _lastCoilsReadUtc = DateTime.MinValue;
@@ -387,6 +398,82 @@ namespace ModbusForge.ViewModels
 
         [ObservableProperty]
         private int _discreteInputsMonitorPeriodMs = 1000;
+
+        // Simulation tab configuration
+        [ObservableProperty]
+        private bool _simulationEnabled = false;
+
+        [ObservableProperty]
+        private int _simulationPeriodMs = 500;
+
+        // Holding Registers ramp
+        [ObservableProperty]
+        private bool _simHoldingsEnabled = false;
+
+        [ObservableProperty]
+        private int _simHoldingStart = 0;
+
+        [ObservableProperty]
+        private int _simHoldingCount = 4;
+
+        [ObservableProperty]
+        private int _simHoldingMin = 0;
+
+        [ObservableProperty]
+        private int _simHoldingMax = 100;
+
+        // Coils toggle
+        [ObservableProperty]
+        private bool _simCoilsEnabled = false;
+
+        [ObservableProperty]
+        private int _simCoilStart = 0;
+
+        [ObservableProperty]
+        private int _simCoilCount = 8;
+
+        // Input Registers ramp
+        [ObservableProperty]
+        private bool _simInputsEnabled = false;
+
+        [ObservableProperty]
+        private int _simInputStart = 0;
+
+        [ObservableProperty]
+        private int _simInputCount = 4;
+
+        [ObservableProperty]
+        private int _simInputMin = 0;
+
+        [ObservableProperty]
+        private int _simInputMax = 100;
+
+        // Discrete Inputs toggle
+        [ObservableProperty]
+        private bool _simDiscreteEnabled = false;
+
+        [ObservableProperty]
+        private int _simDiscreteStart = 0;
+
+        [ObservableProperty]
+        private int _simDiscreteCount = 8;
+
+        partial void OnSimulationPeriodMsChanged(int value)
+        {
+            try
+            {
+                int p = value <= 0 ? 500 : value;
+                _simulationTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(50, p));
+            }
+            catch { }
+        }
+
+        partial void OnSimulationEnabledChanged(bool value)
+        {
+            _simHoldingPhase = 0;
+            _simCoilState = false;
+            _simDiscreteState = false;
+        }
 
         private bool CanConnect() => !IsConnected;
 
@@ -756,6 +843,8 @@ namespace ModbusForge.ViewModels
                         _monitorTimer.Tick -= MonitorTimer_Tick;
                         _trendTimer.Stop();
                         _trendTimer.Tick -= TrendTimer_Tick;
+                        _simulationTimer.Stop();
+                        _simulationTimer.Tick -= SimulationTimer_Tick;
                         try { _trendLogger.Stop(); } catch { }
                         try
                         {
@@ -778,6 +867,86 @@ namespace ModbusForge.ViewModels
                     _modbusService?.Dispose();
                 }
                 _disposed = true;
+            }
+        }
+
+        private async void SimulationTimer_Tick(object? sender, EventArgs e)
+        {
+            if (_isSimulating) return;
+            if (!IsConnected) return;
+            if (!IsServerMode) return;
+            if (!SimulationEnabled) return;
+
+            _isSimulating = true;
+            try
+            {
+                // Holding Registers: ramp pattern across range
+                if (SimHoldingsEnabled)
+                {
+                    int count = SimHoldingCount <= 0 ? 0 : SimHoldingCount;
+                    int start = SimHoldingStart;
+                    int min = SimHoldingMin;
+                    int max = SimHoldingMax;
+                    int range = Math.Max(1, max - min + 1);
+                    _simHoldingPhase = (_simHoldingPhase + 1) % range;
+                    for (int i = 0; i < count; i++)
+                    {
+                        int val = min + ((_simHoldingPhase + i) % range);
+                        if (val < 0) val = 0;
+                        if (val > 65535) val = 65535;
+                        await _modbusService.WriteSingleRegisterAsync(UnitId, start + i, (ushort)val);
+                    }
+                }
+
+                // Coils: toggle all in range
+                if (SimCoilsEnabled)
+                {
+                    int count = SimCoilCount <= 0 ? 0 : SimCoilCount;
+                    int start = SimCoilStart;
+                    for (int i = 0; i < count; i++)
+                    {
+                        await _modbusService.WriteSingleCoilAsync(UnitId, start + i, _simCoilState);
+                    }
+                    _simCoilState = !_simCoilState;
+                }
+
+                // Input Registers: ramp pattern (server helper)
+                if (SimInputsEnabled)
+                {
+                    int count = SimInputCount <= 0 ? 0 : SimInputCount;
+                    int start = SimInputStart;
+                    int min = SimInputMin;
+                    int max = SimInputMax;
+                    int range = Math.Max(1, max - min + 1);
+                    _simHoldingPhase = (_simHoldingPhase + 1) % range;
+                    for (int i = 0; i < count; i++)
+                    {
+                        int val = min + ((_simHoldingPhase + i) % range);
+                        if (val < 0) val = 0;
+                        if (val > 65535) val = 65535;
+                        await _serverService.WriteSingleInputRegisterAsync(UnitId, start + i, (ushort)val);
+                    }
+                }
+
+                // Discrete Inputs: toggle all in range (server helper, bit addressing)
+                if (SimDiscreteEnabled)
+                {
+                    int count = SimDiscreteCount <= 0 ? 0 : SimDiscreteCount;
+                    int start = SimDiscreteStart;
+                    for (int i = 0; i < count; i++)
+                    {
+                        await _serverService.WriteSingleDiscreteInputAsync(UnitId, start + i, _simDiscreteState);
+                    }
+                    _simDiscreteState = !_simDiscreteState;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Simulation tick failed");
+            }
+            finally
+            {
+                _isSimulating = false;
             }
         }
 
@@ -1158,7 +1327,6 @@ namespace ModbusForge.ViewModels
         {
             if (_isMonitoring) return;
             if (!IsConnected) return;
-            if (!GlobalMonitorEnabled) return;
 
             _isMonitoring = true;
             try

@@ -121,6 +121,66 @@ namespace ModbusForge.Services
             });
         }
 
+        // Simulation helpers for read-only areas (from Modbus client perspective)
+        public Task WriteSingleInputRegisterAsync(byte unitId, int registerAddress, ushort value)
+        {
+            if (!_isRunning)
+                throw new InvalidOperationException("Modbus server is not running");
+
+            return Task.Run(() =>
+            {
+                try
+                {
+                    _logger.LogDebug($"[SIM] Writing value {value} to input register {registerAddress} (Unit ID: {unitId})");
+
+                    var buf = _server.GetInputRegisterBuffer<short>();
+                    if (registerAddress < 0 || registerAddress >= buf.Length)
+                        throw new ArgumentOutOfRangeException(nameof(registerAddress), "Input register address is out of range");
+
+                    buf[registerAddress] = unchecked((short)value);
+                    _logger.LogDebug("[SIM] Successfully wrote input register");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error writing to input register (simulation)");
+                    throw;
+                }
+            });
+        }
+
+        public Task WriteSingleDiscreteInputAsync(byte unitId, int address, bool value)
+        {
+            if (!_isRunning)
+                throw new InvalidOperationException("Modbus server is not running");
+
+            return Task.Run(() =>
+            {
+                try
+                {
+                    _logger.LogDebug($"[SIM] Writing discrete input at {address} = {value} (Unit ID: {unitId})");
+
+                    var buf = _server.GetDiscreteInputBuffer<byte>();
+                    var capacity = checked(buf.Length * 8);
+                    if (address < 0 || address >= capacity)
+                        throw new ArgumentOutOfRangeException(nameof(address), "Discrete input address is out of range");
+
+                    int byteIndex = address / 8;
+                    int bitOffset = address % 8;
+                    if (value)
+                        buf[byteIndex] = (byte)(buf[byteIndex] | (1 << bitOffset));
+                    else
+                        buf[byteIndex] = (byte)(buf[byteIndex] & ~(1 << bitOffset));
+
+                    _logger.LogDebug("[SIM] Successfully wrote discrete input");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error writing discrete input (simulation)");
+                    throw;
+                }
+            });
+        }
+
         public Task DisconnectAsync()
         {
             return Task.Run(() =>
