@@ -50,11 +50,11 @@ Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 
 ## Support / Donate
 
-[![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=QR448C7AJFQX2)
+[![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=ELTVNJEYLZE3W)
 
 If you find ModbusForge useful, please consider supporting development:
 
-- PayPal: https://www.paypal.com/donate/?hosted_button_id=QR448C7AJFQX2
+- PayPal: https://www.paypal.com/donate/?hosted_button_id=ELTVNJEYLZE3W
 - Donate Page (PayPal button): [docs/index.html](docs/index.html)
 
 ## Features
