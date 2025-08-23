@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Donate to ModbusForge</title>
+  <meta name="description" content="Support ModbusForge development via PayPal" />
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 2rem; line-height: 1.5; }
+    .container { max-width: 720px; margin: 0 auto; }
+    header h1 { margin: 0 0 0.25rem 0; font-size: 1.75rem; }
+    header p { margin: 0 0 1rem 0; color: #666; }
+    .paypal { margin-top: 1rem; }
+    .fallback { margin-top: 1rem; font-size: .95rem; }
+    code { background: rgba(0,0,0,.05); padding: .1rem .3rem; border-radius: .25rem; }
+  </style>
+  <!-- PayPal Hosted Buttons SDK -->
+  <script 
+    src="https://www.paypal.com/sdk/js?client-id=BAAD5W_Vzhx6R0OKFFxa0iT4w98WD74AzQHtzkyguNUJQaJo8L-quqGqLv3mSl0oIYgj00B7Nj-kjROEfI&components=hosted-buttons&disable-funding=venmo&currency=AUD">
+  </script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Support ModbusForge</h1>
+      <p>Thank you for considering a donation. Your support helps maintain and improve this project.</p>
+    </header>
+
+    <div class="paypal">
+      <div id="paypal-container-QR448C7AJFQX2"></div>
+      <script>
+        paypal.HostedButtons({
+          hostedButtonId: "QR448C7AJFQX2",
+        }).render("#paypal-container-QR448C7AJFQX2");
+      </script>
+    </div>
+
+    <div class="fallback">
+      <noscript>
+        JavaScript is required to render the PayPal button. You can still donate using this direct link:
+        <a href="https://www.paypal.com/donate/?hosted_button_id=QR448C7AJFQX2">Donate with PayPal</a>.
+      </noscript>
+      If the button above does not load, use this direct link:
+      <a href="https://www.paypal.com/donate/?hosted_button_id=QR448C7AJFQX2">Donate with PayPal</a>.
+    </div>
+
+    <hr />
+    <p style="font-size: .9rem; color: #666;">Currency: AUD · Payments processed by PayPal.</p>
+  </div>
+</body>
+</html>
