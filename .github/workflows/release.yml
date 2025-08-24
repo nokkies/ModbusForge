@@ -19,7 +19,7 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-          cache: true
+          # Disable cache because no packages.lock.json is present; caching would fail the step.
 
       - name: Compute version from tag
         id: version
@@ -77,6 +77,18 @@ jobs:
           $pfxPass = $env:CODESIGN_PFX_PASSWORD
           $pfxPath = "$pwd\codesign.pfx"
           [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($pfxBase64))
+          # Locate signtool.exe (Windows SDK)
+          $kits = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
+          $signtool = $null
+          if (Test-Path $kits) {
+            $signtool = Get-ChildItem -LiteralPath $kits -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+              Where-Object FullName -match '\\x64\\' | Select-Object -First 1 -Expand FullName
+          }
+          if (-not $signtool) { $signtool = 'signtool.exe' }
+          if (-not (Get-Command $signtool -ErrorAction SilentlyContinue)) {
+            Write-Host 'Code signing skipped (signtool.exe not found).'
+            exit 0
+          }
           $timestampUrl = 'http://timestamp.digicert.com'
           $files = @(
             '.\publish\win-x64\ModbusForge.exe',
@@ -84,7 +96,7 @@ jobs:
           )
           foreach ($f in $files) {
             if (Test-Path $f) {
-              signtool.exe sign /f $pfxPath /p $pfxPass /fd SHA256 /tr $timestampUrl /td SHA256 "$f"
+              & $signtool sign /f $pfxPath /p $pfxPass /fd SHA256 /tr $timestampUrl /td SHA256 "$f"
             }
           }
 
@@ -121,6 +133,26 @@ jobs:
             Write-Host 'MSIX packaging skipped (MSIX_PUBLISHER or code-signing secrets missing).'
             exit 0
           }
+          # Ensure self-contained publish output exists
+          $publishSc = '.\publish\win-x64-sc'
+          if (-not (Test-Path $publishSc)) {
+            Write-Host 'MSIX packaging skipped (publish\\win-x64-sc not found).'
+            exit 0
+          }
+          # Locate Windows SDK tools
+          $kits = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
+          $makeappx = $null
+          $signtool = $null
+          if (Test-Path $kits) {
+            $makeappx = Get-ChildItem -LiteralPath $kits -Recurse -Filter makeappx.exe -ErrorAction SilentlyContinue |
+              Where-Object FullName -match '\\x64\\' | Select-Object -First 1 -Expand FullName
+            $signtool = Get-ChildItem -LiteralPath $kits -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+              Where-Object FullName -match '\\x64\\' | Select-Object -First 1 -Expand FullName
+          }
+          if (-not $makeappx -or -not $signtool) {
+            Write-Host 'MSIX packaging skipped (Windows SDK tools not found).'
+            exit 0
+          }
           $msixDir = "$pwd\msix"
           New-Item $msixDir -ItemType Directory -Force | Out-Null
           New-Item "$msixDir\Assets" -ItemType Directory -Force | Out-Null
@@ -155,10 +187,10 @@ jobs:
           $manifest = ($manifestLines -join "`n").Replace('{{PUBLISHER}}', $pub).Replace('{{VERSION}}', $version)
           $manifest | Out-File "$msixDir\AppxManifest.xml" -Encoding utf8 -Force
 
-          Copy-Item '.\publish\win-x64-sc\*' "$msixDir" -Recurse -Force
+          Copy-Item $publishSc\* "$msixDir" -Recurse -Force
 
           $msixName = "ModbusForge-$version-win-x64.msix"
-          & makeappx.exe pack /d "$msixDir" /p "$msixName" /o
+          & $makeappx pack /d "$msixDir" /p "$msixName" /o
 
           # Sign MSIX
           $pfxBase64 = $env:CODESIGN_PFX_BASE64
@@ -166,7 +198,7 @@ jobs:
           $pfxPath = "$pwd\codesign-msix.pfx"
           [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($pfxBase64))
           $timestampUrl = 'http://timestamp.digicert.com'
-          signtool.exe sign /f $pfxPath /p $pfxPass /fd SHA256 /tr $timestampUrl /td SHA256 "$msixName"
+          & $signtool sign /f $pfxPath /p $pfxPass /fd SHA256 /tr $timestampUrl /td SHA256 "$msixName"
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
