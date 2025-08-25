@@ -40,9 +40,11 @@ namespace ModbusForge
         private void ConfigureServices(IServiceCollection services)
         {
             // Configuration
+            // Use executable directory instead of current working directory (which may be C:\\Windows\\System32 for MSIX)
+            var basePath = AppContext.BaseDirectory;
             var builder = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+                .SetBasePath(basePath)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
 
             Configuration = builder.Build();
             services.AddSingleton(Configuration);
