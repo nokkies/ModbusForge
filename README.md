@@ -116,6 +116,33 @@ If you find ModbusForge useful, please consider supporting development:
 - Checksums: SHA256 file is attached to the Release for verification.
 - MSIX requires Windows 10 1809 (build 17763) or later.
 
+### Installing the MSIX (trust the certificate)
+
+If Windows shows a message like "The app package isn't trusted" when installing the MSIX, you need to trust the signing certificate once on your machine.
+
+- Certificate file: `ModbusForge.cer` (located in the repo root and often attached to releases)
+
+GUI steps (recommended):
+- Double-click `ModbusForge.cer`.
+- Click "Install Certificate...".
+- Choose "Local Machine" (requires admin) → Next.
+- "Place all certificates in the following store" → Browse → select "Trusted People" → OK → Next → Finish.
+- Optional (for current user): repeat into "Current User" → store "Trusted People".
+- Now double-click the `.msix` to install.
+
+PowerShell (admin) alternative:
+```powershell
+# From the folder where ModbusForge.cer is located
+Import-Certificate -FilePath .\ModbusForge.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+# Optionally also for current user
+Import-Certificate -FilePath .\ModbusForge.cer -CertStoreLocation Cert:\CurrentUser\TrustedPeople
+```
+
+Notes:
+- The certificate "Subject" must match the MSIX Publisher shown in the App Installer. If they differ, installation will be blocked.
+- Some systems may require enabling "Developer Mode" or allowing app sideloading, though recent Windows versions typically allow sideloading without it.
+- Upgrades: installing a newer MSIX will replace the previous version. If Windows blocks the upgrade, uninstall the older version first from "Apps & features".
+
 ## Build and Release
 
 Below are PowerShell commands tested on Windows to produce a Release build and package artifacts.
