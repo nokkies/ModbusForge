@@ -150,23 +150,28 @@ namespace ModbusForge.ViewModels
             
             _logger.LogInformation("MainViewModel initialized");
 
-            // Set window title with version from assembly file info
+            // Set window title with robust version retrieval
+            string? ver = null;
             try
             {
-                var ver = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location)?.ProductVersion ?? string.Empty;
-                if (!string.IsNullOrWhiteSpace(ver))
+                var asm = System.Windows.Application.ResourceAssembly ?? Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+                var asmPath = asm?.Location;
+                if (!string.IsNullOrWhiteSpace(asmPath))
                 {
-                    Title = $"ModbusForge v{ver}";
+                    ver = FileVersionInfo.GetVersionInfo(asmPath)?.ProductVersion;
                 }
-                else
+                if (string.IsNullOrWhiteSpace(ver))
                 {
-                    Title = "ModbusForge v1.1.2"; // fallback
+                    ver = Process.GetCurrentProcess()?.MainModule?.FileVersionInfo?.ProductVersion;
+                }
+                if (string.IsNullOrWhiteSpace(ver))
+                {
+                    ver = Assembly.GetEntryAssembly()?.GetName()?.Version?.ToString();
                 }
             }
-            catch
-            {
-                Title = "ModbusForge v1.1.2"; // fallback on any error
-            }
+            catch { }
+            
+            Title = !string.IsNullOrWhiteSpace(ver) ? $"ModbusForge v{ver}" : "ModbusForge v1.2.0";
 
             // Custom tab commands
             AddCustomEntryCommand = new RelayCommand(AddCustomEntry);

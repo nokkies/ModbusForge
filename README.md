@@ -53,7 +53,6 @@ Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 If you find ModbusForge useful, please consider supporting development:
 
 - PayPal: https://www.paypal.com/donate/?hosted_button_id=ELTVNJEYLZE3W
-- Donate Page (PayPal button): [docs/index.html](docs/index.html)
 
 ## Features
 
@@ -105,7 +104,7 @@ If you find ModbusForge useful, please consider supporting development:
 ## Versioning
 
 - The window title displays the application version from the assembly ProductVersion.
-- CI builds stamp `Version`, `AssemblyVersion`, and `FileVersion` from the Git tag (e.g., `v1.1.2`). Local dev builds use the version in `ModbusForge/ModbusForge.csproj`.
+- CI builds stamp `Version`, `AssemblyVersion`, and `FileVersion` from the Git tag (e.g., `v1.2.0`). Local dev builds use the version in `ModbusForge/ModbusForge.csproj`.
 
 ## Download
 
@@ -144,7 +143,7 @@ dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-con
 4. Create a ZIP artifact:
 
 ```powershell
-$version = "1.1.2"
+$version = "1.2.0"
 Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
 # or for self-contained
 Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$version-win-x64-sc.zip -Force
@@ -153,7 +152,7 @@ Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$ve
 5. Tag and create a GitHub Release (optional):
 
 ```powershell
-$version = "1.1.2"
+$version = "1.2.0"
 git tag v$version
 git push origin v$version
 
@@ -166,6 +165,11 @@ gh release upload v$version .\ModbusForge-$version-win-x64-sc.zip
 If you don’t use the GitHub CLI, you can create a release manually on GitHub and upload the ZIP file(s).
 
 ## Changelog
+
+- 1.2.0 (2025-08-25)
+  - MSIX/runtime: Fixed config loading for MSIX by using `AppContext.BaseDirectory`; `appsettings.json` optional to avoid crashes.
+  - UI: Title and About read ProductVersion robustly (Resource/Entry assembly or process module) with fallback to 1.2.0.
+  - CI: Release workflow builds/signs MSIX with correct Identity version derived from tag.
 
 - 1.1.2 (2025-08-23)
   - Decode tab redesign: removed toggle checkboxes; always reads 2 registers and shows all swap variants side-by-side (None / Swap Bytes / Swap Words / Swap B+W).

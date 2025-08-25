@@ -11,15 +11,26 @@ namespace ModbusForge
         public AboutWindow()
         {
             InitializeComponent();
+            string? ver = null;
             try
             {
-                var ver = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location)?.ProductVersion ?? string.Empty;
-                VersionText.Text = !string.IsNullOrWhiteSpace(ver) ? $"ModbusForge v{ver}" : "ModbusForge v1.1.2";
+                var asm = Application.ResourceAssembly ?? Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+                var asmPath = asm?.Location;
+                if (!string.IsNullOrWhiteSpace(asmPath))
+                {
+                    ver = FileVersionInfo.GetVersionInfo(asmPath)?.ProductVersion;
+                }
+                if (string.IsNullOrWhiteSpace(ver))
+                {
+                    ver = Process.GetCurrentProcess()?.MainModule?.FileVersionInfo?.ProductVersion;
+                }
+                if (string.IsNullOrWhiteSpace(ver))
+                {
+                    ver = Assembly.GetEntryAssembly()?.GetName()?.Version?.ToString();
+                }
             }
-            catch
-            {
-                VersionText.Text = "ModbusForge v1.1.2";
-            }
+            catch { }
+            VersionText.Text = !string.IsNullOrWhiteSpace(ver) ? $"ModbusForge v{ver}" : "ModbusForge v1.2.0";
         }
 
         private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
