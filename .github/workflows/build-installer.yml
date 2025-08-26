@@ -30,11 +30,10 @@ jobs:
     - name: Publish Application
       run: dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishTrimmed=false -o .\publish\win-x64
 
-    - name: Setup Inno Setup
-      uses: jr-g/setup-inno-setup-action@v1
-
-    - name: Compile Installer
-      run: iscc.exe "setup\ModbusForge.iss"
+    - name: Compile Inno Setup Installer
+      uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+      with:
+        path: setup/ModbusForge.iss
 
     - name: Upload Installer Artifact
       uses: actions/upload-artifact@v4
