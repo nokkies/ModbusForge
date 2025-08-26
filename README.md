@@ -48,6 +48,16 @@ Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
    dotnet run --project ModbusForge
    ```
 
+## Installation
+
+When you download and run the installer for ModbusForge, Windows Defender SmartScreen will likely show a warning because the application is not digitally signed with a commercial certificate.
+
+To install the application, follow these steps:
+1.  Run the `ModbusForge-x.x.x-setup.exe` installer.
+2.  Windows will show a blue window titled "Windows protected your PC".
+3.  Click on the **More info** link.
+4.  The publisher will be listed as "Unknown". Click the **Run anyway** button to proceed with the installation.
+
 ## Features
 
 - Client and Server modes (configured via `ModbusForge/ModbusForge/appsettings.json`, section `ServerSettings.Mode`)
@@ -126,6 +136,17 @@ gh release upload v$version .\ModbusForge-$version-win-x64-sc.zip
 ```
 
 If you don’t use the GitHub CLI, you can create a release manually on GitHub and upload the ZIP file(s).
+
+6. Create an Installer (optional):
+
+This project uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create a simple installer.
+
+1. **Install Inno Setup:** Download and install the latest version of Inno Setup from the [official website](https://jrsoftware.org/isdl.php).
+2. **Compile the Script:** Open the `setup/ModbusForge.iss` script in the Inno Setup Compiler, or run it from the command line from the project root:
+   ```powershell
+   & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "setup\ModbusForge.iss"
+   ```
+   The installer will be created in the `installers` directory.
 
 ## Changelog
 

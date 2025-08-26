@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using FluentModbus;
 using System.Net.Sockets;
+using ModbusForge.Helpers;
 
 namespace ModbusForge.Services
 {
@@ -59,22 +60,11 @@ namespace ModbusForge.Services
                 if (startAddress < 0 || count < 0 || startAddress + count > capacity)
                     throw new ArgumentOutOfRangeException(nameof(startAddress), "Requested discrete input range is out of bounds");
 
-                var result = new bool[count];
-                int remaining = count;
-                int srcBitIndex = startAddress;
-                int dstIndex = 0;
+                int byteStart = startAddress / 8;
+                int byteCount = (count + 7) / 8;
+                var data = buf.Slice(byteStart, byteCount).ToArray();
 
-                while (remaining > 0)
-                {
-                    int byteIndex = srcBitIndex / 8;
-                    int bitOffset = srcBitIndex % 8;
-                    byte b = buf[byteIndex];
-                    bool bit = (b & (1 << bitOffset)) != 0;
-                    result[dstIndex++] = bit;
-                    srcBitIndex++;
-                    remaining--;
-                }
-
+                var result = BitConverterHelper.ToBooleanArray(data, count);
                 _logger.LogDebug($"Successfully read {result.Length} discrete inputs");
                 return result;
             });
@@ -121,65 +111,11 @@ namespace ModbusForge.Services
             });
         }
 
-        // Simulation helpers for read-only areas (from Modbus client perspective)
-        public Task WriteSingleInputRegisterAsync(byte unitId, int registerAddress, ushort value)
-        {
-            if (!_isRunning)
-                throw new InvalidOperationException("Modbus server is not running");
-
-            return Task.Run(() =>
-            {
-                try
-                {
-                    _logger.LogDebug($"[SIM] Writing value {value} to input register {registerAddress} (Unit ID: {unitId})");
-
-                    var buf = _server.GetInputRegisterBuffer<short>();
-                    if (registerAddress < 0 || registerAddress >= buf.Length)
-                        throw new ArgumentOutOfRangeException(nameof(registerAddress), "Input register address is out of range");
-
-                    buf[registerAddress] = unchecked((short)value);
-                    _logger.LogDebug("[SIM] Successfully wrote input register");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error writing to input register (simulation)");
-                    throw;
-                }
-            });
-        }
-
-        public Task WriteSingleDiscreteInputAsync(byte unitId, int address, bool value)
-        {
-            if (!_isRunning)
-                throw new InvalidOperationException("Modbus server is not running");
-
-            return Task.Run(() =>
-            {
-                try
-                {
-                    _logger.LogDebug($"[SIM] Writing discrete input at {address} = {value} (Unit ID: {unitId})");
-
-                    var buf = _server.GetDiscreteInputBuffer<byte>();
-                    var capacity = checked(buf.Length * 8);
-                    if (address < 0 || address >= capacity)
-                        throw new ArgumentOutOfRangeException(nameof(address), "Discrete input address is out of range");
-
-                    int byteIndex = address / 8;
-                    int bitOffset = address % 8;
-                    if (value)
-                        buf[byteIndex] = (byte)(buf[byteIndex] | (1 << bitOffset));
-                    else
-                        buf[byteIndex] = (byte)(buf[byteIndex] & ~(1 << bitOffset));
-
-                    _logger.LogDebug("[SIM] Successfully wrote discrete input");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error writing discrete input (simulation)");
-                    throw;
-                }
-            });
-        }
+        // Buffer access for simulation service
+        public Memory<T> GetInputRegisterBuffer<T>() where T : unmanaged => _server.GetInputRegisterBuffer<T>();
+        public Memory<T> GetDiscreteInputBuffer<T>() where T : unmanaged => _server.GetDiscreteInputBuffer<T>();
+        public Memory<T> GetHoldingRegisterBuffer<T>() where T : unmanaged => _server.GetHoldingRegisterBuffer<T>();
+        public Memory<T> GetCoilBuffer<T>() where T : unmanaged => _server.GetCoilBuffer<T>();
 
         public Task DisconnectAsync()
         {
@@ -264,22 +200,11 @@ namespace ModbusForge.Services
                 if (startAddress < 0 || count < 0 || startAddress + count > capacity)
                     throw new ArgumentOutOfRangeException(nameof(startAddress), "Requested coil range is out of bounds");
 
-                var result = new bool[count];
-                int remaining = count;
-                int srcBitIndex = startAddress;
-                int dstIndex = 0;
+                int byteStart = startAddress / 8;
+                int byteCount = (count + 7) / 8;
+                var data = buf.Slice(byteStart, byteCount).ToArray();
 
-                while (remaining > 0)
-                {
-                    int byteIndex = srcBitIndex / 8;
-                    int bitOffset = srcBitIndex % 8;
-                    byte b = buf[byteIndex];
-                    bool bit = (b & (1 << bitOffset)) != 0;
-                    result[dstIndex++] = bit;
-                    srcBitIndex++;
-                    remaining--;
-                }
-
+                var result = BitConverterHelper.ToBooleanArray(data, count);
                 _logger.LogDebug($"Successfully read {result.Length} coils");
                 return result;
             });

@@ -64,6 +64,9 @@ namespace ModbusForge
             services.AddSingleton<ModbusTcpService>();
             services.AddSingleton<ModbusServerService>();
             services.AddSingleton<ITrendLogger, TrendLoggingService>();
+            services.AddSingleton<IFileDialogService, FileDialogService>();
+            services.AddSingleton<ISimulationService, SimulationService>();
+            services.AddSingleton<ICustomEntryService, CustomEntryService>();
             
             // Register ViewModels
             services.AddTransient<MainViewModel>();
