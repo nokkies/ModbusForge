@@ -138,12 +138,12 @@ namespace ModbusForge.ViewModels
                 }
                 else
                 {
-                    Title = "ModbusForge v1.0.6"; // fallback
+                    Title = "ModbusForge v1.2.1"; // fallback
                 }
             }
             catch
             {
-                Title = "ModbusForge v1.0.6"; // fallback on any error
+                Title = "ModbusForge v1.2.1"; // fallback on any error
             }
 
             // Custom tab commands
@@ -186,7 +186,7 @@ namespace ModbusForge.ViewModels
             try { _trendLogger.Start(); } catch { }
             SubscribeCustomEntries();
 
-            _simulationService.Start();
+            _simulationService.Start(this);
         }
 
         [ObservableProperty]

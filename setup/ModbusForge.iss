@@ -4,7 +4,7 @@
 [Setup]
 ; Basic application info
 AppName=ModbusForge
-AppVersion=1.1.1
+AppVersion=1.2.1
 AppPublisher=ModbusForge
 DefaultDirName={autopf}\ModbusForge
 DefaultGroupName=ModbusForge
@@ -12,7 +12,7 @@ UninstallDisplayIcon={app}\ModbusForge.exe
 
 ; Setup output settings
 WizardStyle=modern
-OutputBaseFilename=ModbusForge-1.1.1-setup
+OutputBaseFilename=ModbusForge-1.2.1-setup
 OutputDir=.\installers
 Compression=lzma2
 SolidCompression=yes

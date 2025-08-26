@@ -7,10 +7,10 @@ namespace ModbusForge.Services
 {
     public class SimulationService : ISimulationService, IDisposable
     {
-        private readonly MainViewModel _viewModel;
+        private MainViewModel? _viewModel;
         private readonly ModbusServerService _serverService;
         private readonly ILogger<SimulationService> _logger;
-        private readonly DispatcherTimer _simulationTimer;
+        private DispatcherTimer? _simulationTimer;
         private bool _isSimulating;
         private int _simHoldingPhase;
         private bool _simCoilState;
@@ -18,28 +18,39 @@ namespace ModbusForge.Services
         private DateTime _lastSimTickUtc;
         private double _simTimeSec;
 
-        public SimulationService(MainViewModel viewModel, ModbusServerService serverService, ILogger<SimulationService> logger)
+        public SimulationService(ModbusServerService serverService, ILogger<SimulationService> logger)
         {
-            _viewModel = viewModel;
-            _serverService = serverService;
-            _logger = logger;
-
-            _simulationTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Math.Max(50, _viewModel.SimulationPeriodMs)) };
-            _simulationTimer.Tick += SimulationTimer_Tick;
+            _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public void Start()
+        public void Start(MainViewModel viewModel)
         {
+            _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+            if (_simulationTimer == null)
+            {
+                _simulationTimer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(Math.Max(50, _viewModel.SimulationPeriodMs))
+                };
+                _simulationTimer.Tick += SimulationTimer_Tick;
+            }
+            else
+            {
+                _simulationTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(50, _viewModel.SimulationPeriodMs));
+            }
+            _lastSimTickUtc = DateTime.UtcNow;
             _simulationTimer.Start();
         }
 
         public void Stop()
         {
-            _simulationTimer.Stop();
+            _simulationTimer?.Stop();
         }
 
-        private async void SimulationTimer_Tick(object? sender, EventArgs e)
+        private void SimulationTimer_Tick(object? sender, EventArgs e)
         {
+            if (_viewModel == null) return;
             if (_isSimulating) return;
             if (!_viewModel.IsConnected) return;
             if (!_viewModel.IsServerMode) return;
@@ -79,7 +90,7 @@ namespace ModbusForge.Services
                         int iv = (int)Math.Round(raw);
                         if (iv < 0) iv = 0;
                         if (iv > 65535) iv = 65535;
-                        var holdingRegs = _serverService.GetHoldingRegisterBuffer<short>().Span;
+                        var holdingRegs = _serverService.GetHoldingRegisterBuffer<short>();
                         for (int i = 0; i < count; i++)
                         {
                             holdingRegs[start + i] = (short)iv;
@@ -87,7 +98,7 @@ namespace ModbusForge.Services
                     }
                     else
                     {
-                        var holdingRegs = _serverService.GetHoldingRegisterBuffer<short>().Span;
+                        var holdingRegs = _serverService.GetHoldingRegisterBuffer<short>();
                         int range = Math.Max(1, max - min + 1);
                         _simHoldingPhase = (_simHoldingPhase + 1) % range;
                         for (int i = 0; i < count; i++)
@@ -102,7 +113,7 @@ namespace ModbusForge.Services
 
                 if (_viewModel.SimCoilsEnabled)
                 {
-                    var coilBuf = _serverService.GetCoilBuffer<byte>().Span;
+                    var coilBuf = _serverService.GetCoilBuffer<byte>();
                     int count = _viewModel.SimCoilCount <= 0 ? 0 : _viewModel.SimCoilCount;
                     int start = _viewModel.SimCoilStart;
                     for (int i = 0; i < count; i++)
@@ -120,7 +131,7 @@ namespace ModbusForge.Services
 
                 if (_viewModel.SimInputsEnabled)
                 {
-                    var inputRegs = _serverService.GetInputRegisterBuffer<short>().Span;
+                    var inputRegs = _serverService.GetInputRegisterBuffer<short>();
                     int count = _viewModel.SimInputCount <= 0 ? 0 : _viewModel.SimInputCount;
                     int start = _viewModel.SimInputStart;
                     int min = _viewModel.SimInputMin;
@@ -138,7 +149,7 @@ namespace ModbusForge.Services
 
                 if (_viewModel.SimDiscreteEnabled)
                 {
-                    var discreteBuf = _serverService.GetDiscreteInputBuffer<byte>().Span;
+                    var discreteBuf = _serverService.GetDiscreteInputBuffer<byte>();
                     int count = _viewModel.SimDiscreteCount <= 0 ? 0 : _viewModel.SimDiscreteCount;
                     int start = _viewModel.SimDiscreteStart;
                     for (int i = 0; i < count; i++)

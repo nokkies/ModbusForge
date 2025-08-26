@@ -112,10 +112,10 @@ namespace ModbusForge.Services
         }
 
         // Buffer access for simulation service
-        public Memory<T> GetInputRegisterBuffer<T>() where T : unmanaged => _server.GetInputRegisterBuffer<T>();
-        public Memory<T> GetDiscreteInputBuffer<T>() where T : unmanaged => _server.GetDiscreteInputBuffer<T>();
-        public Memory<T> GetHoldingRegisterBuffer<T>() where T : unmanaged => _server.GetHoldingRegisterBuffer<T>();
-        public Memory<T> GetCoilBuffer<T>() where T : unmanaged => _server.GetCoilBuffer<T>();
+        public Span<T> GetInputRegisterBuffer<T>() where T : unmanaged => _server.GetInputRegisterBuffer<T>();
+        public Span<T> GetDiscreteInputBuffer<T>() where T : unmanaged => _server.GetDiscreteInputBuffer<T>();
+        public Span<T> GetHoldingRegisterBuffer<T>() where T : unmanaged => _server.GetHoldingRegisterBuffer<T>();
+        public Span<T> GetCoilBuffer<T>() where T : unmanaged => _server.GetCoilBuffer<T>();
 
         public Task DisconnectAsync()
         {

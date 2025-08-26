@@ -7,6 +7,7 @@ using System.Windows.Navigation;
 using ModbusForge.ViewModels;
 using Microsoft.Win32;
 using System.IO;
+using ModbusForge.Models;
 
 namespace ModbusForge
 {
@@ -75,6 +76,62 @@ namespace ModbusForge
             }
         }
 
+        private async void Trend_ExportCsv_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var trendView = this.TrendViewControl;
+                if (trendView?.DataContext is not TrendViewModel vm)
+                {
+                    MessageBox.Show("Trend view is not available.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var dlg = new SaveFileDialog
+                {
+                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                    FileName = "trend-export.csv"
+                };
+                if (dlg.ShowDialog(this) == true)
+                {
+                    await vm.ExportCsvAsync(dlg.FileName, vm.SelectedSeriesItem);
+                    _viewModel.StatusMessage = $"Exported CSV: {Path.GetFileName(dlg.FileName)}";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Export CSV failed: {ex.Message}", "Trend Export", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void Trend_ImportCsv_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var trendView = this.TrendViewControl;
+                if (trendView?.DataContext is not TrendViewModel vm)
+                {
+                    MessageBox.Show("Trend view is not available.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var dlg = new OpenFileDialog
+                {
+                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                    Multiselect = false
+                };
+                if (dlg.ShowDialog(this) == true)
+                {
+                    await vm.ImportCsvAsync(dlg.FileName);
+                    _viewModel.StatusMessage = $"Imported CSV: {Path.GetFileName(dlg.FileName)}";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Import CSV failed: {ex.Message}", "Trend Import", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
 
 
         private async void CoilsGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
@@ -105,6 +162,12 @@ namespace ModbusForge
                 grid.CommitEdit(DataGridEditingUnit.Cell, true);
                 grid.CommitEdit(DataGridEditingUnit.Row, true);
             }
+        }
+
+        private void HoldingRegistersGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        {
+            // Placeholder to satisfy XAML event; value processing handled by bindings/VM.
+            if (e.EditAction != DataGridEditAction.Commit) return;
         }
 
         private void CustomGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)

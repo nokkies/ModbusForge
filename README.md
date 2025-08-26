@@ -87,7 +87,7 @@ To install the application, follow these steps:
 
 ## Versioning
 
-- The window title displays the application version from the assembly ProductVersion (fallback to `v1.0.8`).
+- The window title displays the application version from the assembly ProductVersion (fallback to `v1.2.1`).
 
 ## Build and Release
 
