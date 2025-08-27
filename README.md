@@ -87,7 +87,7 @@ To install the application, follow these steps:
 
 ## Versioning
 
-- The window title displays the application version from the assembly ProductVersion (fallback to `v1.2.1`).
+- The window title displays the application version from the assembly ProductVersion (fallback to `v1.3.0`).
 
 ## Build and Release
 
@@ -116,7 +116,7 @@ dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-con
 4. Create a ZIP artifact:
 
 ```powershell
-$version = "1.1.1"
+$version = "1.3.0"
 Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
 # or for self-contained
 Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$version-win-x64-sc.zip -Force
@@ -125,7 +125,7 @@ Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$ve
 5. Tag and create a GitHub Release (optional):
 
 ```powershell
-$version = "1.1.1"
+$version = "1.3.0"
 git tag v$version
 git push origin v$version
 
@@ -149,6 +149,19 @@ This project uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create a si
    The installer will be created in the `installers` directory.
 
 ## Changelog
+
+- 1.3.0 (2025-08-27)
+  - Integrated MahApps.Metro theming and converted `MainWindow` to `MetroWindow`.
+  - Kept Light theme (`Styles/Themes/Light.Blue.xaml`).
+  - Restored tabs to system look for clarity; improved DataGrid readability with gridlines and alternating rows.
+  - Minor UI polish and resources cleanup.
+  - Updated installer and README to 1.3.0.
+
+- 1.2.2 (2025-08-27)
+  - Fixed startup crash by registering `DecodeViewModel` in DI (`App.xaml.cs`).
+  - Restored missing `MenuItem_Donate_Click` handler in `MainWindow.xaml.cs`.
+  - Updated installer script `setup/ModbusForge.iss` to 1.2.2 (AppVersion, OutputBaseFilename).
+  - Refreshed README version references and example commands to 1.2.2.
 
 - 1.1.1 (2025-08-23)
   - Trend: added retention window control (1–60 minutes) with Apply action.

@@ -71,6 +71,7 @@ namespace ModbusForge
             // Register ViewModels
             services.AddTransient<MainViewModel>();
             services.AddTransient<TrendViewModel>();
+            services.AddTransient<DecodeViewModel>();
         }
 
 
