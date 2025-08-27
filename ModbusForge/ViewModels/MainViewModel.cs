@@ -26,8 +26,6 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using ModbusForge.Models;
 using System.Windows.Controls;
-using System.Windows;
-using System.Globalization;
 using ModbusForge.Helpers;
 
 namespace ModbusForge.ViewModels
