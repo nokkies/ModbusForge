@@ -9,7 +9,8 @@ AppPublisher=ModbusForge
 DefaultDirName={autopf}\ModbusForge
 DefaultGroupName=ModbusForge
 UninstallDisplayIcon={app}\ModbusForge.exe
-SetupIconFile=..\ModbusForge\Resources\ModbusForge.ico
+; SetupIconFile disabled temporarily (icon too large for Inno compiler)
+; SetupIconFile=..\ModbusForge\Resources\ModbusForge.ico
 
 ; Setup output settings
 WizardStyle=modern

@@ -129,15 +129,19 @@ namespace ModbusForge.ViewModels
             // Set window title with version from assembly file info
             try
             {
-                var ver = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location)?.ProductVersion ?? string.Empty;
-                if (!string.IsNullOrWhiteSpace(ver))
+                string? ver = null;
+                // In single-file apps, Assembly.Location is empty; use the process path instead
+                var procPath = Environment.ProcessPath;
+                if (!string.IsNullOrEmpty(procPath))
                 {
-                    Title = $"ModbusForge v{ver}";
+                    ver = FileVersionInfo.GetVersionInfo(procPath)?.ProductVersion;
                 }
-                else
+                // Fallback to informational version attribute
+                if (string.IsNullOrWhiteSpace(ver))
                 {
-                    Title = "ModbusForge v1.2.1"; // fallback
+                    ver = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
                 }
+                Title = !string.IsNullOrWhiteSpace(ver) ? $"ModbusForge v{ver}" : "ModbusForge v1.2.1";
             }
             catch
             {
