@@ -28,7 +28,17 @@ jobs:
       run: dotnet build --configuration Release --no-restore
 
     - name: Publish Application
-      run: dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishTrimmed=false -o .\publish\win-x64
+      run: >
+        dotnet publish .\ModbusForge\ModbusForge.csproj
+        -c Release
+        -r win-x64
+        --self-contained true
+        -p:PublishSingleFile=true
+        -p:IncludeNativeLibrariesForSelfExtract=true
+        -p:PublishTrimmed=false
+        -p:DebugType=None
+        -p:DebugSymbols=false
+        -o .\publish\win-x64
 
     - name: Compile Inno Setup Installer
       uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
