@@ -10,14 +10,14 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <AssemblyName>ModbusForge</AssemblyName>
     <RootNamespace>ModbusForge</RootNamespace>
-    <Version>1.2.0</Version>
-    <AssemblyVersion>1.2.0.0</AssemblyVersion>
-    <FileVersion>1.2.0.0</FileVersion>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="Exists('Resources\\ModbusForge.ico')">
+    <Version>1.2.1</Version>
+    <AssemblyVersion>1.2.1.0</AssemblyVersion>
+    <FileVersion>1.2.1.0</FileVersion>
+    <LangVersion>12.0</LangVersion>
     <ApplicationIcon>Resources\ModbusForge.ico</ApplicationIcon>
   </PropertyGroup>
+
+  
 
   <ItemGroup>
     <Content Include="appsettings.json">
@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <Resource Include="Resources/ModbusForgeLOGO.png" />
+    <Resource Include="Resources/ModbusForge.ico" />
   </ItemGroup>
 
   <ItemGroup>

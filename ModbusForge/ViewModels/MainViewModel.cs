@@ -24,6 +24,9 @@ using System.Reflection;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using ModbusForge.Models;
+using System.Windows.Controls;
+using ModbusForge.Helpers;
 
 namespace ModbusForge.ViewModels
 {
@@ -45,7 +48,9 @@ namespace ModbusForge.ViewModels
             App.ServiceProvider.GetRequiredService<ModbusServerService>(),
             App.ServiceProvider.GetRequiredService<ILogger<MainViewModel>>(),
             App.ServiceProvider.GetRequiredService<IOptions<ServerSettings>>(),
-            App.ServiceProvider.GetRequiredService<ITrendLogger>())
+            App.ServiceProvider.GetRequiredService<ITrendLogger>(),
+            App.ServiceProvider.GetRequiredService<ISimulationService>(),
+            App.ServiceProvider.GetRequiredService<ICustomEntryService>())
         {
         }
 
@@ -61,45 +66,16 @@ namespace ModbusForge.ViewModels
             StatusMessage = $"Read {snapshot.Count} custom entries";
         }
 
-    public class CustomEntry : INotifyPropertyChanged
-    {
-        private string _name = string.Empty;
-        private int _address;
-        private string _type = "uint"; // uint,int,real
-        private string _value = "0";
-        private bool _continuous = false;
-        private int _periodMs = 1000;
-        internal DateTime _lastWriteUtc = DateTime.MinValue;
-        // Read monitoring support
-        private bool _monitor = false;
-        private int _readPeriodMs = 1000;
-        internal DateTime _lastReadUtc = DateTime.MinValue;
-        private string _area = "HoldingRegister"; // HoldingRegister, Coil, InputRegister, DiscreteInput
-        // Trend selection support
-        private bool _trend = false;
-
-        public string Name { get => _name; set { if (_name != value) { _name = value; OnPropertyChanged(nameof(Name)); } } }
-        public int Address { get => _address; set { if (_address != value) { _address = value; OnPropertyChanged(nameof(Address)); } } }
-        public string Type { get => _type; set { if (_type != value) { _type = value; OnPropertyChanged(nameof(Type)); } } }
-        public string Value { get => _value; set { if (_value != value) { _value = value; OnPropertyChanged(nameof(Value)); } } }
-        public bool Continuous { get => _continuous; set { if (_continuous != value) { _continuous = value; OnPropertyChanged(nameof(Continuous)); } } }
-        public int PeriodMs { get => _periodMs; set { if (_periodMs != value) { _periodMs = value; OnPropertyChanged(nameof(PeriodMs)); } } }
-        // Per-row continuous read
-        public bool Monitor { get => _monitor; set { if (_monitor != value) { _monitor = value; OnPropertyChanged(nameof(Monitor)); } } }
-        public int ReadPeriodMs { get => _readPeriodMs; set { if (_readPeriodMs != value) { _readPeriodMs = value; OnPropertyChanged(nameof(ReadPeriodMs)); } } }
-        public string Area { get => _area; set { if (_area != value) { _area = value; OnPropertyChanged(nameof(Area)); } } }
-        public bool Trend { get => _trend; set { if (_trend != value) { _trend = value; OnPropertyChanged(nameof(Trend)); } } }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger)
+        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ISimulationService simulationService, ICustomEntryService customEntryService)
         {
+            UpdateHoldingRegisterCommand = new AsyncRelayCommand<DataGridCellEditEndingEventArgs>(UpdateHoldingRegister);
+
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
             _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _trendLogger = trendLogger ?? throw new ArgumentNullException(nameof(trendLogger));
+            _simulationService = simulationService ?? throw new ArgumentNullException(nameof(simulationService));
+            _customEntryService = customEntryService ?? throw new ArgumentNullException(nameof(customEntryService));
             var settings = options?.Value ?? new ServerSettings();
             Mode = string.Equals(settings.Mode, "Server", StringComparison.OrdinalIgnoreCase) ? "Server" : "Client";
 
@@ -150,28 +126,27 @@ namespace ModbusForge.ViewModels
             
             _logger.LogInformation("MainViewModel initialized");
 
-            // Set window title with robust version retrieval
-            string? ver = null;
+            // Set window title with version from assembly file info
             try
             {
-                var asm = System.Windows.Application.ResourceAssembly ?? Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
-                var asmPath = asm?.Location;
-                if (!string.IsNullOrWhiteSpace(asmPath))
+                string? ver = null;
+                // In single-file apps, Assembly.Location is empty; use the process path instead
+                var procPath = Environment.ProcessPath;
+                if (!string.IsNullOrEmpty(procPath))
                 {
-                    ver = FileVersionInfo.GetVersionInfo(asmPath)?.ProductVersion;
+                    ver = FileVersionInfo.GetVersionInfo(procPath)?.ProductVersion;
                 }
+                // Fallback to informational version attribute
                 if (string.IsNullOrWhiteSpace(ver))
                 {
-                    ver = Process.GetCurrentProcess()?.MainModule?.FileVersionInfo?.ProductVersion;
+                    ver = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
                 }
-                if (string.IsNullOrWhiteSpace(ver))
-                {
-                    ver = Assembly.GetEntryAssembly()?.GetName()?.Version?.ToString();
-                }
+                Title = !string.IsNullOrWhiteSpace(ver) ? $"ModbusForge v{ver}" : "ModbusForge v1.2.1";
             }
-            catch { }
-            
-            Title = !string.IsNullOrWhiteSpace(ver) ? $"ModbusForge v{ver}" : "ModbusForge v1.2.0";
+            catch
+            {
+                Title = "ModbusForge v1.2.1"; // fallback on any error
+            }
 
             // Custom tab commands
             AddCustomEntryCommand = new RelayCommand(AddCustomEntry);
@@ -213,11 +188,7 @@ namespace ModbusForge.ViewModels
             try { _trendLogger.Start(); } catch { }
             SubscribeCustomEntries();
 
-            // Simulation timer
-            int simP = SimulationPeriodMs <= 0 ? 500 : SimulationPeriodMs;
-            _simulationTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Math.Max(50, simP)) };
-            _simulationTimer.Tick += SimulationTimer_Tick;
-            _simulationTimer.Start();
+            _simulationService.Start(this);
         }
 
         [ObservableProperty]
@@ -338,15 +309,10 @@ namespace ModbusForge.ViewModels
         private readonly DispatcherTimer _monitorTimer;
         private readonly DispatcherTimer _trendTimer;
         private readonly ITrendLogger _trendLogger;
+        private readonly ICustomEntryService _customEntryService;
         private bool _isMonitoring;
         private bool _isTrending;
-        private readonly DispatcherTimer _simulationTimer;
-        private bool _isSimulating;
-        private int _simHoldingPhase = 0;
-        private bool _simCoilState = false;
-        private bool _simDiscreteState = false;
-        private DateTime _lastSimTickUtc = DateTime.UtcNow;
-        private double _simTimeSec = 0.0;
+        private readonly ISimulationService _simulationService;
         private DateTime _lastHoldingReadUtc = DateTime.MinValue;
         private DateTime _lastInputRegReadUtc = DateTime.MinValue;
         private DateTime _lastCoilsReadUtc = DateTime.MinValue;
@@ -369,6 +335,7 @@ namespace ModbusForge.ViewModels
         public IRelayCommand ReadAllCustomNowCommand { get; }
         public IRelayCommand SaveCustomCommand { get; }
         public IRelayCommand LoadCustomCommand { get; }
+        public IAsyncRelayCommand<DataGridCellEditEndingEventArgs> UpdateHoldingRegisterCommand { get; }
 
         // Global toggles for Custom tab
         [ObservableProperty]
@@ -478,24 +445,6 @@ namespace ModbusForge.ViewModels
         [ObservableProperty]
         private int _simDiscreteCount = 8;
 
-        partial void OnSimulationPeriodMsChanged(int value)
-        {
-            try
-            {
-                int p = value <= 0 ? 500 : value;
-                _simulationTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(50, p));
-            }
-            catch { }
-        }
-
-        partial void OnSimulationEnabledChanged(bool value)
-        {
-            _simHoldingPhase = 0;
-            _simCoilState = false;
-            _simDiscreteState = false;
-            _simTimeSec = 0.0;
-            _lastSimTickUtc = DateTime.UtcNow;
-        }
 
         private bool CanConnect() => !IsConnected;
 
@@ -637,32 +586,19 @@ namespace ModbusForge.ViewModels
                     {
                         if (idx + 1 < values.Length)
                         {
-                            ushort high = values[idx];
-                            ushort low = values[idx + 1];
-                            byte[] b = new byte[4]
-                            {
-                                (byte)(high >> 8), (byte)(high & 0xFF),
-                                (byte)(low >> 8),  (byte)(low & 0xFF)
-                            };
-                            if (BitConverter.IsLittleEndian)
-                                Array.Reverse(b);
-                            float f = BitConverter.ToSingle(b, 0);
+                            float f = DataTypeConverter.ToSingle(values[idx], values[idx + 1]);
                             entry.ValueText = f.ToString(CultureInfo.InvariantCulture);
-                            // blank the following word to avoid overlapping display of the pair
                             HoldingRegisters[idx + 1].ValueText = string.Empty;
                         }
                         else
                         {
                             entry.ValueText = entry.Value.ToString(CultureInfo.InvariantCulture);
                         }
-                        idx += 2; // skip the paired word
+                        idx += 2;
                     }
                     else if (t == "string")
                     {
-                        char c1 = (char)(values[idx] >> 8);
-                        char c2 = (char)(values[idx] & 0xFF);
-                        var s = new string(new[] { c1, c2 }).TrimEnd('\0');
-                        entry.ValueText = s;
+                        entry.ValueText = DataTypeConverter.ToString(values[idx]);
                         idx += 1;
                     }
                     else
@@ -811,38 +747,19 @@ namespace ModbusForge.ViewModels
             await _modbusService.WriteSingleRegisterAsync(UnitId, address, value);
         }
 
-        // Write a 32-bit float (IEEE754) across two consecutive 16-bit registers at the given address using Big-Endian word/byte order.
         public async Task WriteFloatAtAsync(int address, float value)
         {
-            // Convert to big-endian byte order (network order)
-            var bytes = BitConverter.GetBytes(value);
-            if (BitConverter.IsLittleEndian)
-                Array.Reverse(bytes);
-
-            ushort high = (ushort)((bytes[0] << 8) | bytes[1]);
-            ushort low  = (ushort)((bytes[2] << 8) | bytes[3]);
-
-            await _modbusService.WriteSingleRegisterAsync(UnitId, address, high);
-            await _modbusService.WriteSingleRegisterAsync(UnitId, address + 1, low);
+            var registers = DataTypeConverter.ToUInt16(value);
+            await _modbusService.WriteSingleRegisterAsync(UnitId, address, registers[0]);
+            await _modbusService.WriteSingleRegisterAsync(UnitId, address + 1, registers[1]);
         }
 
-        // Write an ASCII string across consecutive 16-bit registers.
-        // Each register stores two bytes: high = first char, low = second char. Pads with 0 if odd length.
         public async Task WriteStringAtAsync(int address, string text)
         {
-            text ??= string.Empty;
-            var bytes = Encoding.ASCII.GetBytes(text);
-            // pad to even length
-            if ((bytes.Length & 1) != 0)
+            var registers = DataTypeConverter.ToUInt16(text);
+            for (int i = 0; i < registers.Length; i++)
             {
-                Array.Resize(ref bytes, bytes.Length + 1);
-                bytes[^1] = 0;
-            }
-
-            for (int i = 0; i < bytes.Length; i += 2)
-            {
-                ushort reg = (ushort)((bytes[i] << 8) | bytes[i + 1]);
-                await _modbusService.WriteSingleRegisterAsync(UnitId, address + (i / 2), reg);
+                await _modbusService.WriteSingleRegisterAsync(UnitId, address + i, registers[i]);
             }
         }
 
@@ -865,8 +782,7 @@ namespace ModbusForge.ViewModels
                         _monitorTimer.Tick -= MonitorTimer_Tick;
                         _trendTimer.Stop();
                         _trendTimer.Tick -= TrendTimer_Tick;
-                        _simulationTimer.Stop();
-                        _simulationTimer.Tick -= SimulationTimer_Tick;
+                        _simulationService.Stop();
                         try { _trendLogger.Stop(); } catch { }
                         try
                         {
@@ -892,125 +808,6 @@ namespace ModbusForge.ViewModels
             }
         }
 
-        private async void SimulationTimer_Tick(object? sender, EventArgs e)
-        {
-            if (_isSimulating) return;
-            if (!IsConnected) return;
-            if (!IsServerMode) return;
-            if (!SimulationEnabled) return;
-
-            _isSimulating = true;
-            try
-            {
-                // Advance simulation time
-                var nowSim = DateTime.UtcNow;
-                double dt = (nowSim - _lastSimTickUtc).TotalSeconds;
-                if (dt < 0 || dt > 5) dt = 0; // guard against large jumps (sleep/resume, breakpoints)
-                _simTimeSec += dt;
-                _lastSimTickUtc = nowSim;
-
-                // Holding Registers: waveform or ramp across range
-                if (SimHoldingsEnabled)
-                {
-                    int count = SimHoldingCount <= 0 ? 0 : SimHoldingCount;
-                    int start = SimHoldingStart;
-                    int min = SimHoldingMin;
-                    int max = SimHoldingMax;
-                    string wf = (SimHoldingWaveformType ?? "Ramp").ToLowerInvariant();
-                    if ((wf == "sine" || wf == "triangle" || wf == "square") && SimHoldingFrequencyHz > 0)
-                    {
-                        double f = SimHoldingFrequencyHz;
-                        double x = 2.0 * Math.PI * f * _simTimeSec;
-                        double w;
-                        if (wf == "sine")
-                        {
-                            w = Math.Sin(x);
-                        }
-                        else if (wf == "triangle")
-                        {
-                            double phase = f * _simTimeSec; // cycles
-                            phase = phase - Math.Floor(phase); // [0,1)
-                            w = 4.0 * Math.Abs(phase - 0.5) - 1.0; // [-1,1]
-                        }
-                        else // square
-                        {
-                            w = Math.Sin(x) >= 0 ? 1.0 : -1.0;
-                        }
-
-                        double raw = SimHoldingOffset + (SimHoldingAmplitude * w);
-                        int iv = (int)Math.Round(raw);
-                        if (iv < 0) iv = 0;
-                        if (iv > 65535) iv = 65535;
-                        for (int i = 0; i < count; i++)
-                        {
-                            await _modbusService.WriteSingleRegisterAsync(UnitId, start + i, (ushort)iv);
-                        }
-                    }
-                    else
-                    {
-                        int range = Math.Max(1, max - min + 1);
-                        _simHoldingPhase = (_simHoldingPhase + 1) % range;
-                        for (int i = 0; i < count; i++)
-                        {
-                            int val = min + ((_simHoldingPhase + i) % range);
-                            if (val < 0) val = 0;
-                            if (val > 65535) val = 65535;
-                            await _modbusService.WriteSingleRegisterAsync(UnitId, start + i, (ushort)val);
-                        }
-                    }
-                }
-
-                // Coils: toggle all in range
-                if (SimCoilsEnabled)
-                {
-                    int count = SimCoilCount <= 0 ? 0 : SimCoilCount;
-                    int start = SimCoilStart;
-                    for (int i = 0; i < count; i++)
-                    {
-                        await _modbusService.WriteSingleCoilAsync(UnitId, start + i, _simCoilState);
-                    }
-                    _simCoilState = !_simCoilState;
-                }
-
-                // Input Registers: ramp pattern (server helper)
-                if (SimInputsEnabled)
-                {
-                    int count = SimInputCount <= 0 ? 0 : SimInputCount;
-                    int start = SimInputStart;
-                    int min = SimInputMin;
-                    int max = SimInputMax;
-                    int range = Math.Max(1, max - min + 1);
-                    _simHoldingPhase = (_simHoldingPhase + 1) % range;
-                    for (int i = 0; i < count; i++)
-                    {
-                        int val = min + ((_simHoldingPhase + i) % range);
-                        if (val < 0) val = 0;
-                        if (val > 65535) val = 65535;
-                        await _serverService.WriteSingleInputRegisterAsync(UnitId, start + i, (ushort)val);
-                    }
-                }
-
-                // Discrete Inputs: toggle all in range (server helper, bit addressing)
-                if (SimDiscreteEnabled)
-                {
-                    int count = SimDiscreteCount <= 0 ? 0 : SimDiscreteCount;
-                    int start = SimDiscreteStart;
-                    for (int i = 0; i < count; i++)
-                    {
-                        await _serverService.WriteSingleDiscreteInputAsync(UnitId, start + i, _simDiscreteState);
-                    }
-                    _simDiscreteState = !_simDiscreteState;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Simulation tick failed");
-            }
-            finally
-            {
-                _isSimulating = false;
-            }
-        }
 
         ~MainViewModel()
         {
@@ -1050,99 +847,6 @@ namespace ModbusForge.ViewModels
         }
     }
 
-    public class RegisterEntry : INotifyPropertyChanged
-    {
-        private int _address;
-        private ushort _value;
-        private string _type = "uint";
-        private string _valueText = "0"; // used for editing/display to avoid WPF ConvertBack to ushort
-
-        public int Address
-        {
-            get => _address;
-            set { if (_address != value) { _address = value; OnPropertyChanged(nameof(Address)); } }
-        }
-
-        public ushort Value
-        {
-            get => _value;
-            set
-            {
-                if (_value != value)
-                {
-                    _value = value;
-                    OnPropertyChanged(nameof(Value));
-                    // keep ValueText in sync for display
-                    var s = _value.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    if (_valueText != s)
-                    {
-                        _valueText = s;
-                        OnPropertyChanged(nameof(ValueText));
-                    }
-                }
-            }
-        }
-
-        public string Type
-        {
-            get => _type;
-            set { if (_type != value) { _type = value; OnPropertyChanged(nameof(Type)); } }
-        }
-
-        // String representation shown/edited in the grid to avoid ConvertBack to ushort for 'real'/'string'
-        public string ValueText
-        {
-            get => _valueText;
-            set
-            {
-                if (_valueText != value)
-                {
-                    _valueText = value;
-                    OnPropertyChanged(nameof(ValueText));
-                }
-            }
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-    public class CoilEntry : INotifyPropertyChanged
-    {
-        private int _address;
-        private bool _state;
-
-        public int Address
-        {
-            get => _address;
-            set { if (_address != value) { _address = value; OnPropertyChanged(nameof(Address)); } }
-        }
-
-        public bool State
-        {
-            get => _state;
-            set { if (_state != value) { _state = value; OnPropertyChanged(nameof(State)); } }
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-    public static class TypeOptions
-    {
-        public static readonly string[] All = new[] { "uint", "int", "real", "string" };
-    }
-
-    public static class AreaOptions
-    {
-        // HoldingRegister and Coil are writable; InputRegister and DiscreteInput are read-only per Modbus spec
-        public static readonly string[] All = new[] { "HoldingRegister", "Coil", "InputRegister", "DiscreteInput" };
-    }
-
-    public static class ModeOptions
-    {
-        public static readonly string[] All = new[] { "Client", "Server" };
-    }
 
     // Extensions to support the Custom tab logic within the ViewModel partial class
     public partial class MainViewModel
@@ -1250,16 +954,7 @@ namespace ModbusForge.ViewModels
                         if (t == "real")
                         {
                             var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 2);
-                            ushort high = regs[0];
-                            ushort low = regs[1];
-                            byte[] b = new byte[4]
-                            {
-                                (byte)(high >> 8), (byte)(high & 0xFF),
-                                (byte)(low >> 8),  (byte)(low & 0xFF)
-                            };
-                            if (BitConverter.IsLittleEndian)
-                                Array.Reverse(b);
-                            float f = BitConverter.ToSingle(b, 0);
+                            float f = DataTypeConverter.ToSingle(regs[0], regs[1]);
                             entry.Value = f.ToString(CultureInfo.InvariantCulture);
                             StatusMessage = $"Read REAL {entry.Value} from HR {entry.Address}";
                         }
@@ -1273,10 +968,7 @@ namespace ModbusForge.ViewModels
                         else if (t == "string")
                         {
                             var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
-                            char c1 = (char)(regs[0] >> 8);
-                            char c2 = (char)(regs[0] & 0xFF);
-                            var s = new string(new[] { c1, c2 }).TrimEnd('\0');
-                            entry.Value = s;
+                            entry.Value = DataTypeConverter.ToString(regs[0]);
                             StatusMessage = $"Read STRING '{entry.Value}' from HR {entry.Address}";
                         }
                         else // uint
@@ -1293,16 +985,7 @@ namespace ModbusForge.ViewModels
                         if (t == "real")
                         {
                             var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 2);
-                            ushort high = regs[0];
-                            ushort low = regs[1];
-                            byte[] b = new byte[4]
-                            {
-                                (byte)(high >> 8), (byte)(high & 0xFF),
-                                (byte)(low >> 8),  (byte)(low & 0xFF)
-                            };
-                            if (BitConverter.IsLittleEndian)
-                                Array.Reverse(b);
-                            float f = BitConverter.ToSingle(b, 0);
+                            float f = DataTypeConverter.ToSingle(regs[0], regs[1]);
                             entry.Value = f.ToString(CultureInfo.InvariantCulture);
                             StatusMessage = $"Read REAL {entry.Value} from IR {entry.Address}";
                         }
@@ -1316,10 +999,7 @@ namespace ModbusForge.ViewModels
                         else if (t == "string")
                         {
                             var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
-                            char c1 = (char)(regs[0] >> 8);
-                            char c2 = (char)(regs[0] & 0xFF);
-                            var s = new string(new[] { c1, c2 }).TrimEnd('\0');
-                            entry.Value = s;
+                            entry.Value = DataTypeConverter.ToString(regs[0]);
                             StatusMessage = $"Read STRING '{entry.Value}' from IR {entry.Address}";
                         }
                         else // uint
@@ -1591,16 +1271,7 @@ namespace ModbusForge.ViewModels
                     if (t == "real")
                     {
                         var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 2);
-                        ushort high = regs[0];
-                        ushort low = regs[1];
-                        byte[] b = new byte[4]
-                        {
-                            (byte)(high >> 8), (byte)(high & 0xFF),
-                            (byte)(low >> 8),  (byte)(low & 0xFF)
-                        };
-                        if (BitConverter.IsLittleEndian) Array.Reverse(b);
-                        float f = BitConverter.ToSingle(b, 0);
-                        return (double)f;
+                        return DataTypeConverter.ToSingle(regs[0], regs[1]);
                     }
                     else if (t == "int")
                     {
@@ -1625,16 +1296,7 @@ namespace ModbusForge.ViewModels
                     if (t == "real")
                     {
                         var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 2);
-                        ushort high = regs[0];
-                        ushort low = regs[1];
-                        byte[] b = new byte[4]
-                        {
-                            (byte)(high >> 8), (byte)(high & 0xFF),
-                            (byte)(low >> 8),  (byte)(low & 0xFF)
-                        };
-                        if (BitConverter.IsLittleEndian) Array.Reverse(b);
-                        float f = BitConverter.ToSingle(b, 0);
-                        return (double)f;
+                        return DataTypeConverter.ToSingle(regs[0], regs[1]);
                     }
                     else if (t == "int")
                     {
@@ -1671,32 +1333,8 @@ namespace ModbusForge.ViewModels
         {
             try
             {
-                var dlg = new SaveFileDialog
-                {
-                    Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
-                    FileName = "custom-entries.json",
-                    Title = "Save Custom Entries"
-                };
-                if (dlg.ShowDialog() == true)
-                {
-                    var data = CustomEntries.Select(e => new
-                    {
-                        e.Name,
-                        e.Address,
-                        e.Type,
-                        e.Value,
-                        e.Continuous,
-                        e.PeriodMs,
-                        e.Monitor,
-                        e.ReadPeriodMs,
-                        e.Area,
-                        e.Trend
-                    }).ToList();
-                    var options = new JsonSerializerOptions { WriteIndented = true };
-                    var json = JsonSerializer.Serialize(data, options);
-                    await File.WriteAllTextAsync(dlg.FileName, json);
-                    StatusMessage = $"Saved {data.Count} custom entries.";
-                }
+                await _customEntryService.SaveCustomAsync(CustomEntries);
+                StatusMessage = $"Saved {CustomEntries.Count} custom entries.";
             }
             catch (Exception ex)
             {
@@ -1709,48 +1347,112 @@ namespace ModbusForge.ViewModels
         {
             try
             {
-                var dlg = new OpenFileDialog
+                var loadedEntries = await _customEntryService.LoadCustomAsync();
+                if (loadedEntries.Any())
                 {
-                    Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
-                    Title = "Load Custom Entries"
-                };
-                if (dlg.ShowDialog() == true)
-                {
-                    var json = await File.ReadAllTextAsync(dlg.FileName);
-                    using var doc = JsonDocument.Parse(json);
-                    var list = new System.Collections.Generic.List<CustomEntry>();
-                    foreach (var item in doc.RootElement.EnumerateArray())
-                    {
-                        var ce = new CustomEntry
-                        {
-                            Name = item.TryGetProperty("Name", out var nm) ? nm.GetString() ?? string.Empty : string.Empty,
-                            Address = item.GetProperty("Address").GetInt32(),
-                            Type = item.TryGetProperty("Type", out var t) ? t.GetString() ?? "uint" : "uint",
-                            Value = item.TryGetProperty("Value", out var v) ? v.GetString() ?? "0" : "0",
-                            Continuous = item.TryGetProperty("Continuous", out var c) && c.GetBoolean(),
-                            PeriodMs = item.TryGetProperty("PeriodMs", out var p) ? p.GetInt32() : 1000,
-                            Monitor = item.TryGetProperty("Monitor", out var mr) && mr.GetBoolean(),
-                            ReadPeriodMs = item.TryGetProperty("ReadPeriodMs", out var rp) ? rp.GetInt32() : 1000,
-                            Area = item.TryGetProperty("Area", out var a) ? a.GetString() ?? "HoldingRegister" : "HoldingRegister",
-                            Trend = item.TryGetProperty("Trend", out var tr) && tr.GetBoolean()
-                        };
-                        list.Add(ce);
-                    }
-
                     CustomEntries.Clear();
-                    foreach (var ce in list)
+                    foreach (var ce in loadedEntries)
                         CustomEntries.Add(ce);
 
-                    // Ensure new items are wired for Trend property changes
                     SubscribeCustomEntries();
-
-                    StatusMessage = $"Loaded {list.Count} custom entries.";
+                    StatusMessage = $"Loaded {loadedEntries.Count} custom entries.";
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading custom entries");
                 MessageBox.Show($"Failed to load custom entries: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task UpdateHoldingRegister(DataGridCellEditEndingEventArgs? e)
+        {
+            if (e is null || e.EditAction != DataGridEditAction.Commit)
+                return;
+
+            if (e.Row?.Item is RegisterEntry entry)
+            {
+                try
+                {
+                    string? editedText = (e.EditingElement as TextBox)?.Text;
+                    string type = entry.Type?.ToLowerInvariant() ?? "uint";
+
+                    if (!string.IsNullOrWhiteSpace(editedText))
+                    {
+                        var text = editedText.Trim().Replace(',', '.');
+                        bool looksLikeFloat = text.Contains('.') || text.Contains("e", StringComparison.OrdinalIgnoreCase);
+
+                        switch (type)
+                        {
+                            case "real":
+                                {
+                                    if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out float f))
+                                    {
+                                        await WriteFloatAtAsync(entry.Address, f);
+                                        e.Cancel = true;
+                                        ReadRegistersCommand.Execute(null);
+                                    }
+                                    else
+                                    {
+                                        MessageBox.Show($"Invalid float value: '{editedText}'", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                        e.Cancel = true;
+                                    }
+                                    break;
+                                }
+                            case "string":
+                                {
+                                    await WriteStringAtAsync(entry.Address, editedText);
+                                    e.Cancel = true;
+                                    ReadRegistersCommand.Execute(null);
+                                    break;
+                                }
+                            case "int":
+                                {
+                                    if (int.TryParse(text, out int iv))
+                                    {
+                                        ushort raw = unchecked((ushort)iv);
+                                        await WriteRegisterAtAsync(entry.Address, raw);
+                                        e.Cancel = true;
+                                        ReadRegistersCommand.Execute(null);
+                                    }
+                                    else
+                                    {
+                                        MessageBox.Show($"Invalid integer value: '{editedText}'", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                        e.Cancel = true;
+                                    }
+                                    break;
+                                }
+                            default:
+                                {
+                                    if (looksLikeFloat && float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out float f))
+                                    {
+                                        await WriteFloatAtAsync(entry.Address, f);
+                                        e.Cancel = true;
+                                        ReadRegistersCommand.Execute(null);
+                                        break;
+                                    }
+                                    if (uint.TryParse(text, out uint uv) && uv <= ushort.MaxValue)
+                                    {
+                                        ushort val = (ushort)uv;
+                                        await WriteRegisterAtAsync(entry.Address, val);
+                                        entry.Value = val;
+                                        e.Cancel = true;
+                                    }
+                                    else
+                                    {
+                                        MessageBox.Show($"Invalid unsigned value: '{editedText}' (0..65535)", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                        e.Cancel = true;
+                                    }
+                                    break;
+                                }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to write register {entry.Address}: {ex.Message}", "Write Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    e.Cancel = true;
+                }
             }
         }
     }

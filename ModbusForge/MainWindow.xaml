@@ -9,7 +9,7 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="1073" Width="1556"
-        Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png">
+        Icon="pack://application:,,,/Resources/ModbusForge.ico">
 
     <Window.Resources>
         <ResourceDictionary>

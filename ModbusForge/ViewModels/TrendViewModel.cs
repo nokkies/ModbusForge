@@ -20,6 +20,7 @@ namespace ModbusForge.ViewModels
     public partial class TrendViewModel : ObservableObject
     {
         private readonly ITrendLogger _loggerSvc;
+        private readonly IFileDialogService _fileDialogService;
         private readonly Dictionary<string, ObservableCollection<double>> _valuesByKey = new();
         private readonly Dictionary<string, List<(DateTime ts, double v)>> _samplesByKey = new();
         private readonly Dictionary<string, SKColor> _colorByKey = new();
@@ -46,9 +47,10 @@ namespace ModbusForge.ViewModels
             public string Name { get; init; } = string.Empty;
         }
 
-        public TrendViewModel(ITrendLogger loggerSvc, IOptions<LoggingSettings> options)
+        public TrendViewModel(ITrendLogger loggerSvc, IOptions<LoggingSettings> options, IFileDialogService fileDialogService)
         {
             _loggerSvc = loggerSvc;
+            _fileDialogService = fileDialogService;
             var s = options?.Value ?? new LoggingSettings();
             s.Clamp();
 
@@ -84,6 +86,9 @@ namespace ModbusForge.ViewModels
             PlayCommand = new RelayCommand(StartFollowing);
             PauseCommand = new RelayCommand(StopFollowing);
 
+            ExportCsvCommand = new AsyncRelayCommand(ExportCsv);
+            ImportCsvCommand = new AsyncRelayCommand(ImportCsv);
+
             // initialize retention minutes from service
             RetentionMinutes = _loggerSvc.RetentionMinutes;
         }
@@ -114,6 +119,8 @@ namespace ModbusForge.ViewModels
         public IRelayCommand PlayCommand { get; }
         public IRelayCommand PauseCommand { get; }
         public IRelayCommand ApplyRetentionCommand => new RelayCommand(ApplyRetention);
+        public IAsyncRelayCommand ExportCsvCommand { get; }
+        public IAsyncRelayCommand ImportCsvCommand { get; }
 
         // ZoomMode is now derived in the View via a converter from LockX/LockY
 
@@ -136,6 +143,22 @@ namespace ModbusForge.ViewModels
             });
         }
 
+        private async Task ExportCsv()
+        {
+            var path = _fileDialogService.ShowSaveFileDialog("Export CSV", "CSV files (*.csv)|*.csv|All files (*.*)|*.*", "trend-export.csv");
+            if (path is not null)
+            {
+                try
+                {
+                    await ExportCsvAsync(path, SelectedSeriesItem);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Export CSV failed: {ex.Message}", "Trend Export", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
         public async System.Threading.Tasks.Task ImportCsvAsync(string path)
         {
             var key = $"Imported:{System.IO.Path.GetFileNameWithoutExtension(path)}";
@@ -149,6 +172,22 @@ namespace ModbusForge.ViewModels
                 if (!DateTime.TryParse(parts[1], null, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var ts)) continue;
                 if (!double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var v)) continue;
                 _loggerSvc.Publish(key, v, ts.ToUniversalTime());
+            }
+        }
+
+        private async Task ImportCsv()
+        {
+            var path = _fileDialogService.ShowOpenFileDialog("Import CSV", "CSV files (*.csv)|*.csv|All files (*.*)|*.*");
+            if (path is not null)
+            {
+                try
+                {
+                    await ImportCsvAsync(path);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Import CSV failed: {ex.Message}", "Trend Import", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 

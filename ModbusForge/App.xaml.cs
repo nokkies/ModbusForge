@@ -40,11 +40,9 @@ namespace ModbusForge
         private void ConfigureServices(IServiceCollection services)
         {
             // Configuration
-            // Use executable directory instead of current working directory (which may be C:\\Windows\\System32 for MSIX)
-            var basePath = AppContext.BaseDirectory;
             var builder = new ConfigurationBuilder()
-                .SetBasePath(basePath)
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 
             Configuration = builder.Build();
             services.AddSingleton(Configuration);
@@ -66,11 +64,13 @@ namespace ModbusForge
             services.AddSingleton<ModbusTcpService>();
             services.AddSingleton<ModbusServerService>();
             services.AddSingleton<ITrendLogger, TrendLoggingService>();
+            services.AddSingleton<IFileDialogService, FileDialogService>();
+            services.AddSingleton<ISimulationService, SimulationService>();
+            services.AddSingleton<ICustomEntryService, CustomEntryService>();
             
             // Register ViewModels
-            services.AddSingleton<MainViewModel>();
+            services.AddTransient<MainViewModel>();
             services.AddTransient<TrendViewModel>();
-            services.AddTransient<DecodeViewModel>();
         }
 
 

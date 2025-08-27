@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using System.IO;
+using ModbusForge.Helpers;
 
 namespace ModbusForge.Services
 {
@@ -71,17 +72,7 @@ namespace ModbusForge.Services
                 return await Task.Run(() =>
                 {
                     var bytes = _client.ReadDiscreteInputs(unitId, startAddress, count);
-                    var result = new bool[count];
-                    int bitIndex = 0;
-                    for (int i = 0; i < bytes.Length && bitIndex < count; i++)
-                    {
-                        byte b = bytes[i];
-                        for (int bit = 0; bit < 8 && bitIndex < count; bit++)
-                        {
-                            result[bitIndex++] = (b & (1 << bit)) != 0;
-                        }
-                    }
-                    return result;
+                    return BitConverterHelper.ToBooleanArray(bytes, count);
                 });
             }
             catch (SocketException ex)
@@ -237,21 +228,8 @@ namespace ModbusForge.Services
 
                 return await Task.Run(() =>
                 {
-                    // Read packed bytes where LSB of first byte is first coil
                     var bytes = _client.ReadCoils(unitId, startAddress, count);
-                    var result = new bool[count];
-
-                    int bitIndex = 0;
-                    for (int i = 0; i < bytes.Length && bitIndex < count; i++)
-                    {
-                        byte b = bytes[i];
-                        for (int bit = 0; bit < 8 && bitIndex < count; bit++)
-                        {
-                            result[bitIndex++] = (b & (1 << bit)) != 0;
-                        }
-                    }
-
-                    return result;
+                    return BitConverterHelper.ToBooleanArray(bytes, count);
                 }).ConfigureAwait(false);
             }
             catch (SocketException ex)

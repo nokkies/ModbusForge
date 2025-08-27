@@ -1,0 +1,65 @@
+name: Build Installer
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Publish Application
+      run: >
+        dotnet publish .\ModbusForge\ModbusForge.csproj
+        -c Release
+        -r win-x64
+        --self-contained true
+        -p:PublishSingleFile=true
+        -p:IncludeNativeLibrariesForSelfExtract=true
+        -p:PublishTrimmed=false
+        -p:DebugType=None
+        -p:DebugSymbols=false
+        -o .\publish\win-x64
+
+    - name: Compile Inno Setup Installer
+      uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+      with:
+        path: setup/ModbusForge.iss
+
+    - name: List outputs
+      shell: pwsh
+      run: |
+        Get-ChildItem -Recurse -File .\publish | Select-Object FullName
+        if (Test-Path .\installers) { Get-ChildItem -File .\installers | Select-Object Name,Length,LastWriteTime } else { Write-Host "No installers directory yet" }
+
+    - name: Upload Installer Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ModbusForge-Installer
+        path: installers/*.exe
+        if-no-files-found: error
+
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: installers/*.exe

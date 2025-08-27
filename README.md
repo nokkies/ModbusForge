@@ -1,9 +1,5 @@
 # ModbusForge
 
-![Release Workflow](https://github.com/nokkies/ModbusForge/actions/workflows/release.yml/badge.svg)
-![Latest Release](https://img.shields.io/github/v/release/nokkies/ModbusForge)
-![Downloads](https://img.shields.io/github/downloads/nokkies/ModbusForge/total)
-
 Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 
 ## Current Status
@@ -18,6 +14,12 @@ Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 - Logging/Trend tab: select rows to trend, zoom/pan, CSV/PNG export, retention window 1–60 minutes
 - Persistence for Custom entries to JSON (Save/Load)
 
+### 🚧 In Progress
+- Start/Stop Modbus server from the UI
+- UI enhancements and refactors
+- Simulation feature design (logic blocks and register connectors)
+- Comprehensive error handling and polish
+
 ## Prerequisites
 
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
@@ -27,7 +29,7 @@ Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 
 1. **Clone the repository**
    ```
-   git clone https://github.com/nokkies/ModbusForge.git
+   git clone https://github.com/yourusername/ModbusForge.git
    cd ModbusForge
    ```
 
@@ -46,13 +48,15 @@ Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
    dotnet run --project ModbusForge
    ```
 
-## Support / Donate
+## Installation
 
-[![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=ELTVNJEYLZE3W)
+When you download and run the installer for ModbusForge, Windows Defender SmartScreen will likely show a warning because the application is not digitally signed with a commercial certificate.
 
-If you find ModbusForge useful, please consider supporting development:
-
-- PayPal: https://www.paypal.com/donate/?hosted_button_id=ELTVNJEYLZE3W
+To install the application, follow these steps:
+1.  Run the `ModbusForge-x.x.x-setup.exe` installer.
+2.  Windows will show a blue window titled "Windows protected your PC".
+3.  Click on the **More info** link.
+4.  The publisher will be listed as "Unknown". Click the **Run anyway** button to proceed with the installation.
 
 ## Features
 
@@ -64,21 +68,14 @@ If you find ModbusForge useful, please consider supporting development:
   - Type: `uint`, `int`, `real` (32-bit float across 2 registers), `string` (2 chars per 16-bit register)
   - On-demand Read/Write buttons
   - Continuous Write (per-row)
-  - Live reads: when Global Continuous Read is ON, rows with `Trend` enabled are read asynchronously by the trend timer and their `Value` updates live in the grid
+  - Live reads: when Global Continuous Read is ON, rows with `Trend` enabled are read at the trend sample rate and their `Value` updates in the grid
   - Save/Load entries to JSON (`custom-entries.json`)
+
 - Logging/Trend
   - Add/remove trend series per Custom row (`Trend` column)
   - Adjustable retention window (1–60 minutes)
   - Zoom and pan controls, play/pause live window, reset axes
   - Export/Import CSV, export PNG
-- Decode tab
-  - Always reads 2 registers and displays all decoding variants side-by-side:
-    - None, Swap Bytes, Swap Words, Swap Bytes+Words
-  - Shows both 16-bit (first word) and 32-bit (two words) interpretations:
-    - Raw hex, Unsigned, Signed, Float (32-bit), ASCII
-  - Read button is enabled only when connected; Enter key triggers Read
-  - Address accepts decimal (e.g., 100) or hex (e.g., 0x64)
-  - Shows "Reading..." while a read is in progress
 
 ## Modes: Client vs Server
 
@@ -86,62 +83,11 @@ If you find ModbusForge useful, please consider supporting development:
   - `Mode`: `Client` or `Server`
   - `DefaultPort`, `DefaultUnitId`, etc.
 - Both client and server services are registered; the `MainViewModel` selects the `IModbusService` implementation at runtime based on `Mode`.
-
-### Server Controls
-
-- Start server:
-  - Set `Mode` to `Server`.
-  - Set `Port` (default `502`, configurable via `ServerSettings.DefaultPort`).
-  - Click `Start Server` (Connect button). Status shows "Server started" on success.
-- Stop server:
-  - Click `Disconnect`. Status shows "Server stopped".
-- Defaults:
-  - `DefaultPort` and `DefaultUnitId` come from `appsettings.json` (`ServerSettings`).
-  - Note: `UnitId` applies to client operations. In Server mode, it is not used by the listener.
-- Common error (port in use):
-  - You’ll see a friendly message and an option to retry on port `1502`. See Troubleshooting → "Port already in use (10048)".
+- Server start/stop from UI is planned and under active development.
 
 ## Versioning
 
-- The window title displays the application version from the assembly ProductVersion.
-- CI builds stamp `Version`, `AssemblyVersion`, and `FileVersion` from the Git tag (e.g., `v1.2.0`). Local dev builds use the version in `ModbusForge/ModbusForge.csproj`.
-
-## Download
-
-- Latest Release: https://github.com/nokkies/ModbusForge/releases/latest
-- Assets provided on each release:
-  - `ModbusForge-<version>-win-x64.zip` (framework-dependent; requires .NET 8 Desktop Runtime)
-  - `ModbusForge-<version>-win-x64-sc.zip` (self-contained; no .NET install required)
-  - `ModbusForge-<version>-win-x64.msix` (Windows installer; double-click to install; signed if code-signing secrets are configured)
-- Checksums: SHA256 file is attached to the Release for verification.
-- MSIX requires Windows 10 1809 (build 17763) or later.
-
-### Installing the MSIX (trust the certificate)
-
-If Windows shows a message like "The app package isn't trusted" when installing the MSIX, you need to trust the signing certificate once on your machine.
-
-- Certificate file: `ModbusForge.cer` (located in the repo root and often attached to releases)
-
-GUI steps (recommended):
-- Double-click `ModbusForge.cer`.
-- Click "Install Certificate...".
-- Choose "Local Machine" (requires admin) → Next.
-- "Place all certificates in the following store" → Browse → select "Trusted People" → OK → Next → Finish.
-- Optional (for current user): repeat into "Current User" → store "Trusted People".
-- Now double-click the `.msix` to install.
-
-PowerShell (admin) alternative:
-```powershell
-# From the folder where ModbusForge.cer is located
-Import-Certificate -FilePath .\ModbusForge.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
-# Optionally also for current user
-Import-Certificate -FilePath .\ModbusForge.cer -CertStoreLocation Cert:\CurrentUser\TrustedPeople
-```
-
-Notes:
-- The certificate "Subject" must match the MSIX Publisher shown in the App Installer. If they differ, installation will be blocked.
-- Some systems may require enabling "Developer Mode" or allowing app sideloading, though recent Windows versions typically allow sideloading without it.
-- Upgrades: installing a newer MSIX will replace the previous version. If Windows blocks the upgrade, uninstall the older version first from "Apps & features".
+- The window title displays the application version from the assembly ProductVersion (fallback to `v1.2.1`).
 
 ## Build and Release
 
@@ -170,7 +116,7 @@ dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-con
 4. Create a ZIP artifact:
 
 ```powershell
-$version = "1.2.0"
+$version = "1.1.1"
 Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
 # or for self-contained
 Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$version-win-x64-sc.zip -Force
@@ -179,7 +125,7 @@ Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$ve
 5. Tag and create a GitHub Release (optional):
 
 ```powershell
-$version = "1.2.0"
+$version = "1.1.1"
 git tag v$version
 git push origin v$version
 
@@ -191,18 +137,18 @@ gh release upload v$version .\ModbusForge-$version-win-x64-sc.zip
 
 If you don’t use the GitHub CLI, you can create a release manually on GitHub and upload the ZIP file(s).
 
+6. Create an Installer (optional):
+
+This project uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create a simple installer.
+
+1. **Install Inno Setup:** Download and install the latest version of Inno Setup from the [official website](https://jrsoftware.org/isdl.php).
+2. **Compile the Script:** Open the `setup/ModbusForge.iss` script in the Inno Setup Compiler, or run it from the command line from the project root:
+   ```powershell
+   & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "setup\ModbusForge.iss"
+   ```
+   The installer will be created in the `installers` directory.
+
 ## Changelog
-
-- 1.2.0 (2025-08-25)
-  - MSIX/runtime: Fixed config loading for MSIX by using `AppContext.BaseDirectory`; `appsettings.json` optional to avoid crashes.
-  - UI: Title and About read ProductVersion robustly (Resource/Entry assembly or process module) with fallback to 1.2.0.
-  - CI: Release workflow builds/signs MSIX with correct Identity version derived from tag.
-
-- 1.1.2 (2025-08-23)
-  - Decode tab redesign: removed toggle checkboxes; always reads 2 registers and shows all swap variants side-by-side (None / Swap Bytes / Swap Words / Swap B+W).
-  - ViewModel: computes all variants internally; Read is enabled only when connected; added IsBusy to prevent double-reads and show "Reading...".
-  - UX polish: Enter key triggers Read; Address accepts decimal or 0x-prefixed hex; improved status messages.
-  - Docs: README updated with Decode section and changelog entry.
 
 - 1.1.1 (2025-08-23)
   - Trend: added retention window control (1–60 minutes) with Apply action.
@@ -227,6 +173,13 @@ If you don’t use the GitHub CLI, you can create a release manually on GitHub a
   - Package alignment: SkiaSharp 3.116.1 + SkiaSharp.Views.WPF 3.116.1; LiveChartsCore.SkiaSharpView.WPF remains at 2.0.0-rc5.4.
   - Minor cleanups and nullability adjustments.
 
+## Simulation Roadmap
+
+- Logic function blocks: AND, OR, NOT, SET/RESET, timers (TON/TOF/TP)
+- Connectors to Modbus registers/coils for inputs/outputs
+- Visual block editor with wiring, polling, and write-back to registers
+- Persistable simulation graphs and runtime execution with scan-cycle
+
 ## Project Structure
 
 - `ModbusForge/` - Main WPF application project
@@ -241,7 +194,7 @@ If you don’t use the GitHub CLI, you can create a release manually on GitHub a
 
 ## Attribution
 
-This project uses the FluentModbus library for Modbus client and server functionality:
+This project uses the excellent FluentModbus library for Modbus client and server functionality:
 
 - FluentModbus: https://github.com/Apollo3zehn/FluentModbus (MIT License)
 
@@ -290,6 +243,14 @@ If you encounter build issues:
   tasklist | findstr <PID>
   ```
   You can either stop that process or change the server port in the UI and try again.
+
+## Next Steps
+
+1. Wire server start/stop into UI commands
+2. Finalize UI refactors and tab UX polish
+3. Implement simulation function blocks and connectors
+4. Add comprehensive error handling and user feedback
+5. Add unit and integration tests
 
 ## License
 
