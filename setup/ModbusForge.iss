@@ -9,6 +9,7 @@ AppPublisher=ModbusForge
 DefaultDirName={autopf}\ModbusForge
 DefaultGroupName=ModbusForge
 UninstallDisplayIcon={app}\ModbusForge.exe
+SetupIconFile=..\ModbusForge\Resources\ModbusForge.ico
 
 ; Setup output settings
 WizardStyle=modern
