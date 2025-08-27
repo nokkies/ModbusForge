@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+  <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -10,9 +10,9 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <AssemblyName>ModbusForge</AssemblyName>
     <RootNamespace>ModbusForge</RootNamespace>
-    <Version>1.2.1</Version>
-    <AssemblyVersion>1.2.1.0</AssemblyVersion>
-    <FileVersion>1.2.1.0</FileVersion>
+    <Version>1.3.0</Version>
+    <AssemblyVersion>1.3.0.0</AssemblyVersion>
+    <FileVersion>1.3.0.0</FileVersion>
     <LangVersion>12.0</LangVersion>
     <ApplicationIcon>Resources\ModbusForge.ico</ApplicationIcon>
   </PropertyGroup>
@@ -46,6 +46,8 @@
     <!-- Pin SkiaSharp to stable to reduce NU1701 warnings from transitive dependencies -->
     <PackageReference Include="SkiaSharp" Version="3.116.1" />
     <PackageReference Include="SkiaSharp.Views.WPF" Version="3.116.1" />
+    <!-- MahApps.Metro for modern theming and controls -->
+    <PackageReference Include="MahApps.Metro" Version="2.4.10" />
   </ItemGroup>
 
   

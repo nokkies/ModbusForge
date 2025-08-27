@@ -7,6 +7,11 @@
     <Application.Resources>
       <ResourceDictionary>
         <ResourceDictionary.MergedDictionaries>
+          <!-- MahApps.Metro base styles -->
+          <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml"/>
+          <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml"/>
+          <!-- MahApps theme: Light.Blue -->
+          <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Light.Blue.xaml"/>
           <!-- App-level resources so they are available during control InitializeComponent -->
           <ResourceDictionary Source="Resources/Converters.xaml"/>
         </ResourceDictionary.MergedDictionaries>
