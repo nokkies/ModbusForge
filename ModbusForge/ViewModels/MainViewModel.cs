@@ -18,6 +18,7 @@ using System.Windows.Threading;
 using System.Text;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Win32;
 using System.IO;
 using System.Reflection;
@@ -548,7 +549,7 @@ namespace ModbusForge.ViewModels
             }
         }
 
-        private async Task ReadRegistersAsync()
+        private async Task ReadRegistersAsync(bool isPolled = false)
         {
             try
             {
@@ -613,12 +614,21 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = $"Error reading registers: {ex.Message}";
                 _logger.LogError(ex, "Error reading registers");
-                MessageBox.Show($"Failed to read registers: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+
+                if (isPolled)
+                {
+                    HoldingMonitorEnabled = false;
+                    StatusMessage = $"Polling stopped due to error: {ex.Message}";
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to read registers: {ex.Message}", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
-        private async Task ReadInputRegistersAsync()
+        private async Task ReadInputRegistersAsync(bool isPolled = false)
         {
             try
             {
@@ -640,8 +650,17 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = $"Error reading input registers: {ex.Message}";
                 _logger.LogError(ex, "Error reading input registers");
-                MessageBox.Show($"Failed to read input registers: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+
+                if (isPolled)
+                {
+                    InputRegistersMonitorEnabled = false;
+                    StatusMessage = $"Polling stopped due to error: {ex.Message}";
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to read input registers: {ex.Message}", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -664,7 +683,7 @@ namespace ModbusForge.ViewModels
             }
         }
 
-        private async Task ReadCoilsAsync()
+        private async Task ReadCoilsAsync(bool isPolled = false)
         {
             try
             {
@@ -685,12 +704,21 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = $"Error reading coils: {ex.Message}";
                 _logger.LogError(ex, "Error reading coils");
-                MessageBox.Show($"Failed to read coils: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+
+                if (isPolled)
+                {
+                    CoilsMonitorEnabled = false;
+                    StatusMessage = $"Polling stopped due to error: {ex.Message}";
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to read coils: {ex.Message}", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
-        private async Task ReadDiscreteInputsAsync()
+        private async Task ReadDiscreteInputsAsync(bool isPolled = false)
         {
             try
             {
@@ -711,8 +739,17 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = $"Error reading discrete inputs: {ex.Message}";
                 _logger.LogError(ex, "Error reading discrete inputs");
-                MessageBox.Show($"Failed to read discrete inputs: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+
+                if (isPolled)
+                {
+                    DiscreteInputsMonitorEnabled = false;
+                    StatusMessage = $"Polling stopped due to error: {ex.Message}";
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to read discrete inputs: {ex.Message}", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -853,12 +890,39 @@ namespace ModbusForge.ViewModels
     {
         private void AddCustomEntry()
         {
-            int nextAddress = 0;
-            if (CustomEntries.Count > 0)
+            if (CustomEntries.Any())
             {
-                nextAddress = CustomEntries[^1].Address + 1;
+                var last = CustomEntries.Last();
+                var newEntry = new CustomEntry
+                {
+                    Name = IncrementName(last.Name),
+                    Area = last.Area,
+                    Type = last.Type,
+                    Address = last.Address + (string.Equals(last.Type, "real", StringComparison.OrdinalIgnoreCase) ? 2 : 1)
+                };
+                CustomEntries.Add(newEntry);
             }
-            CustomEntries.Add(new CustomEntry { Address = nextAddress, Area = "HoldingRegister", Type = "uint", Value = "0", Continuous = false, PeriodMs = 1000, Monitor = false, ReadPeriodMs = 1000 });
+            else
+            {
+                CustomEntries.Add(new CustomEntry { Address = 0, Area = "HoldingRegister", Type = "uint", Value = "0" });
+            }
+        }
+
+        private static string IncrementName(string lastName)
+        {
+            if (string.IsNullOrWhiteSpace(lastName)) return string.Empty;
+
+            var match = Regex.Match(lastName, @"(\d+)$");
+            if (match.Success)
+            {
+                var numStr = match.Groups[1].Value;
+                if (int.TryParse(numStr, out int num))
+                {
+                    return lastName.Substring(0, match.Index) + (num + 1);
+                }
+            }
+
+            return $"{lastName} 1";
         }
 
         private async Task WriteCustomNowAsync(CustomEntry entry)
@@ -1080,7 +1144,7 @@ namespace ModbusForge.ViewModels
                     int p = HoldingMonitorPeriodMs <= 0 ? 1000 : HoldingMonitorPeriodMs;
                     if ((now - _lastHoldingReadUtc).TotalMilliseconds >= p)
                     {
-                        await ReadRegistersAsync();
+                        await ReadRegistersAsync(isPolled: true);
                         _lastHoldingReadUtc = now;
                     }
                 }
@@ -1090,7 +1154,7 @@ namespace ModbusForge.ViewModels
                     int p = InputRegistersMonitorPeriodMs <= 0 ? 1000 : InputRegistersMonitorPeriodMs;
                     if ((now - _lastInputRegReadUtc).TotalMilliseconds >= p)
                     {
-                        await ReadInputRegistersAsync();
+                        await ReadInputRegistersAsync(isPolled: true);
                         _lastInputRegReadUtc = now;
                     }
                 }
@@ -1100,7 +1164,7 @@ namespace ModbusForge.ViewModels
                     int p = CoilsMonitorPeriodMs <= 0 ? 1000 : CoilsMonitorPeriodMs;
                     if ((now - _lastCoilsReadUtc).TotalMilliseconds >= p)
                     {
-                        await ReadCoilsAsync();
+                        await ReadCoilsAsync(isPolled: true);
                         _lastCoilsReadUtc = now;
                     }
                 }
@@ -1110,7 +1174,7 @@ namespace ModbusForge.ViewModels
                     int p = DiscreteInputsMonitorPeriodMs <= 0 ? 1000 : DiscreteInputsMonitorPeriodMs;
                     if ((now - _lastDiscreteReadUtc).TotalMilliseconds >= p)
                     {
-                        await ReadDiscreteInputsAsync();
+                        await ReadDiscreteInputsAsync(isPolled: true);
                         _lastDiscreteReadUtc = now;
                     }
                 }

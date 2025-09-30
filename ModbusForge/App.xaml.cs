@@ -69,7 +69,7 @@ namespace ModbusForge
             services.AddSingleton<ICustomEntryService, CustomEntryService>();
             
             // Register ViewModels
-            services.AddTransient<MainViewModel>();
+            services.AddSingleton<MainViewModel>();
             services.AddTransient<TrendViewModel>();
             services.AddTransient<DecodeViewModel>();
         }
