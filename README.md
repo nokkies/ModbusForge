@@ -1,4 +1,4 @@
-# ModbusForge v2.0.2
+# ModbusForge v2.1.0
 
 Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 
@@ -82,7 +82,7 @@ To install the application, follow these steps:
 
 ## Versioning
 
-- The window title displays the application version from the assembly ProductVersion (fallback to `v2.0.0`).
+- The window title displays the application version from the assembly ProductVersion (fallback to `v2.1.0`).
 
 ## Build and Release
 
@@ -111,7 +111,7 @@ dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-con
 4. Create a ZIP artifact:
 
 ```powershell
-$version = "2.0.2"
+$version = "2.1.0"
 Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
 # or for self-contained
 Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$version-win-x64-sc.zip -Force
@@ -120,7 +120,7 @@ Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$ve
 5. Tag and create a GitHub Release (optional):
 
 ```powershell
-$version = "2.0.2"
+$version = "2.1.0"
 git tag v$version
 git push origin v$version
 
@@ -144,6 +144,11 @@ This project uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create a si
    The installer will be created in the `installers` directory.
 
 ## Changelog
+
+- 2.1.0 (2025-10-23)
+  - Added console logging tab for real-time monitoring of all Modbus operations
+  - Console displays connection attempts, successes, failures, and data operations
+  - Improved debugging and troubleshooting capabilities
 
 - 2.0.2 (2025-10-23)
   - Fixed client address offset issues

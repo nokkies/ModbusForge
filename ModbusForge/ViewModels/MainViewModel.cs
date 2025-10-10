@@ -35,6 +35,7 @@ namespace ModbusForge.ViewModels
         private IModbusService _modbusService;
         private readonly ModbusTcpService _clientService;
         private readonly ModbusServerService _serverService;
+        private readonly IConsoleLoggerService _consoleLoggerService;
         private bool _disposed = false;
         // Mode-aware UI helpers
 
@@ -50,7 +51,8 @@ namespace ModbusForge.ViewModels
             App.ServiceProvider.GetRequiredService<IOptions<ServerSettings>>(),
             App.ServiceProvider.GetRequiredService<ITrendLogger>(),
             App.ServiceProvider.GetRequiredService<ISimulationService>(),
-            App.ServiceProvider.GetRequiredService<ICustomEntryService>())
+            App.ServiceProvider.GetRequiredService<ICustomEntryService>(),
+            App.ServiceProvider.GetRequiredService<IConsoleLoggerService>())
         {
         }
 
@@ -66,7 +68,7 @@ namespace ModbusForge.ViewModels
             StatusMessage = $"Read {snapshot.Count} custom entries";
         }
 
-        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ISimulationService simulationService, ICustomEntryService customEntryService)
+        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ISimulationService simulationService, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService)
         {
             // Store dependencies
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
@@ -75,7 +77,7 @@ namespace ModbusForge.ViewModels
             _trendLogger = trendLogger ?? throw new ArgumentNullException(nameof(trendLogger));
             _simulationService = simulationService ?? throw new ArgumentNullException(nameof(simulationService));
             _customEntryService = customEntryService ?? throw new ArgumentNullException(nameof(customEntryService));
-
+            _consoleLoggerService = consoleLoggerService ?? throw new ArgumentNullException(nameof(consoleLoggerService));
             var settings = options?.Value ?? new ServerSettings();
 
             // Initialize in logical order
@@ -181,11 +183,11 @@ namespace ModbusForge.ViewModels
                 string? version = GetApplicationVersion();
                 Title = !string.IsNullOrWhiteSpace(version) 
                     ? $"ModbusForge v{version}" 
-                    : "ModbusForge v2.0.0";
+                    : "ModbusForge v2.1.0";
             }
             catch
             {
-                Title = "ModbusForge v2.0.0";
+                Title = "ModbusForge v2.1.0";
             }
         }
 
@@ -239,7 +241,7 @@ namespace ModbusForge.ViewModels
         private string _title = "ModbusForge";
 
         [ObservableProperty]
-        private string _version = "2.0.2";
+        private string _version = "2.1.0";
 
         // UI-selectable mode: "Client" or "Server"
         [ObservableProperty]
@@ -376,6 +378,8 @@ namespace ModbusForge.ViewModels
         public IRelayCommand ReadInputRegistersCommand { get; private set; }
         public IRelayCommand ReadDiscreteInputsCommand { get; private set; }
 
+        public ObservableCollection<string> ConsoleMessages => _consoleLoggerService.LogMessages;
+
         // Custom tab
         public ObservableCollection<CustomEntry> CustomEntries { get; } = new();
         public ICommand AddCustomEntryCommand { get; private set; }
@@ -504,6 +508,7 @@ namespace ModbusForge.ViewModels
             try
             {
                 StatusMessage = IsServerMode ? "Starting server..." : "Connecting...";
+                _consoleLoggerService.Log(StatusMessage);
                 var success = await _modbusService.ConnectAsync(ServerAddress, Port);
 
                 if (success)
@@ -512,15 +517,18 @@ namespace ModbusForge.ViewModels
                     _hasConnectionError = false;
                     StatusMessage = IsServerMode ? "Server started" : "Connected to Modbus server";
                     _logger.LogInformation(IsServerMode ? "Successfully started Modbus server" : "Successfully connected to Modbus server");
+                    _consoleLoggerService.Log(StatusMessage);
                 }
                 else
                 {
                     IsConnected = false;
                     StatusMessage = IsServerMode ? "Server failed to start" : "Connection failed";
                     _logger.LogWarning(IsServerMode ? "Failed to start Modbus server" : "Failed to connect to Modbus server");
+                    _consoleLoggerService.Log(StatusMessage);
                     var msg = IsServerMode
                         ? $"Failed to start server on port {Port}. The port may be in use. Try another port (e.g., 1502) or stop the process using it."
                         : "Failed to connect to Modbus server.";
+                    _consoleLoggerService.Log(msg);
                     MessageBox.Show(msg, IsServerMode ? "Server Error" : "Connection Error",
                         MessageBoxButton.OK, MessageBoxImage.Warning);
 
@@ -539,19 +547,23 @@ namespace ModbusForge.ViewModels
                             {
                                 Port = 1502;
                                 StatusMessage = $"Retrying server on port {Port}...";
+                                _consoleLoggerService.Log(StatusMessage);
                                 var retryOk = await _modbusService.ConnectAsync(ServerAddress, Port);
                                 if (retryOk)
                                 {
                                     IsConnected = true;
                                     StatusMessage = "Server started";
                                     _logger.LogInformation("Successfully started Modbus server on alternative port {AltPort}", Port);
+                                    _consoleLoggerService.Log($"Successfully started Modbus server on alternative port {Port}");
                                 }
                                 else
                                 {
                                     IsConnected = false;
                                     StatusMessage = "Server failed to start";
                                     _logger.LogWarning("Failed to start Modbus server on alternative port {AltPort}", Port);
-                                    MessageBox.Show($"Failed to start server on alternative port {Port}. The port may also be in use or blocked.",
+                                    var failMsg = $"Failed to start server on alternative port {Port}. The port may also be in use or blocked.";
+                                    _consoleLoggerService.Log(failMsg);
+                                    MessageBox.Show(failMsg,
                                         "Server Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                                     // Restore original port so user sees their intended value
                                     Port = originalPort;
@@ -563,6 +575,7 @@ namespace ModbusForge.ViewModels
                                 Port = originalPort;
                                 StatusMessage = $"Server error: {rex.Message}";
                                 _logger.LogError(rex, "Error retrying server start on alternative port 1502");
+                                _consoleLoggerService.Log($"Failed to start server on alternative port 1502: {rex.Message}");
                                 MessageBox.Show($"Failed to start server on alternative port 1502: {rex.Message}",
                                     "Server Error", MessageBoxButton.OK, MessageBoxImage.Error);
                             }
@@ -574,6 +587,7 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = IsServerMode ? $"Server error: {ex.Message}" : $"Error: {ex.Message}";
                 _logger.LogError(ex, IsServerMode ? "Error starting Modbus server" : "Error connecting to Modbus server");
+                _consoleLoggerService.Log(StatusMessage);
                 MessageBox.Show(IsServerMode ? $"Failed to start server: {ex.Message}" : $"Failed to connect: {ex.Message}", IsServerMode ? "Server Error" : "Connection Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -585,16 +599,20 @@ namespace ModbusForge.ViewModels
         {
             try
             {
-                _logger.LogInformation(IsServerMode ? "Stopping Modbus server" : "Disconnecting from Modbus server");
+                var msg = IsServerMode ? "Stopping Modbus server" : "Disconnecting from Modbus server";
+                _logger.LogInformation(msg);
+                _consoleLoggerService.Log(msg);
                 await _modbusService.DisconnectAsync();
                 IsConnected = false;
                 StatusMessage = IsServerMode ? "Server stopped" : "Disconnected";
                 _logger.LogInformation(IsServerMode ? "Successfully stopped Modbus server" : "Successfully disconnected from Modbus server");
+                _consoleLoggerService.Log(StatusMessage);
             }
             catch (Exception ex)
             {
                 StatusMessage = IsServerMode ? $"Error stopping server: {ex.Message}" : $"Error disconnecting: {ex.Message}";
                 _logger.LogError(ex, IsServerMode ? "Error stopping Modbus server" : "Error disconnecting from Modbus server");
+                _consoleLoggerService.Log(StatusMessage);
                 MessageBox.Show(IsServerMode ? $"Failed to stop server: {ex.Message}" : $"Failed to disconnect: {ex.Message}", IsServerMode ? "Server Stop Error" : "Disconnection Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -605,6 +623,7 @@ namespace ModbusForge.ViewModels
             try
             {
                 StatusMessage = "Reading registers...";
+                _consoleLoggerService.Log($"Reading {RegisterCount} holding registers from address {RegisterStart}");
                 var values = await _modbusService.ReadHoldingRegistersAsync(UnitId, RegisterStart, RegisterCount);
                 if (values is null)
                 {
@@ -666,6 +685,7 @@ namespace ModbusForge.ViewModels
                 }
                 StatusMessage = $"Read {values.Length} registers";
                 _hasConnectionError = false;
+                _consoleLoggerService.Log(StatusMessage);
             }
             catch (Exception ex)
             {
@@ -673,6 +693,7 @@ namespace ModbusForge.ViewModels
                 _logger.LogError(ex, "Error reading registers");
                 _hasConnectionError = true;
                 _lastErrorTime = DateTime.UtcNow;
+                _consoleLoggerService.Log(StatusMessage);
                 if (!suppressPopup)
                 {
                     MessageBox.Show($"Failed to read registers: {ex.Message}", "Read Error",
@@ -686,6 +707,7 @@ namespace ModbusForge.ViewModels
             try
             {
                 StatusMessage = "Reading input registers...";
+                _consoleLoggerService.Log($"Reading {InputRegisterCount} input registers from address {InputRegisterStart}");
                 var values = await _modbusService.ReadInputRegistersAsync(UnitId, InputRegisterStart, InputRegisterCount);
                 if (values is null)
                 {
@@ -704,6 +726,7 @@ namespace ModbusForge.ViewModels
                 }
                 StatusMessage = $"Read {values.Length} input registers";
                 _hasConnectionError = false;
+                _consoleLoggerService.Log(StatusMessage);
             }
             catch (Exception ex)
             {
@@ -711,6 +734,7 @@ namespace ModbusForge.ViewModels
                 _logger.LogError(ex, "Error reading input registers");
                 _hasConnectionError = true;
                 _lastErrorTime = DateTime.UtcNow;
+                _consoleLoggerService.Log(StatusMessage);
                 if (!suppressPopup)
                 {
                     MessageBox.Show($"Failed to read input registers: {ex.Message}", "Read Error",
@@ -724,8 +748,10 @@ namespace ModbusForge.ViewModels
             try
             {
                 StatusMessage = "Writing register...";
+                _consoleLoggerService.Log($"Writing register {WriteRegisterAddress} with value {WriteRegisterValue}");
                 await _modbusService.WriteSingleRegisterAsync(UnitId, WriteRegisterAddress, WriteRegisterValue);
                 StatusMessage = "Register written";
+                _consoleLoggerService.Log(StatusMessage);
                 // Optionally refresh
                 await ReadRegistersAsync();
             }
@@ -733,6 +759,7 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = $"Error writing register: {ex.Message}";
                 _logger.LogError(ex, "Error writing register");
+                _consoleLoggerService.Log(StatusMessage);
                 MessageBox.Show($"Failed to write register: {ex.Message}", "Write Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -743,6 +770,7 @@ namespace ModbusForge.ViewModels
             try
             {
                 StatusMessage = "Reading coils...";
+                _consoleLoggerService.Log($"Reading {CoilCount} coils from address {CoilStart}");
                 var states = await _modbusService.ReadCoilsAsync(UnitId, CoilStart, CoilCount);
                 if (states is null)
                 {
@@ -760,6 +788,7 @@ namespace ModbusForge.ViewModels
                 }
                 StatusMessage = $"Read {states.Length} coils";
                 _hasConnectionError = false;
+                _consoleLoggerService.Log(StatusMessage);
             }
             catch (Exception ex)
             {
@@ -767,6 +796,7 @@ namespace ModbusForge.ViewModels
                 _logger.LogError(ex, "Error reading coils");
                 _hasConnectionError = true;
                 _lastErrorTime = DateTime.UtcNow;
+                _consoleLoggerService.Log(StatusMessage);
                 if (!suppressPopup)
                 {
                     MessageBox.Show($"Failed to read coils: {ex.Message}", "Read Error",
@@ -780,6 +810,7 @@ namespace ModbusForge.ViewModels
             try
             {
                 StatusMessage = "Reading discrete inputs...";
+                _consoleLoggerService.Log($"Reading {DiscreteInputCount} discrete inputs from address {DiscreteInputStart}");
                 var states = await _modbusService.ReadDiscreteInputsAsync(UnitId, DiscreteInputStart, DiscreteInputCount);
                 if (states is null)
                 {
@@ -797,6 +828,7 @@ namespace ModbusForge.ViewModels
                 }
                 StatusMessage = $"Read {states.Length} discrete inputs";
                 _hasConnectionError = false;
+                _consoleLoggerService.Log(StatusMessage);
             }
             catch (Exception ex)
             {
@@ -804,6 +836,7 @@ namespace ModbusForge.ViewModels
                 _logger.LogError(ex, "Error reading discrete inputs");
                 _hasConnectionError = true;
                 _lastErrorTime = DateTime.UtcNow;
+                _consoleLoggerService.Log(StatusMessage);
                 if (!suppressPopup)
                 {
                     MessageBox.Show($"Failed to read discrete inputs: {ex.Message}", "Read Error",
@@ -817,8 +850,10 @@ namespace ModbusForge.ViewModels
             try
             {
                 StatusMessage = "Writing coil...";
+                _consoleLoggerService.Log($"Writing coil {WriteCoilAddress} with value {WriteCoilState}");
                 await _modbusService.WriteSingleCoilAsync(UnitId, WriteCoilAddress, WriteCoilState);
                 StatusMessage = "Coil written";
+                _consoleLoggerService.Log(StatusMessage);
                 // Optionally refresh
                 await ReadCoilsAsync();
             }
@@ -826,6 +861,7 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = $"Error writing coil: {ex.Message}";
                 _logger.LogError(ex, "Error writing coil");
+                _consoleLoggerService.Log(StatusMessage);
                 MessageBox.Show($"Failed to write coil: {ex.Message}", "Write Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }

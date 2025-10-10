@@ -427,6 +427,11 @@
                     <views:TrendView x:Name="TrendViewControl" />
                 </Grid>
             </TabItem>
+            <TabItem Header="Console">
+                <Grid Margin="5">
+                    <ListView ItemsSource="{Binding ConsoleMessages}" />
+                </Grid>
+            </TabItem>
         </TabControl>
 
         <StatusBar Grid.Row="3">
