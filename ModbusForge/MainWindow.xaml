@@ -10,7 +10,11 @@
         xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="1073" Width="1556"
-        Icon="pack://application:,,,/Resources/ModbusForge.ico">
+        Icon="pack://application:,,,/Resources/ModbusForge.ico"
+        BorderThickness="1"
+        GlowBrush="{DynamicResource MahApps.Brushes.Accent}"
+        WindowTitleBrush="{DynamicResource MahApps.Brushes.Accent}"
+        NonActiveWindowTitleBrush="{DynamicResource MahApps.Brushes.Accent3}">
 
     <mah:MetroWindow.Resources>
         <ResourceDictionary>
@@ -57,6 +61,27 @@
                 <Setter Property="RowBackground" Value="Transparent"/>
                 <Setter Property="EnableRowVirtualization" Value="True"/>
                 <Setter Property="EnableColumnVirtualization" Value="True"/>
+            </Style>
+
+            <!-- Modern Button Style -->
+            <Style TargetType="Button" BasedOn="{StaticResource MahApps.Styles.Button}">
+                <Setter Property="Padding" Value="12,6"/>
+                <Setter Property="Margin" Value="4,2"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+            </Style>
+
+            <!-- GroupBox Style -->
+            <Style TargetType="GroupBox" BasedOn="{StaticResource MahApps.Styles.GroupBox}">
+                <Setter Property="Margin" Value="5"/>
+                <Setter Property="Padding" Value="8"/>
+                <Setter Property="BorderThickness" Value="1"/>
+            </Style>
+
+            <!-- StatusBar Style -->
+            <Style TargetType="StatusBar">
+                <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Accent4}"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="FontWeight" Value="Medium"/>
             </Style>
         </ResourceDictionary>
     </mah:MetroWindow.Resources>
@@ -407,10 +432,16 @@
                 <TextBlock Text="{Binding StatusMessage}" FontWeight="SemiBold"/>
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock>
-                    <Run Text="Status:" FontWeight="SemiBold"/>
-                    <Run Text="{Binding IsConnected, Converter={StaticResource BooleanToConnectedConverter}}"/>
-                </TextBlock>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Margin="0,0,20,0">
+                        <Run Text="Version:" FontWeight="SemiBold"/>
+                        <Run Text="{Binding Version}"/>
+                    </TextBlock>
+                    <TextBlock>
+                        <Run Text="Status:" FontWeight="SemiBold"/>
+                        <Run Text="{Binding IsConnected, Converter={StaticResource BooleanToConnectedConverter}}"/>
+                    </TextBlock>
+                </StackPanel>
             </StatusBarItem>
         </StatusBar>
     </Grid>

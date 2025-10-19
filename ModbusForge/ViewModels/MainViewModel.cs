@@ -196,6 +196,9 @@ namespace ModbusForge.ViewModels
         [ObservableProperty]
         private string _title = "ModbusForge";
 
+        [ObservableProperty]
+        private string _version = "1.4.0";
+
         // UI-selectable mode: "Client" or "Server"
         [ObservableProperty]
         private string _mode = "Client";
