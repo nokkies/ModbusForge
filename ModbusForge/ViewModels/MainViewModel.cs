@@ -168,6 +168,8 @@ namespace ModbusForge.ViewModels
             ReadAllCustomNowCommand = new RelayCommand(async () => await ReadAllCustomNowAsync());
             SaveCustomCommand = new RelayCommand(async () => await SaveCustomAsync());
             LoadCustomCommand = new RelayCommand(async () => await LoadCustomAsync());
+            SaveAllConfigCommand = new RelayCommand(async () => await SaveAllConfigAsync());
+            LoadAllConfigCommand = new RelayCommand(async () => await LoadAllConfigAsync());
 
             // Start custom writer timer
             _customTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
@@ -317,6 +319,8 @@ namespace ModbusForge.ViewModels
         private DateTime _lastInputRegReadUtc = DateTime.MinValue;
         private DateTime _lastCoilsReadUtc = DateTime.MinValue;
         private DateTime _lastDiscreteReadUtc = DateTime.MinValue;
+        private bool _hasConnectionError = false;
+        private DateTime _lastErrorTime = DateTime.MinValue;
 
         public ICommand ConnectCommand { get; }
         public IRelayCommand DisconnectCommand { get; }
@@ -335,6 +339,8 @@ namespace ModbusForge.ViewModels
         public IRelayCommand ReadAllCustomNowCommand { get; }
         public IRelayCommand SaveCustomCommand { get; }
         public IRelayCommand LoadCustomCommand { get; }
+        public IRelayCommand SaveAllConfigCommand { get; }
+        public IRelayCommand LoadAllConfigCommand { get; }
         public IAsyncRelayCommand<DataGridCellEditEndingEventArgs> UpdateHoldingRegisterCommand { get; }
 
         // Global toggles for Custom tab
@@ -458,6 +464,7 @@ namespace ModbusForge.ViewModels
                 if (success)
                 {
                     IsConnected = true;
+                    _hasConnectionError = false;
                     StatusMessage = IsServerMode ? "Server started" : "Connected to Modbus server";
                     _logger.LogInformation(IsServerMode ? "Successfully started Modbus server" : "Successfully connected to Modbus server");
                 }
@@ -548,7 +555,7 @@ namespace ModbusForge.ViewModels
             }
         }
 
-        private async Task ReadRegistersAsync()
+        private async Task ReadRegistersAsync(bool suppressPopup = false)
         {
             try
             {
@@ -608,17 +615,23 @@ namespace ModbusForge.ViewModels
                     }
                 }
                 StatusMessage = $"Read {values.Length} registers";
+                _hasConnectionError = false;
             }
             catch (Exception ex)
             {
                 StatusMessage = $"Error reading registers: {ex.Message}";
                 _logger.LogError(ex, "Error reading registers");
-                MessageBox.Show($"Failed to read registers: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                _hasConnectionError = true;
+                _lastErrorTime = DateTime.UtcNow;
+                if (!suppressPopup)
+                {
+                    MessageBox.Show($"Failed to read registers: {ex.Message}", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
-        private async Task ReadInputRegistersAsync()
+        private async Task ReadInputRegistersAsync(bool suppressPopup = false)
         {
             try
             {
@@ -635,13 +648,19 @@ namespace ModbusForge.ViewModels
                     });
                 }
                 StatusMessage = $"Read {values.Length} input registers";
+                _hasConnectionError = false;
             }
             catch (Exception ex)
             {
                 StatusMessage = $"Error reading input registers: {ex.Message}";
                 _logger.LogError(ex, "Error reading input registers");
-                MessageBox.Show($"Failed to read input registers: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                _hasConnectionError = true;
+                _lastErrorTime = DateTime.UtcNow;
+                if (!suppressPopup)
+                {
+                    MessageBox.Show($"Failed to read input registers: {ex.Message}", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -664,7 +683,7 @@ namespace ModbusForge.ViewModels
             }
         }
 
-        private async Task ReadCoilsAsync()
+        private async Task ReadCoilsAsync(bool suppressPopup = false)
         {
             try
             {
@@ -680,17 +699,23 @@ namespace ModbusForge.ViewModels
                     });
                 }
                 StatusMessage = $"Read {states.Length} coils";
+                _hasConnectionError = false;
             }
             catch (Exception ex)
             {
                 StatusMessage = $"Error reading coils: {ex.Message}";
                 _logger.LogError(ex, "Error reading coils");
-                MessageBox.Show($"Failed to read coils: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                _hasConnectionError = true;
+                _lastErrorTime = DateTime.UtcNow;
+                if (!suppressPopup)
+                {
+                    MessageBox.Show($"Failed to read coils: {ex.Message}", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
-        private async Task ReadDiscreteInputsAsync()
+        private async Task ReadDiscreteInputsAsync(bool suppressPopup = false)
         {
             try
             {
@@ -706,13 +731,19 @@ namespace ModbusForge.ViewModels
                     });
                 }
                 StatusMessage = $"Read {states.Length} discrete inputs";
+                _hasConnectionError = false;
             }
             catch (Exception ex)
             {
                 StatusMessage = $"Error reading discrete inputs: {ex.Message}";
                 _logger.LogError(ex, "Error reading discrete inputs");
-                MessageBox.Show($"Failed to read discrete inputs: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                _hasConnectionError = true;
+                _lastErrorTime = DateTime.UtcNow;
+                if (!suppressPopup)
+                {
+                    MessageBox.Show($"Failed to read discrete inputs: {ex.Message}", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -854,11 +885,47 @@ namespace ModbusForge.ViewModels
         private void AddCustomEntry()
         {
             int nextAddress = 0;
+            string area = "HoldingRegister";
+            string type = "uint";
+            string name = "";
+            
             if (CustomEntries.Count > 0)
             {
-                nextAddress = CustomEntries[^1].Address + 1;
+                var lastEntry = CustomEntries[^1];
+                area = lastEntry.Area ?? "HoldingRegister";
+                type = lastEntry.Type ?? "uint";
+                
+                int addressIncrement = 1;
+                if (type.Equals("real", StringComparison.OrdinalIgnoreCase))
+                {
+                    addressIncrement = 2;
+                }
+                else if (type.Equals("uint", StringComparison.OrdinalIgnoreCase) || 
+                         type.Equals("int", StringComparison.OrdinalIgnoreCase))
+                {
+                    addressIncrement = 1;
+                }
+                
+                nextAddress = lastEntry.Address + addressIncrement;
+                
+                if (!string.IsNullOrWhiteSpace(lastEntry.Name))
+                {
+                    name = lastEntry.Name;
+                }
             }
-            CustomEntries.Add(new CustomEntry { Address = nextAddress, Area = "HoldingRegister", Type = "uint", Value = "0", Continuous = false, PeriodMs = 1000, Monitor = false, ReadPeriodMs = 1000 });
+            
+            CustomEntries.Add(new CustomEntry 
+            { 
+                Address = nextAddress, 
+                Area = area, 
+                Type = type, 
+                Name = name,
+                Value = "0", 
+                Continuous = false, 
+                PeriodMs = 1000, 
+                Monitor = false, 
+                ReadPeriodMs = 1000 
+            });
         }
 
         private async Task WriteCustomNowAsync(CustomEntry entry)
@@ -1070,6 +1137,11 @@ namespace ModbusForge.ViewModels
             if (_isMonitoring) return;
             if (!IsConnected) return;
 
+            if (_hasConnectionError && (DateTime.UtcNow - _lastErrorTime).TotalSeconds < 5)
+            {
+                return;
+            }
+
             _isMonitoring = true;
             try
             {
@@ -1080,7 +1152,7 @@ namespace ModbusForge.ViewModels
                     int p = HoldingMonitorPeriodMs <= 0 ? 1000 : HoldingMonitorPeriodMs;
                     if ((now - _lastHoldingReadUtc).TotalMilliseconds >= p)
                     {
-                        await ReadRegistersAsync();
+                        await ReadRegistersAsync(suppressPopup: true);
                         _lastHoldingReadUtc = now;
                     }
                 }
@@ -1090,7 +1162,7 @@ namespace ModbusForge.ViewModels
                     int p = InputRegistersMonitorPeriodMs <= 0 ? 1000 : InputRegistersMonitorPeriodMs;
                     if ((now - _lastInputRegReadUtc).TotalMilliseconds >= p)
                     {
-                        await ReadInputRegistersAsync();
+                        await ReadInputRegistersAsync(suppressPopup: true);
                         _lastInputRegReadUtc = now;
                     }
                 }
@@ -1100,7 +1172,7 @@ namespace ModbusForge.ViewModels
                     int p = CoilsMonitorPeriodMs <= 0 ? 1000 : CoilsMonitorPeriodMs;
                     if ((now - _lastCoilsReadUtc).TotalMilliseconds >= p)
                     {
-                        await ReadCoilsAsync();
+                        await ReadCoilsAsync(suppressPopup: true);
                         _lastCoilsReadUtc = now;
                     }
                 }
@@ -1110,7 +1182,7 @@ namespace ModbusForge.ViewModels
                     int p = DiscreteInputsMonitorPeriodMs <= 0 ? 1000 : DiscreteInputsMonitorPeriodMs;
                     if ((now - _lastDiscreteReadUtc).TotalMilliseconds >= p)
                     {
-                        await ReadDiscreteInputsAsync();
+                        await ReadDiscreteInputsAsync(suppressPopup: true);
                         _lastDiscreteReadUtc = now;
                     }
                 }
@@ -1362,6 +1434,85 @@ namespace ModbusForge.ViewModels
             {
                 _logger.LogError(ex, "Error loading custom entries");
                 MessageBox.Show($"Failed to load custom entries: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task SaveAllConfigAsync()
+        {
+            try
+            {
+                var dialog = new SaveFileDialog
+                {
+                    Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+                    DefaultExt = "json",
+                    FileName = "modbusforge-config.json"
+                };
+
+                if (dialog.ShowDialog() == true)
+                {
+                    var config = new AppConfiguration
+                    {
+                        Mode = Mode,
+                        ServerAddress = ServerAddress,
+                        Port = Port,
+                        UnitId = UnitId,
+                        CustomEntries = CustomEntries.ToList()
+                    };
+
+                    var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+                    await File.WriteAllTextAsync(dialog.FileName, json);
+                    StatusMessage = $"Saved configuration to {Path.GetFileName(dialog.FileName)}";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving configuration");
+                MessageBox.Show($"Failed to save configuration: {ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task LoadAllConfigAsync()
+        {
+            try
+            {
+                var dialog = new OpenFileDialog
+                {
+                    Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+                    DefaultExt = "json"
+                };
+
+                if (dialog.ShowDialog() == true)
+                {
+                    var json = await File.ReadAllTextAsync(dialog.FileName);
+                    var config = JsonSerializer.Deserialize<AppConfiguration>(json);
+
+                    if (config != null)
+                    {
+                        if (!string.IsNullOrWhiteSpace(config.Mode))
+                            Mode = config.Mode;
+                        if (!string.IsNullOrWhiteSpace(config.ServerAddress))
+                            ServerAddress = config.ServerAddress;
+                        if (config.Port > 0)
+                            Port = config.Port;
+                        if (config.UnitId > 0)
+                            UnitId = config.UnitId;
+
+                        if (config.CustomEntries != null && config.CustomEntries.Any())
+                        {
+                            CustomEntries.Clear();
+                            foreach (var ce in config.CustomEntries)
+                                CustomEntries.Add(ce);
+                            SubscribeCustomEntries();
+                        }
+
+                        StatusMessage = $"Loaded configuration from {Path.GetFileName(dialog.FileName)}";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading configuration");
+                MessageBox.Show($"Failed to load configuration: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

@@ -71,6 +71,9 @@
 
         <Menu Grid.Row="0">
             <MenuItem Header="_File">
+                <MenuItem Header="_Load All Configuration..." Command="{Binding LoadAllConfigCommand}"/>
+                <MenuItem Header="_Save All Configuration..." Command="{Binding SaveAllConfigCommand}"/>
+                <Separator/>
                 <MenuItem Header="_Load Custom..." Command="{Binding LoadCustomCommand}"/>
                 <MenuItem Header="_Save Custom..." Command="{Binding SaveCustomCommand}"/>
                 <Separator/>
@@ -280,8 +283,8 @@
                             <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
                             <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{StaticResource TypeOptionsAll}" Width="*"/>
                             <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="2*"/>
-                            <DataGridCheckBoxColumn Header="Cont." Binding="{Binding Continuous}" Width="Auto"/>
-                            <DataGridTextColumn Header="Period (ms)" Binding="{Binding PeriodMs}" Width="*"/>
+                            <DataGridCheckBoxColumn Header="Cont. Write" Binding="{Binding Continuous}" Width="Auto"/>
+                            <DataGridTextColumn Header="Write Period (ms)" Binding="{Binding PeriodMs}" Width="*"/>
                             <DataGridCheckBoxColumn Header="Trend" Binding="{Binding Trend}" Width="Auto"/>
                             <DataGridTemplateColumn Header="Actions" Width="Auto">
                                 <DataGridTemplateColumn.CellTemplate>

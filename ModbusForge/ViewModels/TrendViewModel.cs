@@ -224,6 +224,7 @@ namespace ModbusForge.ViewModels
                 {
                     Name = string.IsNullOrWhiteSpace(displayName) ? key : displayName,
                     Values = values,
+                    GeometrySize = 0,
                     GeometryStroke = null,
                     Fill = null,
                     Stroke = new SolidColorPaint(color) { StrokeThickness = 2 }
