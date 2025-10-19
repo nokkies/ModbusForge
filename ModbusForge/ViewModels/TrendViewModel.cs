@@ -384,7 +384,12 @@ namespace ModbusForge.ViewModels
                         next = _palette[(_paletteCursor + 1) % _palette.Count];
                         _paletteCursor = (_paletteCursor + 2) % _palette.Count;
                     }
+                    if (_colorByKey.TryGetValue(item.Key, out var oldColor))
+                    {
+                        _usedColors.Remove(oldColor);
+                    }
                     _colorByKey[item.Key] = next;
+                    _usedColors.Add(next);
                     ls.Stroke = new SolidColorPaint(next) { StrokeThickness = 2 };
                     break;
                 }
