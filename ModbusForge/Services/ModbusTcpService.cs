@@ -39,7 +39,9 @@ namespace ModbusForge.Services
                     try
                     {
                         _logger.LogDebug($"Reading {count} input registers starting at {startAddress} (Unit ID: {unitId})");
-                        var registers = _client.ReadInputRegisters(unitId, (ushort)startAddress, (ushort)count);
+                        // NModbus uses 0-based protocol addresses, convert from 1-based UI address
+                        ushort protocolAddress = (ushort)(startAddress > 0 ? startAddress - 1 : 0);
+                        var registers = _client.ReadInputRegisters(unitId, protocolAddress, (ushort)count);
                         return registers;
                     }
                     catch (Exception ex)
@@ -69,7 +71,9 @@ namespace ModbusForge.Services
                     try
                     {
                         _logger.LogDebug($"Reading {count} discrete inputs starting at {startAddress} (Unit ID: {unitId})");
-                        var inputs = _client.ReadInputs(unitId, (ushort)startAddress, (ushort)count);
+                        // NModbus uses 0-based protocol addresses, convert from 1-based UI address
+                        ushort protocolAddress = (ushort)(startAddress > 0 ? startAddress - 1 : 0);
+                        var inputs = _client.ReadInputs(unitId, protocolAddress, (ushort)count);
                         return inputs;
                     }
                     catch (Exception ex)
@@ -161,7 +165,9 @@ namespace ModbusForge.Services
                     try
                     {
                         _logger.LogDebug($"Reading {count} holding registers starting at {startAddress} (Unit ID: {unitId})");
-                        var registers = _client.ReadHoldingRegisters(unitId, (ushort)startAddress, (ushort)count);
+                        // NModbus uses 0-based protocol addresses, convert from 1-based UI address
+                        ushort protocolAddress = (ushort)(startAddress > 0 ? startAddress - 1 : 0);
+                        var registers = _client.ReadHoldingRegisters(unitId, protocolAddress, (ushort)count);
                         return registers;
                     }
                     catch (Exception ex)
@@ -190,7 +196,9 @@ namespace ModbusForge.Services
                 {
                     try
                     {
-                        _client.WriteSingleRegister(unitId, (ushort)registerAddress, value);
+                        // NModbus uses 0-based protocol addresses, convert from 1-based UI address
+                        ushort protocolAddress = (ushort)(registerAddress > 0 ? registerAddress - 1 : 0);
+                        _client.WriteSingleRegister(unitId, protocolAddress, value);
                     }
                     catch (Exception ex)
                     {
@@ -218,7 +226,9 @@ namespace ModbusForge.Services
                     try
                     {
                         _logger.LogDebug($"Reading {count} coils starting at {startAddress} (Unit ID: {unitId})");
-                        var coils = _client.ReadCoils(unitId, (ushort)startAddress, (ushort)count);
+                        // NModbus uses 0-based protocol addresses, convert from 1-based UI address
+                        ushort protocolAddress = (ushort)(startAddress > 0 ? startAddress - 1 : 0);
+                        var coils = _client.ReadCoils(unitId, protocolAddress, (ushort)count);
                         return coils;
                     }
                     catch (Exception ex)
@@ -248,7 +258,9 @@ namespace ModbusForge.Services
                     try
                     {
                         _logger.LogDebug($"Writing coil at {coilAddress} = {value} (Unit ID: {unitId})");
-                        _client.WriteSingleCoil(unitId, (ushort)coilAddress, value);
+                        // NModbus uses 0-based protocol addresses, convert from 1-based UI address
+                        ushort protocolAddress = (ushort)(coilAddress > 0 ? coilAddress - 1 : 0);
+                        _client.WriteSingleCoil(unitId, protocolAddress, value);
                     }
                     catch (Exception ex)
                     {

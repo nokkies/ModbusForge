@@ -197,7 +197,7 @@ namespace ModbusForge.ViewModels
         private string _title = "ModbusForge";
 
         [ObservableProperty]
-        private string _version = "2.0.1";
+        private string _version = "2.0.2";
 
         // UI-selectable mode: "Client" or "Server"
         [ObservableProperty]
@@ -394,7 +394,7 @@ namespace ModbusForge.ViewModels
         private bool _simHoldingsEnabled = false;
 
         [ObservableProperty]
-        private int _simHoldingStart = 0;
+        private int _simHoldingStart = 1;
 
         [ObservableProperty]
         private int _simHoldingCount = 4;
@@ -423,7 +423,7 @@ namespace ModbusForge.ViewModels
         private bool _simCoilsEnabled = false;
 
         [ObservableProperty]
-        private int _simCoilStart = 0;
+        private int _simCoilStart = 1;
 
         [ObservableProperty]
         private int _simCoilCount = 8;
@@ -433,7 +433,7 @@ namespace ModbusForge.ViewModels
         private bool _simInputsEnabled = false;
 
         [ObservableProperty]
-        private int _simInputStart = 0;
+        private int _simInputStart = 1;
 
         [ObservableProperty]
         private int _simInputCount = 4;
@@ -449,7 +449,7 @@ namespace ModbusForge.ViewModels
         private bool _simDiscreteEnabled = false;
 
         [ObservableProperty]
-        private int _simDiscreteStart = 0;
+        private int _simDiscreteStart = 1;
 
         [ObservableProperty]
         private int _simDiscreteCount = 8;

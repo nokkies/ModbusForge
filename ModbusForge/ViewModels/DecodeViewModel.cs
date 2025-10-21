@@ -131,70 +131,19 @@ namespace ModbusForge.ViewModels
         {
             try
             {
-                var svc = ActiveService;
-                var unit = _main.UnitId;
-                // Parse address from text (decimal or 0x hex)
-                if (!TryParseAddress(AddressInput, out var addr))
-                {
-                    Status = "Invalid address. Use decimal (e.g., 100) or hex (e.g., 0x64).";
+                if (!ValidateAndSetAddress())
                     return;
-                }
-                Address = addr; // keep numeric copy updated for consumers
+
                 IsBusy = true;
-                var two = 2; // always read two registers to display all possibilities
-
-                ushort[] regs = Array.Empty<ushort>();
+                var regs = await ReadRegistersFromAreaAsync();
                 
-                if (Area.Equals("InputRegister", StringComparison.OrdinalIgnoreCase))
-                {
-                    regs = await svc.ReadInputRegistersAsync(unit, addr, two);
-                }
-                else if (Area.Equals("HoldingRegister", StringComparison.OrdinalIgnoreCase))
-                {
-                    regs = await svc.ReadHoldingRegistersAsync(unit, addr, two);
-                }
-                else if (Area.Equals("Coil", StringComparison.OrdinalIgnoreCase))
-                {
-                    var coils = await svc.ReadCoilsAsync(unit, addr, (ushort)two);
-                    regs = coils.Select(b => (ushort)(b ? 1 : 0)).ToArray();
-                }
-                else if (Area.Equals("DiscreteInput", StringComparison.OrdinalIgnoreCase))
-                {
-                    var inputs = await svc.ReadDiscreteInputsAsync(unit, addr, (ushort)two);
-                    regs = inputs.Select(b => (ushort)(b ? 1 : 0)).ToArray();
-                }
-                else
-                {
-                    Status = $"Unsupported area: {Area}";
-                    return;
-                }
-
-                // Prepare bytes, Modbus big-endian per register: Hi,Lo for each 16-bit
-                if (regs.Length == 0)
+                if (regs == null || regs.Length == 0)
                 {
                     Status = "No data returned";
                     return;
                 }
 
-                ushort r0 = regs[0];
-                ushort r1 = regs.Length > 1 ? regs[1] : (ushort)0;
-                var baseBytes = new byte[]
-                {
-                    (byte)(r0 >> 8), (byte)(r0 & 0xFF), (byte)(r1 >> 8), (byte)(r1 & 0xFF)
-                };
-
-                // Compute and assign all variants
-                ComputeAndAssignVariants(baseBytes);
-
-                string areaCode = Area switch
-                {
-                    string s when s.Equals("InputRegister", StringComparison.OrdinalIgnoreCase) => "IR",
-                    string s when s.Equals("HoldingRegister", StringComparison.OrdinalIgnoreCase) => "HR",
-                    string s when s.Equals("Coil", StringComparison.OrdinalIgnoreCase) => "Coil",
-                    string s when s.Equals("DiscreteInput", StringComparison.OrdinalIgnoreCase) => "DIn",
-                    _ => Area
-                };
-                Status = $"Read {(UseTwoRegisters ? 2 : 1)} {areaCode} from {addr}";
+                ProcessAndDisplayResults(regs);
             }
             catch (Exception ex)
             {
@@ -205,6 +154,108 @@ namespace ModbusForge.ViewModels
             {
                 IsBusy = false;
             }
+        }
+
+        /// <summary>
+        /// Validates address input and updates the Address property.
+        /// </summary>
+        /// <returns>True if valid, false otherwise</returns>
+        private bool ValidateAndSetAddress()
+        {
+            if (!TryParseAddress(AddressInput, out var addr))
+            {
+                Status = "Invalid address. Use decimal (e.g., 100) or hex (e.g., 0x64).";
+                return false;
+            }
+            Address = addr;
+            return true;
+        }
+
+        /// <summary>
+        /// Reads registers from the selected area type (Holding, Input, Coil, Discrete).
+        /// </summary>
+        /// <returns>Array of register values as ushorts</returns>
+        private async Task<ushort[]?> ReadRegistersFromAreaAsync()
+        {
+            var svc = ActiveService;
+            var unit = _main.UnitId;
+            var count = 2; // Always read 2 registers for decode view
+
+            return Area.ToLowerInvariant() switch
+            {
+                "holdingregister" => await svc.ReadHoldingRegistersAsync(unit, Address, count),
+                "inputregister" => await svc.ReadInputRegistersAsync(unit, Address, count),
+                "coil" => await ReadCoilsAsRegistersAsync(svc, unit, count),
+                "discreteinput" => await ReadDiscreteInputsAsRegistersAsync(svc, unit, count),
+                _ => throw new InvalidOperationException($"Unsupported area: {Area}")
+            };
+        }
+
+        /// <summary>
+        /// Reads coils and converts them to ushort array for uniform processing.
+        /// </summary>
+        private async Task<ushort[]> ReadCoilsAsRegistersAsync(IModbusService svc, byte unit, int count)
+        {
+            var coils = await svc.ReadCoilsAsync(unit, Address, (ushort)count);
+            return coils.Select(b => (ushort)(b ? 1 : 0)).ToArray();
+        }
+
+        /// <summary>
+        /// Reads discrete inputs and converts them to ushort array for uniform processing.
+        /// </summary>
+        private async Task<ushort[]> ReadDiscreteInputsAsRegistersAsync(IModbusService svc, byte unit, int count)
+        {
+            var inputs = await svc.ReadDiscreteInputsAsync(unit, Address, (ushort)count);
+            return inputs.Select(b => (ushort)(b ? 1 : 0)).ToArray();
+        }
+
+        /// <summary>
+        /// Processes register data and updates all display properties.
+        /// </summary>
+        private void ProcessAndDisplayResults(ushort[] regs)
+        {
+            var baseBytes = ConvertRegistersToBytes(regs);
+            ComputeAndAssignVariants(baseBytes);
+            Status = FormatSuccessMessage();
+        }
+
+        /// <summary>
+        /// Converts register values to byte array in Modbus big-endian format.
+        /// </summary>
+        private static byte[] ConvertRegistersToBytes(ushort[] regs)
+        {
+            ushort r0 = regs[0];
+            ushort r1 = regs.Length > 1 ? regs[1] : (ushort)0;
+            return new byte[]
+            {
+                (byte)(r0 >> 8), (byte)(r0 & 0xFF),
+                (byte)(r1 >> 8), (byte)(r1 & 0xFF)
+            };
+        }
+
+        /// <summary>
+        /// Formats success status message with area code.
+        /// </summary>
+        private string FormatSuccessMessage()
+        {
+            string areaCode = GetAreaCode();
+            int count = UseTwoRegisters ? 2 : 1;
+            return $"Read {count} {areaCode} from {Address}";
+        }
+
+        /// <summary>
+        /// Gets the short code for the current area type.
+        /// </summary>
+        private string GetAreaCode()
+        {
+            return Area.ToLowerInvariant() switch
+            {
+                "inputregister" => "IR",
+                "holdingregister" => "HR",
+                "coil" => "Coil",
+                "discreteinput" => "DIn",
+                _ => Area
+            };
         }
 
         private byte[] ApplySwap(byte[] b)
