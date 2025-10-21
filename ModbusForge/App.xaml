@@ -10,11 +10,25 @@
           <!-- MahApps.Metro base styles -->
           <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml"/>
           <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml"/>
-          <!-- MahApps theme: Light.Blue -->
+          <!-- MahApps theme: Light.Blue (base) -->
           <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Light.Blue.xaml"/>
           <!-- App-level resources so they are available during control InitializeComponent -->
           <ResourceDictionary Source="Resources/Converters.xaml"/>
+          <!-- Custom Light Metallic Theme -->
+          <ResourceDictionary Source="Resources/LightMetallicTheme.xaml"/>
         </ResourceDictionary.MergedDictionaries>
+
+        <!-- Override MahApps colors with light metallic scheme -->
+        <SolidColorBrush x:Key="MahApps.Brushes.ThemeBackground" Color="{StaticResource LightMetallicWhite}"/>
+        <SolidColorBrush x:Key="MahApps.Brushes.ThemeForeground" Color="{StaticResource LightMetallicText}"/>
+        <SolidColorBrush x:Key="MahApps.Brushes.Accent" Color="{StaticResource LightMetallicAccent}"/>
+        <SolidColorBrush x:Key="MahApps.Brushes.Accent2" Color="{StaticResource LightMetallicAccentHover}"/>
+        <SolidColorBrush x:Key="MahApps.Brushes.Accent3" Color="{StaticResource LightMetallicDarkSilver}"/>
+        <SolidColorBrush x:Key="MahApps.Brushes.Control.Background" Color="{StaticResource LightMetallicSilver}"/>
+        <SolidColorBrush x:Key="MahApps.Brushes.Control.Border" Color="{StaticResource LightMetallicBorder}"/>
+        <SolidColorBrush x:Key="MahApps.Brushes.Gray1" Color="{StaticResource LightMetallicChrome}"/>
+        <SolidColorBrush x:Key="MahApps.Brushes.Gray2" Color="{StaticResource LightMetallicSteel}"/>
+        <SolidColorBrush x:Key="MahApps.Brushes.Gray3" Color="{StaticResource LightMetallicDarkSilver}"/>
       </ResourceDictionary>
     </Application.Resources>
 </Application>

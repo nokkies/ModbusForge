@@ -1,4 +1,4 @@
-# ModbusForge
+# ModbusForge v2.0.0
 
 Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 
@@ -7,7 +7,7 @@ Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 ### ✅ Completed
 - Project structure and solution setup (WPF + MVVM with CommunityToolkit.Mvvm)
 - Dependency Injection and typed configuration via `ServerSettings` (Microsoft.Extensions.Options)
-- Modbus TCP client and server services using FluentModbus
+- Modbus TCP client and server services using NModbus4 v2.0.0
 - Connection UI, read/write for registers and coils
 - Monitoring: periodic reads for Registers, Coils, Discrete Inputs, gated by a single global Continuous Read toggle
 - Custom tab: per-row Area (HoldingRegister/Coil/InputRegister/DiscreteInput) and Type (uint/int/real/string), on-demand Read/Write, per-row Continuous Write, and live read updates driven by Trend-enabled rows
@@ -202,9 +202,9 @@ This project uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create a si
 
 ## Attribution
 
-This project uses the excellent FluentModbus library for Modbus client and server functionality:
+This project uses the NModbus4 library for Modbus client and server functionality:
 
-- FluentModbus: https://github.com/Apollo3zehn/FluentModbus (MIT License)
+- NModbus4: https://github.com/NModbus4/NModbus4 (MIT License)
 
 ## Troubleshooting
 

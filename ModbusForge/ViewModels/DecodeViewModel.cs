@@ -26,7 +26,7 @@ namespace ModbusForge.ViewModels
             _logger = logger;
 
             Area = "HoldingRegister";
-            Address = 0;
+            Address = 1;
             UseTwoRegisters = true; // retained for compatibility; not used by UI anymore
 
             _readNowCommand = new AsyncRelayCommand(ReadAsync, CanRead);
@@ -34,7 +34,8 @@ namespace ModbusForge.ViewModels
             try { _readNowCommand.NotifyCanExecuteChanged(); } catch { }
             _main.PropertyChanged += (s, e) =>
             {
-                if (string.Equals(e.PropertyName, nameof(MainViewModel.IsConnected), StringComparison.Ordinal))
+                if (string.Equals(e.PropertyName, nameof(MainViewModel.IsConnected), StringComparison.Ordinal) ||
+                    string.Equals(e.PropertyName, nameof(MainViewModel.Mode), StringComparison.Ordinal))
                 {
                     try { _readNowCommand.NotifyCanExecuteChanged(); } catch { }
                 }
@@ -50,7 +51,7 @@ namespace ModbusForge.ViewModels
         private int address;
 
         [ObservableProperty]
-        private string addressInput = "0";
+        private string addressInput = "1";
 
         [ObservableProperty]
         private bool useTwoRegisters;
@@ -142,9 +143,31 @@ namespace ModbusForge.ViewModels
                 IsBusy = true;
                 var two = 2; // always read two registers to display all possibilities
 
-                ushort[] regs = Area.Equals("InputRegister", StringComparison.OrdinalIgnoreCase)
-                    ? await svc.ReadInputRegistersAsync(unit, addr, two)
-                    : await svc.ReadHoldingRegistersAsync(unit, addr, two);
+                ushort[] regs = Array.Empty<ushort>();
+                
+                if (Area.Equals("InputRegister", StringComparison.OrdinalIgnoreCase))
+                {
+                    regs = await svc.ReadInputRegistersAsync(unit, addr, two);
+                }
+                else if (Area.Equals("HoldingRegister", StringComparison.OrdinalIgnoreCase))
+                {
+                    regs = await svc.ReadHoldingRegistersAsync(unit, addr, two);
+                }
+                else if (Area.Equals("Coil", StringComparison.OrdinalIgnoreCase))
+                {
+                    var coils = await svc.ReadCoilsAsync(unit, addr, (ushort)two);
+                    regs = coils.Select(b => (ushort)(b ? 1 : 0)).ToArray();
+                }
+                else if (Area.Equals("DiscreteInput", StringComparison.OrdinalIgnoreCase))
+                {
+                    var inputs = await svc.ReadDiscreteInputsAsync(unit, addr, (ushort)two);
+                    regs = inputs.Select(b => (ushort)(b ? 1 : 0)).ToArray();
+                }
+                else
+                {
+                    Status = $"Unsupported area: {Area}";
+                    return;
+                }
 
                 // Prepare bytes, Modbus big-endian per register: Hi,Lo for each 16-bit
                 if (regs.Length == 0)
@@ -163,7 +186,15 @@ namespace ModbusForge.ViewModels
                 // Compute and assign all variants
                 ComputeAndAssignVariants(baseBytes);
 
-                Status = $"Read {(UseTwoRegisters ? 2 : 1)} {(Area.StartsWith("Input", StringComparison.OrdinalIgnoreCase) ? "IR" : "HR")} from {addr}";
+                string areaCode = Area switch
+                {
+                    string s when s.Equals("InputRegister", StringComparison.OrdinalIgnoreCase) => "IR",
+                    string s when s.Equals("HoldingRegister", StringComparison.OrdinalIgnoreCase) => "HR",
+                    string s when s.Equals("Coil", StringComparison.OrdinalIgnoreCase) => "Coil",
+                    string s when s.Equals("DiscreteInput", StringComparison.OrdinalIgnoreCase) => "DIn",
+                    _ => Area
+                };
+                Status = $"Read {(UseTwoRegisters ? 2 : 1)} {areaCode} from {addr}";
             }
             catch (Exception ex)
             {

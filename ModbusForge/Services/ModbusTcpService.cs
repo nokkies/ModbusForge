@@ -1,4 +1,4 @@
-using FluentModbus;
+using Modbus.Device;
 using System;
 using System.Net;
 using System.Net.Sockets;
@@ -12,47 +12,43 @@ namespace ModbusForge.Services
 {
     public class ModbusTcpService : IModbusService, IDisposable
     {
-        private readonly ModbusTcpClient _client;
+        private IModbusMaster _client;
+        private TcpClient _tcpClient;
         private bool _disposed = false;
         private readonly ILogger<ModbusTcpService> _logger;
         private readonly SemaphoreSlim _ioLock = new SemaphoreSlim(1, 1);
+        private string _lastIpAddress;
+        private int _lastPort;
 
         public ModbusTcpService(ILogger<ModbusTcpService> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _client = new ModbusTcpClient();
             _logger.LogInformation("Modbus TCP client created");
         }
 
         public async Task<ushort[]> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
         {
-            if (!_client.IsConnected)
-                throw new InvalidOperationException("Not connected to Modbus server");
+            if (!IsConnected)
+                return null;
 
             await _ioLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                _logger.LogDebug($"Reading {count} input registers starting at {startAddress} (Unit ID: {unitId})");
                 return await Task.Run(() =>
                 {
-                    var span = _client.ReadInputRegisters<ushort>(unitId, (ushort)startAddress, (ushort)count);
-                    return span.ToArray();
+                    try
+                    {
+                        _logger.LogDebug($"Reading {count} input registers starting at {startAddress} (Unit ID: {unitId})");
+                        var registers = _client.ReadInputRegisters(unitId, (ushort)startAddress, (ushort)count);
+                        return registers;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error reading input registers");
+                        HandleConnectionLoss();
+                        return null;
+                    }
                 }).ConfigureAwait(false);
-            }
-            catch (SocketException ex)
-            {
-                _logger.LogWarning(ex, "Socket error reading input registers");
-                throw;
-            }
-            catch (IOException ex)
-            {
-                _logger.LogWarning(ex, "I/O error reading input registers");
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error reading input registers");
-                throw;
             }
             finally
             {
@@ -62,33 +58,27 @@ namespace ModbusForge.Services
 
         public async Task<bool[]> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
         {
-            if (!_client.IsConnected)
-                throw new InvalidOperationException("Not connected to Modbus server");
+            if (!IsConnected)
+                return null;
 
-            await _ioLock.WaitAsync();
+            await _ioLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                _logger.LogDebug($"Reading {count} discrete inputs starting at {startAddress} (Unit ID: {unitId})");
                 return await Task.Run(() =>
                 {
-                    var bytes = _client.ReadDiscreteInputs(unitId, startAddress, count);
-                    return BitConverterHelper.ToBooleanArray(bytes, count);
-                });
-            }
-            catch (SocketException ex)
-            {
-                _logger.LogWarning(ex, "Socket error reading discrete inputs");
-                throw;
-            }
-            catch (IOException ex)
-            {
-                _logger.LogWarning(ex, "I/O error reading discrete inputs");
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error reading discrete inputs");
-                throw;
+                    try
+                    {
+                        _logger.LogDebug($"Reading {count} discrete inputs starting at {startAddress} (Unit ID: {unitId})");
+                        var inputs = _client.ReadInputs(unitId, (ushort)startAddress, (ushort)count);
+                        return inputs;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error reading discrete inputs");
+                        HandleConnectionLoss();
+                        return null;
+                    }
+                }).ConfigureAwait(false);
             }
             finally
             {
@@ -96,7 +86,7 @@ namespace ModbusForge.Services
             }
         }
 
-        public bool IsConnected => _client.IsConnected;
+        public bool IsConnected => _client != null && _tcpClient != null && _tcpClient.Connected;
 
         public async Task<bool> ConnectAsync(string ipAddress, int port)
         {
@@ -107,14 +97,21 @@ namespace ModbusForge.Services
                 {
                     try
                     {
-                        var endpoint = new IPEndPoint(IPAddress.Parse(ipAddress), port);
-                        _client.Connect(endpoint, ModbusEndianness.BigEndian);
+                        _lastIpAddress = ipAddress;
+                        _lastPort = port;
+                        _tcpClient = new TcpClient();
+                        _tcpClient.Connect(ipAddress, port);
+                        _client = ModbusIpMaster.CreateIp(_tcpClient);
                         _logger.LogInformation($"Connected to Modbus server at {ipAddress}:{port}");
-                        return _client.IsConnected;
+                        return true;
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Failed to connect to Modbus server");
+                        _client?.Dispose();
+                        _client = null;
+                        _tcpClient?.Close();
+                        _tcpClient = null;
                         return false;
                     }
                 }).ConfigureAwait(false);
@@ -130,10 +127,13 @@ namespace ModbusForge.Services
             await _ioLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                if (_client.IsConnected)
+                if (IsConnected)
                 {
                     _logger.LogInformation("Disconnecting from Modbus server");
-                    _client.Disconnect();
+                    _client?.Dispose();
+                    _client = null;
+                    _tcpClient?.Close();
+                    _tcpClient = null;
                     _logger.LogInformation("Successfully disconnected from Modbus server");
                 }
             }
@@ -150,34 +150,27 @@ namespace ModbusForge.Services
 
         public async Task<ushort[]> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count)
         {
-            if (!_client.IsConnected)
-                throw new InvalidOperationException("Not connected to Modbus server");
+            if (!IsConnected)
+                return null;
 
             await _ioLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                _logger.LogDebug($"Reading {count} holding registers starting at {startAddress} (Unit ID: {unitId})");
-                
-                return await Task.Run(() => 
+                return await Task.Run(() =>
                 {
-                    var registers = _client.ReadHoldingRegisters<ushort>(unitId, (ushort)startAddress, (ushort)count);
-                    return registers.ToArray();
+                    try
+                    {
+                        _logger.LogDebug($"Reading {count} holding registers starting at {startAddress} (Unit ID: {unitId})");
+                        var registers = _client.ReadHoldingRegisters(unitId, (ushort)startAddress, (ushort)count);
+                        return registers;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error reading holding registers");
+                        HandleConnectionLoss();
+                        return null;
+                    }
                 }).ConfigureAwait(false);
-            }
-            catch (SocketException ex)
-            {
-                _logger.LogWarning(ex, "Socket error reading holding registers");
-                throw;
-            }
-            catch (IOException ex)
-            {
-                _logger.LogWarning(ex, "I/O error reading holding registers");
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error reading holding registers");
-                throw;
             }
             finally
             {
@@ -187,28 +180,24 @@ namespace ModbusForge.Services
 
         public async Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
         {
-            if (!_client.IsConnected)
-                throw new InvalidOperationException("Not connected to Modbus server");
+            if (!IsConnected)
+                return;
 
             await _ioLock.WaitAsync().ConfigureAwait(false);
             try
             {
                 await Task.Run(() =>
                 {
-                    // Convert ushort to short for FluentModbus
-                    short signedValue = (short)value;
-                    _client.WriteSingleRegister(unitId, (ushort)registerAddress, signedValue);
+                    try
+                    {
+                        _client.WriteSingleRegister(unitId, (ushort)registerAddress, value);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error writing single register");
+                        HandleConnectionLoss();
+                    }
                 }).ConfigureAwait(false);
-            }
-            catch (SocketException ex)
-            {
-                _logger.LogWarning(ex, "Socket error writing single register");
-                throw;
-            }
-            catch (IOException ex)
-            {
-                _logger.LogWarning(ex, "I/O error writing single register");
-                throw;
             }
             finally
             {
@@ -218,34 +207,27 @@ namespace ModbusForge.Services
 
         public async Task<bool[]> ReadCoilsAsync(byte unitId, int startAddress, int count)
         {
-            if (!_client.IsConnected)
-                throw new InvalidOperationException("Not connected to Modbus server");
+            if (!IsConnected)
+                return null;
 
             await _ioLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                _logger.LogDebug($"Reading {count} coils starting at {startAddress} (Unit ID: {unitId})");
-
                 return await Task.Run(() =>
                 {
-                    var bytes = _client.ReadCoils(unitId, startAddress, count);
-                    return BitConverterHelper.ToBooleanArray(bytes, count);
+                    try
+                    {
+                        _logger.LogDebug($"Reading {count} coils starting at {startAddress} (Unit ID: {unitId})");
+                        var coils = _client.ReadCoils(unitId, (ushort)startAddress, (ushort)count);
+                        return coils;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error reading coils");
+                        HandleConnectionLoss();
+                        return null;
+                    }
                 }).ConfigureAwait(false);
-            }
-            catch (SocketException ex)
-            {
-                _logger.LogWarning(ex, "Socket error reading coils");
-                throw;
-            }
-            catch (IOException ex)
-            {
-                _logger.LogWarning(ex, "I/O error reading coils");
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error reading coils");
-                throw;
             }
             finally
             {
@@ -255,36 +237,45 @@ namespace ModbusForge.Services
 
         public async Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)
         {
-            if (!_client.IsConnected)
-                throw new InvalidOperationException("Not connected to Modbus server");
+            if (!IsConnected)
+                return;
 
             await _ioLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                _logger.LogDebug($"Writing coil at {coilAddress} = {value} (Unit ID: {unitId})");
                 await Task.Run(() =>
                 {
-                    _client.WriteSingleCoil(unitId, coilAddress, value);
+                    try
+                    {
+                        _logger.LogDebug($"Writing coil at {coilAddress} = {value} (Unit ID: {unitId})");
+                        _client.WriteSingleCoil(unitId, (ushort)coilAddress, value);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error writing single coil");
+                        HandleConnectionLoss();
+                    }
                 }).ConfigureAwait(false);
-            }
-            catch (SocketException ex)
-            {
-                _logger.LogWarning(ex, "Socket error writing single coil");
-                throw;
-            }
-            catch (IOException ex)
-            {
-                _logger.LogWarning(ex, "I/O error writing single coil");
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error writing single coil");
-                throw;
             }
             finally
             {
                 _ioLock.Release();
+            }
+        }
+
+        private void HandleConnectionLoss()
+        {
+            _logger.LogInformation("Client is disconnected. Cleaning up connection.");
+            try
+            {
+                _client?.Dispose();
+                _client = null;
+                _tcpClient?.Close();
+                _tcpClient = null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during explicit disconnect after connection loss.");
             }
         }
 
@@ -300,9 +291,17 @@ namespace ModbusForge.Services
             {
                 if (disposing)
                 {
-                    try { _ioLock.Wait(); } catch { }
-                    _client?.Dispose();
-                    try { _ioLock.Release(); } catch { }
+                    _ioLock.Wait();
+                    try
+                    {
+                        _client?.Dispose();
+                        _tcpClient?.Close();
+                    }
+                    finally
+                    {
+                        _ioLock.Release();
+                        _ioLock.Dispose();
+                    }
                 }
                 _disposed = true;
             }

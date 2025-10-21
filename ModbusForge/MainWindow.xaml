@@ -12,9 +12,11 @@
         Title="{Binding Title}" Height="1073" Width="1556"
         Icon="pack://application:,,,/Resources/ModbusForge.ico"
         BorderThickness="1"
-        GlowBrush="{DynamicResource MahApps.Brushes.Accent}"
-        WindowTitleBrush="{DynamicResource MahApps.Brushes.Accent}"
-        NonActiveWindowTitleBrush="{DynamicResource MahApps.Brushes.Accent3}">
+        Background="{StaticResource LightMetallicWhiteBrush}"
+        GlowBrush="{StaticResource LightMetallicAccentBrush}"
+        WindowTitleBrush="{StaticResource LightMetallicChromeBrush}"
+        NonActiveWindowTitleBrush="{StaticResource LightMetallicSteelBrush}"
+        TitleForeground="{StaticResource LightMetallicTextBrush}">
 
     <mah:MetroWindow.Resources>
         <ResourceDictionary>

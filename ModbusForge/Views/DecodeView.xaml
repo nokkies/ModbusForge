@@ -12,6 +12,8 @@
         <x:Array x:Key="DecodeAreaOptions" Type="{x:Type sys:String}">
             <sys:String>HoldingRegister</sys:String>
             <sys:String>InputRegister</sys:String>
+            <sys:String>Coil</sys:String>
+            <sys:String>DiscreteInput</sys:String>
         </x:Array>
     </UserControl.Resources>
     <Grid>

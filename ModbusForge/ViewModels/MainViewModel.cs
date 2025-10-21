@@ -110,10 +110,10 @@ namespace ModbusForge.ViewModels
             WriteCoilCommand = new RelayCommand(async () => await WriteCoilAsync(), () => IsConnected);
             ReadInputRegistersCommand = new RelayCommand(async () => await ReadInputRegistersAsync(), () => IsConnected);
             ReadDiscreteInputsCommand = new RelayCommand(async () => await ReadDiscreteInputsAsync(), () => IsConnected);
-            
+
             // Initialize DisconnectCommand property
             DisconnectCommand = _disconnectCommand;
-            
+
             // Set initial state
             // Set initial service based on Mode and initialize state
             _modbusService = IsServerMode ? _serverService : _clientService;
@@ -123,7 +123,7 @@ namespace ModbusForge.ViewModels
             // Load defaults from configuration
             Port = settings.DefaultPort;
             try { UnitId = Convert.ToByte(settings.DefaultUnitId); } catch { UnitId = 1; }
-            
+
             _logger.LogInformation("MainViewModel initialized");
 
             // Set window title with version from assembly file info
@@ -197,7 +197,7 @@ namespace ModbusForge.ViewModels
         private string _title = "ModbusForge";
 
         [ObservableProperty]
-        private string _version = "1.4.0";
+        private string _version = "2.0.1";
 
         // UI-selectable mode: "Client" or "Server"
         [ObservableProperty]
@@ -255,13 +255,13 @@ namespace ModbusForge.ViewModels
 
         // Registers UI state
         [ObservableProperty]
-        private int _registerStart = 0;
+        private int _registerStart = 1;
 
         [ObservableProperty]
         private int _registerCount = 10;
 
         [ObservableProperty]
-        private int _writeRegisterAddress = 0;
+        private int _writeRegisterAddress = 1;
 
         [ObservableProperty]
         private ushort _writeRegisterValue = 0;
@@ -270,13 +270,13 @@ namespace ModbusForge.ViewModels
 
         // Coils UI state
         [ObservableProperty]
-        private int _coilStart = 0;
+        private int _coilStart = 1;
 
         [ObservableProperty]
         private int _coilCount = 16;
 
         [ObservableProperty]
-        private int _writeCoilAddress = 0;
+        private int _writeCoilAddress = 1;
 
         [ObservableProperty]
         private bool _writeCoilState = false;
@@ -285,7 +285,7 @@ namespace ModbusForge.ViewModels
 
         // Input Registers UI state
         [ObservableProperty]
-        private int _inputRegisterStart = 0;
+        private int _inputRegisterStart = 1;
 
         [ObservableProperty]
         private int _inputRegisterCount = 10;
@@ -294,7 +294,7 @@ namespace ModbusForge.ViewModels
 
         // Discrete Inputs UI state
         [ObservableProperty]
-        private int _discreteInputStart = 0;
+        private int _discreteInputStart = 1;
 
         [ObservableProperty]
         private int _discreteInputCount = 16;
@@ -463,7 +463,7 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = IsServerMode ? "Starting server..." : "Connecting...";
                 var success = await _modbusService.ConnectAsync(ServerAddress, Port);
-                
+
                 if (success)
                 {
                     IsConnected = true;
@@ -532,7 +532,7 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = IsServerMode ? $"Server error: {ex.Message}" : $"Error: {ex.Message}";
                 _logger.LogError(ex, IsServerMode ? "Error starting Modbus server" : "Error connecting to Modbus server");
-                MessageBox.Show(IsServerMode ? $"Failed to start server: {ex.Message}" : $"Failed to connect: {ex.Message}", IsServerMode ? "Server Error" : "Connection Error", 
+                MessageBox.Show(IsServerMode ? $"Failed to start server: {ex.Message}" : $"Failed to connect: {ex.Message}", IsServerMode ? "Server Error" : "Connection Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -553,7 +553,7 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = IsServerMode ? $"Error stopping server: {ex.Message}" : $"Error disconnecting: {ex.Message}";
                 _logger.LogError(ex, IsServerMode ? "Error stopping Modbus server" : "Error disconnecting from Modbus server");
-                MessageBox.Show(IsServerMode ? $"Failed to stop server: {ex.Message}" : $"Failed to disconnect: {ex.Message}", IsServerMode ? "Server Stop Error" : "Disconnection Error", 
+                MessageBox.Show(IsServerMode ? $"Failed to stop server: {ex.Message}" : $"Failed to disconnect: {ex.Message}", IsServerMode ? "Server Stop Error" : "Disconnection Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -564,6 +564,11 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = "Reading registers...";
                 var values = await _modbusService.ReadHoldingRegistersAsync(UnitId, RegisterStart, RegisterCount);
+                if (values is null)
+                {
+                    StatusMessage = "Failed to read registers (connection lost)";
+                    return;
+                }
                 // Preserve per-address Type if rows already exist
                 var typeByAddress = HoldingRegisters.ToDictionary(r => r.Address, r => r.Type);
 
@@ -640,6 +645,11 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = "Reading input registers...";
                 var values = await _modbusService.ReadInputRegistersAsync(UnitId, InputRegisterStart, InputRegisterCount);
+                if (values is null)
+                {
+                    StatusMessage = "Failed to read input registers (connection lost)";
+                    return;
+                }
                 InputRegisters.Clear();
                 for (int i = 0; i < values.Length; i++)
                 {
@@ -692,6 +702,11 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = "Reading coils...";
                 var states = await _modbusService.ReadCoilsAsync(UnitId, CoilStart, CoilCount);
+                if (states is null)
+                {
+                    StatusMessage = "Failed to read coils (connection lost)";
+                    return;
+                }
                 Coils.Clear();
                 for (int i = 0; i < states.Length; i++)
                 {
@@ -724,6 +739,11 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = "Reading discrete inputs...";
                 var states = await _modbusService.ReadDiscreteInputsAsync(UnitId, DiscreteInputStart, DiscreteInputCount);
+                if (states is null)
+                {
+                    StatusMessage = "Failed to read discrete inputs (connection lost)";
+                    return;
+                }
                 DiscreteInputs.Clear();
                 for (int i = 0; i < states.Length; i++)
                 {
@@ -887,47 +907,47 @@ namespace ModbusForge.ViewModels
     {
         private void AddCustomEntry()
         {
-            int nextAddress = 0;
+            int nextAddress = 1;
             string area = "HoldingRegister";
             string type = "uint";
             string name = "";
-            
+
             if (CustomEntries.Count > 0)
             {
                 var lastEntry = CustomEntries[^1];
                 area = lastEntry.Area ?? "HoldingRegister";
                 type = lastEntry.Type ?? "uint";
-                
+
                 int addressIncrement = 1;
                 if (type.Equals("real", StringComparison.OrdinalIgnoreCase))
                 {
                     addressIncrement = 2;
                 }
-                else if (type.Equals("uint", StringComparison.OrdinalIgnoreCase) || 
+                else if (type.Equals("uint", StringComparison.OrdinalIgnoreCase) ||
                          type.Equals("int", StringComparison.OrdinalIgnoreCase))
                 {
                     addressIncrement = 1;
                 }
-                
+
                 nextAddress = lastEntry.Address + addressIncrement;
-                
+
                 if (!string.IsNullOrWhiteSpace(lastEntry.Name))
                 {
                     name = lastEntry.Name;
                 }
             }
-            
-            CustomEntries.Add(new CustomEntry 
-            { 
-                Address = nextAddress, 
-                Area = area, 
-                Type = type, 
+
+            CustomEntries.Add(new CustomEntry
+            {
+                Address = nextAddress,
+                Area = area,
+                Type = type,
                 Name = name,
-                Value = "0", 
-                Continuous = false, 
-                PeriodMs = 1000, 
-                Monitor = false, 
-                ReadPeriodMs = 1000 
+                Value = "0",
+                Continuous = false,
+                PeriodMs = 1000,
+                Monitor = false,
+                ReadPeriodMs = 1000
             });
         }
 
@@ -1019,81 +1039,91 @@ namespace ModbusForge.ViewModels
                 switch (area)
                 {
                     case "holdingregister":
-                    {
-                        var t = (entry.Type ?? "uint").ToLowerInvariant();
-                        if (t == "real")
                         {
-                            var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 2);
-                            float f = DataTypeConverter.ToSingle(regs[0], regs[1]);
-                            entry.Value = f.ToString(CultureInfo.InvariantCulture);
-                            StatusMessage = $"Read REAL {entry.Value} from HR {entry.Address}";
+                            var t = (entry.Type ?? "uint").ToLowerInvariant();
+                            if (t == "real")
+                            {
+                                var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 2);
+                                if (regs is null) return;
+                                float f = DataTypeConverter.ToSingle(regs[0], regs[1]);
+                                entry.Value = f.ToString(CultureInfo.InvariantCulture);
+                                StatusMessage = $"Read REAL {entry.Value} from HR {entry.Address}";
+                            }
+                            else if (t == "int")
+                            {
+                                var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
+                                if (regs is null) return;
+                                short sv = unchecked((short)regs[0]);
+                                entry.Value = sv.ToString(CultureInfo.InvariantCulture);
+                                StatusMessage = $"Read INT {entry.Value} from HR {entry.Address}";
+                            }
+                            else if (t == "string")
+                            {
+                                var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
+                                if (regs is null) return;
+                                entry.Value = DataTypeConverter.ToString(regs[0]);
+                                StatusMessage = $"Read STRING '{entry.Value}' from HR {entry.Address}";
+                            }
+                            else // uint
+                            {
+                                var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
+                                if (regs is null) return;
+                                entry.Value = regs[0].ToString(CultureInfo.InvariantCulture);
+                                StatusMessage = $"Read UINT {entry.Value} from HR {entry.Address}";
+                            }
+                            break;
                         }
-                        else if (t == "int")
-                        {
-                            var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
-                            short sv = unchecked((short)regs[0]);
-                            entry.Value = sv.ToString(CultureInfo.InvariantCulture);
-                            StatusMessage = $"Read INT {entry.Value} from HR {entry.Address}";
-                        }
-                        else if (t == "string")
-                        {
-                            var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
-                            entry.Value = DataTypeConverter.ToString(regs[0]);
-                            StatusMessage = $"Read STRING '{entry.Value}' from HR {entry.Address}";
-                        }
-                        else // uint
-                        {
-                            var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
-                            entry.Value = regs[0].ToString(CultureInfo.InvariantCulture);
-                            StatusMessage = $"Read UINT {entry.Value} from HR {entry.Address}";
-                        }
-                        break;
-                    }
                     case "inputregister":
-                    {
-                        var t = (entry.Type ?? "uint").ToLowerInvariant();
-                        if (t == "real")
                         {
-                            var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 2);
-                            float f = DataTypeConverter.ToSingle(regs[0], regs[1]);
-                            entry.Value = f.ToString(CultureInfo.InvariantCulture);
-                            StatusMessage = $"Read REAL {entry.Value} from IR {entry.Address}";
+                            var t = (entry.Type ?? "uint").ToLowerInvariant();
+                            if (t == "real")
+                            {
+                                var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 2);
+                                if (regs is null) return;
+                                float f = DataTypeConverter.ToSingle(regs[0], regs[1]);
+                                entry.Value = f.ToString(CultureInfo.InvariantCulture);
+                                StatusMessage = $"Read REAL {entry.Value} from IR {entry.Address}";
+                            }
+                            else if (t == "int")
+                            {
+                                var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
+                                if (regs is null) return;
+                                short sv = unchecked((short)regs[0]);
+                                entry.Value = sv.ToString(CultureInfo.InvariantCulture);
+                                StatusMessage = $"Read INT {entry.Value} from IR {entry.Address}";
+                            }
+                            else if (t == "string")
+                            {
+                                var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
+                                if (regs is null) return;
+                                entry.Value = DataTypeConverter.ToString(regs[0]);
+                                StatusMessage = $"Read STRING '{entry.Value}' from IR {entry.Address}";
+                            }
+                            else // uint
+                            {
+                                var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
+                                if (regs is null) return;
+                                entry.Value = regs[0].ToString(CultureInfo.InvariantCulture);
+                                StatusMessage = $"Read UINT {entry.Value} from IR {entry.Address}";
+                            }
+                            break;
                         }
-                        else if (t == "int")
-                        {
-                            var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
-                            short sv = unchecked((short)regs[0]);
-                            entry.Value = sv.ToString(CultureInfo.InvariantCulture);
-                            StatusMessage = $"Read INT {entry.Value} from IR {entry.Address}";
-                        }
-                        else if (t == "string")
-                        {
-                            var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
-                            entry.Value = DataTypeConverter.ToString(regs[0]);
-                            StatusMessage = $"Read STRING '{entry.Value}' from IR {entry.Address}";
-                        }
-                        else // uint
-                        {
-                            var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
-                            entry.Value = regs[0].ToString(CultureInfo.InvariantCulture);
-                            StatusMessage = $"Read UINT {entry.Value} from IR {entry.Address}";
-                        }
-                        break;
-                    }
                     case "coil":
-                    {
-                        var states = await _modbusService.ReadCoilsAsync(UnitId, entry.Address, 1);
-                        entry.Value = states[0] ? "1" : "0";
-                        StatusMessage = $"Read COIL {entry.Value} from {entry.Address}";
-                        break;
-                    }
+                        {
+                            var states = await _modbusService.ReadCoilsAsync(UnitId, entry.Address, 1);
+                            if (states is null) return;
+                            entry.Value = states[0] ? "1" : "0";
+                            StatusMessage = $"Read COIL {entry.Value} from {entry.Address}";
+                            break;
+                        }
                     case "discreteinput":
-                    {
-                        var states = await _modbusService.ReadDiscreteInputsAsync(UnitId, entry.Address, 1);
-                        entry.Value = states[0] ? "1" : "0";
-                        StatusMessage = $"Read DI {entry.Value} from {entry.Address}";
-                        break;
-                    }
+                        {
+                            var states = await _modbusService.ReadDiscreteInputsAsync(UnitId, entry.Address, 1);
+                            if (states is null) return;
+                            entry.Value = states[0] ? "1" : "0";
+                            StatusMessage = $"Read DI {entry.Value} from {entry.Address}";
+                            break;
+                        }
                     default:
                         StatusMessage = $"Unknown area: {entry.Area}";
                         break;
@@ -1341,64 +1371,72 @@ namespace ModbusForge.ViewModels
             switch (area)
             {
                 case "holdingregister":
-                {
-                    var t = (entry.Type ?? "uint").ToLowerInvariant();
-                    if (t == "real")
                     {
-                        var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 2);
-                        return DataTypeConverter.ToSingle(regs[0], regs[1]);
+                        var t = (entry.Type ?? "uint").ToLowerInvariant();
+                        if (t == "real")
+                        {
+                            var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 2);
+                            if (regs is null) return null;
+                            return DataTypeConverter.ToSingle(regs[0], regs[1]);
+                        }
+                        else if (t == "int")
+                        {
+                            var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
+                            if (regs is null) return null;
+                            short sv = unchecked((short)regs[0]);
+                            return (double)sv;
+                        }
+                        else if (t == "string")
+                        {
+                            // not a numeric trend; skip
+                            return null;
+                        }
+                        else // uint
+                        {
+                            var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
+                            if (regs is null) return null;
+                            return (double)regs[0];
+                        }
                     }
-                    else if (t == "int")
-                    {
-                        var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
-                        short sv = unchecked((short)regs[0]);
-                        return (double)sv;
-                    }
-                    else if (t == "string")
-                    {
-                        // not a numeric trend; skip
-                        return null;
-                    }
-                    else // uint
-                    {
-                        var regs = await _modbusService.ReadHoldingRegistersAsync(UnitId, entry.Address, 1);
-                        return (double)regs[0];
-                    }
-                }
                 case "inputregister":
-                {
-                    var t = (entry.Type ?? "uint").ToLowerInvariant();
-                    if (t == "real")
                     {
-                        var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 2);
-                        return DataTypeConverter.ToSingle(regs[0], regs[1]);
+                        var t = (entry.Type ?? "uint").ToLowerInvariant();
+                        if (t == "real")
+                        {
+                            var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 2);
+                            if (regs is null) return null;
+                            return DataTypeConverter.ToSingle(regs[0], regs[1]);
+                        }
+                        else if (t == "int")
+                        {
+                            var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
+                            if (regs is null) return null;
+                            short sv = unchecked((short)regs[0]);
+                            return (double)sv;
+                        }
+                        else if (t == "string")
+                        {
+                            return null;
+                        }
+                        else // uint
+                        {
+                            var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
+                            if (regs is null) return null;
+                            return (double)regs[0];
+                        }
                     }
-                    else if (t == "int")
-                    {
-                        var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
-                        short sv = unchecked((short)regs[0]);
-                        return (double)sv;
-                    }
-                    else if (t == "string")
-                    {
-                        return null;
-                    }
-                    else // uint
-                    {
-                        var regs = await _modbusService.ReadInputRegistersAsync(UnitId, entry.Address, 1);
-                        return (double)regs[0];
-                    }
-                }
                 case "coil":
-                {
-                    var states = await _modbusService.ReadCoilsAsync(UnitId, entry.Address, 1);
-                    return states[0] ? 1.0 : 0.0;
-                }
+                    {
+                        var states = await _modbusService.ReadCoilsAsync(UnitId, entry.Address, 1);
+                        if (states is null) return null;
+                        return states[0] ? 1.0 : 0.0;
+                    }
                 case "discreteinput":
-                {
-                    var states = await _modbusService.ReadDiscreteInputsAsync(UnitId, entry.Address, 1);
-                    return states[0] ? 1.0 : 0.0;
-                }
+                    {
+                        var states = await _modbusService.ReadDiscreteInputsAsync(UnitId, entry.Address, 1);
+                        if (states is null) return null;
+                        return states[0] ? 1.0 : 0.0;
+                    }
                 default:
                     return null;
             }

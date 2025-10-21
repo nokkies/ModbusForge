@@ -90,15 +90,63 @@ namespace ModbusForge.Services
                         int iv = (int)Math.Round(raw);
                         if (iv < 0) iv = 0;
                         if (iv > 65535) iv = 65535;
-                        var holdingRegs = _serverService.GetHoldingRegisterBuffer<short>();
-                        for (int i = 0; i < count; i++)
+                        var dataStore = _serverService.GetDataStore();
+                        if (dataStore != null)
                         {
-                            holdingRegs[start + i] = (short)iv;
+                            for (int i = 0; i < count; i++)
+                            {
+                                int addr = start + i;
+                                if (addr >= 0 && addr < dataStore.HoldingRegisters.Count)
+                                    dataStore.HoldingRegisters[addr] = (ushort)iv;
+                            }
                         }
                     }
                     else
                     {
-                        var holdingRegs = _serverService.GetHoldingRegisterBuffer<short>();
+                        var dataStore = _serverService.GetDataStore();
+                        if (dataStore != null)
+                        {
+                            int range = Math.Max(1, max - min + 1);
+                            _simHoldingPhase = (_simHoldingPhase + 1) % range;
+                            for (int i = 0; i < count; i++)
+                            {
+                                int val = min + ((_simHoldingPhase + i) % range);
+                                if (val < 0) val = 0;
+                                if (val > 65535) val = 65535;
+                                int addr = start + i;
+                                if (addr >= 0 && addr < dataStore.HoldingRegisters.Count)
+                                    dataStore.HoldingRegisters[addr] = (ushort)val;
+                            }
+                        }
+                    }
+                }
+
+                if (_viewModel.SimCoilsEnabled)
+                {
+                    var dataStore = _serverService.GetDataStore();
+                    if (dataStore != null)
+                    {
+                        int count = _viewModel.SimCoilCount <= 0 ? 0 : _viewModel.SimCoilCount;
+                        int start = _viewModel.SimCoilStart;
+                        for (int i = 0; i < count; i++)
+                        {
+                            int addr = start + i;
+                            if (addr >= 0 && addr < dataStore.CoilDiscretes.Count)
+                                dataStore.CoilDiscretes[addr] = _simCoilState;
+                        }
+                        _simCoilState = !_simCoilState;
+                    }
+                }
+
+                if (_viewModel.SimInputsEnabled)
+                {
+                    var dataStore = _serverService.GetDataStore();
+                    if (dataStore != null)
+                    {
+                        int count = _viewModel.SimInputCount <= 0 ? 0 : _viewModel.SimInputCount;
+                        int start = _viewModel.SimInputStart;
+                        int min = _viewModel.SimInputMin;
+                        int max = _viewModel.SimInputMax;
                         int range = Math.Max(1, max - min + 1);
                         _simHoldingPhase = (_simHoldingPhase + 1) % range;
                         for (int i = 0; i < count; i++)
@@ -106,63 +154,28 @@ namespace ModbusForge.Services
                             int val = min + ((_simHoldingPhase + i) % range);
                             if (val < 0) val = 0;
                             if (val > 65535) val = 65535;
-                            holdingRegs[start + i] = (short)val;
+                            int addr = start + i;
+                            if (addr >= 0 && addr < dataStore.InputRegisters.Count)
+                                dataStore.InputRegisters[addr] = (ushort)val;
                         }
-                    }
-                }
-
-                if (_viewModel.SimCoilsEnabled)
-                {
-                    var coilBuf = _serverService.GetCoilBuffer<byte>();
-                    int count = _viewModel.SimCoilCount <= 0 ? 0 : _viewModel.SimCoilCount;
-                    int start = _viewModel.SimCoilStart;
-                    for (int i = 0; i < count; i++)
-                    {
-                        int address = start + i;
-                        int byteIndex = address / 8;
-                        int bitOffset = address % 8;
-                        if (_simCoilState)
-                            coilBuf[byteIndex] = (byte)(coilBuf[byteIndex] | (1 << bitOffset));
-                        else
-                            coilBuf[byteIndex] = (byte)(coilBuf[byteIndex] & ~(1 << bitOffset));
-                    }
-                    _simCoilState = !_simCoilState;
-                }
-
-                if (_viewModel.SimInputsEnabled)
-                {
-                    var inputRegs = _serverService.GetInputRegisterBuffer<short>();
-                    int count = _viewModel.SimInputCount <= 0 ? 0 : _viewModel.SimInputCount;
-                    int start = _viewModel.SimInputStart;
-                    int min = _viewModel.SimInputMin;
-                    int max = _viewModel.SimInputMax;
-                    int range = Math.Max(1, max - min + 1);
-                    _simHoldingPhase = (_simHoldingPhase + 1) % range;
-                    for (int i = 0; i < count; i++)
-                    {
-                        int val = min + ((_simHoldingPhase + i) % range);
-                        if (val < 0) val = 0;
-                        if (val > 65535) val = 65535;
-                        inputRegs[start + i] = (short)val;
                     }
                 }
 
                 if (_viewModel.SimDiscreteEnabled)
                 {
-                    var discreteBuf = _serverService.GetDiscreteInputBuffer<byte>();
-                    int count = _viewModel.SimDiscreteCount <= 0 ? 0 : _viewModel.SimDiscreteCount;
-                    int start = _viewModel.SimDiscreteStart;
-                    for (int i = 0; i < count; i++)
+                    var dataStore = _serverService.GetDataStore();
+                    if (dataStore != null)
                     {
-                        int address = start + i;
-                        int byteIndex = address / 8;
-                        int bitOffset = address % 8;
-                        if (_simDiscreteState)
-                            discreteBuf[byteIndex] = (byte)(discreteBuf[byteIndex] | (1 << bitOffset));
-                        else
-                            discreteBuf[byteIndex] = (byte)(discreteBuf[byteIndex] & ~(1 << bitOffset));
+                        int count = _viewModel.SimDiscreteCount <= 0 ? 0 : _viewModel.SimDiscreteCount;
+                        int start = _viewModel.SimDiscreteStart;
+                        for (int i = 0; i < count; i++)
+                        {
+                            int addr = start + i;
+                            if (addr >= 0 && addr < dataStore.InputDiscretes.Count)
+                                dataStore.InputDiscretes[addr] = _simDiscreteState;
+                        }
+                        _simDiscreteState = !_simDiscreteState;
                     }
-                    _simDiscreteState = !_simDiscreteState;
                 }
             }
             catch (Exception ex)

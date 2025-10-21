@@ -3,7 +3,8 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using FluentModbus;
+using Modbus.Data;
+using Modbus.Device;
 using System.Net.Sockets;
 using ModbusForge.Helpers;
 
@@ -11,16 +12,22 @@ namespace ModbusForge.Services
 {
     public class ModbusServerService : IModbusService, IDisposable
     {
-        private readonly ModbusTcpServer _server;
+        private ModbusTcpSlave _slave;
+        private TcpListener _listener;
+        private DataStore _dataStore;
+        private Task _listenTask;
+        private CancellationTokenSource _cts;
         private bool _disposed = false;
         private readonly ILogger<ModbusServerService> _logger;
-        private bool _isRunning = false;
+        private volatile bool _isRunning = false;
+        private readonly object _stateLock = new object();
         private const int DefaultPort = 502;
+        private const byte DefaultSlaveId = 1;
+        private const int ShutdownTimeoutMs = 5000;
 
         public ModbusServerService(ILogger<ModbusServerService> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _server = new ModbusTcpServer();
             _logger.LogInformation("Modbus TCP server created");
         }
 
@@ -33,16 +40,22 @@ namespace ModbusForge.Services
             {
                 _logger.LogDebug($"Reading {count} input registers starting at {startAddress} (Unit ID: {unitId})");
 
-                var src = _server.GetInputRegisterBuffer<short>();
-                if (startAddress < 0 || count < 0 || startAddress + count > src.Length)
-                    throw new ArgumentOutOfRangeException(nameof(startAddress), "Requested range is out of bounds");
+                lock (_stateLock)
+                {
+                    if (_dataStore == null)
+                        throw new InvalidOperationException("Data store not initialized");
 
-                var result = new ushort[count];
-                for (int i = 0; i < count; i++)
-                    result[i] = unchecked((ushort)src[startAddress + i]);
+                    var registers = _dataStore.InputRegisters;
+                    if (startAddress < 1 || count < 0 || startAddress + count - 1 > registers.Count)
+                        throw new ArgumentOutOfRangeException(nameof(startAddress), "Requested range is out of bounds");
 
-                _logger.LogDebug($"Successfully read {result.Length} input registers");
-                return result;
+                    var result = new ushort[count];
+                    for (int i = 0; i < count; i++)
+                        result[i] = registers[(ushort)(startAddress + i)];
+
+                    _logger.LogDebug($"Successfully read {result.Length} input registers");
+                    return result;
+                }
             });
         }
 
@@ -55,16 +68,14 @@ namespace ModbusForge.Services
             {
                 _logger.LogDebug($"Reading {count} discrete inputs starting at {startAddress} (Unit ID: {unitId})");
 
-                var buf = _server.GetDiscreteInputBuffer<byte>();
-                var capacity = checked(buf.Length * 8);
-                if (startAddress < 0 || count < 0 || startAddress + count > capacity)
+                var inputs = _dataStore.InputDiscretes;
+                if (startAddress < 1 || count < 0 || startAddress + count - 1 > inputs.Count)
                     throw new ArgumentOutOfRangeException(nameof(startAddress), "Requested discrete input range is out of bounds");
 
-                int byteStart = startAddress / 8;
-                int byteCount = (count + 7) / 8;
-                var data = buf.Slice(byteStart, byteCount).ToArray();
+                var result = new bool[count];
+                for (int i = 0; i < count; i++)
+                    result[i] = inputs[(ushort)(startAddress + i)];
 
-                var result = BitConverterHelper.ToBooleanArray(data, count);
                 _logger.LogDebug($"Successfully read {result.Length} discrete inputs");
                 return result;
             });
@@ -76,64 +87,145 @@ namespace ModbusForge.Services
         {
             return Task.Run(() =>
             {
-                try
+                lock (_stateLock)
                 {
-                    if (_isRunning)
-                        return true;
+                    try
+                    {
+                        if (_isRunning)
+                            return true;
 
-                    var endpoint = new IPEndPoint(IPAddress.Any, port == 0 ? DefaultPort : port);
-                    _server.Start(endpoint);
-                    _isRunning = true;
+                        var endpoint = new IPEndPoint(IPAddress.Any, port == 0 ? DefaultPort : port);
+                    
+                    // Create data store
+                    _dataStore = new DataStore();
+                    
+                    // Initialize holding registers to support addresses up to 10000
+                    for (int i = 0; i < 10000; i++)
+                    {
+                        _dataStore.HoldingRegisters.Add(0);
+                    }
+                    
+                    // Initialize input registers to support addresses up to 10000
+                    for (int i = 0; i < 10000; i++)
+                    {
+                        _dataStore.InputRegisters.Add(0);
+                    }
+                    
+                    // Initialize coils to support addresses up to 10000
+                    for (int i = 0; i < 10000; i++)
+                    {
+                        _dataStore.CoilDiscretes.Add(false);
+                    }
+                    
+                    // Initialize discrete inputs to support addresses up to 10000
+                    for (int i = 0; i < 10000; i++)
+                    {
+                        _dataStore.InputDiscretes.Add(false);
+                    }
+                    
+                    // Initialize some test data in holding registers
+                    for (ushort i = 1; i <= 16; i++)
+                        _dataStore.HoldingRegisters[i] = (ushort)(i * 10);
+                    
+                    // Create and start TCP listener
+                    _listener = new TcpListener(endpoint);
+                    _listener.Start();
+                    
+                    // Create slave
+                    _slave = ModbusTcpSlave.CreateTcp(DefaultSlaveId, _listener);
+                    _slave.DataStore = _dataStore;
+                    
+                    // Start listening for connections
+                    _cts = new CancellationTokenSource();
+                    _isRunning = true; // Set before starting listen task
+                    _listenTask = Task.Run(() =>
+                    {
+                        try { _slave.Listen(); }
+                        catch (Exception ex) { _logger.LogError(ex, "Listen task failed"); }
+                    });
+                    
                     _logger.LogInformation($"Modbus TCP server started on {endpoint}");
-
-                    // Initialize some test data in the server buffer (first few registers)
-                    var buf = _server.GetHoldingRegisterBuffer<short>();
-                    var initCount = Math.Min(16, buf.Length);
-                    for (int i = 0; i < initCount; i++)
-                        buf[i] = (short)(i * 10);
-
                     return true;
-                }
-                catch (SocketException sockEx) when (sockEx.SocketErrorCode == SocketError.AddressAlreadyInUse)
-                {
-                    _isRunning = false;
+                    }
+                    catch (SocketException sockEx) when (sockEx.SocketErrorCode == SocketError.AddressAlreadyInUse)
+                    {
+                        CleanupResources();
+                        _isRunning = false;
                     int p = port == 0 ? DefaultPort : port;
                     _logger.LogWarning(sockEx, "Port {Port} is already in use. Server could not start.", p);
-                    // Return false so the UI can present a friendly message and suggestions
                     return false;
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to start Modbus TCP server");
-                    _isRunning = false;
-                    return false;
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to start Modbus TCP server");
+                        CleanupResources();
+                        _isRunning = false;
+                        return false;
+                    }
                 }
             });
         }
 
-        // Buffer access for simulation service
-        public Span<T> GetInputRegisterBuffer<T>() where T : unmanaged => _server.GetInputRegisterBuffer<T>();
-        public Span<T> GetDiscreteInputBuffer<T>() where T : unmanaged => _server.GetDiscreteInputBuffer<T>();
-        public Span<T> GetHoldingRegisterBuffer<T>() where T : unmanaged => _server.GetHoldingRegisterBuffer<T>();
-        public Span<T> GetCoilBuffer<T>() where T : unmanaged => _server.GetCoilBuffer<T>();
+        private void CleanupResources()
+        {
+            try
+            {
+                _cts?.Cancel();
+                _slave?.Dispose();
+                _listener?.Stop();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error during resource cleanup");
+            }
+            finally
+            {
+                _slave = null;
+                _listener = null;
+                _cts?.Dispose();
+                _cts = null;
+            }
+        }
+
+        // Data store access for simulation service
+        public DataStore GetDataStore()
+        {
+            lock (_stateLock)
+            {
+                return _dataStore;
+            }
+        }
 
         public Task DisconnectAsync()
         {
             return Task.Run(() =>
             {
-                try
+                lock (_stateLock)
                 {
-                    if (_isRunning)
+                    try
                     {
-                        _server.Stop();
+                        if (!_isRunning)
+                            return;
+
                         _isRunning = false;
+                        _cts?.Cancel();
+                        _listener?.Stop();
+
+                        // Wait for listen task to complete
+                        if (_listenTask != null && !_listenTask.IsCompleted)
+                        {
+                            if (!_listenTask.Wait(ShutdownTimeoutMs))
+                                _logger.LogWarning("Listen task did not complete within timeout");
+                        }
+
+                        CleanupResources();
                         _logger.LogInformation("Modbus TCP server stopped");
                     }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error stopping Modbus TCP server");
-                    throw;
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error stopping Modbus TCP server");
+                        throw;
+                    }
                 }
             });
         }
@@ -147,13 +239,13 @@ namespace ModbusForge.Services
             {
                 _logger.LogDebug($"Reading {count} holding registers starting at {startAddress} (Unit ID: {unitId})");
 
-                var src = _server.GetHoldingRegisterBuffer<short>();
-                if (startAddress < 0 || count < 0 || startAddress + count > src.Length)
+                var registers = _dataStore.HoldingRegisters;
+                if (startAddress < 1 || count < 0 || startAddress + count - 1 > registers.Count)
                     throw new ArgumentOutOfRangeException(nameof(startAddress), "Requested range is out of bounds");
 
                 var result = new ushort[count];
                 for (int i = 0; i < count; i++)
-                    result[i] = unchecked((ushort)src[startAddress + i]);
+                    result[i] = registers[(ushort)(startAddress + i)];
 
                 _logger.LogDebug($"Successfully read {result.Length} registers");
                 return result;
@@ -171,11 +263,11 @@ namespace ModbusForge.Services
                 {
                     _logger.LogDebug($"Writing value {value} to register {registerAddress} (Unit ID: {unitId})");
 
-                    var buf = _server.GetHoldingRegisterBuffer<short>();
-                    if (registerAddress < 0 || registerAddress >= buf.Length)
+                    var registers = _dataStore.HoldingRegisters;
+                    if (registerAddress < 1 || registerAddress > registers.Count)
                         throw new ArgumentOutOfRangeException(nameof(registerAddress), "Register address is out of range");
 
-                    buf[registerAddress] = unchecked((short)value);
+                    registers[(ushort)registerAddress] = value;
                     _logger.LogDebug("Successfully wrote to register");
                 }
                 catch (Exception ex)
@@ -195,16 +287,14 @@ namespace ModbusForge.Services
             {
                 _logger.LogDebug($"Reading {count} coils starting at {startAddress} (Unit ID: {unitId})");
 
-                var buf = _server.GetCoilBuffer<byte>(); // packed bits, LSB first
-                var capacity = checked(buf.Length * 8);
-                if (startAddress < 0 || count < 0 || startAddress + count > capacity)
+                var coils = _dataStore.CoilDiscretes;
+                if (startAddress < 1 || count < 0 || startAddress + count - 1 > coils.Count)
                     throw new ArgumentOutOfRangeException(nameof(startAddress), "Requested coil range is out of bounds");
 
-                int byteStart = startAddress / 8;
-                int byteCount = (count + 7) / 8;
-                var data = buf.Slice(byteStart, byteCount).ToArray();
+                var result = new bool[count];
+                for (int i = 0; i < count; i++)
+                    result[i] = coils[(ushort)(startAddress + i)];
 
-                var result = BitConverterHelper.ToBooleanArray(data, count);
                 _logger.LogDebug($"Successfully read {result.Length} coils");
                 return result;
             });
@@ -221,18 +311,11 @@ namespace ModbusForge.Services
                 {
                     _logger.LogDebug($"Writing coil at {coilAddress} = {value} (Unit ID: {unitId})");
 
-                    var buf = _server.GetCoilBuffer<byte>();
-                    var capacity = checked(buf.Length * 8);
-                    if (coilAddress < 0 || coilAddress >= capacity)
+                    var coils = _dataStore.CoilDiscretes;
+                    if (coilAddress < 1 || coilAddress > coils.Count)
                         throw new ArgumentOutOfRangeException(nameof(coilAddress), "Coil address is out of range");
 
-                    int byteIndex = coilAddress / 8;
-                    int bitOffset = coilAddress % 8;
-                    if (value)
-                        buf[byteIndex] = (byte)(buf[byteIndex] | (1 << bitOffset));
-                    else
-                        buf[byteIndex] = (byte)(buf[byteIndex] & ~(1 << bitOffset));
-
+                    coils[(ushort)coilAddress] = value;
                     _logger.LogDebug("Successfully wrote coil");
                 }
                 catch (Exception ex)
@@ -257,13 +340,17 @@ namespace ModbusForge.Services
                 {
                     try
                     {
-                        if (_isRunning)
-                            _server.Stop();
+                        _cts?.Cancel();
+                        _slave?.Dispose();
+                        _listener?.Stop();
                     }
                     catch { /* ignore on dispose */ }
                     finally
                     {
-                        _server?.Dispose();
+                        _slave = null;
+                        _listener = null;
+                        _cts?.Dispose();
+                        _cts = null;
                         _isRunning = false;
                     }
                 }
