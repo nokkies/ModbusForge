@@ -1,7 +1,6 @@
-using System.ComponentModel;
-using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using ModbusForge.ViewModels;
+using System.Windows.Controls;
 
 namespace ModbusForge.Views
 {
@@ -10,10 +9,7 @@ namespace ModbusForge.Views
         public DecodeView()
         {
             InitializeComponent();
-            if (!DesignerProperties.GetIsInDesignMode(this))
-            {
-                DataContext = App.ServiceProvider.GetRequiredService<DecodeViewModel>();
-            }
+            DataContext = App.ServiceProvider.GetRequiredService<DecodeViewModel>();
         }
     }
 }
