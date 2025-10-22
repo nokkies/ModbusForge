@@ -1,4 +1,4 @@
-# ModbusForge v2.0.0
+# ModbusForge v2.0.2
 
 Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 
@@ -82,7 +82,7 @@ To install the application, follow these steps:
 
 ## Versioning
 
-- The window title displays the application version from the assembly ProductVersion (fallback to `v1.3.0`).
+- The window title displays the application version from the assembly ProductVersion (fallback to `v2.0.0`).
 
 ## Build and Release
 
@@ -111,7 +111,7 @@ dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-con
 4. Create a ZIP artifact:
 
 ```powershell
-$version = "1.3.0"
+$version = "2.0.2"
 Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
 # or for self-contained
 Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$version-win-x64-sc.zip -Force
@@ -120,7 +120,7 @@ Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$ve
 5. Tag and create a GitHub Release (optional):
 
 ```powershell
-$version = "1.3.0"
+$version = "2.0.2"
 git tag v$version
 git push origin v$version
 

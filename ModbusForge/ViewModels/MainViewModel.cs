@@ -181,11 +181,11 @@ namespace ModbusForge.ViewModels
                 string? version = GetApplicationVersion();
                 Title = !string.IsNullOrWhiteSpace(version) 
                     ? $"ModbusForge v{version}" 
-                    : "ModbusForge v1.2.1";
+                    : "ModbusForge v2.0.0";
             }
             catch
             {
-                Title = "ModbusForge v1.2.1";
+                Title = "ModbusForge v2.0.0";
             }
         }
 
