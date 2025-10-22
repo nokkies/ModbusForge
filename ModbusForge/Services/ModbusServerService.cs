@@ -12,11 +12,11 @@ namespace ModbusForge.Services
 {
     public class ModbusServerService : IModbusService, IDisposable
     {
-        private ModbusTcpSlave _slave;
-        private TcpListener _listener;
-        private DataStore _dataStore;
-        private Task _listenTask;
-        private CancellationTokenSource _cts;
+        private ModbusTcpSlave? _slave;
+        private TcpListener? _listener;
+        private DataStore? _dataStore;
+        private Task? _listenTask;
+        private CancellationTokenSource? _cts;
         private bool _disposed = false;
         private readonly ILogger<ModbusServerService> _logger;
         private volatile bool _isRunning = false;
@@ -188,7 +188,7 @@ namespace ModbusForge.Services
         }
 
         // Data store access for simulation service
-        public DataStore GetDataStore()
+        public DataStore? GetDataStore()
         {
             lock (_stateLock)
             {

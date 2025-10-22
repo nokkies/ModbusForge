@@ -145,6 +145,19 @@ This project uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create a si
 
 ## Changelog
 
+- 2.0.2 (2025-10-23)
+  - Fixed client address offset issues
+  - Updated installer to version 2.0.2
+
+- 2.0.1 (2025-10-23)
+  - Fixed server address offset issues
+  - Improved connection stability
+
+- 2.0.0 (2025-10-22)
+  - Migrated from FluentModbus to NModbus4 for improved server stability
+  - Resolved server stopping issues
+  - Updated dependencies and improved error handling
+
 - 1.3.0 (2025-08-27)
   - Integrated MahApps.Metro theming and converted `MainWindow` to `MetroWindow`.
   - Kept Light theme (`Styles/Themes/Light.Blue.xaml`).

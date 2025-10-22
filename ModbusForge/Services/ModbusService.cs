@@ -11,8 +11,8 @@ namespace ModbusForge.Services
     public class ModbusService : IModbusService, IDisposable
     {
         private readonly ILogger<ModbusService> _logger;
-        private IModbusMaster _client;
-        private TcpClient _tcpClient;
+        private IModbusMaster? _client;
+        private TcpClient? _tcpClient;
         private bool _disposed = false;
 
         public ModbusService(ILogger<ModbusService> logger)

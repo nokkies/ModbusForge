@@ -12,12 +12,12 @@ namespace ModbusForge.Services
 {
     public class ModbusTcpService : IModbusService, IDisposable
     {
-        private IModbusMaster _client;
-        private TcpClient _tcpClient;
+        private IModbusMaster? _client;
+        private TcpClient? _tcpClient;
         private bool _disposed = false;
         private readonly ILogger<ModbusTcpService> _logger;
         private readonly SemaphoreSlim _ioLock = new SemaphoreSlim(1, 1);
-        private string _lastIpAddress;
+        private string? _lastIpAddress;
         private int _lastPort;
 
         public ModbusTcpService(ILogger<ModbusTcpService> logger)
