@@ -142,11 +142,11 @@ namespace ModbusForge.ViewModels
                 {
                     ver = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
                 }
-                Title = !string.IsNullOrWhiteSpace(ver) ? $"ModbusForge v{ver}" : "ModbusForge v1.2.1";
+                Title = !string.IsNullOrWhiteSpace(ver) ? $"ModbusForge v{ver}" : "ModbusForge v2.0.3";
             }
             catch
             {
-                Title = "ModbusForge v1.2.1"; // fallback on any error
+                Title = "ModbusForge v2.0.3"; // fallback on any error
             }
 
             // Custom tab commands
