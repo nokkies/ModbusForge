@@ -70,7 +70,7 @@ namespace ModbusForge
             services.AddSingleton<IConsoleLoggerService, ConsoleLoggerService>();
             
             // Register ViewModels
-            services.AddTransient<MainViewModel>();
+            services.AddSingleton<MainViewModel>();
             services.AddTransient<TrendViewModel>();
             services.AddTransient<DecodeViewModel>();
         }

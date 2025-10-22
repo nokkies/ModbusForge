@@ -149,6 +149,16 @@ This project uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create a si
   - Added console logging tab for real-time monitoring of all Modbus operations
   - Console displays connection attempts, successes, failures, and data operations
   - Improved debugging and troubleshooting capabilities
+  - Fixed CS1002 syntax error in MainViewModel.cs that was preventing compilation
+  - Optimized TrendViewModel color lookup performance (O(n) → O(1)) for better chart rendering
+  - Improved error handling synchronization in color management
+
+- 2.0.3 (2025-10-23)
+  - Enhanced error handling for continuous polling - monitors automatically disable on communication errors instead of showing disruptive pop-ups
+  - Improved UI clarity - renamed 'Cont.' column to 'Cont. Write' for better understanding
+  - Smart custom entry addition - auto-increments addresses and names when adding new entries
+  - Fixed Decode tab Read button functionality by making MainViewModel a singleton
+  - Cleaner trend charts by removing large data point geometries
 
 - 2.0.2 (2025-10-23)
   - Fixed client address offset issues

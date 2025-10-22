@@ -24,6 +24,7 @@ namespace ModbusForge.ViewModels
         private readonly Dictionary<string, ObservableCollection<double>> _valuesByKey = new();
         private readonly Dictionary<string, List<(DateTime ts, double v)>> _samplesByKey = new();
         private readonly Dictionary<string, SKColor> _colorByKey = new();
+        private readonly HashSet<SKColor> _usedColors = new();
         private readonly List<SKColor> _palette = new()
         {
             new SKColor(33,150,243),   // blue
@@ -340,10 +341,11 @@ namespace ModbusForge.ViewModels
             {
                 var idx = (_paletteCursor + i) % _palette.Count;
                 var c = _palette[idx];
-                if (!_colorByKey.Values.Contains(c))
+                if (!_usedColors.Contains(c))
                 {
                     _paletteCursor = (idx + 1) % _palette.Count;
                     _colorByKey[key] = c;
+                    _usedColors.Add(c);
                     return c;
                 }
             }
@@ -351,12 +353,17 @@ namespace ModbusForge.ViewModels
             var color = _palette[_paletteCursor];
             _paletteCursor = (_paletteCursor + 1) % _palette.Count;
             _colorByKey[key] = color;
+            _usedColors.Add(color);
             return color;
         }
 
         private void ReleaseColor(string key)
         {
-            if (_colorByKey.ContainsKey(key)) _colorByKey.Remove(key);
+            if (_colorByKey.TryGetValue(key, out var color))
+            {
+                _colorByKey.Remove(key);
+                _usedColors.Remove(color);
+            }
         }
 
         private void ChangeColor()
@@ -378,7 +385,12 @@ namespace ModbusForge.ViewModels
                         next = _palette[(_paletteCursor + 1) % _palette.Count];
                         _paletteCursor = (_paletteCursor + 2) % _palette.Count;
                     }
+                    if (_colorByKey.TryGetValue(item.Key, out var oldColor))
+                    {
+                        _usedColors.Remove(oldColor);
+                    }
                     _colorByKey[item.Key] = next;
+                    _usedColors.Add(next);
                     ls.Stroke = new SolidColorPaint(next) { StrokeThickness = 2 };
                     break;
                 }
