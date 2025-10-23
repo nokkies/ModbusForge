@@ -182,13 +182,21 @@ namespace ModbusForge.ViewModels
             try
             {
                 string? version = GetApplicationVersion();
-                Title = !string.IsNullOrWhiteSpace(version) 
-                    ? $"ModbusForge v{version}" 
-                    : "ModbusForge v2.1.0";
+                if (!string.IsNullOrWhiteSpace(version))
+                {
+                    Title = $"ModbusForge v{version}";
+                    Version = version;
+                }
+                else
+                {
+                    Title = "ModbusForge v2.1.1";
+                    Version = "2.1.1";
+                }
             }
             catch
             {
-                Title = "ModbusForge v2.1.0";
+                Title = "ModbusForge v2.1.1";
+                Version = "2.1.1";
             }
         }
 
@@ -242,7 +250,7 @@ namespace ModbusForge.ViewModels
         private string _title = "ModbusForge";
 
         [ObservableProperty]
-        private string _version = "2.1.0";
+        private string _version = "2.1.1";
 
         // UI-selectable mode: "Client" or "Server"
         [ObservableProperty]
@@ -1310,6 +1318,37 @@ namespace ModbusForge.ViewModels
             try
             {
                 var now = DateTime.UtcNow;
+
+                // Simple heartbeat: try a minimal read to verify connection is alive
+                // Only do this if no monitoring is active
+                if (!HoldingMonitorEnabled && !InputRegistersMonitorEnabled && 
+                    !CoilsMonitorEnabled && !DiscreteInputsMonitorEnabled)
+                {
+                    try
+                    {
+                        // Quick connectivity check - read 1 register
+                        var heartbeat = await _modbusService.ReadHoldingRegistersAsync(UnitId, 1, 1);
+                        if (heartbeat == null)
+                        {
+                            // Connection lost
+                            _logger.LogWarning("Heartbeat check failed - connection lost");
+                            await _modbusService.DisconnectAsync();
+                            IsConnected = false;
+                            MessageBox.Show("Connection to server lost.\n\nPlease reconnect when the server is available.", 
+                                "Connection Lost", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Heartbeat check failed");
+                        await _modbusService.DisconnectAsync();
+                        IsConnected = false;
+                        MessageBox.Show("Connection to server lost.\n\nPlease reconnect when the server is available.", 
+                            "Connection Lost", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                }
 
                 if (HoldingMonitorEnabled)
                 {

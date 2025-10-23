@@ -90,7 +90,44 @@ namespace ModbusForge.Services
             }
         }
 
-        public bool IsConnected => _client != null && _tcpClient != null && _tcpClient.Connected;
+        public bool IsConnected
+        {
+            get
+            {
+                if (_client == null || _tcpClient == null)
+                    return false;
+
+                try
+                {
+                    if (!_tcpClient.Connected)
+                        return false;
+
+                    // Use Poll to check if socket is still alive
+                    // Poll with SelectMode.SelectRead returns true if:
+                    // - Connection is closed/reset/terminated
+                    // - Data is available for reading
+                    // We check Available == 0 to distinguish between the two
+                    bool pollResult = _tcpClient.Client.Poll(1, SelectMode.SelectRead);
+                    bool noDataAvailable = _tcpClient.Client.Available == 0;
+                    
+                    if (pollResult && noDataAvailable)
+                    {
+                        // Socket is closed - clean up
+                        _logger.LogWarning("Socket poll detected closed connection");
+                        HandleConnectionLoss();
+                        return false;
+                    }
+
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error checking connection status");
+                    HandleConnectionLoss();
+                    return false;
+                }
+            }
+        }
 
         public async Task<bool> ConnectAsync(string ipAddress, int port)
         {
