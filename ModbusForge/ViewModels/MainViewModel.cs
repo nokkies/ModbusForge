@@ -692,8 +692,18 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = $"Error reading registers: {ex.Message}";
                 _logger.LogError(ex, "Error reading registers");
-                MessageBox.Show($"Failed to read registers: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                
+                if (HoldingMonitorEnabled)
+                {
+                    HoldingMonitorEnabled = false;
+                    MessageBox.Show($"Failed to read registers: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to read registers: {ex.Message}", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -727,8 +737,18 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = $"Error reading input registers: {ex.Message}";
                 _logger.LogError(ex, "Error reading input registers");
-                MessageBox.Show($"Failed to read input registers: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                
+                if (InputRegistersMonitorEnabled)
+                {
+                    InputRegistersMonitorEnabled = false;
+                    MessageBox.Show($"Failed to read input registers: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to read input registers: {ex.Message}", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -783,8 +803,18 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = $"Error reading coils: {ex.Message}";
                 _logger.LogError(ex, "Error reading coils");
-                MessageBox.Show($"Failed to read coils: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                
+                if (CoilsMonitorEnabled)
+                {
+                    CoilsMonitorEnabled = false;
+                    MessageBox.Show($"Failed to read coils: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to read coils: {ex.Message}", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -817,8 +847,18 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = $"Error reading discrete inputs: {ex.Message}";
                 _logger.LogError(ex, "Error reading discrete inputs");
-                MessageBox.Show($"Failed to read discrete inputs: {ex.Message}", "Read Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                
+                if (DiscreteInputsMonitorEnabled)
+                {
+                    DiscreteInputsMonitorEnabled = false;
+                    MessageBox.Show($"Failed to read discrete inputs: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to read discrete inputs: {ex.Message}", "Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -1233,7 +1273,6 @@ namespace ModbusForge.ViewModels
         {
             if (!IsConnected) return;
             var now = DateTime.UtcNow;
-            // Iterate over a snapshot to avoid InvalidOperationException when the collection is modified during awaits
             var snapshot = CustomEntries.ToList();
             foreach (var entry in snapshot)
             {
@@ -1241,8 +1280,18 @@ namespace ModbusForge.ViewModels
                 int period = entry.PeriodMs <= 0 ? 1000 : entry.PeriodMs;
                 if ((now - entry._lastWriteUtc).TotalMilliseconds >= period)
                 {
-                    await WriteCustomNowAsync(entry);
-                    entry._lastWriteUtc = now;
+                    try
+                    {
+                        await WriteCustomNowAsync(entry);
+                        entry._lastWriteUtc = now;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Continuous write failed for {Area} {Address}", entry.Area, entry.Address);
+                        entry.Continuous = false;
+                        MessageBox.Show($"Continuous write failed for {entry.Area} {entry.Address}: {ex.Message}\n\nContinuous write has been paused for this entry. Fix the issue and re-enable if needed.", "Write Error",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                 }
             }
         }
@@ -1404,6 +1453,7 @@ namespace ModbusForge.ViewModels
             try
             {
                 var now = DateTime.UtcNow;
+                int errorCount = 0;
                 foreach (var ce in snapshot)
                 {
                     try
@@ -1412,7 +1462,6 @@ namespace ModbusForge.ViewModels
                         if (val.HasValue)
                         {
                             _trendLogger.Publish(GetTrendKey(ce), val.Value, now);
-                            // Also update the UI-bound value for the Custom row so the grid reflects live reads
                             var area = (ce.Area ?? "HoldingRegister").ToLowerInvariant();
                             var type = (ce.Type ?? "uint").ToLowerInvariant();
                             string display;
@@ -1428,7 +1477,7 @@ namespace ModbusForge.ViewModels
                             {
                                 display = ((short)val.Value).ToString(CultureInfo.InvariantCulture);
                             }
-                            else // uint
+                            else
                             {
                                 display = ((ushort)val.Value).ToString(CultureInfo.InvariantCulture);
                             }
@@ -1438,7 +1487,15 @@ namespace ModbusForge.ViewModels
                     catch (Exception ex)
                     {
                         _logger.LogDebug(ex, "Trend read failed for {Area} {Address}", ce.Area, ce.Address);
+                        errorCount++;
                     }
+                }
+                
+                if (errorCount > 0 && errorCount == snapshot.Count)
+                {
+                    GlobalMonitorEnabled = false;
+                    MessageBox.Show($"All trend reads failed. Continuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Trend Read Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
             finally
