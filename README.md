@@ -1,19 +1,46 @@
-# ModbusForge v2.1.3
+# ModbusForge v2.2.0
 
-Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
+A professional Modbus TCP client/server application built with .NET 8.0 and WPF. ModbusForge provides comprehensive tools for testing, monitoring, and automating Modbus communications.
 
-## Current Status
+![ModbusForge](ModbusForge/Resources/ModbusForgeLOGO.png)
 
-### ✅ Completed
-- Project structure and solution setup (WPF + MVVM with CommunityToolkit.Mvvm)
-- Dependency Injection and typed configuration via `ServerSettings` (Microsoft.Extensions.Options)
-- Modbus TCP client and server services using NModbus4 v2.0.0
-- Connection UI, read/write for registers and coils
-- Monitoring: periodic reads for Registers, Coils, Discrete Inputs, gated by a single global Continuous Read toggle
-- Custom tab: per-row Area (HoldingRegister/Coil/InputRegister/DiscreteInput) and Type (uint/int/real/string), on-demand Read/Write, per-row Continuous Write, and live read updates driven by Trend-enabled rows
-- Logging/Trend tab: select rows to trend, zoom/pan, CSV/PNG export, retention window 1–60 minutes
-- Persistence for Custom entries to JSON (Save/Load)
-- Start/Stop Modbus server from the UI
+## ✨ What's New in v2.2.0
+
+- **🔧 Options Menu** - Preferences dialog for application settings persistence
+- **🔗 Multi-Device Connections** - Connect to multiple Modbus servers simultaneously with the new Connection Manager
+- **📜 Scripting/Automation** - Create and run automated test sequences with the Script Editor
+- **🎨 UI Modernization** - Enhanced theme with smooth animations and modern styling
+
+## Key Features
+
+### Core Functionality
+- **Client & Server Modes** - Switch between Modbus TCP client and server
+- **Full Register Support** - Read/write holding registers, input registers, coils, and discrete inputs
+- **Real-time Monitoring** - Continuous polling with configurable intervals
+- **Connection Diagnostics** - Test TCP and Modbus connectivity separately with latency measurements
+
+### Multi-Device Support (New in v2.2.0)
+- Connect to multiple Modbus servers simultaneously
+- Save and manage connection profiles
+- Quick switching between active connections
+- Profiles persist between sessions
+
+### Scripting & Automation (New in v2.2.0)
+- Visual script editor for creating test sequences
+- Support for read/write operations, delays, and logging
+- Run scripts with repeat counts and configurable delays
+- Save/load scripts as `.mbscript` files
+
+### Data Visualization
+- **Trend Charts** - Real-time graphing with zoom/pan controls
+- **CSV/PNG Export** - Export trend data and charts
+- **Console Logging** - Real-time log of all Modbus operations
+
+### Custom Data Tab
+- Per-row configuration: Area, Type (uint/int/real/string)
+- On-demand and continuous read/write
+- Live value updates with trend integration
+- Save/Load configurations to JSON
 
 ## Prerequisites
 
@@ -53,24 +80,51 @@ To install the application, follow these steps:
 3.  Click on the **More info** link.
 4.  The publisher will be listed as "Unknown". Click the **Run anyway** button to proceed with the installation.
 
-## Features
+## Feature Details
 
-- Client and Server modes (configured via `ModbusForge/ModbusForge/appsettings.json`, section `ServerSettings.Mode`)
-- Modbus TCP client operations: read/write holding registers, read coils, discrete inputs, and input registers
-- Global Continuous Read toggle that gates all periodic reads
-- Custom tab with per-row:
-  - Area: `HoldingRegister`, `Coil`, `InputRegister`, `DiscreteInput`
-  - Type: `uint`, `int`, `real` (32-bit float across 2 registers), `string` (2 chars per 16-bit register)
-  - On-demand Read/Write buttons
-  - Continuous Write (per-row)
-  - Live reads: when Global Continuous Read is ON, rows with `Trend` enabled are read at the trend sample rate and their `Value` updates in the grid
-  - Save/Load entries to JSON (`custom-entries.json`)
+### Connection Manager
+Access via **Options → Connection Manager**
+- Create, edit, and delete connection profiles
+- Each profile stores: Name, IP Address, Port, Unit ID
+- Connect/disconnect individual profiles
+- Set active connection for main window operations
+- Profiles saved to `%AppData%\ModbusForge\connection-profiles.json`
 
-- Logging/Trend
-  - Add/remove trend series per Custom row (`Trend` column)
-  - Adjustable retention window (1–60 minutes)
-  - Zoom and pan controls, play/pause live window, reset axes
-  - Export/Import CSV, export PNG
+### Script Editor
+Access via **Options → Script Editor**
+- **Supported Commands:**
+  - Read Holding Registers / Input Registers
+  - Read Coils / Discrete Inputs
+  - Write Single Register / Coil
+  - Delay (configurable milliseconds)
+  - Log messages
+- **Script Settings:**
+  - Repeat count for looping
+  - Delay between commands
+  - Stop on error option
+- **Output Log:** Real-time execution feedback
+
+### Preferences
+Access via **Options → Preferences**
+- Auto-reconnect on connection loss
+- Show diagnostics on connection error
+- Console logging settings
+- Confirm before exit
+- Settings saved to `%AppData%\ModbusForge\settings.json`
+
+### Custom Data Tab
+- **Area Types:** HoldingRegister, Coil, InputRegister, DiscreteInput
+- **Data Types:** uint, int, real (32-bit float), string
+- On-demand Read/Write buttons per row
+- Continuous Write mode per row
+- Live reads when Global Continuous Read is enabled
+- Save/Load configurations to JSON
+
+### Trend & Logging
+- Real-time trend charts with zoom/pan
+- Adjustable retention window (1–60 minutes)
+- Export to CSV or PNG
+- Console tab shows all Modbus operations
 
 ## Modes: Client vs Server
 
@@ -82,7 +136,7 @@ To install the application, follow these steps:
 
 ## Versioning
 
-- The window title displays the application version from the assembly ProductVersion (fallback to `v2.1.2`).
+- The window title displays the application version from the assembly ProductVersion (fallback to `v2.2.0`).
 
 ## Build and Release
 
@@ -111,7 +165,7 @@ dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-con
 4. Create a ZIP artifact:
 
 ```powershell
-$version = "2.1.2"
+$version = "2.2.0"
 Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
 # or for self-contained
 Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$version-win-x64-sc.zip -Force
@@ -120,7 +174,7 @@ Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$ve
 5. Tag and create a GitHub Release (optional):
 
 ```powershell
-$version = "2.1.2"
+$version = "2.2.0"
 git tag v$version
 git push origin v$version
 
@@ -303,13 +357,14 @@ If you encounter build issues:
   ```
   You can either stop that process or change the server port in the UI and try again.
 
-## Next Steps
+## Roadmap
 
-1. Wire server start/stop into UI commands
-2. Finalize UI refactors and tab UX polish
-3. Implement simulation function blocks and connectors
-4. Add comprehensive error handling and user feedback
-5. Add unit and integration tests
+- [ ] Batch operations for multiple registers
+- [ ] Enhanced logging with file export
+- [ ] Simulation function blocks (AND, OR, timers)
+- [ ] Visual block editor for simulation
+- [ ] Unit and integration tests
+- [ ] Code signing for installers
 
 ## License
 
