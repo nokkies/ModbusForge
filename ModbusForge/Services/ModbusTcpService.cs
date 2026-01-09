@@ -360,5 +360,143 @@ namespace ModbusForge.Services
         {
             Dispose(false);
         }
+
+        public async Task<ConnectionDiagnosticResult> RunDiagnosticsAsync(string ipAddress, int port, byte unitId)
+        {
+            var result = new ConnectionDiagnosticResult();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            // Step 1: Test raw TCP connection
+            TcpClient? testClient = null;
+            try
+            {
+                _logger.LogInformation($"Diagnostics: Testing TCP connection to {ipAddress}:{port}");
+                testClient = new TcpClient();
+                
+                // Use async connect with timeout
+                var connectTask = testClient.ConnectAsync(ipAddress, port);
+                if (await Task.WhenAny(connectTask, Task.Delay(5000)) != connectTask)
+                {
+                    result.TcpConnected = false;
+                    result.TcpError = "Connection timeout (5s) - host may be unreachable or port blocked by firewall";
+                    return result;
+                }
+
+                await connectTask; // Propagate any exception
+                result.TcpLatencyMs = (int)sw.ElapsedMilliseconds;
+                result.TcpConnected = true;
+                result.RemoteEndpoint = testClient.Client.RemoteEndPoint?.ToString() ?? ipAddress;
+                result.LocalEndpoint = testClient.Client.LocalEndPoint?.ToString() ?? "unknown";
+                _logger.LogInformation($"Diagnostics: TCP connected in {result.TcpLatencyMs}ms");
+            }
+            catch (SocketException sockEx)
+            {
+                result.TcpConnected = false;
+                result.TcpError = $"Socket error ({sockEx.SocketErrorCode}): {GetSocketErrorDescription(sockEx.SocketErrorCode)}";
+                _logger.LogWarning($"Diagnostics: TCP failed - {result.TcpError}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                result.TcpConnected = false;
+                result.TcpError = ex.Message;
+                _logger.LogWarning($"Diagnostics: TCP failed - {ex.Message}");
+                return result;
+            }
+
+            // Step 2: Test Modbus protocol communication
+            try
+            {
+                sw.Restart();
+                _logger.LogInformation($"Diagnostics: Testing Modbus protocol with Unit ID {unitId}");
+                
+                var master = ModbusIpMaster.CreateIp(testClient);
+                master.Transport.ReadTimeout = 5000;
+                master.Transport.WriteTimeout = 5000;
+
+                // Try to read a single holding register - this is the most basic Modbus operation
+                try
+                {
+                    var registers = master.ReadHoldingRegisters(unitId, 0, 1);
+                    result.ModbusLatencyMs = (int)sw.ElapsedMilliseconds;
+                    result.ModbusResponding = true;
+                    _logger.LogInformation($"Diagnostics: Modbus responded in {result.ModbusLatencyMs}ms, read value: {registers[0]}");
+                }
+                catch (Modbus.SlaveException slaveEx)
+                {
+                    // Slave responded with an exception - this means Modbus IS working, just the request was invalid
+                    result.ModbusLatencyMs = (int)sw.ElapsedMilliseconds;
+                    result.ModbusResponding = true; // Device responded, even if with error
+                    result.ModbusError = $"Device responded with exception code {slaveEx.SlaveExceptionCode}: {GetModbusExceptionDescription(slaveEx.SlaveExceptionCode)}";
+                    _logger.LogInformation($"Diagnostics: Modbus device responded with exception - {result.ModbusError}");
+                }
+                catch (IOException ioEx)
+                {
+                    result.ModbusResponding = false;
+                    if (ioEx.InnerException is SocketException innerSock)
+                    {
+                        result.ModbusError = $"Connection reset by device - {GetSocketErrorDescription(innerSock.SocketErrorCode)}. Device may have rejected the Modbus request or closed the connection.";
+                    }
+                    else
+                    {
+                        result.ModbusError = $"I/O error: {ioEx.Message}. Device may have closed the connection.";
+                    }
+                    _logger.LogWarning($"Diagnostics: Modbus I/O failed - {result.ModbusError}");
+                }
+                catch (TimeoutException)
+                {
+                    result.ModbusResponding = false;
+                    result.ModbusError = "Modbus timeout - device accepted TCP but did not respond to Modbus request. Check Unit ID or device may not support Modbus TCP.";
+                    _logger.LogWarning($"Diagnostics: Modbus timeout");
+                }
+
+                master.Dispose();
+            }
+            catch (Exception ex)
+            {
+                result.ModbusResponding = false;
+                result.ModbusError = ex.Message;
+                _logger.LogWarning($"Diagnostics: Modbus test failed - {ex.Message}");
+            }
+            finally
+            {
+                testClient?.Close();
+            }
+
+            return result;
+        }
+
+        private static string GetSocketErrorDescription(SocketError error)
+        {
+            return error switch
+            {
+                SocketError.ConnectionRefused => "Connection refused - no service listening on port or firewall blocking",
+                SocketError.HostUnreachable => "Host unreachable - check IP address and network connectivity",
+                SocketError.NetworkUnreachable => "Network unreachable - check network configuration",
+                SocketError.TimedOut => "Connection timed out - host not responding",
+                SocketError.ConnectionReset => "Connection reset by remote host",
+                SocketError.ConnectionAborted => "Connection aborted by local system",
+                SocketError.AddressNotAvailable => "Address not available - invalid IP address",
+                SocketError.HostNotFound => "Host not found - DNS resolution failed",
+                _ => error.ToString()
+            };
+        }
+
+        private static string GetModbusExceptionDescription(byte exceptionCode)
+        {
+            return exceptionCode switch
+            {
+                1 => "Illegal Function - function code not supported",
+                2 => "Illegal Data Address - address out of range or not mapped",
+                3 => "Illegal Data Value - value out of range",
+                4 => "Slave Device Failure - device internal error",
+                5 => "Acknowledge - request accepted, processing",
+                6 => "Slave Device Busy - device busy, retry later",
+                8 => "Memory Parity Error - device memory error",
+                10 => "Gateway Path Unavailable",
+                11 => "Gateway Target Device Failed to Respond",
+                _ => $"Unknown exception code {exceptionCode}"
+            };
+        }
     }
 }

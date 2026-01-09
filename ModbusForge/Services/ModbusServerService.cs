@@ -357,5 +357,26 @@ namespace ModbusForge.Services
                 _disposed = true;
             }
         }
+
+        public Task<ConnectionDiagnosticResult> RunDiagnosticsAsync(string ipAddress, int port, byte unitId)
+        {
+            // Server mode diagnostics - check if server is running and listening
+            var result = new ConnectionDiagnosticResult();
+            
+            if (_isRunning && _listener != null)
+            {
+                result.TcpConnected = true;
+                result.ModbusResponding = true;
+                result.LocalEndpoint = _listener.LocalEndpoint?.ToString() ?? $"0.0.0.0:{port}";
+                result.RemoteEndpoint = "Server Mode";
+            }
+            else
+            {
+                result.TcpConnected = false;
+                result.TcpError = "Server is not running";
+            }
+            
+            return Task.FromResult(result);
+        }
     }
 }

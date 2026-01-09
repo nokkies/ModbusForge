@@ -216,5 +216,17 @@ namespace ModbusForge.Services
                 _disposed = true;
             }
         }
+
+        public Task<ConnectionDiagnosticResult> RunDiagnosticsAsync(string ipAddress, int port, byte unitId)
+        {
+            // Simple implementation - just return current connection state
+            var result = new ConnectionDiagnosticResult
+            {
+                TcpConnected = IsConnected,
+                ModbusResponding = IsConnected,
+                TcpError = IsConnected ? string.Empty : "Not connected"
+            };
+            return Task.FromResult(result);
+        }
     }
 }

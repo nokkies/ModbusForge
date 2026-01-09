@@ -137,6 +137,7 @@ namespace ModbusForge.ViewModels
             ConnectCommand = new RelayCommand(async () => await ConnectAsync(), CanConnect);
             _disconnectCommand = new RelayCommand(async () => await DisconnectAsync(), CanDisconnect);
             DisconnectCommand = _disconnectCommand;
+            RunDiagnosticsCommand = new RelayCommand(async () => await RunDiagnosticsAsync());
             
             ReadRegistersCommand = new RelayCommand(async () => await ReadRegistersAsync(), () => IsConnected);
             WriteRegisterCommand = new RelayCommand(async () => await WriteRegisterAsync(), () => IsConnected);
@@ -189,14 +190,14 @@ namespace ModbusForge.ViewModels
                 }
                 else
                 {
-                    Title = "ModbusForge v2.1.2";
-                    Version = "2.1.2";
+                    Title = "ModbusForge v2.1.3";
+                    Version = "2.1.3";
                 }
             }
             catch
             {
-                Title = "ModbusForge v2.1.2";
-                Version = "2.1.2";
+                Title = "ModbusForge v2.1.3";
+                Version = "2.1.3";
             }
         }
 
@@ -380,6 +381,7 @@ namespace ModbusForge.ViewModels
 
         public ICommand ConnectCommand { get; private set; }
         public IRelayCommand DisconnectCommand { get; private set; }
+        public ICommand RunDiagnosticsCommand { get; private set; }
         public IRelayCommand ReadRegistersCommand { get; private set; }
         public IRelayCommand WriteRegisterCommand { get; private set; }
         public IRelayCommand ReadCoilsCommand { get; private set; }
@@ -627,6 +629,80 @@ namespace ModbusForge.ViewModels
             }
         }
 
+        private async Task RunDiagnosticsAsync()
+        {
+            try
+            {
+                StatusMessage = "Running diagnostics...";
+                _consoleLoggerService.Log($"=== Connection Diagnostics ===");
+                _consoleLoggerService.Log($"Target: {ServerAddress}:{Port}, Unit ID: {UnitId}");
+
+                var result = await _modbusService.RunDiagnosticsAsync(ServerAddress, Port, UnitId);
+
+                _consoleLoggerService.Log($"TCP Connection: {(result.TcpConnected ? "OK" : "FAILED")}");
+                if (result.TcpConnected)
+                {
+                    _consoleLoggerService.Log($"  Local: {result.LocalEndpoint}");
+                    _consoleLoggerService.Log($"  Remote: {result.RemoteEndpoint}");
+                    _consoleLoggerService.Log($"  Latency: {result.TcpLatencyMs}ms");
+                }
+                else if (!string.IsNullOrEmpty(result.TcpError))
+                {
+                    _consoleLoggerService.Log($"  Error: {result.TcpError}");
+                }
+
+                if (result.TcpConnected)
+                {
+                    _consoleLoggerService.Log($"Modbus Protocol: {(result.ModbusResponding ? "OK" : "FAILED")}");
+                    if (result.ModbusResponding)
+                        _consoleLoggerService.Log($"  Latency: {result.ModbusLatencyMs}ms");
+                    if (!string.IsNullOrEmpty(result.ModbusError))
+                        _consoleLoggerService.Log($"  Note: {result.ModbusError}");
+                }
+
+                _consoleLoggerService.Log($"=== Result: {result.Summary} ===");
+                StatusMessage = result.Summary;
+
+                var icon = result.IsFullyConnected ? MessageBoxImage.Information : 
+                           result.TcpConnected ? MessageBoxImage.Warning : MessageBoxImage.Error;
+                
+                var details = new StringBuilder();
+                details.AppendLine($"Target: {ServerAddress}:{Port}");
+                details.AppendLine($"Unit ID: {UnitId}");
+                details.AppendLine();
+                details.AppendLine($"TCP Connection: {(result.TcpConnected ? "Success" : "Failed")}");
+                if (result.TcpConnected)
+                {
+                    details.AppendLine($"  Latency: {result.TcpLatencyMs}ms");
+                    details.AppendLine($"  Local: {result.LocalEndpoint}");
+                    details.AppendLine($"  Remote: {result.RemoteEndpoint}");
+                }
+                else
+                {
+                    details.AppendLine($"  Error: {result.TcpError}");
+                }
+                
+                if (result.TcpConnected)
+                {
+                    details.AppendLine();
+                    details.AppendLine($"Modbus Protocol: {(result.ModbusResponding ? "Success" : "Failed")}");
+                    if (result.ModbusResponding)
+                        details.AppendLine($"  Latency: {result.ModbusLatencyMs}ms");
+                    if (!string.IsNullOrEmpty(result.ModbusError))
+                        details.AppendLine($"  {result.ModbusError}");
+                }
+
+                MessageBox.Show(details.ToString(), "Connection Diagnostics", MessageBoxButton.OK, icon);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Diagnostics error: {ex.Message}";
+                _consoleLoggerService.Log($"Diagnostics failed: {ex.Message}");
+                _logger.LogError(ex, "Error running diagnostics");
+                MessageBox.Show($"Diagnostics failed: {ex.Message}", "Diagnostics Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private async Task ReadRegistersAsync()
         {
             try
@@ -788,6 +864,7 @@ namespace ModbusForge.ViewModels
             {
                 StatusMessage = "Reading coils...";
                 _consoleLoggerService.Log($"Reading {CoilCount} coils from address {CoilStart}");
+
                 var states = await _modbusService.ReadCoilsAsync(UnitId, CoilStart, CoilCount);
                 if (states is null)
                 {

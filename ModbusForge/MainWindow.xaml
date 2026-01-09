@@ -159,6 +159,9 @@
                 <StackPanel Grid.Column="9" Orientation="Horizontal">
                     <Button Content="Disconnect" Command="{Binding DisconnectCommand}" 
                             IsEnabled="{Binding IsConnected}"
+                            Width="80" Margin="0,0,5,0"/>
+                    <Button Content="Diagnostics" Command="{Binding RunDiagnosticsCommand}" 
+                            ToolTip="Test TCP and Modbus connectivity"
                             Width="80"/>
                 </StackPanel>
             </Grid>

@@ -1,4 +1,4 @@
-# ModbusForge v2.1.2
+# ModbusForge v2.1.3
 
 Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 
@@ -144,6 +144,11 @@ This project uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create a si
    The installer will be created in the `installers` directory.
 
 ## Changelog
+
+- 2.1.3 (2025-01-09)
+  - Added connection diagnostics feature - test TCP and Modbus connectivity separately
+  - Diagnostics button shows detailed connection status with latency measurements
+  - Helps identify if connection issues are at TCP level or Modbus protocol level
 
 - 2.1.2 (2025-01-09)
   - Removed Unit ID clamping restriction - now allows full byte range 0-255 for compatibility with devices like Micro850
