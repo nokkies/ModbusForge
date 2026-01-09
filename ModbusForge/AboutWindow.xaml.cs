@@ -30,7 +30,7 @@ namespace ModbusForge
                 }
             }
             catch { }
-            VersionText.Text = !string.IsNullOrWhiteSpace(ver) ? $"ModbusForge v{ver}" : "ModbusForge v1.2.0";
+            VersionText.Text = !string.IsNullOrWhiteSpace(ver) ? $"ModbusForge v{ver}" : "ModbusForge v2.1.2";
         }
 
         private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)

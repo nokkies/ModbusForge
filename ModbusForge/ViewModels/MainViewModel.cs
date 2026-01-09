@@ -189,14 +189,14 @@ namespace ModbusForge.ViewModels
                 }
                 else
                 {
-                    Title = "ModbusForge v2.1.1";
-                    Version = "2.1.1";
+                    Title = "ModbusForge v2.1.2";
+                    Version = "2.1.2";
                 }
             }
             catch
             {
-                Title = "ModbusForge v2.1.1";
-                Version = "2.1.1";
+                Title = "ModbusForge v2.1.2";
+                Version = "2.1.2";
             }
         }
 
@@ -988,22 +988,13 @@ namespace ModbusForge.ViewModels
             }
         }
 
-        // Clamp UnitId to Modbus spec range 1..247
+        // Allow full byte range 0..255 for Unit ID (some devices like Micro850 require 0 or 255)
         partial void OnUnitIdChanged(byte value)
         {
-            byte clamped = value;
-            if (value < 1) clamped = 1;
-            else if (value > 247) clamped = 247;
-
-            if (clamped != value)
-            {
-                _logger.LogWarning("UnitId {Original} is out of range. Clamping to {Clamped}.", value, clamped);
-                // Reassign to trigger update only when necessary
-                UnitId = clamped;
-            }
+            // No clamping - allow any valid byte value (0-255)
+            _logger.LogDebug("UnitId changed to {Value}.", value);
         }
     }
-
 
     // Extensions to support the Custom tab logic within the ViewModel partial class
     public partial class MainViewModel

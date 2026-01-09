@@ -1,4 +1,4 @@
-# ModbusForge v2.1.0
+# ModbusForge v2.1.2
 
 Modbus TCP client/server WPF application built with .NET 8.0 (Windows, WPF).
 
@@ -82,7 +82,7 @@ To install the application, follow these steps:
 
 ## Versioning
 
-- The window title displays the application version from the assembly ProductVersion (fallback to `v2.1.0`).
+- The window title displays the application version from the assembly ProductVersion (fallback to `v2.1.2`).
 
 ## Build and Release
 
@@ -111,7 +111,7 @@ dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-con
 4. Create a ZIP artifact:
 
 ```powershell
-$version = "2.1.0"
+$version = "2.1.2"
 Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
 # or for self-contained
 Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$version-win-x64-sc.zip -Force
@@ -120,7 +120,7 @@ Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$ve
 5. Tag and create a GitHub Release (optional):
 
 ```powershell
-$version = "2.1.0"
+$version = "2.1.2"
 git tag v$version
 git push origin v$version
 
@@ -144,6 +144,17 @@ This project uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create a si
    The installer will be created in the `installers` directory.
 
 ## Changelog
+
+- 2.1.2 (2025-01-09)
+  - Removed Unit ID clamping restriction - now allows full byte range 0-255 for compatibility with devices like Micro850
+
+- 2.1.1 (2025-10-24)
+  - Added heartbeat monitoring for reliable connection loss detection
+  - Enhanced socket polling in ModbusTcpService for immediate disconnection detection
+  - Improved localhost connection handling and reliability
+  - Status bar version now automatically syncs with assembly version
+  - Fixed continuous polling pause on errors
+  - Optimized color lookup performance in trend charts
 
 - 2.1.0 (2025-10-23)
   - Added console logging tab for real-time monitoring of all Modbus operations
