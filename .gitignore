@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Release artifacts (built by CI, not tracked in repo)
+ModbusForge-*.zip
+ModbusForge-*.zip.sha256
+ModbusForge-*.msix
+installers/
