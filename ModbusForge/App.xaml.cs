@@ -69,6 +69,7 @@ namespace ModbusForge
             services.AddSingleton<ICustomEntryService, CustomEntryService>();
             services.AddSingleton<IConsoleLoggerService, ConsoleLoggerService>();
             services.AddSingleton<ISettingsService, SettingsService>();
+            services.AddSingleton<IConnectionManager, ConnectionManager>();
             
             // Register ViewModels
             services.AddSingleton<MainViewModel>();

@@ -77,6 +77,19 @@ namespace ModbusForge
             }
         }
 
+        private void MenuItem_ConnectionManager_Click(object sender, RoutedEventArgs e)
+        {
+            var connectionManager = App.ServiceProvider.GetService(typeof(IConnectionManager)) as IConnectionManager;
+            if (connectionManager != null)
+            {
+                var connectionManagerWindow = new ConnectionManagerWindow(connectionManager)
+                {
+                    Owner = this
+                };
+                connectionManagerWindow.ShowDialog();
+            }
+        }
+
         private void Trend_ExportPng_Click(object sender, RoutedEventArgs e)
         {
             try
