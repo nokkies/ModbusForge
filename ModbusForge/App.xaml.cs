@@ -70,6 +70,7 @@ namespace ModbusForge
             services.AddSingleton<IConsoleLoggerService, ConsoleLoggerService>();
             services.AddSingleton<ISettingsService, SettingsService>();
             services.AddSingleton<IConnectionManager, ConnectionManager>();
+            services.AddSingleton<IScriptRunner, ScriptRunner>();
             
             // Register ViewModels
             services.AddSingleton<MainViewModel>();

@@ -90,6 +90,24 @@ namespace ModbusForge
             }
         }
 
+        private void MenuItem_ScriptEditor_Click(object sender, RoutedEventArgs e)
+        {
+            var scriptRunner = App.ServiceProvider.GetService(typeof(IScriptRunner)) as IScriptRunner;
+            if (scriptRunner != null)
+            {
+                // Get the current Modbus service and unit ID from the view model
+                var modbusService = _viewModel.IsConnected ? 
+                    (App.ServiceProvider.GetService(typeof(ModbusTcpService)) as IModbusService) : null;
+                var unitId = _viewModel.UnitId;
+                
+                var scriptEditorWindow = new ScriptEditorWindow(scriptRunner, modbusService, unitId)
+                {
+                    Owner = this
+                };
+                scriptEditorWindow.Show();
+            }
+        }
+
         private void Trend_ExportPng_Click(object sender, RoutedEventArgs e)
         {
             try

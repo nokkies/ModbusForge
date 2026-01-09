@@ -114,6 +114,8 @@
             <MenuItem Header="_Options">
                 <MenuItem Header="_Preferences..." Click="MenuItem_Preferences_Click"/>
                 <MenuItem Header="_Connection Manager..." Click="MenuItem_ConnectionManager_Click"/>
+                <Separator/>
+                <MenuItem Header="_Script Editor..." Click="MenuItem_ScriptEditor_Click"/>
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_Donate..." Click="MenuItem_Donate_Click"/>
