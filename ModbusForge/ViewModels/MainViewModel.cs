@@ -190,14 +190,14 @@ namespace ModbusForge.ViewModels
                 }
                 else
                 {
-                    Title = "ModbusForge v2.1.3";
-                    Version = "2.1.3";
+                    Title = "ModbusForge v2.2.0";
+                    Version = "2.2.0";
                 }
             }
             catch
             {
-                Title = "ModbusForge v2.1.3";
-                Version = "2.1.3";
+                Title = "ModbusForge v2.2.0";
+                Version = "2.2.0";
             }
         }
 

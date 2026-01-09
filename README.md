@@ -145,6 +145,13 @@ This project uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create a si
 
 ## Changelog
 
+- 2.2.0 (2025-01-09)
+  - **Options Menu**: Added Preferences dialog for application settings persistence
+  - **Multi-Device Connections**: New Connection Manager for managing multiple Modbus server connections simultaneously
+  - **Scripting/Automation**: Script Editor for creating and running automated test sequences
+  - **UI Modernization**: Enhanced theme with modern styles, animations for TextBox, GroupBox, TabItem controls
+  - Connection profiles are saved and restored between sessions
+
 - 2.1.3 (2025-01-09)
   - Added connection diagnostics feature - test TCP and Modbus connectivity separately
   - Diagnostics button shows detailed connection status with latency measurements
