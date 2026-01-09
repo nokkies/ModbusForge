@@ -9,6 +9,7 @@ using Microsoft.Win32;
 using System.IO;
 using System.Diagnostics;
 using ModbusForge.Models;
+using ModbusForge.Services;
 using MahApps.Metro.Controls;
 
 namespace ModbusForge
@@ -63,6 +64,18 @@ namespace ModbusForge
             }
         }
 
+        private void MenuItem_Preferences_Click(object sender, RoutedEventArgs e)
+        {
+            var settingsService = App.ServiceProvider.GetService(typeof(ISettingsService)) as ISettingsService;
+            if (settingsService != null)
+            {
+                var preferencesWindow = new PreferencesWindow(settingsService)
+                {
+                    Owner = this
+                };
+                preferencesWindow.ShowDialog();
+            }
+        }
 
         private void Trend_ExportPng_Click(object sender, RoutedEventArgs e)
         {

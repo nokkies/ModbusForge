@@ -111,6 +111,9 @@
                 <MenuItem Header="Export _PNG..." Click="Trend_ExportPng_Click"/>
                 <MenuItem Header="_Import CSV..." Click="Trend_ImportCsv_Click"/>
             </MenuItem>
+            <MenuItem Header="_Options">
+                <MenuItem Header="_Preferences..." Click="MenuItem_Preferences_Click"/>
+            </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_Donate..." Click="MenuItem_Donate_Click"/>
                 <MenuItem Header="_About" Click="MenuItem_About_Click"/>
