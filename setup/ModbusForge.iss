@@ -28,8 +28,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 ; These files are expected to be in a 'publish' directory relative to the project root.
 ; The Inno Setup compiler should be run from the project root directory.
-Source: "..\publish\win-x64\ModbusForge.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\publish\win-x64\appsettings.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\publish\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\ModbusForge"; Filename: "{app}\ModbusForge.exe"
