@@ -120,10 +120,30 @@ jobs:
           }
 
       - name: Build Inno Setup Installer
-        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
-        with:
-          path: setup/ModbusForge.iss
-          options: /DAppVersion=${{ steps.version.outputs.version }}
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          # Download and install Inno Setup if not available
+          $innoUrl = 'https://jrsoftware.org/download.php/is.exe'
+          $innoInstaller = "$env:TEMP\innosetup.exe"
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) {
+            Write-Host "Downloading Inno Setup..."
+            Invoke-WebRequest -Uri $innoUrl -OutFile $innoInstaller
+            Write-Host "Installing Inno Setup..."
+            Start-Process -FilePath $innoInstaller -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-' -Wait
+            $env:PATH += ";${env:ProgramFiles(x86)}\Inno Setup 6"
+          }
+          # Build installer
+          Write-Host "Building installer with version $version..."
+          & iscc /DAppVersion=$version setup\ModbusForge.iss
+          # List output
+          if (Test-Path .\installers) {
+            Write-Host "Installer created:"
+            Get-ChildItem .\installers\*.exe | Select-Object Name,Length
+          } else {
+            Write-Host "ERROR: installers directory not found!"
+            exit 1
+          }
 
       - name: Create MSIX package (optional)
         if: ${{ always() }}
