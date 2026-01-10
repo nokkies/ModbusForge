@@ -46,13 +46,13 @@ namespace ModbusForge.Services
         Task<ConnectionDiagnosticResult> RunDiagnosticsAsync(string ipAddress, int port, byte unitId);
         
         // Modbus operations
-        Task<ushort[]> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count);
-        Task<ushort[]> ReadInputRegistersAsync(byte unitId, int startAddress, int count);
+        Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count);
+        Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count);
         Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value);
 
         // Coil operations
-        Task<bool[]> ReadCoilsAsync(byte unitId, int startAddress, int count);
-        Task<bool[]> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count);
+        Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count);
+        Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count);
         Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value);
     }
 }

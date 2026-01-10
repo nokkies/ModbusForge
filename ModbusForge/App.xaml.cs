@@ -1,16 +1,13 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using ModbusForge.Models;
-using ModbusForge.Services;
-using ModbusForge.ViewModels;
 using System;
 using System.IO;
-using System.Globalization;
 using System.Windows;
-using System.Windows.Data;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ModbusForge.Configuration;
+using ModbusForge.Services;
+using ModbusForge.ViewModels;
 
 namespace ModbusForge
 {

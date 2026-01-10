@@ -190,14 +190,14 @@ namespace ModbusForge.ViewModels
                 }
                 else
                 {
-                    Title = "ModbusForge v2.2.2";
-                    Version = "2.2.2";
+                    Title = "ModbusForge v2.3.0";
+                    Version = "2.3.0";
                 }
             }
             catch
             {
-                Title = "ModbusForge v2.2.2";
-                Version = "2.2.2";
+                Title = "ModbusForge v2.3.0";
+                Version = "2.3.0";
             }
         }
 
@@ -1031,11 +1031,21 @@ namespace ModbusForge.ViewModels
                     catch { }
                     try
                     {
-                        // Attempt a graceful disconnect to avoid in-flight I/O errors
-                        _modbusService?.DisconnectAsync().GetAwaiter().GetResult();
+                        // Attempt a graceful disconnect with timeout to avoid freezing
+                        if (_modbusService != null && IsConnected)
+                        {
+                            var disconnectTask = _modbusService.DisconnectAsync();
+                            if (!disconnectTask.Wait(TimeSpan.FromSeconds(2)))
+                            {
+                                _logger.LogWarning("Disconnect timed out during disposal");
+                            }
+                        }
                         IsConnected = false;
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error during disconnect in Dispose");
+                    }
                     _modbusService?.Dispose();
                 }
                 _disposed = true;

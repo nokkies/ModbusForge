@@ -26,7 +26,7 @@ namespace ModbusForge.Services
             _logger.LogInformation("Modbus TCP client created");
         }
 
-        public async Task<ushort[]> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
+        public async Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
         {
             if (!IsConnected)
                 return null;
@@ -41,7 +41,8 @@ namespace ModbusForge.Services
                         _logger.LogDebug($"Reading {count} input registers starting at {startAddress} (Unit ID: {unitId})");
                         // NModbus uses 0-based protocol addresses, convert from 1-based UI address
                         ushort protocolAddress = (ushort)(startAddress > 0 ? startAddress - 1 : 0);
-                        var registers = _client.ReadInputRegisters(unitId, protocolAddress, (ushort)count);
+                        var registers = _client?.ReadInputRegisters(unitId, protocolAddress, (ushort)count);
+                        if (registers == null) return Array.Empty<ushort>();
                         return registers;
                     }
                     catch (Exception ex)
@@ -58,7 +59,7 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task<bool[]> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
+        public async Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
         {
             if (!IsConnected)
                 return null;
@@ -73,7 +74,8 @@ namespace ModbusForge.Services
                         _logger.LogDebug($"Reading {count} discrete inputs starting at {startAddress} (Unit ID: {unitId})");
                         // NModbus uses 0-based protocol addresses, convert from 1-based UI address
                         ushort protocolAddress = (ushort)(startAddress > 0 ? startAddress - 1 : 0);
-                        var inputs = _client.ReadInputs(unitId, protocolAddress, (ushort)count);
+                        var inputs = _client?.ReadInputs(unitId, protocolAddress, (ushort)count);
+                        if (inputs == null) return Array.Empty<bool>();
                         return inputs;
                     }
                     catch (Exception ex)
@@ -189,7 +191,7 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task<ushort[]> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count)
+        public async Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count)
         {
             if (!IsConnected)
                 return null;
@@ -204,7 +206,8 @@ namespace ModbusForge.Services
                         _logger.LogDebug($"Reading {count} holding registers starting at {startAddress} (Unit ID: {unitId})");
                         // NModbus uses 0-based protocol addresses, convert from 1-based UI address
                         ushort protocolAddress = (ushort)(startAddress > 0 ? startAddress - 1 : 0);
-                        var registers = _client.ReadHoldingRegisters(unitId, protocolAddress, (ushort)count);
+                        var registers = _client?.ReadHoldingRegisters(unitId, protocolAddress, (ushort)count);
+                        if (registers == null) return Array.Empty<ushort>();
                         return registers;
                     }
                     catch (Exception ex)
@@ -235,7 +238,7 @@ namespace ModbusForge.Services
                     {
                         // NModbus uses 0-based protocol addresses, convert from 1-based UI address
                         ushort protocolAddress = (ushort)(registerAddress > 0 ? registerAddress - 1 : 0);
-                        _client.WriteSingleRegister(unitId, protocolAddress, value);
+                        _client?.WriteSingleRegister(unitId, protocolAddress, value);
                     }
                     catch (Exception ex)
                     {
@@ -250,7 +253,7 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task<bool[]> ReadCoilsAsync(byte unitId, int startAddress, int count)
+        public async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
         {
             if (!IsConnected)
                 return null;
@@ -265,7 +268,8 @@ namespace ModbusForge.Services
                         _logger.LogDebug($"Reading {count} coils starting at {startAddress} (Unit ID: {unitId})");
                         // NModbus uses 0-based protocol addresses, convert from 1-based UI address
                         ushort protocolAddress = (ushort)(startAddress > 0 ? startAddress - 1 : 0);
-                        var coils = _client.ReadCoils(unitId, protocolAddress, (ushort)count);
+                        var coils = _client?.ReadCoils(unitId, protocolAddress, (ushort)count);
+                        if (coils == null) return Array.Empty<bool>();
                         return coils;
                     }
                     catch (Exception ex)
@@ -297,7 +301,7 @@ namespace ModbusForge.Services
                         _logger.LogDebug($"Writing coil at {coilAddress} = {value} (Unit ID: {unitId})");
                         // NModbus uses 0-based protocol addresses, convert from 1-based UI address
                         ushort protocolAddress = (ushort)(coilAddress > 0 ? coilAddress - 1 : 0);
-                        _client.WriteSingleCoil(unitId, protocolAddress, value);
+                        _client?.WriteSingleCoil(unitId, protocolAddress, value);
                     }
                     catch (Exception ex)
                     {

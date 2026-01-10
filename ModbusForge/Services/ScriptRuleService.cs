@@ -203,12 +203,12 @@ namespace ModbusForge.Services
             // Compare based on operator
             return rule.TriggerOperator switch
             {
-                "Equals" => CompareValues(currentValue, triggerValueObj, (a, b) => a.Equals(b)),
-                "NotEquals" => CompareValues(currentValue, triggerValueObj, (a, b) => !a.Equals(b)),
-                "GreaterThan" => CompareNumericValues(currentValue, triggerValueObj, (a, b) => a > b),
-                "LessThan" => CompareNumericValues(currentValue, triggerValueObj, (a, b) => a < b),
-                "GreaterThanOrEqual" => CompareNumericValues(currentValue, triggerValueObj, (a, b) => a >= b),
-                "LessThanOrEqual" => CompareNumericValues(currentValue, triggerValueObj, (a, b) => a <= b),
+                "Equals" => CompareValues(currentValue, triggerValueObj ?? new object(), (a, b) => a.Equals(b)),
+                "NotEquals" => CompareValues(currentValue, triggerValueObj ?? new object(), (a, b) => !a.Equals(b)),
+                "GreaterThan" => CompareNumericValues(currentValue, triggerValueObj ?? new object(), (a, b) => a > b),
+                "LessThan" => CompareNumericValues(currentValue, triggerValueObj ?? new object(), (a, b) => a < b),
+                "GreaterThanOrEqual" => CompareNumericValues(currentValue, triggerValueObj ?? new object(), (a, b) => a >= b),
+                "LessThanOrEqual" => CompareNumericValues(currentValue, triggerValueObj ?? new object(), (a, b) => a <= b),
                 _ => false
             };
         }

@@ -10,11 +10,23 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <AssemblyName>ModbusForge</AssemblyName>
     <RootNamespace>ModbusForge</RootNamespace>
-    <Version>2.2.2</Version>
-    <AssemblyVersion>2.2.2.0</AssemblyVersion>
-    <FileVersion>2.2.2.0</FileVersion>
+    <Version>2.3.0</Version>
+    <AssemblyVersion>2.3.0.0</AssemblyVersion>
+    <FileVersion>2.3.0.0</FileVersion>
     <LangVersion>12.0</LangVersion>
     <ApplicationIcon>Resources\ModbusForge.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- Suppress package compatibility warnings for legacy packages -->
+  <ItemGroup>
+    <PackageReference Include="NModbus4" Version="2.0.5516.31020" />
+    <PackageReference Include="OpenTK" Version="3.3.1" />
+    <PackageReference Include="OpenTK.GLWpfControl" Version="3.3.0" />
+  </ItemGroup>
+
+  <!-- Suppress NU1701 warnings for package compatibility -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
 
   
@@ -32,7 +44,6 @@
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.0" />
-    <PackageReference Include="NModbus4" Version="2.0.0" />
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />

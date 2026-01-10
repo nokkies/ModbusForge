@@ -15,7 +15,11 @@ namespace ModbusForge
             try
             {
                 var asm = Application.ResourceAssembly ?? Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+                #if !NET5_0_OR_GREATER || !SINGLE_FILE
                 var asmPath = asm?.Location;
+                #else
+                var asmPath = null;
+                #endif
                 if (!string.IsNullOrWhiteSpace(asmPath))
                 {
                     ver = FileVersionInfo.GetVersionInfo(asmPath)?.ProductVersion;

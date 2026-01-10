@@ -31,12 +31,12 @@ namespace ModbusForge.Services
             _logger.LogInformation("Modbus TCP server created");
         }
 
-        public Task<ushort[]> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
+        public async Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
         {
             if (!_isRunning)
                 throw new InvalidOperationException("Modbus server is not running");
 
-            return Task.Run(() =>
+            return await Task.Run(() =>
             {
                 _logger.LogDebug($"Reading {count} input registers starting at {startAddress} (Unit ID: {unitId})");
 
@@ -59,17 +59,17 @@ namespace ModbusForge.Services
             });
         }
 
-        public Task<bool[]> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
+        public async Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
         {
             if (!_isRunning)
                 throw new InvalidOperationException("Modbus server is not running");
 
-            return Task.Run(() =>
+            return await Task.Run(() =>
             {
                 _logger.LogDebug($"Reading {count} discrete inputs starting at {startAddress} (Unit ID: {unitId})");
 
-                var inputs = _dataStore.InputDiscretes;
-                if (startAddress < 1 || count < 0 || startAddress + count - 1 > inputs.Count)
+                var inputs = _dataStore?.InputDiscretes;
+                if (inputs == null || startAddress < 1 || count < 0 || startAddress + count - 1 > inputs.Count)
                     throw new ArgumentOutOfRangeException(nameof(startAddress), "Requested discrete input range is out of bounds");
 
                 var result = new bool[count];
@@ -83,9 +83,9 @@ namespace ModbusForge.Services
 
         public bool IsConnected => _isRunning;
 
-        public Task<bool> ConnectAsync(string ipAddress, int port)
+        public async Task<bool> ConnectAsync(string ipAddress, int port)
         {
-            return Task.Run(() =>
+            return await Task.Run(() =>
             {
                 lock (_stateLock)
                 {
@@ -104,9 +104,10 @@ namespace ModbusForge.Services
                     {
                         _dataStore.HoldingRegisters.Add(0);
                     }
-                    
-                    // Initialize input registers to support addresses up to 10000
-                    for (int i = 0; i < 10000; i++)
+                                         
+
+                        // Initialize input registers to support addresses up to 10000
+                        for (int i = 0; i < 10000; i++)
                     {
                         _dataStore.InputRegisters.Add(0);
                     }
@@ -196,9 +197,9 @@ namespace ModbusForge.Services
             }
         }
 
-        public Task DisconnectAsync()
+        public async Task DisconnectAsync()
         {
-            return Task.Run(() =>
+            await Task.Run(() =>
             {
                 lock (_stateLock)
                 {
@@ -230,17 +231,17 @@ namespace ModbusForge.Services
             });
         }
 
-        public Task<ushort[]> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count)
+        public async Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count)
         {
             if (!_isRunning)
                 throw new InvalidOperationException("Modbus server is not running");
 
-            return Task.Run(() =>
+            return await Task.Run(() =>
             {
                 _logger.LogDebug($"Reading {count} holding registers starting at {startAddress} (Unit ID: {unitId})");
 
-                var registers = _dataStore.HoldingRegisters;
-                if (startAddress < 1 || count < 0 || startAddress + count - 1 > registers.Count)
+                var registers = _dataStore?.HoldingRegisters;
+                if (registers == null || startAddress < 1 || count < 0 || startAddress + count - 1 > registers.Count)
                     throw new ArgumentOutOfRangeException(nameof(startAddress), "Requested range is out of bounds");
 
                 var result = new ushort[count];
@@ -252,19 +253,19 @@ namespace ModbusForge.Services
             });
         }
 
-        public Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
+        public async Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
         {
             if (!_isRunning)
                 throw new InvalidOperationException("Modbus server is not running");
 
-            return Task.Run(() =>
+            await Task.Run(() =>
             {
                 try
                 {
                     _logger.LogDebug($"Writing value {value} to register {registerAddress} (Unit ID: {unitId})");
 
-                    var registers = _dataStore.HoldingRegisters;
-                    if (registerAddress < 1 || registerAddress > registers.Count)
+                    var registers = _dataStore?.HoldingRegisters;
+                    if (registers == null || registerAddress < 1 || registerAddress > registers.Count)
                         throw new ArgumentOutOfRangeException(nameof(registerAddress), "Register address is out of range");
 
                     registers[(ushort)registerAddress] = value;
@@ -278,17 +279,17 @@ namespace ModbusForge.Services
             });
         }
 
-        public Task<bool[]> ReadCoilsAsync(byte unitId, int startAddress, int count)
+        public async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
         {
             if (!_isRunning)
                 throw new InvalidOperationException("Modbus server is not running");
 
-            return Task.Run(() =>
+            return await Task.Run(() =>
             {
                 _logger.LogDebug($"Reading {count} coils starting at {startAddress} (Unit ID: {unitId})");
 
-                var coils = _dataStore.CoilDiscretes;
-                if (startAddress < 1 || count < 0 || startAddress + count - 1 > coils.Count)
+                var coils = _dataStore?.CoilDiscretes;
+                if (coils == null || startAddress < 1 || count < 0 || startAddress + count - 1 > coils.Count)
                     throw new ArgumentOutOfRangeException(nameof(startAddress), "Requested coil range is out of bounds");
 
                 var result = new bool[count];
@@ -311,8 +312,8 @@ namespace ModbusForge.Services
                 {
                     _logger.LogDebug($"Writing coil at {coilAddress} = {value} (Unit ID: {unitId})");
 
-                    var coils = _dataStore.CoilDiscretes;
-                    if (coilAddress < 1 || coilAddress > coils.Count)
+                    var coils = _dataStore?.CoilDiscretes;
+                    if (coils == null || coilAddress < 1 || coilAddress > coils.Count)
                         throw new ArgumentOutOfRangeException(nameof(coilAddress), "Coil address is out of range");
 
                     coils[(ushort)coilAddress] = value;
