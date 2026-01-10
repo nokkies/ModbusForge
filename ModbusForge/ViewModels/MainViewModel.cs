@@ -41,6 +41,8 @@ namespace ModbusForge.ViewModels
         private readonly ConnectionCoordinator _connectionCoordinator;
         private readonly RegisterCoordinator _registerCoordinator;
         private readonly CustomEntryCoordinator _customEntryCoordinator;
+        private readonly TrendCoordinator _trendCoordinator;
+        private readonly ConfigurationCoordinator _configurationCoordinator;
         private bool _disposed = false;
         // Mode-aware UI helpers
 
@@ -60,7 +62,9 @@ namespace ModbusForge.ViewModels
             App.ServiceProvider.GetRequiredService<IConsoleLoggerService>(),
             App.ServiceProvider.GetRequiredService<ConnectionCoordinator>(),
             App.ServiceProvider.GetRequiredService<RegisterCoordinator>(),
-            App.ServiceProvider.GetRequiredService<CustomEntryCoordinator>())
+            App.ServiceProvider.GetRequiredService<CustomEntryCoordinator>(),
+            App.ServiceProvider.GetRequiredService<TrendCoordinator>(),
+            App.ServiceProvider.GetRequiredService<ConfigurationCoordinator>())
         {
         }
 
@@ -76,7 +80,7 @@ namespace ModbusForge.ViewModels
             StatusMessage = $"Read {snapshot.Count} custom entries";
         }
 
-        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ISimulationService simulationService, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator)
+        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ISimulationService simulationService, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator)
         {
             // Store dependencies
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
@@ -89,6 +93,8 @@ namespace ModbusForge.ViewModels
             _connectionCoordinator = connectionCoordinator ?? throw new ArgumentNullException(nameof(connectionCoordinator));
             _registerCoordinator = registerCoordinator ?? throw new ArgumentNullException(nameof(registerCoordinator));
             _customEntryCoordinator = customEntryCoordinator ?? throw new ArgumentNullException(nameof(customEntryCoordinator));
+            _trendCoordinator = trendCoordinator ?? throw new ArgumentNullException(nameof(trendCoordinator));
+            _configurationCoordinator = configurationCoordinator ?? throw new ArgumentNullException(nameof(configurationCoordinator));
             var settings = options?.Value ?? new ServerSettings();
 
             // Initialize in logical order
@@ -380,7 +386,6 @@ namespace ModbusForge.ViewModels
         private readonly ITrendLogger _trendLogger;
         private readonly ICustomEntryService _customEntryService;
         private bool _isMonitoring;
-        private bool _isTrending;
         private readonly ISimulationService _simulationService;
         private DateTime _lastHoldingReadUtc = DateTime.MinValue;
         private DateTime _lastInputRegReadUtc = DateTime.MinValue;
@@ -1138,66 +1143,15 @@ namespace ModbusForge.ViewModels
 
         private async void TrendTimer_Tick(object? sender, EventArgs e)
         {
-            if (_isTrending) return;
             if (!IsConnected) return;
             if (!GlobalMonitorEnabled) return;
 
-            var snapshot = CustomEntries.Where(c => c.Trend).ToList();
-            if (snapshot.Count == 0) return;
-
-            _isTrending = true;
-            try
-            {
-                var now = DateTime.UtcNow;
-                int errorCount = 0;
-                foreach (var ce in snapshot)
-                {
-                    try
-                    {
-                        var val = await ReadValueForTrendAsync(ce);
-                        if (val.HasValue)
-                        {
-                            _trendLogger.Publish(GetTrendKey(ce), val.Value, now);
-                            var area = (ce.Area ?? "HoldingRegister").ToLowerInvariant();
-                            var type = (ce.Type ?? "uint").ToLowerInvariant();
-                            string display;
-                            if (area == "coil" || area == "discreteinput")
-                            {
-                                display = val.Value != 0.0 ? "1" : "0";
-                            }
-                            else if (type == "real")
-                            {
-                                display = val.Value.ToString("G9", CultureInfo.InvariantCulture);
-                            }
-                            else if (type == "int")
-                            {
-                                display = ((short)val.Value).ToString(CultureInfo.InvariantCulture);
-                            }
-                            else
-                            {
-                                display = ((ushort)val.Value).ToString(CultureInfo.InvariantCulture);
-                            }
-                            ce.Value = display;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogDebug(ex, "Trend read failed for {Area} {Address}", ce.Area, ce.Address);
-                        errorCount++;
-                    }
-                }
-                
-                if (errorCount > 0 && errorCount == snapshot.Count)
-                {
-                    GlobalMonitorEnabled = false;
-                    MessageBox.Show($"All trend reads failed. Continuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Trend Read Error",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-            finally
-            {
-                _isTrending = false;
-            }
+            var trendEntries = CustomEntries.Where(c => c.Trend);
+            await _trendCoordinator.ProcessTrendSamplingAsync(
+                trendEntries,
+                UnitId,
+                IsServerMode,
+                enabled => GlobalMonitorEnabled = enabled);
         }
 
         private async Task<double?> ReadValueForTrendAsync(CustomEntry entry)
@@ -1290,80 +1244,24 @@ namespace ModbusForge.ViewModels
 
         private async Task SaveAllConfigAsync()
         {
-            try
-            {
-                var dialog = new SaveFileDialog
-                {
-                    Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
-                    DefaultExt = "json",
-                    FileName = "modbusforge-config.json"
-                };
-
-                if (dialog.ShowDialog() == true)
-                {
-                    var config = new AppConfiguration
-                    {
-                        Mode = Mode,
-                        ServerAddress = ServerAddress,
-                        Port = Port,
-                        UnitId = UnitId,
-                        CustomEntries = CustomEntries.ToList()
-                    };
-
-                    var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
-                    await File.WriteAllTextAsync(dialog.FileName, json);
-                    StatusMessage = $"Saved configuration to {Path.GetFileName(dialog.FileName)}";
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error saving configuration");
-                MessageBox.Show($"Failed to save configuration: {ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            await _configurationCoordinator.SaveAllConfigAsync(
+                Mode, ServerAddress, Port, UnitId, CustomEntries,
+                msg => StatusMessage = msg);
         }
 
         private async Task LoadAllConfigAsync()
         {
-            try
+            var config = await _configurationCoordinator.LoadAllConfigAsync(msg => StatusMessage = msg);
+            if (config != null)
             {
-                var dialog = new OpenFileDialog
-                {
-                    Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
-                    DefaultExt = "json"
-                };
-
-                if (dialog.ShowDialog() == true)
-                {
-                    var json = await File.ReadAllTextAsync(dialog.FileName);
-                    var config = JsonSerializer.Deserialize<AppConfiguration>(json);
-
-                    if (config != null)
-                    {
-                        if (!string.IsNullOrWhiteSpace(config.Mode))
-                            Mode = config.Mode;
-                        if (!string.IsNullOrWhiteSpace(config.ServerAddress))
-                            ServerAddress = config.ServerAddress;
-                        if (config.Port > 0)
-                            Port = config.Port;
-                        if (config.UnitId > 0)
-                            UnitId = config.UnitId;
-
-                        if (config.CustomEntries != null && config.CustomEntries.Any())
-                        {
-                            CustomEntries.Clear();
-                            foreach (var ce in config.CustomEntries)
-                                CustomEntries.Add(ce);
-                            SubscribeCustomEntries();
-                        }
-
-                        StatusMessage = $"Loaded configuration from {Path.GetFileName(dialog.FileName)}";
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error loading configuration");
-                MessageBox.Show($"Failed to load configuration: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _configurationCoordinator.ApplyConfiguration(
+                    config,
+                    m => Mode = m,
+                    addr => ServerAddress = addr,
+                    p => Port = p,
+                    u => UnitId = u,
+                    CustomEntries,
+                    SubscribeCustomEntries);
             }
         }
 
