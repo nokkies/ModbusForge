@@ -92,19 +92,24 @@ namespace ModbusForge
 
         private void MenuItem_ScriptEditor_Click(object sender, RoutedEventArgs e)
         {
-            var scriptRunner = App.ServiceProvider.GetService(typeof(IScriptRunner)) as IScriptRunner;
-            if (scriptRunner != null)
+            var scriptEditorViewModel = App.ServiceProvider.GetService(typeof(ScriptEditorViewModel)) as ScriptEditorViewModel;
+            if (scriptEditorViewModel != null)
             {
-                // Get the current Modbus service and unit ID from the view model
-                var modbusService = _viewModel.IsConnected ? 
-                    (App.ServiceProvider.GetService(typeof(ModbusTcpService)) as IModbusService) : null;
-                var unitId = _viewModel.UnitId;
-                
-                var scriptEditorWindow = new ScriptEditorWindow(scriptRunner, modbusService, unitId)
+                var scriptEditorWindow = new Views.ScriptEditorWindow()
                 {
-                    Owner = this
+                    Owner = this,
+                    DataContext = scriptEditorViewModel
                 };
                 scriptEditorWindow.Show();
+            }
+        }
+
+        private void MenuItem_ScriptRulesHelp_Click(object sender, RoutedEventArgs e)
+        {
+            var scriptEditorViewModel = App.ServiceProvider.GetService(typeof(ScriptEditorViewModel)) as ScriptEditorViewModel;
+            if (scriptEditorViewModel != null)
+            {
+                scriptEditorViewModel.ShowHelpCommand.Execute(null);
             }
         }
 

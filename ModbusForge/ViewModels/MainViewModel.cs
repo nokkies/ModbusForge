@@ -37,7 +37,7 @@ namespace ModbusForge.ViewModels
         private readonly ModbusTcpService _clientService;
         private readonly ModbusServerService _serverService;
         private readonly IConsoleLoggerService _consoleLoggerService;
-        private bool _disposed = false;
+                private bool _disposed = false;
         // Mode-aware UI helpers
 
         public bool IsServerMode => string.Equals(Mode, "Server", StringComparison.OrdinalIgnoreCase);
@@ -79,7 +79,7 @@ namespace ModbusForge.ViewModels
             _simulationService = simulationService ?? throw new ArgumentNullException(nameof(simulationService));
             _customEntryService = customEntryService ?? throw new ArgumentNullException(nameof(customEntryService));
             _consoleLoggerService = consoleLoggerService ?? throw new ArgumentNullException(nameof(consoleLoggerService));
-            var settings = options?.Value ?? new ServerSettings();
+                        var settings = options?.Value ?? new ServerSettings();
 
             // Initialize in logical order
             InitializeMode(settings);
@@ -190,14 +190,14 @@ namespace ModbusForge.ViewModels
                 }
                 else
                 {
-                    Title = "ModbusForge v2.2.0";
-                    Version = "2.2.0";
+                    Title = "ModbusForge v2.2.2";
+                    Version = "2.2.2";
                 }
             }
             catch
             {
-                Title = "ModbusForge v2.2.0";
-                Version = "2.2.0";
+                Title = "ModbusForge v2.2.2";
+                Version = "2.2.2";
             }
         }
 
@@ -1078,7 +1078,7 @@ namespace ModbusForge.ViewModels
     {
         private void AddCustomEntry()
         {
-            int nextAddress = 0;
+            int nextAddress = 1;
             if (CustomEntries.Count > 0)
             {
                 nextAddress = CustomEntries[^1].Address + 1;

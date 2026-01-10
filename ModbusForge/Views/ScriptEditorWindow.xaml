@@ -1,0 +1,184 @@
+<mah:MetroWindow x:Class="ModbusForge.Views.ScriptEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+        xmlns:viewmodels="clr-namespace:ModbusForge.ViewModels"
+        Title="ModbusForge - Script Rules Editor" 
+        Height="600" Width="900"
+        WindowStartupLocation="CenterOwner"
+        BorderBrush="{DynamicResource MahApps.Brushes.Accent}"
+        BorderThickness="1">
+    
+    <Window.Resources>
+        <viewmodels:ScriptEditorViewModel x:Key="ViewModel"/>
+    </Window.Resources>
+    
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBlock Text="Script Rules Editor" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            <TextBlock Text="Automate Modbus operations based on conditions" FontSize="12" Foreground="Gray" VerticalAlignment="Center" Margin="10,0,0,0"/>
+        </StackPanel>
+
+        <!-- Toolbar -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
+            <Button Content="New Rule" Command="{Binding NewRuleCommand}" Width="80" Margin="0,0,5,0"/>
+            <Button Content="Delete" Command="{Binding DeleteRuleCommand}" Width="60" Margin="0,0,5,0"/>
+            <Button Content="Reset One-Time" Command="{Binding ResetOneTimeCommand}" Width="100" Margin="0,0,5,0"/>
+            <Button Content="Clear All" Command="{Binding ClearAllCommand}" Width="70" Margin="0,0,5,0"/>
+            <Separator Width="10" Opacity="0"/>
+            <CheckBox Content="Enable Rules" IsChecked="{Binding RulesEnabled}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <Button Content="Help" Command="{Binding ShowHelpCommand}" Width="60"/>
+        </StackPanel>
+
+        <!-- Rules List -->
+        <DataGrid x:Name="RulesDataGrid" Grid.Row="2" 
+                  ItemsSource="{Binding Rules}" 
+                  SelectedItem="{Binding SelectedRule}"
+                  AutoGenerateColumns="False" 
+                  CanUserAddRows="False"
+                  GridLinesVisibility="Horizontal"
+                  HeadersVisibility="Column"
+                  Margin="0,0,0,10">
+            
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding Enabled}" Width="60"/>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="120" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Condition" Binding="{Binding ConditionType}" Width="80"/>
+                <DataGridTextColumn Header="Trigger" Binding="{Binding TriggerArea, StringFormat={}{0}[{0}]}" Width="100"/>
+                <DataGridTextColumn Header="Operator" Binding="{Binding TriggerOperator}" Width="70"/>
+                <DataGridTextColumn Header="Value" Binding="{Binding TriggerValue}" Width="60"/>
+                <DataGridTextColumn Header="Action" Binding="{Binding ActionType}" Width="80"/>
+                <DataGridTextColumn Header="Target" Binding="{Binding ActionArea, StringFormat={}{0}[{0}]}" Width="100"/>
+                <DataGridTextColumn Header="Set To" Binding="{Binding ActionValue}" Width="60"/>
+                <DataGridCheckBoxColumn Header="One-Time" Binding="{Binding OneTime}" Width="70"/>
+                <DataGridCheckBoxColumn Header="Triggered" Binding="{Binding Triggered}" Width="70"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Rule Editor -->
+        <GroupBox Grid.Row="3" Header="Rule Details" Padding="10" Height="200">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Left Column - Condition -->
+                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,0">
+                    <TextBlock Text="CONDITION" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Text="Name:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedRule.Name}" Margin="0,0,0,5"/>
+
+                        <TextBlock Text="If:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" SelectedItem="{Binding SelectedRule.ConditionType}" Margin="0,0,0,5">
+                            <ComboBoxItem Content="RegisterValue"/>
+                        </ComboBox>
+
+                        <TextBlock Text="Area:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" SelectedItem="{Binding SelectedRule.TriggerArea}" Margin="0,0,0,5">
+                            <ComboBoxItem Content="HoldingRegister"/>
+                            <ComboBoxItem Content="InputRegister"/>
+                            <ComboBoxItem Content="Coil"/>
+                            <ComboBoxItem Content="DiscreteInput"/>
+                        </ComboBox>
+
+                        <TextBlock Text="Address:" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding SelectedRule.TriggerAddress}" Margin="0,0,0,5"/>
+
+                        <TextBlock Text="Operator:" Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <ComboBox Grid.Row="4" Grid.Column="1" SelectedItem="{Binding SelectedRule.TriggerOperator}" Margin="0,0,0,5">
+                            <ComboBoxItem Content="Equals"/>
+                            <ComboBoxItem Content="NotEquals"/>
+                            <ComboBoxItem Content="GreaterThan"/>
+                            <ComboBoxItem Content="LessThan"/>
+                            <ComboBoxItem Content="GreaterThanOrEqual"/>
+                            <ComboBoxItem Content="LessThanOrEqual"/>
+                        </ComboBox>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Right Column - Action -->
+                <StackPanel Grid.Row="0" Grid.Column="1" Margin="10,0,0,0">
+                    <TextBlock Text="ACTION" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Text="Value:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedRule.TriggerValue}" Margin="0,0,0,5"/>
+
+                        <TextBlock Text="Then:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" SelectedItem="{Binding SelectedRule.ActionType}" Margin="0,0,0,5">
+                            <ComboBoxItem Content="SetRegister"/>
+                            <ComboBoxItem Content="SetCoil"/>
+                            <ComboBoxItem Content="LogMessage"/>
+                        </ComboBox>
+
+                        <TextBlock Text="Area:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" SelectedItem="{Binding SelectedRule.ActionArea}" Margin="0,0,0,5">
+                            <ComboBoxItem Content="HoldingRegister"/>
+                            <ComboBoxItem Content="Coil"/>
+                        </ComboBox>
+
+                        <TextBlock Text="Address:" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding SelectedRule.ActionAddress}" Margin="0,0,0,5"/>
+
+                        <TextBlock Text="Set To:" Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding SelectedRule.ActionValue}" Margin="0,0,0,5"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Bottom Row - Options -->
+                <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,10,0,0">
+                    <CheckBox Content="One-Time Rule" IsChecked="{Binding SelectedRule.OneTime}" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                    <CheckBox Content="Enabled" IsChecked="{Binding SelectedRule.Enabled}" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                    <TextBlock Text="Delay (ms):" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                    <TextBox Text="{Binding SelectedRule.DelayMs}" Width="80" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Description -->
+                <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" 
+                           Text="{Binding SelectedRule.Description}" 
+                           FontStyle="Italic" 
+                           Foreground="Gray" 
+                           Margin="0,10,0,0"
+                           TextWrapping="Wrap"/>
+            </Grid>
+        </GroupBox>
+    </Grid>
+</mah:MetroWindow>

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using ModbusForge.Models;
 using ModbusForge.Services;
 using ModbusForge.ViewModels;
 using System;
@@ -63,6 +64,14 @@ namespace ModbusForge
             // Register services (both Client and Server). ViewModel selects at runtime.
             services.AddSingleton<ModbusTcpService>();
             services.AddSingleton<ModbusServerService>();
+            services.AddSingleton<IModbusService>(provider => 
+            {
+                // Get the server settings to determine which service to use
+                var settings = provider.GetRequiredService<IOptions<ServerSettings>>().Value;
+                return string.Equals(settings.Mode, "Server", StringComparison.OrdinalIgnoreCase)
+                    ? provider.GetRequiredService<ModbusServerService>()
+                    : provider.GetRequiredService<ModbusTcpService>();
+            });
             services.AddSingleton<ITrendLogger, TrendLoggingService>();
             services.AddSingleton<IFileDialogService, FileDialogService>();
             services.AddSingleton<ISimulationService, SimulationService>();
@@ -71,11 +80,13 @@ namespace ModbusForge
             services.AddSingleton<ISettingsService, SettingsService>();
             services.AddSingleton<IConnectionManager, ConnectionManager>();
             services.AddSingleton<IScriptRunner, ScriptRunner>();
+            services.AddSingleton<IScriptRuleService, ScriptRuleService>();
             
             // Register ViewModels
             services.AddSingleton<MainViewModel>();
             services.AddTransient<TrendViewModel>();
             services.AddTransient<DecodeViewModel>();
+            services.AddTransient<ScriptEditorViewModel>();
         }
 
 
