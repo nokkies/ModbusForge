@@ -262,6 +262,8 @@ public static class AreaOptions { ... }     // REMOVE
 ## 📋 Version Strategy Summary
 
 - **v2.2.3**: Code complexity & legacy cleanup (MainViewModel refactor, Options.cs removal)
-- **v2.2.4**: Package compatibility (LiveCharts stable, PrivateAssets cleanup)  
-- **v2.2.5**: Final package polishing (NU1701 warnings, dependency modernization)
-- **v2.3.0**: Release with all improvements complete
+- **v2.3.0**: Server freeze fix and graceful shutdown improvements
+- **v2.4.0**: ✅ **COMPLETED** - Coordinator pattern (ConnectionCoordinator, RegisterCoordinator, CustomEntryCoordinator)
+- **v2.5.0**: Remaining coordinators (SimulationCoordinator, TrendCoordinator, ConfigurationCoordinator)
+- **v2.6.0**: Testing infrastructure (Unit tests, Integration tests, UI automation tests)
+- **v2.7.0**: Package compatibility (LiveCharts stable, PrivateAssets cleanup, NU1701 warnings)

@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using ModbusForge.Configuration;
 using ModbusForge.Services;
 using ModbusForge.ViewModels;
+using ModbusForge.ViewModels.Coordinators;
 
 namespace ModbusForge
 {
@@ -78,6 +79,11 @@ namespace ModbusForge
             services.AddSingleton<IConnectionManager, ConnectionManager>();
             services.AddSingleton<IScriptRunner, ScriptRunner>();
             services.AddSingleton<IScriptRuleService, ScriptRuleService>();
+            
+            // Register Coordinators
+            services.AddSingleton<ConnectionCoordinator>();
+            services.AddSingleton<RegisterCoordinator>();
+            services.AddSingleton<CustomEntryCoordinator>();
             
             // Register ViewModels
             services.AddSingleton<MainViewModel>();

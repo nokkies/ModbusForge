@@ -28,6 +28,7 @@ using System.Collections.Specialized;
 using ModbusForge.Models;
 using System.Windows.Controls;
 using ModbusForge.Helpers;
+using ModbusForge.ViewModels.Coordinators;
 
 namespace ModbusForge.ViewModels
 {
@@ -37,7 +38,10 @@ namespace ModbusForge.ViewModels
         private readonly ModbusTcpService _clientService;
         private readonly ModbusServerService _serverService;
         private readonly IConsoleLoggerService _consoleLoggerService;
-                private bool _disposed = false;
+        private readonly ConnectionCoordinator _connectionCoordinator;
+        private readonly RegisterCoordinator _registerCoordinator;
+        private readonly CustomEntryCoordinator _customEntryCoordinator;
+        private bool _disposed = false;
         // Mode-aware UI helpers
 
         public bool IsServerMode => string.Equals(Mode, "Server", StringComparison.OrdinalIgnoreCase);
@@ -53,7 +57,10 @@ namespace ModbusForge.ViewModels
             App.ServiceProvider.GetRequiredService<ITrendLogger>(),
             App.ServiceProvider.GetRequiredService<ISimulationService>(),
             App.ServiceProvider.GetRequiredService<ICustomEntryService>(),
-            App.ServiceProvider.GetRequiredService<IConsoleLoggerService>())
+            App.ServiceProvider.GetRequiredService<IConsoleLoggerService>(),
+            App.ServiceProvider.GetRequiredService<ConnectionCoordinator>(),
+            App.ServiceProvider.GetRequiredService<RegisterCoordinator>(),
+            App.ServiceProvider.GetRequiredService<CustomEntryCoordinator>())
         {
         }
 
@@ -69,7 +76,7 @@ namespace ModbusForge.ViewModels
             StatusMessage = $"Read {snapshot.Count} custom entries";
         }
 
-        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ISimulationService simulationService, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService)
+        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ISimulationService simulationService, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator)
         {
             // Store dependencies
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
@@ -79,7 +86,10 @@ namespace ModbusForge.ViewModels
             _simulationService = simulationService ?? throw new ArgumentNullException(nameof(simulationService));
             _customEntryService = customEntryService ?? throw new ArgumentNullException(nameof(customEntryService));
             _consoleLoggerService = consoleLoggerService ?? throw new ArgumentNullException(nameof(consoleLoggerService));
-                        var settings = options?.Value ?? new ServerSettings();
+            _connectionCoordinator = connectionCoordinator ?? throw new ArgumentNullException(nameof(connectionCoordinator));
+            _registerCoordinator = registerCoordinator ?? throw new ArgumentNullException(nameof(registerCoordinator));
+            _customEntryCoordinator = customEntryCoordinator ?? throw new ArgumentNullException(nameof(customEntryCoordinator));
+            var settings = options?.Value ?? new ServerSettings();
 
             // Initialize in logical order
             InitializeMode(settings);
@@ -512,461 +522,66 @@ namespace ModbusForge.ViewModels
         private int _simDiscreteCount = 8;
 
 
-        private bool CanConnect() => !IsConnected;
+        private bool CanConnect() => _connectionCoordinator.CanConnect(IsConnected);
 
         private async Task ConnectAsync()
         {
-            try
-            {
-                StatusMessage = IsServerMode ? "Starting server..." : "Connecting...";
-                _consoleLoggerService.Log(StatusMessage);
-                var success = await _modbusService.ConnectAsync(ServerAddress, Port);
-
-                if (success)
-                {
-                    IsConnected = true;
-                    _hasConnectionError = false;
-                    StatusMessage = IsServerMode ? "Server started" : "Connected to Modbus server";
-                    _logger.LogInformation(IsServerMode ? "Successfully started Modbus server" : "Successfully connected to Modbus server");
-                    _consoleLoggerService.Log(StatusMessage);
-                }
-                else
-                {
-                    IsConnected = false;
-                    StatusMessage = IsServerMode ? "Server failed to start" : "Connection failed";
-                    _logger.LogWarning(IsServerMode ? "Failed to start Modbus server" : "Failed to connect to Modbus server");
-                    _consoleLoggerService.Log(StatusMessage);
-                    var msg = IsServerMode
-                        ? $"Failed to start server on port {Port}. The port may be in use. Try another port (e.g., 1502) or stop the process using it."
-                        : "Failed to connect to Modbus server.";
-                    _consoleLoggerService.Log(msg);
-                    MessageBox.Show(msg, IsServerMode ? "Server Error" : "Connection Error",
-                        MessageBoxButton.OK, MessageBoxImage.Warning);
-
-                    // If in Server mode, offer to retry automatically on alternative port 1502
-                    if (IsServerMode)
-                    {
-                        var retry = MessageBox.Show(
-                            "Would you like to retry starting the server on port 1502 now?",
-                            "Try Alternative Port",
-                            MessageBoxButton.YesNo,
-                            MessageBoxImage.Question);
-                        if (retry == MessageBoxResult.Yes)
-                        {
-                            int originalPort = Port;
-                            try
-                            {
-                                Port = 1502;
-                                StatusMessage = $"Retrying server on port {Port}...";
-                                _consoleLoggerService.Log(StatusMessage);
-                                var retryOk = await _modbusService.ConnectAsync(ServerAddress, Port);
-                                if (retryOk)
-                                {
-                                    IsConnected = true;
-                                    StatusMessage = "Server started";
-                                    _logger.LogInformation("Successfully started Modbus server on alternative port {AltPort}", Port);
-                                    _consoleLoggerService.Log($"Successfully started Modbus server on alternative port {Port}");
-                                }
-                                else
-                                {
-                                    IsConnected = false;
-                                    StatusMessage = "Server failed to start";
-                                    _logger.LogWarning("Failed to start Modbus server on alternative port {AltPort}", Port);
-                                    var failMsg = $"Failed to start server on alternative port {Port}. The port may also be in use or blocked.";
-                                    _consoleLoggerService.Log(failMsg);
-                                    MessageBox.Show(failMsg,
-                                        "Server Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                                    // Restore original port so user sees their intended value
-                                    Port = originalPort;
-                                }
-                            }
-                            catch (Exception rex)
-                            {
-                                // Restore original port on any unexpected error
-                                Port = originalPort;
-                                StatusMessage = $"Server error: {rex.Message}";
-                                _logger.LogError(rex, "Error retrying server start on alternative port 1502");
-                                _consoleLoggerService.Log($"Failed to start server on alternative port 1502: {rex.Message}");
-                                MessageBox.Show($"Failed to start server on alternative port 1502: {rex.Message}",
-                                    "Server Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = IsServerMode ? $"Server error: {ex.Message}" : $"Error: {ex.Message}";
-                _logger.LogError(ex, IsServerMode ? "Error starting Modbus server" : "Error connecting to Modbus server");
-                _consoleLoggerService.Log(StatusMessage);
-                MessageBox.Show(IsServerMode ? $"Failed to start server: {ex.Message}" : $"Failed to connect: {ex.Message}", IsServerMode ? "Server Error" : "Connection Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            await _connectionCoordinator.ConnectAsync(ServerAddress, Port, IsServerMode,
+                msg => StatusMessage = msg, connected => IsConnected = connected);
         }
 
-        private bool CanDisconnect() => IsConnected;
+        private bool CanDisconnect() => _connectionCoordinator.CanDisconnect(IsConnected);
 
         private async Task DisconnectAsync()
         {
-            try
-            {
-                var msg = IsServerMode ? "Stopping Modbus server" : "Disconnecting from Modbus server";
-                _logger.LogInformation(msg);
-                _consoleLoggerService.Log(msg);
-                await _modbusService.DisconnectAsync();
-                IsConnected = false;
-                StatusMessage = IsServerMode ? "Server stopped" : "Disconnected";
-                _logger.LogInformation(IsServerMode ? "Successfully stopped Modbus server" : "Successfully disconnected from Modbus server");
-                _consoleLoggerService.Log(StatusMessage);
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = IsServerMode ? $"Error stopping server: {ex.Message}" : $"Error disconnecting: {ex.Message}";
-                _logger.LogError(ex, IsServerMode ? "Error stopping Modbus server" : "Error disconnecting from Modbus server");
-                _consoleLoggerService.Log(StatusMessage);
-                MessageBox.Show(IsServerMode ? $"Failed to stop server: {ex.Message}" : $"Failed to disconnect: {ex.Message}", IsServerMode ? "Server Stop Error" : "Disconnection Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            await _connectionCoordinator.DisconnectAsync(IsServerMode,
+                msg => StatusMessage = msg, connected => IsConnected = connected);
         }
 
         private async Task RunDiagnosticsAsync()
         {
-            try
-            {
-                StatusMessage = "Running diagnostics...";
-                _consoleLoggerService.Log($"=== Connection Diagnostics ===");
-                _consoleLoggerService.Log($"Target: {ServerAddress}:{Port}, Unit ID: {UnitId}");
-
-                var result = await _modbusService.RunDiagnosticsAsync(ServerAddress, Port, UnitId);
-
-                _consoleLoggerService.Log($"TCP Connection: {(result.TcpConnected ? "OK" : "FAILED")}");
-                if (result.TcpConnected)
-                {
-                    _consoleLoggerService.Log($"  Local: {result.LocalEndpoint}");
-                    _consoleLoggerService.Log($"  Remote: {result.RemoteEndpoint}");
-                    _consoleLoggerService.Log($"  Latency: {result.TcpLatencyMs}ms");
-                }
-                else if (!string.IsNullOrEmpty(result.TcpError))
-                {
-                    _consoleLoggerService.Log($"  Error: {result.TcpError}");
-                }
-
-                if (result.TcpConnected)
-                {
-                    _consoleLoggerService.Log($"Modbus Protocol: {(result.ModbusResponding ? "OK" : "FAILED")}");
-                    if (result.ModbusResponding)
-                        _consoleLoggerService.Log($"  Latency: {result.ModbusLatencyMs}ms");
-                    if (!string.IsNullOrEmpty(result.ModbusError))
-                        _consoleLoggerService.Log($"  Note: {result.ModbusError}");
-                }
-
-                _consoleLoggerService.Log($"=== Result: {result.Summary} ===");
-                StatusMessage = result.Summary;
-
-                var icon = result.IsFullyConnected ? MessageBoxImage.Information : 
-                           result.TcpConnected ? MessageBoxImage.Warning : MessageBoxImage.Error;
-                
-                var details = new StringBuilder();
-                details.AppendLine($"Target: {ServerAddress}:{Port}");
-                details.AppendLine($"Unit ID: {UnitId}");
-                details.AppendLine();
-                details.AppendLine($"TCP Connection: {(result.TcpConnected ? "Success" : "Failed")}");
-                if (result.TcpConnected)
-                {
-                    details.AppendLine($"  Latency: {result.TcpLatencyMs}ms");
-                    details.AppendLine($"  Local: {result.LocalEndpoint}");
-                    details.AppendLine($"  Remote: {result.RemoteEndpoint}");
-                }
-                else
-                {
-                    details.AppendLine($"  Error: {result.TcpError}");
-                }
-                
-                if (result.TcpConnected)
-                {
-                    details.AppendLine();
-                    details.AppendLine($"Modbus Protocol: {(result.ModbusResponding ? "Success" : "Failed")}");
-                    if (result.ModbusResponding)
-                        details.AppendLine($"  Latency: {result.ModbusLatencyMs}ms");
-                    if (!string.IsNullOrEmpty(result.ModbusError))
-                        details.AppendLine($"  {result.ModbusError}");
-                }
-
-                MessageBox.Show(details.ToString(), "Connection Diagnostics", MessageBoxButton.OK, icon);
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Diagnostics error: {ex.Message}";
-                _consoleLoggerService.Log($"Diagnostics failed: {ex.Message}");
-                _logger.LogError(ex, "Error running diagnostics");
-                MessageBox.Show($"Diagnostics failed: {ex.Message}", "Diagnostics Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            await _connectionCoordinator.RunDiagnosticsAsync(ServerAddress, Port, UnitId,
+                msg => StatusMessage = msg);
         }
 
         private async Task ReadRegistersAsync()
         {
-            try
-            {
-                StatusMessage = "Reading registers...";
-                _consoleLoggerService.Log($"Reading {RegisterCount} holding registers from address {RegisterStart}");
-                var values = await _modbusService.ReadHoldingRegistersAsync(UnitId, RegisterStart, RegisterCount);
-                if (values is null)
-                {
-                    StatusMessage = "Failed to read registers (connection lost)";
-                    return;
-                }
-                // Preserve per-address Type if rows already exist
-                var typeByAddress = HoldingRegisters.ToDictionary(r => r.Address, r => r.Type);
-
-                HoldingRegisters.Clear();
-                for (int i = 0; i < values.Length; i++)
-                {
-                    int addr = RegisterStart + i;
-                    var entry = new RegisterEntry
-                    {
-                        Address = addr,
-                        Value = values[i],
-                        Type = typeByAddress.TryGetValue(addr, out var t) ? t : RegistersGlobalType
-                    };
-                    HoldingRegisters.Add(entry);
-                }
-
-                // Compute ValueText based on Type for better display (floats, strings, signed ints)
-                int idx = 0;
-                while (idx < HoldingRegisters.Count)
-                {
-                    var entry = HoldingRegisters[idx];
-                    var t = (entry.Type ?? "uint").ToLowerInvariant();
-                    if (t == "int")
-                    {
-                        short sv = unchecked((short)values[idx]);
-                        entry.ValueText = sv.ToString(CultureInfo.InvariantCulture);
-                        idx += 1;
-                    }
-                    else if (t == "real")
-                    {
-                        if (idx + 1 < values.Length)
-                        {
-                            float f = DataTypeConverter.ToSingle(values[idx], values[idx + 1]);
-                            entry.ValueText = f.ToString(CultureInfo.InvariantCulture);
-                            HoldingRegisters[idx + 1].ValueText = string.Empty;
-                        }
-                        else
-                        {
-                            entry.ValueText = entry.Value.ToString(CultureInfo.InvariantCulture);
-                        }
-                        idx += 2;
-                    }
-                    else if (t == "string")
-                    {
-                        entry.ValueText = DataTypeConverter.ToString(values[idx]);
-                        idx += 1;
-                    }
-                    else
-                    {
-                        entry.ValueText = entry.Value.ToString(CultureInfo.InvariantCulture);
-                        idx += 1;
-                    }
-                }
-                StatusMessage = $"Read {values.Length} registers";
-                _hasConnectionError = false;
-                _consoleLoggerService.Log(StatusMessage);
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Error reading registers: {ex.Message}";
-                _logger.LogError(ex, "Error reading registers");
-                
-                if (HoldingMonitorEnabled)
-                {
-                    HoldingMonitorEnabled = false;
-                    MessageBox.Show($"Failed to read registers: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                else
-                {
-                    MessageBox.Show($"Failed to read registers: {ex.Message}", "Read Error",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
+            await _registerCoordinator.ReadRegistersAsync(UnitId, RegisterStart, RegisterCount,
+                RegistersGlobalType, HoldingRegisters, msg => StatusMessage = msg,
+                hasError => _hasConnectionError = hasError, HoldingMonitorEnabled, IsServerMode);
         }
 
         private async Task ReadInputRegistersAsync()
         {
-            try
-            {
-                StatusMessage = "Reading input registers...";
-                _consoleLoggerService.Log($"Reading {InputRegisterCount} input registers from address {InputRegisterStart}");
-                var values = await _modbusService.ReadInputRegistersAsync(UnitId, InputRegisterStart, InputRegisterCount);
-                if (values is null)
-                {
-                    StatusMessage = "Failed to read input registers (connection lost)";
-                    return;
-                }
-                InputRegisters.Clear();
-                for (int i = 0; i < values.Length; i++)
-                {
-                    InputRegisters.Add(new RegisterEntry
-                    {
-                        Address = InputRegisterStart + i,
-                        Value = values[i],
-                        Type = InputRegistersGlobalType
-                    });
-                }
-                StatusMessage = $"Read {values.Length} input registers";
-                _hasConnectionError = false;
-                _consoleLoggerService.Log(StatusMessage);
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Error reading input registers: {ex.Message}";
-                _logger.LogError(ex, "Error reading input registers");
-                
-                if (InputRegistersMonitorEnabled)
-                {
-                    InputRegistersMonitorEnabled = false;
-                    MessageBox.Show($"Failed to read input registers: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                else
-                {
-                    MessageBox.Show($"Failed to read input registers: {ex.Message}", "Read Error",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
+            await _registerCoordinator.ReadInputRegistersAsync(UnitId, InputRegisterStart, InputRegisterCount,
+                InputRegistersGlobalType, InputRegisters, msg => StatusMessage = msg,
+                hasError => _hasConnectionError = hasError, InputRegistersMonitorEnabled, IsServerMode);
         }
 
         private async Task WriteRegisterAsync()
         {
-            try
-            {
-                StatusMessage = "Writing register...";
-                _consoleLoggerService.Log($"Writing register {WriteRegisterAddress} with value {WriteRegisterValue}");
-                await _modbusService.WriteSingleRegisterAsync(UnitId, WriteRegisterAddress, WriteRegisterValue);
-                StatusMessage = "Register written";
-                _consoleLoggerService.Log(StatusMessage);
-                // Optionally refresh
-                await ReadRegistersAsync();
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Error writing register: {ex.Message}";
-                _logger.LogError(ex, "Error writing register");
-                _consoleLoggerService.Log(StatusMessage);
-                MessageBox.Show($"Failed to write register: {ex.Message}", "Write Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            await _registerCoordinator.WriteRegisterAsync(UnitId, WriteRegisterAddress, WriteRegisterValue,
+                msg => StatusMessage = msg, async () => await ReadRegistersAsync(), IsServerMode);
         }
 
         private async Task ReadCoilsAsync()
         {
-            try
-            {
-                StatusMessage = "Reading coils...";
-                _consoleLoggerService.Log($"Reading {CoilCount} coils from address {CoilStart}");
-
-                var states = await _modbusService.ReadCoilsAsync(UnitId, CoilStart, CoilCount);
-                if (states is null)
-                {
-                    StatusMessage = "Failed to read coils (connection lost)";
-                    return;
-                }
-                Coils.Clear();
-                for (int i = 0; i < states.Length; i++)
-                {
-                    Coils.Add(new CoilEntry
-                    {
-                        Address = CoilStart + i,
-                        State = states[i]
-                    });
-                }
-                StatusMessage = $"Read {states.Length} coils";
-                _hasConnectionError = false;
-                _consoleLoggerService.Log(StatusMessage);
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Error reading coils: {ex.Message}";
-                _logger.LogError(ex, "Error reading coils");
-                
-                if (CoilsMonitorEnabled)
-                {
-                    CoilsMonitorEnabled = false;
-                    MessageBox.Show($"Failed to read coils: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                else
-                {
-                    MessageBox.Show($"Failed to read coils: {ex.Message}", "Read Error",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
+            await _registerCoordinator.ReadCoilsAsync(UnitId, CoilStart, CoilCount,
+                Coils, msg => StatusMessage = msg,
+                hasError => _hasConnectionError = hasError, CoilsMonitorEnabled, IsServerMode);
         }
 
         private async Task ReadDiscreteInputsAsync()
         {
-            try
-            {
-                StatusMessage = "Reading discrete inputs...";
-                _consoleLoggerService.Log($"Reading {DiscreteInputCount} discrete inputs from address {DiscreteInputStart}");
-                var states = await _modbusService.ReadDiscreteInputsAsync(UnitId, DiscreteInputStart, DiscreteInputCount);
-                if (states is null)
-                {
-                    StatusMessage = "Failed to read discrete inputs (connection lost)";
-                    return;
-                }
-                DiscreteInputs.Clear();
-                for (int i = 0; i < states.Length; i++)
-                {
-                    DiscreteInputs.Add(new CoilEntry
-                    {
-                        Address = DiscreteInputStart + i,
-                        State = states[i]
-                    });
-                }
-                StatusMessage = $"Read {states.Length} discrete inputs";
-                _hasConnectionError = false;
-                _consoleLoggerService.Log(StatusMessage);
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Error reading discrete inputs: {ex.Message}";
-                _logger.LogError(ex, "Error reading discrete inputs");
-                
-                if (DiscreteInputsMonitorEnabled)
-                {
-                    DiscreteInputsMonitorEnabled = false;
-                    MessageBox.Show($"Failed to read discrete inputs: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                else
-                {
-                    MessageBox.Show($"Failed to read discrete inputs: {ex.Message}", "Read Error",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
+            await _registerCoordinator.ReadDiscreteInputsAsync(UnitId, DiscreteInputStart, DiscreteInputCount,
+                DiscreteInputs, msg => StatusMessage = msg,
+                hasError => _hasConnectionError = hasError, DiscreteInputsMonitorEnabled, IsServerMode);
         }
 
         private async Task WriteCoilAsync()
         {
-            try
-            {
-                StatusMessage = "Writing coil...";
-                _consoleLoggerService.Log($"Writing coil {WriteCoilAddress} with value {WriteCoilState}");
-                await _modbusService.WriteSingleCoilAsync(UnitId, WriteCoilAddress, WriteCoilState);
-                StatusMessage = "Coil written";
-                _consoleLoggerService.Log(StatusMessage);
-                // Optionally refresh
-                await ReadCoilsAsync();
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Error writing coil: {ex.Message}";
-                _logger.LogError(ex, "Error writing coil");
-                _consoleLoggerService.Log(StatusMessage);
-                MessageBox.Show($"Failed to write coil: {ex.Message}", "Write Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            await _registerCoordinator.WriteCoilAsync(UnitId, WriteCoilAddress, WriteCoilState,
+                msg => StatusMessage = msg, async () => await ReadCoilsAsync(), IsServerMode);
         }
 
         public void Dispose()
@@ -978,28 +593,22 @@ namespace ModbusForge.ViewModels
         // Helper methods for inline editing from the view
         public async Task WriteRegisterAtAsync(int address, ushort value)
         {
-            await _modbusService.WriteSingleRegisterAsync(UnitId, address, value);
+            await _registerCoordinator.WriteRegisterAtAsync(UnitId, address, value, IsServerMode);
         }
 
         public async Task WriteFloatAtAsync(int address, float value)
         {
-            var registers = DataTypeConverter.ToUInt16(value);
-            await _modbusService.WriteSingleRegisterAsync(UnitId, address, registers[0]);
-            await _modbusService.WriteSingleRegisterAsync(UnitId, address + 1, registers[1]);
+            await _registerCoordinator.WriteFloatAtAsync(UnitId, address, value, IsServerMode);
         }
 
         public async Task WriteStringAtAsync(int address, string text)
         {
-            var registers = DataTypeConverter.ToUInt16(text);
-            for (int i = 0; i < registers.Length; i++)
-            {
-                await _modbusService.WriteSingleRegisterAsync(UnitId, address + i, registers[i]);
-            }
+            await _registerCoordinator.WriteStringAtAsync(UnitId, address, text, IsServerMode);
         }
 
         public async Task WriteCoilAtAsync(int address, bool state)
         {
-            await _modbusService.WriteSingleCoilAsync(UnitId, address, state);
+            await _registerCoordinator.WriteCoilAtAsync(UnitId, address, state, IsServerMode);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -1088,42 +697,12 @@ namespace ModbusForge.ViewModels
     {
         private void AddCustomEntry()
         {
-            int nextAddress = 1;
-            if (CustomEntries.Count > 0)
-            {
-                nextAddress = CustomEntries[^1].Address + 1;
-            }
-            CustomEntries.Add(new CustomEntry { Address = nextAddress, Area = "HoldingRegister", Type = "uint", Value = "0", Continuous = false, PeriodMs = 1000, Monitor = false, ReadPeriodMs = 1000 });
+            _customEntryCoordinator.AddCustomEntry(CustomEntries);
         }
 
         private async Task WriteCustomNowAsync(CustomEntry entry)
         {
-            if (entry is null) return;
-            try
-            {
-                var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
-                switch (area)
-                {
-                    case "holdingregister":
-                        await WriteHoldingRegisterByTypeAsync(entry);
-                        break;
-                    case "coil":
-                        await WriteCoilAsync(entry);
-                        break;
-                    case "inputregister":
-                    case "discreteinput":
-                        StatusMessage = $"{entry.Area} is read-only. Select HoldingRegister or Coil to write.";
-                        break;
-                    default:
-                        StatusMessage = $"Unknown area: {entry.Area}";
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error writing custom entry");
-                StatusMessage = $"Custom write error: {ex.Message}";
-            }
+            await _customEntryCoordinator.WriteCustomNowAsync(entry, UnitId, msg => StatusMessage = msg, IsServerMode);
         }
 
         /// <summary>
@@ -1700,38 +1279,13 @@ namespace ModbusForge.ViewModels
 
         private async Task SaveCustomAsync()
         {
-            try
-            {
-                await _customEntryService.SaveCustomAsync(CustomEntries);
-                StatusMessage = $"Saved {CustomEntries.Count} custom entries.";
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error saving custom entries");
-                MessageBox.Show($"Failed to save custom entries: {ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            await _customEntryCoordinator.SaveCustomAsync(CustomEntries, msg => StatusMessage = msg);
         }
 
         private async Task LoadCustomAsync()
         {
-            try
-            {
-                var loadedEntries = await _customEntryService.LoadCustomAsync();
-                if (loadedEntries.Any())
-                {
-                    CustomEntries.Clear();
-                    foreach (var ce in loadedEntries)
-                        CustomEntries.Add(ce);
-
-                    SubscribeCustomEntries();
-                    StatusMessage = $"Loaded {loadedEntries.Count} custom entries.";
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error loading custom entries");
-                MessageBox.Show($"Failed to load custom entries: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            await _customEntryCoordinator.LoadCustomAsync(CustomEntries, msg => StatusMessage = msg);
+            SubscribeCustomEntries();
         }
 
         private async Task SaveAllConfigAsync()
