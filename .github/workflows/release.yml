@@ -119,6 +119,12 @@ jobs:
             $out | Out-File -FilePath "$($f.FullName).sha256" -Encoding ascii -NoNewline
           }
 
+      - name: Build Inno Setup Installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: setup/ModbusForge.iss
+          options: /DAppVersion=${{ steps.version.outputs.version }}
+
       - name: Create MSIX package (optional)
         if: ${{ always() }}
         shell: pwsh
@@ -210,6 +216,7 @@ jobs:
             ModbusForge-*-win-x64.zip.sha256
             ModbusForge-*-win-x64-sc.zip.sha256
             ModbusForge-*-win-x64.msix
+            installers/*.exe
           if-no-files-found: ignore
 
       - name: Create GitHub Release and upload assets
@@ -227,6 +234,7 @@ jobs:
             ModbusForge-*-win-x64.zip.sha256
             ModbusForge-*-win-x64-sc.zip.sha256
             ModbusForge-*-win-x64.msix
+            installers/*.exe
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

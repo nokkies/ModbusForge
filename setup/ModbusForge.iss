@@ -1,10 +1,14 @@
 ; ModbusForge Inno Setup Script
 ; See https://jrsoftware.org/isinfo.php for documentation
 
+#ifndef AppVersion
+  #define AppVersion "2.4.0"
+#endif
+
 [Setup]
 ; Basic application info
 AppName=ModbusForge
-AppVersion=2.2.2
+AppVersion={#AppVersion}
 AppPublisher=ModbusForge
 DefaultDirName={autopf}\ModbusForge
 DefaultGroupName=ModbusForge
@@ -14,7 +18,7 @@ UninstallDisplayIcon={app}\ModbusForge.exe
 
 ; Setup output settings
 WizardStyle=modern
-OutputBaseFilename=ModbusForge-2.2.2-setup
+OutputBaseFilename=ModbusForge-{#AppVersion}-setup
 OutputDir=..\installers
 Compression=lzma2
 SolidCompression=yes
