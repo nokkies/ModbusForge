@@ -837,36 +837,7 @@ namespace ModbusForge.ViewModels
         /// </summary>
         private async Task ReadHoldingRegisterByTypeAsync(CustomEntry entry)
         {
-            var type = (entry.Type ?? "uint").ToLowerInvariant();
-            var address = entry.Address;
-            
-            switch (type)
-            {
-                case "real":
-                    var regsReal = await _modbusService.ReadHoldingRegistersAsync(UnitId, address, 2);
-                    if (regsReal is null) return;
-                    entry.Value = DataTypeConverter.ToSingle(regsReal[0], regsReal[1]).ToString(CultureInfo.InvariantCulture);
-                    StatusMessage = $"Read REAL {entry.Value} from HR {address}";
-                    break;
-                case "int":
-                    var regsInt = await _modbusService.ReadHoldingRegistersAsync(UnitId, address, 1);
-                    if (regsInt is null) return;
-                    entry.Value = unchecked((short)regsInt[0]).ToString(CultureInfo.InvariantCulture);
-                    StatusMessage = $"Read INT {entry.Value} from HR {address}";
-                    break;
-                case "string":
-                    var regsString = await _modbusService.ReadHoldingRegistersAsync(UnitId, address, 1);
-                    if (regsString is null) return;
-                    entry.Value = DataTypeConverter.ToString(regsString[0]);
-                    StatusMessage = $"Read STRING '{entry.Value}' from HR {address}";
-                    break;
-                default: // uint
-                    var regsUInt = await _modbusService.ReadHoldingRegistersAsync(UnitId, address, 1);
-                    if (regsUInt is null) return;
-                    entry.Value = regsUInt[0].ToString(CultureInfo.InvariantCulture);
-                    StatusMessage = $"Read UINT {entry.Value} from HR {address}";
-                    break;
-            }
+            await ReadRegisterGenericAsync(entry, _modbusService.ReadHoldingRegistersAsync, "HR");
         }
 
         /// <summary>
@@ -874,34 +845,39 @@ namespace ModbusForge.ViewModels
         /// </summary>
         private async Task ReadInputRegisterByTypeAsync(CustomEntry entry)
         {
+            await ReadRegisterGenericAsync(entry, _modbusService.ReadInputRegistersAsync, "IR");
+        }
+
+        private async Task ReadRegisterGenericAsync(CustomEntry entry, Func<byte, int, int, Task<ushort[]?>> readFunc, string logPrefix)
+        {
             var type = (entry.Type ?? "uint").ToLowerInvariant();
             var address = entry.Address;
             
             switch (type)
             {
                 case "real":
-                    var regsReal = await _modbusService.ReadInputRegistersAsync(UnitId, address, 2);
+                    var regsReal = await readFunc(UnitId, address, 2);
                     if (regsReal is null) return;
                     entry.Value = DataTypeConverter.ToSingle(regsReal[0], regsReal[1]).ToString(CultureInfo.InvariantCulture);
-                    StatusMessage = $"Read REAL {entry.Value} from IR {address}";
+                    StatusMessage = $"Read REAL {entry.Value} from {logPrefix} {address}";
                     break;
                 case "int":
-                    var regsInt = await _modbusService.ReadInputRegistersAsync(UnitId, address, 1);
+                    var regsInt = await readFunc(UnitId, address, 1);
                     if (regsInt is null) return;
                     entry.Value = unchecked((short)regsInt[0]).ToString(CultureInfo.InvariantCulture);
-                    StatusMessage = $"Read INT {entry.Value} from IR {address}";
+                    StatusMessage = $"Read INT {entry.Value} from {logPrefix} {address}";
                     break;
                 case "string":
-                    var regsString = await _modbusService.ReadInputRegistersAsync(UnitId, address, 1);
+                    var regsString = await readFunc(UnitId, address, 1);
                     if (regsString is null) return;
                     entry.Value = DataTypeConverter.ToString(regsString[0]);
-                    StatusMessage = $"Read STRING '{entry.Value}' from IR {address}";
+                    StatusMessage = $"Read STRING '{entry.Value}' from {logPrefix} {address}";
                     break;
                 default: // uint
-                    var regsUInt = await _modbusService.ReadInputRegistersAsync(UnitId, address, 1);
+                    var regsUInt = await readFunc(UnitId, address, 1);
                     if (regsUInt is null) return;
                     entry.Value = regsUInt[0].ToString(CultureInfo.InvariantCulture);
-                    StatusMessage = $"Read UINT {entry.Value} from IR {address}";
+                    StatusMessage = $"Read UINT {entry.Value} from {logPrefix} {address}";
                     break;
             }
         }
