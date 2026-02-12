@@ -152,10 +152,10 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="Server:" Grid.Column="0" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
+                    <TextBlock Text="{Binding AddressLabel}" Grid.Column="0" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <TextBox Grid.Column="1" Text="{Binding ServerAddress, UpdateSourceTrigger=PropertyChanged}" 
                              IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
-                             Margin="0,0,16,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
+                             Margin="0,0,16,0"/>
 
                     <TextBlock Text="Port:" Grid.Column="2" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <TextBox Grid.Column="3" Text="{Binding Port}" 

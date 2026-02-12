@@ -50,6 +50,7 @@ namespace ModbusForge.ViewModels
         public bool ShowClientFields => !IsServerMode; // show IP/UnitId only in client mode
         public string ConnectButtonText => IsServerMode ? "Start Server" : "Connect";
         public string ConnectionHeader => IsServerMode ? "Modbus Connection (Server)" : "Modbus Connection (Client)";
+        public string AddressLabel => IsServerMode ? "Interface:" : "Server:";
 
         public MainViewModel() : this(
             App.ServiceProvider.GetRequiredService<ModbusTcpService>(),
@@ -293,6 +294,7 @@ namespace ModbusForge.ViewModels
                 OnPropertyChanged(nameof(ShowClientFields));
                 OnPropertyChanged(nameof(ConnectButtonText));
                 OnPropertyChanged(nameof(ConnectionHeader));
+                OnPropertyChanged(nameof(AddressLabel));
             }
             catch (Exception ex)
             {
