@@ -84,7 +84,12 @@ namespace ModbusForge
             services.AddSingleton<ConnectionCoordinator>();
             services.AddSingleton<RegisterCoordinator>();
             services.AddSingleton<CustomEntryCoordinator>();
-            services.AddSingleton<TrendCoordinator>();
+            services.AddSingleton<TrendCoordinator>(provider => new TrendCoordinator(
+                provider.GetRequiredService<ModbusTcpService>(),
+                provider.GetRequiredService<ModbusServerService>(),
+                provider.GetRequiredService<ITrendLogger>(),
+                provider.GetRequiredService<ILogger<TrendCoordinator>>()
+            ));
             services.AddSingleton<ConfigurationCoordinator>();
             
             // Register ViewModels
