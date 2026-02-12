@@ -81,7 +81,7 @@ namespace ModbusForge.Services
             });
         }
 
-        public bool IsConnected => _isRunning;
+        public virtual bool IsConnected => _isRunning;
 
         public async Task<bool> ConnectAsync(string ipAddress, int port)
         {
@@ -197,7 +197,7 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task DisconnectAsync()
+        public virtual async Task DisconnectAsync()
         {
             await Task.Run(() =>
             {
