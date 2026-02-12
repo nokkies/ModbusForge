@@ -144,9 +144,9 @@ namespace ModbusForge.Services
             {
                 try
                 {
-                    _logger.LogDebug($"Writing value {value} to register {registerAddress} (Unit ID: {unitId})");
+                    _logger.LogDebug($"Writing to register {registerAddress} (Unit ID: {unitId})");
                     _client?.WriteSingleRegister(unitId, (ushort)registerAddress, value);
-                    _logger.LogDebug($"Successfully wrote register {registerAddress} with value {value}");
+                    _logger.LogDebug($"Successfully wrote register {registerAddress}");
                 }
                 catch (Exception ex)
                 {
@@ -189,9 +189,9 @@ namespace ModbusForge.Services
             {
                 try
                 {
-                    _logger.LogDebug($"Writing coil at {coilAddress} = {value} (Unit ID: {unitId})");
+                    _logger.LogDebug($"Writing coil at {coilAddress} (Unit ID: {unitId})");
                     _client?.WriteSingleCoil(unitId, (ushort)coilAddress, value);
-                    _logger.LogDebug($"Successfully wrote coil {coilAddress} with value {value}");
+                    _logger.LogDebug($"Successfully wrote coil {coilAddress}");
                 }
                 catch (Exception ex)
                 {
