@@ -7,6 +7,6 @@ namespace ModbusForge.Services
     public interface ICustomEntryService
     {
         Task SaveCustomAsync(ObservableCollection<CustomEntry> entries);
-        Task<ObservableCollection<CustomEntry>> LoadCustomAsync();
+        Task<ObservableCollection<CustomEntry>?> LoadCustomAsync();
     }
 }

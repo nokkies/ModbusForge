@@ -169,7 +169,9 @@ public partial class ScriptEditorWindow : MetroWindow, INotifyPropertyChanged
         OutputLog.Items.Clear();
     }
 
-    private void SaveScript_Click(object sender, RoutedEventArgs e)
+    private const long MaxFileSize = 1 * 1024 * 1024; // 1MB limit for scripts
+
+    private async void SaveScript_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new SaveFileDialog
         {
@@ -202,8 +204,9 @@ public partial class ScriptEditorWindow : MetroWindow, INotifyPropertyChanged
                     }).ToList()
                 };
 
-                var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(dlg.FileName, json);
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                using var stream = File.Create(dlg.FileName);
+                await JsonSerializer.SerializeAsync(stream, data, options);
                 MessageBox.Show("Script saved successfully.", "Save Script", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
@@ -213,7 +216,7 @@ public partial class ScriptEditorWindow : MetroWindow, INotifyPropertyChanged
         }
     }
 
-    private void LoadScript_Click(object sender, RoutedEventArgs e)
+    private async void LoadScript_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new OpenFileDialog
         {
@@ -224,8 +227,16 @@ public partial class ScriptEditorWindow : MetroWindow, INotifyPropertyChanged
         {
             try
             {
-                var json = File.ReadAllText(dlg.FileName);
-                var data = JsonSerializer.Deserialize<ScriptData>(json);
+                var fileInfo = new FileInfo(dlg.FileName);
+                if (fileInfo.Length > MaxFileSize)
+                {
+                    MessageBox.Show($"The selected file is too large (max {MaxFileSize / 1024 / 1024}MB).",
+                        "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                using var stream = File.OpenRead(dlg.FileName);
+                var data = await JsonSerializer.DeserializeAsync<ScriptData>(stream);
 
                 if (data != null)
                 {

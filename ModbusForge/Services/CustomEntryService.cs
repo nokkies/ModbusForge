@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Logging;
 using ModbusForge.Models;
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Text.Json;
@@ -10,22 +13,32 @@ namespace ModbusForge.Services
     public class CustomEntryService : ICustomEntryService
     {
         private readonly IFileDialogService _fileDialogService;
+        private readonly ILogger<CustomEntryService> _logger;
+        private const long MaxFileSize = 2 * 1024 * 1024; // 2MB limit for custom entries
 
-        public CustomEntryService(IFileDialogService fileDialogService)
+        public CustomEntryService(IFileDialogService fileDialogService, ILogger<CustomEntryService> logger)
         {
             _fileDialogService = fileDialogService;
+            _logger = logger;
         }
 
-        public async Task<ObservableCollection<CustomEntry>> LoadCustomAsync()
+        public async Task<ObservableCollection<CustomEntry>?> LoadCustomAsync()
         {
             var path = _fileDialogService.ShowOpenFileDialog("Load Custom Entries", "JSON files (*.json)|*.json|All files (*.*)|*.*");
             if (path is null)
             {
-                return new ObservableCollection<CustomEntry>();
+                return null;
             }
 
-            var json = await File.ReadAllTextAsync(path);
-            using var doc = JsonDocument.Parse(json);
+            var fileInfo = new FileInfo(path);
+            if (fileInfo.Length > MaxFileSize)
+            {
+                _logger.LogError("File {Path} exceeds maximum size of {MaxSize} bytes", path, MaxFileSize);
+                throw new InvalidDataException($"The selected file is too large (max {MaxFileSize / 1024 / 1024}MB).");
+            }
+
+            using var stream = File.OpenRead(path);
+            using var doc = await JsonDocument.ParseAsync(stream);
             var list = new ObservableCollection<CustomEntry>();
             foreach (var item in doc.RootElement.EnumerateArray())
             {
@@ -55,7 +68,7 @@ namespace ModbusForge.Services
                 return;
             }
 
-            var data = new System.Collections.Generic.List<object>();
+            var data = new List<object>();
             foreach (var e in entries)
             {
                 data.Add(new
@@ -72,9 +85,10 @@ namespace ModbusForge.Services
                     e.Trend
                 });
             }
+
             var options = new JsonSerializerOptions { WriteIndented = true };
-            var json = JsonSerializer.Serialize(data, options);
-            await File.WriteAllTextAsync(path, json);
+            using var stream = File.Create(path);
+            await JsonSerializer.SerializeAsync(stream, data, options);
         }
     }
 }
