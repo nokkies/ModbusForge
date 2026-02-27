@@ -32,7 +32,7 @@ namespace ModbusForge.Services
         }
     }
 
-    public interface IModbusService : IDisposable
+    public interface IModbusService : IDisposable, IAsyncDisposable
     {
         bool IsConnected { get; }
         

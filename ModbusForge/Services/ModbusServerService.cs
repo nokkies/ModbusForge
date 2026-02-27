@@ -333,6 +333,29 @@ namespace ModbusForge.Services
             GC.SuppressFinalize(this);
         }
 
+        public async ValueTask DisposeAsync()
+        {
+            await DisposeAsyncCore().ConfigureAwait(false);
+            Dispose(false);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual async ValueTask DisposeAsyncCore()
+        {
+            if (!_disposed)
+            {
+                try
+                {
+                    await DisconnectAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error during DisposeAsync");
+                }
+                _disposed = true;
+            }
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposed)

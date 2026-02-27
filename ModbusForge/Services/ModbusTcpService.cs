@@ -338,12 +338,41 @@ namespace ModbusForge.Services
             GC.SuppressFinalize(this);
         }
 
+        public async ValueTask DisposeAsync()
+        {
+            await DisposeAsyncCore().ConfigureAwait(false);
+            Dispose(false);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual async ValueTask DisposeAsyncCore()
+        {
+            if (!_disposed)
+            {
+                // Use async wait to avoid blocking the calling thread
+                await _ioLock.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    _client?.Dispose();
+                    _tcpClient?.Close();
+                }
+                finally
+                {
+                    _ioLock.Release();
+                    _ioLock.Dispose();
+                }
+                _disposed = true;
+            }
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposed)
             {
                 if (disposing)
                 {
+                    // For synchronous dispose, we have to wait synchronously.
+                    // Callers are encouraged to use DisposeAsync to avoid blocking.
                     _ioLock.Wait();
                     try
                     {
