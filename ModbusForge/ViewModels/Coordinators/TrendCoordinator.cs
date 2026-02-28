@@ -17,15 +17,15 @@ namespace ModbusForge.ViewModels.Coordinators
     /// </summary>
     public class TrendCoordinator
     {
-        private readonly ModbusTcpService _clientService;
-        private readonly ModbusServerService _serverService;
+        private readonly IModbusService _clientService;
+        private readonly IModbusService _serverService;
         private readonly ITrendLogger _trendLogger;
         private readonly ILogger<TrendCoordinator> _logger;
         private bool _isTrending;
 
         public TrendCoordinator(
-            ModbusTcpService clientService,
-            ModbusServerService serverService,
+            IModbusService clientService,
+            IModbusService serverService,
             ITrendLogger trendLogger,
             ILogger<TrendCoordinator> logger)
         {
@@ -46,58 +46,28 @@ namespace ModbusForge.ViewModels.Coordinators
         {
             if (_isTrending) return;
 
-            var snapshot = trendEntries.ToList();
+            var snapshot = trendEntries.Where(ce => !string.Equals(ce.Type, "string", StringComparison.OrdinalIgnoreCase)).ToList();
             if (snapshot.Count == 0) return;
 
             _isTrending = true;
             try
             {
                 var now = DateTime.UtcNow;
+                int totalEntries = snapshot.Count;
+                int successCount = 0;
                 int errorCount = 0;
 
-                foreach (var ce in snapshot)
+                var groups = snapshot.GroupBy(ce => (ce.Area ?? "HoldingRegister").ToLowerInvariant());
+
+                foreach (var group in groups)
                 {
-                    try
-                    {
-                        var val = await ReadValueForTrendAsync(ce, unitId, isServerMode);
-                        if (val.HasValue)
-                        {
-                            _trendLogger.Publish(GetTrendKey(ce), val.Value, now);
-                            
-                            // Update display value
-                            var area = (ce.Area ?? "HoldingRegister").ToLowerInvariant();
-                            var type = (ce.Type ?? "uint").ToLowerInvariant();
-                            string display;
-                            
-                            if (area == "coil" || area == "discreteinput")
-                            {
-                                display = val.Value != 0.0 ? "1" : "0";
-                            }
-                            else if (type == "real")
-                            {
-                                display = val.Value.ToString("G9", CultureInfo.InvariantCulture);
-                            }
-                            else if (type == "int")
-                            {
-                                display = ((short)val.Value).ToString(CultureInfo.InvariantCulture);
-                            }
-                            else
-                            {
-                                display = ((ushort)val.Value).ToString(CultureInfo.InvariantCulture);
-                            }
-                            
-                            ce.Value = display;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogDebug(ex, "Trend read failed for {Area} {Address}", ce.Area, ce.Address);
-                        errorCount++;
-                    }
+                    await ProcessAreaAsync(group.Key, group, unitId, isServerMode, now,
+                        onSuccess: () => successCount++,
+                        onError: () => errorCount++);
                 }
 
                 // If all trend reads failed, disable monitoring and show error
-                if (errorCount > 0 && errorCount == snapshot.Count)
+                if (errorCount > 0 && successCount == 0)
                 {
                     setGlobalMonitorEnabled(false);
                     MessageBox.Show(
@@ -113,12 +83,230 @@ namespace ModbusForge.ViewModels.Coordinators
             }
         }
 
+        private async Task ProcessAreaAsync(
+            string area,
+            IEnumerable<CustomEntry> entries,
+            byte unitId,
+            bool isServerMode,
+            DateTime now,
+            Action onSuccess,
+            Action onError)
+        {
+            var service = isServerMode ? _serverService : _clientService;
+            var sorted = entries.OrderBy(e => e.Address).ToList();
+            var chunks = CreateChunks(sorted);
+
+            foreach (var chunk in chunks)
+            {
+                try
+                {
+                    await ReadChunkAsync(area, chunk, service, unitId, now);
+                    foreach (var _ in chunk) onSuccess();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Trend read failed for chunk in {Area}", area);
+                    // If a chunk fails, try to fallback to individual reads?
+                    // For now, assume chunk failure means connection issue or invalid range,
+                    // which likely affects individual reads too.
+                    // But to be safe and consistent with previous behavior (where one bad entry didn't stop others),
+                    // we could try falling back. However, existing code didn't group, so one bad entry just failed that one.
+                    // If we group, one bad entry (e.g. illegal address) will fail the whole chunk.
+                    // This is a trade-off. To be robust, we should try individual read on failure.
+
+                    // Fallback to individual reads
+                    foreach (var entry in chunk)
+                    {
+                        try
+                        {
+                            var val = await ReadValueForTrendAsync(entry, unitId, isServerMode);
+                            if (val.HasValue)
+                            {
+                                UpdateEntry(entry, val.Value, now);
+                                onSuccess();
+                            }
+                            else
+                            {
+                                // Should be rare to get null without exception if connected
+                                onError();
+                            }
+                        }
+                        catch (Exception innerEx)
+                        {
+                            _logger.LogDebug(innerEx, "Individual fallback failed for {Area} {Address}", entry.Area, entry.Address);
+                            onError();
+                        }
+                    }
+                }
+            }
+        }
+
+        private List<List<CustomEntry>> CreateChunks(List<CustomEntry> sortedEntries)
+        {
+            var chunks = new List<List<CustomEntry>>();
+            if (sortedEntries.Count == 0) return chunks;
+
+            var currentChunk = new List<CustomEntry>();
+            currentChunk.Add(sortedEntries[0]);
+
+            int chunkStart = sortedEntries[0].Address;
+            int chunkEnd = chunkStart + GetSize(sortedEntries[0]);
+
+            for (int i = 1; i < sortedEntries.Count; i++)
+            {
+                var entry = sortedEntries[i];
+                int entryStart = entry.Address;
+                int entryEnd = entryStart + GetSize(entry);
+
+                int potentialNewEnd = Math.Max(chunkEnd, entryEnd);
+                int potentialCount = potentialNewEnd - chunkStart;
+
+                // Allow gap of up to 10 registers/coils. Reading 10 extra is cheap compared to new request.
+                // Modbus frame overhead ~10-20 bytes + RTT.
+                bool gapOk = (entryStart - chunkEnd) <= 10;
+                // Max count: 120 (safe margin below 125/253 limits)
+                bool countOk = potentialCount <= 120;
+
+                if (gapOk && countOk)
+                {
+                    currentChunk.Add(entry);
+                    chunkEnd = potentialNewEnd;
+                }
+                else
+                {
+                    chunks.Add(currentChunk);
+                    currentChunk = new List<CustomEntry>();
+                    currentChunk.Add(entry);
+                    chunkStart = entryStart;
+                    chunkEnd = entryEnd;
+                }
+            }
+            chunks.Add(currentChunk);
+            return chunks;
+        }
+
+        private int GetSize(CustomEntry entry)
+        {
+            var type = (entry.Type ?? "uint").ToLowerInvariant();
+            if (type == "real" || type == "float") return 2;
+            return 1;
+        }
+
+        private async Task ReadChunkAsync(
+            string area,
+            List<CustomEntry> chunk,
+            IModbusService service,
+            byte unitId,
+            DateTime now)
+        {
+            if (chunk.Count == 0) return;
+
+            int startAddress = chunk[0].Address;
+            int endAddress = chunk.Max(e => e.Address + GetSize(e));
+            int count = endAddress - startAddress;
+
+            if (area == "holdingregister")
+            {
+                var data = await service.ReadHoldingRegistersAsync(unitId, startAddress, count);
+                if (data == null) throw new Exception("Read returned null");
+                foreach (var entry in chunk)
+                {
+                    int offset = entry.Address - startAddress;
+                    double? val = ExtractRegisterValue(entry, data, offset);
+                    if (val.HasValue) UpdateEntry(entry, val.Value, now);
+                }
+            }
+            else if (area == "inputregister")
+            {
+                var data = await service.ReadInputRegistersAsync(unitId, startAddress, count);
+                if (data == null) throw new Exception("Read returned null");
+                foreach (var entry in chunk)
+                {
+                    int offset = entry.Address - startAddress;
+                    double? val = ExtractRegisterValue(entry, data, offset);
+                    if (val.HasValue) UpdateEntry(entry, val.Value, now);
+                }
+            }
+            else if (area == "coil")
+            {
+                var data = await service.ReadCoilsAsync(unitId, startAddress, count);
+                if (data == null) throw new Exception("Read returned null");
+                foreach (var entry in chunk)
+                {
+                    int offset = entry.Address - startAddress;
+                    double? val = (offset < data.Length) ? (data[offset] ? 1.0 : 0.0) : null;
+                    if (val.HasValue) UpdateEntry(entry, val.Value, now);
+                }
+            }
+            else if (area == "discreteinput")
+            {
+                var data = await service.ReadDiscreteInputsAsync(unitId, startAddress, count);
+                if (data == null) throw new Exception("Read returned null");
+                foreach (var entry in chunk)
+                {
+                    int offset = entry.Address - startAddress;
+                    double? val = (offset < data.Length) ? (data[offset] ? 1.0 : 0.0) : null;
+                    if (val.HasValue) UpdateEntry(entry, val.Value, now);
+                }
+            }
+        }
+
+        private double? ExtractRegisterValue(CustomEntry entry, ushort[] data, int offset)
+        {
+            if (offset < 0 || offset >= data.Length) return null;
+
+            var type = (entry.Type ?? "uint").ToLowerInvariant();
+
+            if (type == "real")
+            {
+                if (offset + 1 >= data.Length) return null;
+                return DataTypeConverter.ToSingle(data[offset], data[offset + 1]);
+            }
+            else if (type == "int")
+            {
+                return (double)unchecked((short)data[offset]);
+            }
+            else // uint
+            {
+                return (double)data[offset];
+            }
+        }
+
+        private void UpdateEntry(CustomEntry ce, double val, DateTime now)
+        {
+             _trendLogger.Publish(GetTrendKey(ce), val, now);
+
+            var area = (ce.Area ?? "HoldingRegister").ToLowerInvariant();
+            var type = (ce.Type ?? "uint").ToLowerInvariant();
+            string display;
+
+            if (area == "coil" || area == "discreteinput")
+            {
+                display = val != 0.0 ? "1" : "0";
+            }
+            else if (type == "real")
+            {
+                display = val.ToString("G9", CultureInfo.InvariantCulture);
+            }
+            else if (type == "int")
+            {
+                display = ((short)val).ToString(CultureInfo.InvariantCulture);
+            }
+            else
+            {
+                display = ((ushort)val).ToString(CultureInfo.InvariantCulture);
+            }
+
+            ce.Value = display;
+        }
+
         /// <summary>
         /// Reads a value from a custom entry for trend logging.
+        /// (Kept for fallback logic)
         /// </summary>
         private async Task<double?> ReadValueForTrendAsync(CustomEntry entry, byte unitId, bool isServerMode)
         {
-            var service = isServerMode ? (IModbusService)_serverService : _clientService;
+            var service = isServerMode ? _serverService : _clientService;
             var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
 
             switch (area)
@@ -167,7 +355,6 @@ namespace ModbusForge.ViewModels.Coordinators
             }
             else if (type == "string")
             {
-                // Not a numeric trend; skip
                 return null;
             }
             else // uint
