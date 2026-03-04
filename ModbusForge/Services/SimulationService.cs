@@ -1,13 +1,13 @@
 using System;
 using System.Windows.Threading;
-using ModbusForge.ViewModels;
+using ModbusForge.ViewModels.Coordinators;
 using Microsoft.Extensions.Logging;
 
 namespace ModbusForge.Services
 {
     public class SimulationService : ISimulationService, IDisposable
     {
-        private MainViewModel? _viewModel;
+        private SimulationCoordinator? _coordinator;
         private readonly ModbusServerService _serverService;
         private readonly ILogger<SimulationService> _logger;
         private DispatcherTimer? _simulationTimer;
@@ -24,20 +24,20 @@ namespace ModbusForge.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public void Start(MainViewModel viewModel)
+        public void Start(SimulationCoordinator coordinator)
         {
-            _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+            _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
             if (_simulationTimer == null)
             {
                 _simulationTimer = new DispatcherTimer
                 {
-                    Interval = TimeSpan.FromMilliseconds(Math.Max(50, _viewModel.SimulationPeriodMs))
+                    Interval = TimeSpan.FromMilliseconds(Math.Max(50, _coordinator.SimulationPeriodMs))
                 };
                 _simulationTimer.Tick += SimulationTimer_Tick;
             }
             else
             {
-                _simulationTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(50, _viewModel.SimulationPeriodMs));
+                _simulationTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(50, _coordinator.SimulationPeriodMs));
             }
             _lastSimTickUtc = DateTime.UtcNow;
             _simulationTimer.Start();
@@ -50,11 +50,13 @@ namespace ModbusForge.Services
 
         private void SimulationTimer_Tick(object? sender, EventArgs e)
         {
-            if (_viewModel == null) return;
+            if (_coordinator == null) return;
             if (_isSimulating) return;
-            if (!_viewModel.IsConnected) return;
-            if (!_viewModel.IsServerMode) return;
-            if (!_viewModel.SimulationEnabled) return;
+
+            // Simulation only runs when server is running (connected)
+            if (!_serverService.IsConnected) return;
+
+            if (!_coordinator.SimulationEnabled) return;
 
             _isSimulating = true;
             try
@@ -65,16 +67,16 @@ namespace ModbusForge.Services
                 _simTimeSec += dt;
                 _lastSimTickUtc = nowSim;
 
-                if (_viewModel.SimHoldingsEnabled)
+                if (_coordinator.SimHoldingsEnabled)
                 {
-                    int count = _viewModel.SimHoldingCount <= 0 ? 0 : _viewModel.SimHoldingCount;
-                    int start = _viewModel.SimHoldingStart;
-                    int min = _viewModel.SimHoldingMin;
-                    int max = _viewModel.SimHoldingMax;
-                    string wf = (_viewModel.SimHoldingWaveformType ?? "Ramp").ToLowerInvariant();
-                    if ((wf == "sine" || wf == "triangle" || wf == "square") && _viewModel.SimHoldingFrequencyHz > 0)
+                    int count = _coordinator.SimHoldingCount <= 0 ? 0 : _coordinator.SimHoldingCount;
+                    int start = _coordinator.SimHoldingStart;
+                    int min = _coordinator.SimHoldingMin;
+                    int max = _coordinator.SimHoldingMax;
+                    string wf = (_coordinator.SimHoldingWaveformType ?? "Ramp").ToLowerInvariant();
+                    if ((wf == "sine" || wf == "triangle" || wf == "square") && _coordinator.SimHoldingFrequencyHz > 0)
                     {
-                        double f = _viewModel.SimHoldingFrequencyHz;
+                        double f = _coordinator.SimHoldingFrequencyHz;
                         double x = 2.0 * Math.PI * f * _simTimeSec;
                         double w;
                         if (wf == "sine") w = Math.Sin(x);
@@ -86,7 +88,7 @@ namespace ModbusForge.Services
                         }
                         else w = Math.Sin(x) >= 0 ? 1.0 : -1.0;
 
-                        double raw = _viewModel.SimHoldingOffset + (_viewModel.SimHoldingAmplitude * w);
+                        double raw = _coordinator.SimHoldingOffset + (_coordinator.SimHoldingAmplitude * w);
                         int iv = (int)Math.Round(raw);
                         if (iv < 0) iv = 0;
                         if (iv > 65535) iv = 65535;
@@ -121,13 +123,13 @@ namespace ModbusForge.Services
                     }
                 }
 
-                if (_viewModel.SimCoilsEnabled)
+                if (_coordinator.SimCoilsEnabled)
                 {
                     var dataStore = _serverService.GetDataStore();
                     if (dataStore != null)
                     {
-                        int count = _viewModel.SimCoilCount <= 0 ? 0 : _viewModel.SimCoilCount;
-                        int start = _viewModel.SimCoilStart;
+                        int count = _coordinator.SimCoilCount <= 0 ? 0 : _coordinator.SimCoilCount;
+                        int start = _coordinator.SimCoilStart;
                         for (int i = 0; i < count; i++)
                         {
                             int addr = start + i;
@@ -138,15 +140,15 @@ namespace ModbusForge.Services
                     }
                 }
 
-                if (_viewModel.SimInputsEnabled)
+                if (_coordinator.SimInputsEnabled)
                 {
                     var dataStore = _serverService.GetDataStore();
                     if (dataStore != null)
                     {
-                        int count = _viewModel.SimInputCount <= 0 ? 0 : _viewModel.SimInputCount;
-                        int start = _viewModel.SimInputStart;
-                        int min = _viewModel.SimInputMin;
-                        int max = _viewModel.SimInputMax;
+                        int count = _coordinator.SimInputCount <= 0 ? 0 : _coordinator.SimInputCount;
+                        int start = _coordinator.SimInputStart;
+                        int min = _coordinator.SimInputMin;
+                        int max = _coordinator.SimInputMax;
                         int range = Math.Max(1, max - min + 1);
                         _simHoldingPhase = (_simHoldingPhase + 1) % range;
                         for (int i = 0; i < count; i++)
@@ -161,13 +163,13 @@ namespace ModbusForge.Services
                     }
                 }
 
-                if (_viewModel.SimDiscreteEnabled)
+                if (_coordinator.SimDiscreteEnabled)
                 {
                     var dataStore = _serverService.GetDataStore();
                     if (dataStore != null)
                     {
-                        int count = _viewModel.SimDiscreteCount <= 0 ? 0 : _viewModel.SimDiscreteCount;
-                        int start = _viewModel.SimDiscreteStart;
+                        int count = _coordinator.SimDiscreteCount <= 0 ? 0 : _coordinator.SimDiscreteCount;
+                        int start = _coordinator.SimDiscreteStart;
                         for (int i = 0; i < count; i++)
                         {
                             int addr = start + i;

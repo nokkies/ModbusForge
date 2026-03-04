@@ -364,9 +364,9 @@
 
                     <!-- Toolbar -->
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
-                        <CheckBox Content="Enable Simulation" IsChecked="{Binding SimulationEnabled}" VerticalAlignment="Center"/>
+                        <CheckBox Content="Enable Simulation" IsChecked="{Binding SimulationCoordinator.SimulationEnabled}" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding SimulationPeriodMs}"/>
+                        <TextBox Width="80" Text="{Binding SimulationCoordinator.SimulationPeriodMs}"/>
                         <TextBlock VerticalAlignment="Center" Foreground="Gray" Margin="10,0,0,0">
                             <Run Text="Note:" FontWeight="SemiBold"/>
                             <Run Text=" Server mode only."/>
@@ -378,25 +378,25 @@
                         <GroupBox Header="Holding Registers (Waveform)">
                             <StackPanel Orientation="Vertical" Margin="5">
                                 <StackPanel Orientation="Horizontal">
-                                    <CheckBox Content="Enable" IsChecked="{Binding SimHoldingsEnabled}" VerticalAlignment="Center"/>
+                                    <CheckBox Content="Enable" IsChecked="{Binding SimulationCoordinator.SimHoldingsEnabled}" VerticalAlignment="Center"/>
                                     <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                    <TextBox Width="80" Text="{Binding SimHoldingStart}"/>
+                                    <TextBox Width="80" Text="{Binding SimulationCoordinator.SimHoldingStart}"/>
                                     <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                    <TextBox Width="80" Text="{Binding SimHoldingCount}"/>
+                                    <TextBox Width="80" Text="{Binding SimulationCoordinator.SimHoldingCount}"/>
                                     <TextBlock Text=" Min:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                    <TextBox Width="80" Text="{Binding SimHoldingMin}"/>
+                                    <TextBox Width="80" Text="{Binding SimulationCoordinator.SimHoldingMin}"/>
                                     <TextBlock Text=" Max:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                    <TextBox Width="80" Text="{Binding SimHoldingMax}"/>
+                                    <TextBox Width="80" Text="{Binding SimulationCoordinator.SimHoldingMax}"/>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                                     <TextBlock Text=" Waveform:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <ComboBox Width="100" SelectedItem="{Binding SimHoldingWaveformType}" ItemsSource="{StaticResource WaveformOptionsAll}"/>
+                                    <ComboBox Width="100" SelectedItem="{Binding SimulationCoordinator.SimHoldingWaveformType}" ItemsSource="{StaticResource WaveformOptionsAll}"/>
                                     <TextBlock Text=" Amp:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                    <TextBox Width="80" Text="{Binding SimHoldingAmplitude}"/>
+                                    <TextBox Width="80" Text="{Binding SimulationCoordinator.SimHoldingAmplitude}"/>
                                     <TextBlock Text=" Freq (Hz):" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                    <TextBox Width="80" Text="{Binding SimHoldingFrequencyHz}"/>
+                                    <TextBox Width="80" Text="{Binding SimulationCoordinator.SimHoldingFrequencyHz}"/>
                                     <TextBlock Text=" Offset:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                    <TextBox Width="80" Text="{Binding SimHoldingOffset}"/>
+                                    <TextBox Width="80" Text="{Binding SimulationCoordinator.SimHoldingOffset}"/>
                                 </StackPanel>
                                 <TextBlock Foreground="Gray" Margin="0,4,0,0">
                                     <Run Text="Note:" FontWeight="SemiBold"/>
@@ -407,35 +407,35 @@
 
                         <GroupBox Header="Coils (Toggle)">
                             <StackPanel Orientation="Horizontal" Margin="5">
-                                <CheckBox Content="Enable" IsChecked="{Binding SimCoilsEnabled}" VerticalAlignment="Center"/>
+                                <CheckBox Content="Enable" IsChecked="{Binding SimulationCoordinator.SimCoilsEnabled}" VerticalAlignment="Center"/>
                                 <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimCoilStart}"/>
+                                <TextBox Width="80" Text="{Binding SimulationCoordinator.SimCoilStart}"/>
                                 <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimCoilCount}"/>
+                                <TextBox Width="80" Text="{Binding SimulationCoordinator.SimCoilCount}"/>
                             </StackPanel>
                         </GroupBox>
 
                         <GroupBox Header="Input Registers (Ramp)">
                             <StackPanel Orientation="Horizontal" Margin="5">
-                                <CheckBox Content="Enable" IsChecked="{Binding SimInputsEnabled}" VerticalAlignment="Center"/>
+                                <CheckBox Content="Enable" IsChecked="{Binding SimulationCoordinator.SimInputsEnabled}" VerticalAlignment="Center"/>
                                 <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimInputStart}"/>
+                                <TextBox Width="80" Text="{Binding SimulationCoordinator.SimInputStart}"/>
                                 <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimInputCount}"/>
+                                <TextBox Width="80" Text="{Binding SimulationCoordinator.SimInputCount}"/>
                                 <TextBlock Text=" Min:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimInputMin}"/>
+                                <TextBox Width="80" Text="{Binding SimulationCoordinator.SimInputMin}"/>
                                 <TextBlock Text=" Max:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimInputMax}"/>
+                                <TextBox Width="80" Text="{Binding SimulationCoordinator.SimInputMax}"/>
                             </StackPanel>
                         </GroupBox>
 
                         <GroupBox Header="Discrete Inputs (Toggle)">
                             <StackPanel Orientation="Horizontal" Margin="5">
-                                <CheckBox Content="Enable" IsChecked="{Binding SimDiscreteEnabled}" VerticalAlignment="Center"/>
+                                <CheckBox Content="Enable" IsChecked="{Binding SimulationCoordinator.SimDiscreteEnabled}" VerticalAlignment="Center"/>
                                 <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimDiscreteStart}"/>
+                                <TextBox Width="80" Text="{Binding SimulationCoordinator.SimDiscreteStart}"/>
                                 <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimDiscreteCount}"/>
+                                <TextBox Width="80" Text="{Binding SimulationCoordinator.SimDiscreteCount}"/>
                             </StackPanel>
                         </GroupBox>
                     </StackPanel>

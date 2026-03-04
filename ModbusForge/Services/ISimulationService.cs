@@ -1,10 +1,10 @@
 namespace ModbusForge.Services
 {
-    using ModbusForge.ViewModels;
+    using ModbusForge.ViewModels.Coordinators;
 
     public interface ISimulationService
     {
-        void Start(MainViewModel viewModel);
+        void Start(SimulationCoordinator coordinator);
         void Stop();
     }
 }
