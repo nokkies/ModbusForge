@@ -16,7 +16,23 @@ namespace ModbusForge.Models
         RS,      // Set-Reset latch (flip-flop)
         TON,     // Timer On-Delay
         TOF,     // Timer Off-Delay
-        TP       // Timer Pulse
+        TP,      // Timer Pulse
+        // Counters
+        CTU,     // Counter Up - count rising edges
+        CTD,     // Counter Down - count falling edges
+        CTC,     // Counter Up/Down - combined with direction
+        // Comparators
+        COMPARE_EQ,   // Equal
+        COMPARE_NE,   // Not Equal
+        COMPARE_GT,   // Greater Than
+        COMPARE_LT,   // Less Than
+        COMPARE_GE,   // Greater Than or Equal
+        COMPARE_LE,   // Less Than or Equal
+        // Math operations
+        MATH_ADD,     // Addition
+        MATH_SUB,     // Subtraction
+        MATH_MUL,     // Multiplication
+        MATH_DIV      // Division
     }
 
     /// <summary>
@@ -75,11 +91,23 @@ namespace ModbusForge.Models
         [ObservableProperty]
         private bool _setDominant = true;
 
+        // Counter preset (for CTU, CTD, CTC)
+        [ObservableProperty]
+        private int _counterPreset = 10;
+
+        // Compare value (for comparators)
+        [ObservableProperty]
+        private int _compareValue = 0;
+
         // For timer state tracking (not persisted)
         public int TimerAccumulatorMs { get; set; } = 0;
         public bool TimerLastInput { get; set; } = false;
         public bool TimerOutput { get; set; } = false;
         public bool RsState { get; set; } = false;
+
+        // For counter state tracking (not persisted)
+        public int CounterValue { get; set; } = 0;
+        public bool CounterLastInput { get; set; } = false;
     }
 
     /// <summary>
