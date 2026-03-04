@@ -8,16 +8,16 @@ namespace ModbusForge.Tests.Coordinators
 {
     public class ConnectionCoordinatorTests
     {
-        private readonly Mock<ModbusTcpService> _mockClientService;
-        private readonly Mock<ModbusServerService> _mockServerService;
+        private readonly Mock<IModbusService> _mockClientService;
+        private readonly Mock<IModbusService> _mockServerService;
         private readonly Mock<IConsoleLoggerService> _mockConsoleLogger;
         private readonly Mock<ILogger<ConnectionCoordinator>> _mockLogger;
         private readonly ConnectionCoordinator _coordinator;
 
         public ConnectionCoordinatorTests()
         {
-            _mockClientService = new Mock<ModbusTcpService>(MockBehavior.Loose);
-            _mockServerService = new Mock<ModbusServerService>(MockBehavior.Loose, null!, null!);
+            _mockClientService = new Mock<IModbusService>();
+            _mockServerService = new Mock<IModbusService>();
             _mockConsoleLogger = new Mock<IConsoleLoggerService>();
             _mockLogger = new Mock<ILogger<ConnectionCoordinator>>();
             

@@ -11,14 +11,14 @@ namespace ModbusForge.ViewModels.Coordinators
     /// </summary>
     public class ConnectionCoordinator
     {
-        private readonly ModbusTcpService _clientService;
-        private readonly ModbusServerService _serverService;
+        private readonly IModbusService _clientService;
+        private readonly IModbusService _serverService;
         private readonly IConsoleLoggerService _consoleLoggerService;
         private readonly ILogger<ConnectionCoordinator> _logger;
 
         public ConnectionCoordinator(
-            ModbusTcpService clientService,
-            ModbusServerService serverService,
+            IModbusService clientService,
+            IModbusService serverService,
             IConsoleLoggerService consoleLoggerService,
             ILogger<ConnectionCoordinator> logger)
         {
