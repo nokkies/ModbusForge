@@ -69,7 +69,8 @@ namespace ModbusForge.Services
             lock (_sync)
             {
                 if (_keys.ContainsKey(key)) return;
-                _keys[key] = string.IsNullOrWhiteSpace(displayName) ? key : displayName;
+                displayName = string.IsNullOrWhiteSpace(displayName) ? key : displayName;
+                _keys[key] = displayName;
             }
             Added?.Invoke(key, displayName);
         }
