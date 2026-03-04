@@ -168,3 +168,6 @@ Server Shutdown:
 
 **Estimated Risk:** Low - Changes are defensive and improve reliability
 **Estimated Impact:** High - Fixes critical concurrency and data corruption issues
+
+### User Feedback Items
+- **Trend View**: Need to automatically enable 'continuous read' when a trend line is added so that users don't have to manually check multiple boxes to see data flow.

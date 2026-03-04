@@ -25,6 +25,8 @@ namespace ModbusForge.ViewModels.Coordinators
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
+        private const long MaxFileSize = 5 * 1024 * 1024; // 5MB limit for full configuration
+
         /// <summary>
         /// Saves the complete application configuration to a JSON file.
         /// </summary>
@@ -56,8 +58,9 @@ namespace ModbusForge.ViewModels.Coordinators
                         CustomEntries = customEntries.ToList()
                     };
 
-                    var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
-                    await File.WriteAllTextAsync(dialog.FileName, json);
+                    var options = new JsonSerializerOptions { WriteIndented = true };
+                    using var stream = File.Create(dialog.FileName);
+                    await JsonSerializer.SerializeAsync(stream, config, options);
                     setStatusMessage($"Saved configuration to {Path.GetFileName(dialog.FileName)}");
                 }
             }
@@ -83,8 +86,14 @@ namespace ModbusForge.ViewModels.Coordinators
 
                 if (dialog.ShowDialog() == true)
                 {
-                    var json = await File.ReadAllTextAsync(dialog.FileName);
-                    var config = JsonSerializer.Deserialize<AppConfiguration>(json);
+                    var fileInfo = new FileInfo(dialog.FileName);
+                    if (fileInfo.Length > MaxFileSize)
+                    {
+                        throw new InvalidDataException($"The selected file is too large (max {MaxFileSize / 1024 / 1024}MB).");
+                    }
+
+                    using var stream = File.OpenRead(dialog.FileName);
+                    var config = await JsonSerializer.DeserializeAsync<AppConfiguration>(stream);
 
                     if (config != null)
                     {

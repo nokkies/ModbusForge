@@ -24,6 +24,7 @@ namespace ModbusForge.Services
         private const int DefaultPort = 502;
         private const byte DefaultSlaveId = 1;
         private const int ShutdownTimeoutMs = 5000;
+        private const int DefaultDataStoreSize = 10000;
 
         public ModbusServerService(ILogger<ModbusServerService> logger)
         {
@@ -99,27 +100,27 @@ namespace ModbusForge.Services
                     // Create data store
                     _dataStore = new DataStore();
                     
-                    // Initialize holding registers to support addresses up to 10000
-                    for (int i = 0; i < 10000; i++)
+                    // Initialize holding registers to support addresses up to DefaultDataStoreSize
+                    for (int i = 0; i < DefaultDataStoreSize; i++)
                     {
                         _dataStore.HoldingRegisters.Add(0);
                     }
                                          
 
-                        // Initialize input registers to support addresses up to 10000
-                        for (int i = 0; i < 10000; i++)
+                        // Initialize input registers to support addresses up to DefaultDataStoreSize
+                        for (int i = 0; i < DefaultDataStoreSize; i++)
                     {
                         _dataStore.InputRegisters.Add(0);
                     }
                     
-                    // Initialize coils to support addresses up to 10000
-                    for (int i = 0; i < 10000; i++)
+                    // Initialize coils to support addresses up to DefaultDataStoreSize
+                    for (int i = 0; i < DefaultDataStoreSize; i++)
                     {
                         _dataStore.CoilDiscretes.Add(false);
                     }
                     
-                    // Initialize discrete inputs to support addresses up to 10000
-                    for (int i = 0; i < 10000; i++)
+                    // Initialize discrete inputs to support addresses up to DefaultDataStoreSize
+                    for (int i = 0; i < DefaultDataStoreSize; i++)
                     {
                         _dataStore.InputDiscretes.Add(false);
                     }

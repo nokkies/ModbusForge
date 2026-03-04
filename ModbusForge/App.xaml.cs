@@ -81,10 +81,20 @@ namespace ModbusForge
             services.AddSingleton<IScriptRuleService, ScriptRuleService>();
             
             // Register Coordinators
-            services.AddSingleton<ConnectionCoordinator>();
+            services.AddSingleton<ConnectionCoordinator>(provider => new ConnectionCoordinator(
+                provider.GetRequiredService<ModbusTcpService>(),
+                provider.GetRequiredService<ModbusServerService>(),
+                provider.GetRequiredService<IConsoleLoggerService>(),
+                provider.GetRequiredService<ILogger<ConnectionCoordinator>>()
+            ));
             services.AddSingleton<RegisterCoordinator>();
             services.AddSingleton<CustomEntryCoordinator>();
-            services.AddSingleton<TrendCoordinator>();
+            services.AddSingleton<TrendCoordinator>(provider => new TrendCoordinator(
+                provider.GetRequiredService<ModbusTcpService>(),
+                provider.GetRequiredService<ModbusServerService>(),
+                provider.GetRequiredService<ITrendLogger>(),
+                provider.GetRequiredService<ILogger<TrendCoordinator>>()
+            ));
             services.AddSingleton<ConfigurationCoordinator>();
             
             // Register ViewModels
