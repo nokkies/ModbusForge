@@ -439,9 +439,26 @@ namespace ModbusForge.ViewModels
         [ObservableProperty]
         private bool _globalMonitorEnabled = false;
 
+        partial void OnGlobalMonitorEnabledChanged(bool value)
+        {
+            if (!value)
+            {
+                // When global is disabled, disable all individual monitors
+                HoldingMonitorEnabled = false;
+                InputRegistersMonitorEnabled = false;
+                CoilsMonitorEnabled = false;
+                DiscreteInputsMonitorEnabled = false;
+            }
+        }
+
         // Monitoring toggles and periods
         [ObservableProperty]
         private bool _holdingMonitorEnabled = false;
+
+        partial void OnHoldingMonitorEnabledChanged(bool value)
+        {
+            if (value) GlobalMonitorEnabled = true;
+        }
 
         [ObservableProperty]
         private int _holdingMonitorPeriodMs = 1000;
@@ -449,17 +466,32 @@ namespace ModbusForge.ViewModels
         [ObservableProperty]
         private bool _inputRegistersMonitorEnabled = false;
 
+        partial void OnInputRegistersMonitorEnabledChanged(bool value)
+        {
+            if (value) GlobalMonitorEnabled = true;
+        }
+
         [ObservableProperty]
         private int _inputRegistersMonitorPeriodMs = 1000;
 
         [ObservableProperty]
         private bool _coilsMonitorEnabled = false;
 
+        partial void OnCoilsMonitorEnabledChanged(bool value)
+        {
+            if (value) GlobalMonitorEnabled = true;
+        }
+
         [ObservableProperty]
         private int _coilsMonitorPeriodMs = 1000;
 
         [ObservableProperty]
         private bool _discreteInputsMonitorEnabled = false;
+
+        partial void OnDiscreteInputsMonitorEnabledChanged(bool value)
+        {
+            if (value) GlobalMonitorEnabled = true;
+        }
 
         [ObservableProperty]
         private int _discreteInputsMonitorPeriodMs = 1000;

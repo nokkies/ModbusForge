@@ -205,7 +205,7 @@
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <ComboBox Width="120" SelectedItem="{Binding RegistersGlobalType}" ItemsSource="{StaticResource TypeOptionsAll}"/>
                         <Separator Width="10" Opacity="0"/>
-                        <CheckBox Content="Continuous Read" IsChecked="{Binding HoldingMonitorEnabled}" VerticalAlignment="Center"/>
+                        <mah:ToggleSwitch IsOn="{Binding HoldingMonitorEnabled, Mode=TwoWay}" OnContent="Continuous Read" OffContent="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding HoldingMonitorPeriodMs}"/>
                     </StackPanel>
@@ -235,7 +235,7 @@
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <ComboBox Width="120" SelectedItem="{Binding InputRegistersGlobalType}" ItemsSource="{StaticResource TypeOptionsAll}"/>
                         <Separator Width="10" Opacity="0"/>
-                        <CheckBox Content="Continuous Read" IsChecked="{Binding InputRegistersMonitorEnabled}" VerticalAlignment="Center"/>
+                        <mah:ToggleSwitch IsOn="{Binding InputRegistersMonitorEnabled, Mode=TwoWay}" OnContent="Continuous Read" OffContent="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding InputRegistersMonitorPeriodMs}"/>
                     </StackPanel>
@@ -263,7 +263,7 @@
                         <TextBox Width="80" Text="{Binding CoilCount}" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadCoilsCommand}" Width="80"/>
                         <Separator Width="10" Opacity="0"/>
-                        <CheckBox Content="Continuous Read" IsChecked="{Binding CoilsMonitorEnabled}" VerticalAlignment="Center"/>
+                        <mah:ToggleSwitch IsOn="{Binding CoilsMonitorEnabled, Mode=TwoWay}" OnContent="Continuous Read" OffContent="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding CoilsMonitorPeriodMs}"/>
                     </StackPanel>
@@ -290,7 +290,7 @@
                         <TextBox Width="80" Text="{Binding DiscreteInputCount}" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadDiscreteInputsCommand}" Width="80"/>
                         <Separator Width="10" Opacity="0"/>
-                        <CheckBox Content="Continuous Read" IsChecked="{Binding DiscreteInputsMonitorEnabled}" VerticalAlignment="Center"/>
+                        <mah:ToggleSwitch IsOn="{Binding DiscreteInputsMonitorEnabled, Mode=TwoWay}" OnContent="Continuous Read" OffContent="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding DiscreteInputsMonitorPeriodMs}"/>
                     </StackPanel>
@@ -319,7 +319,7 @@
                         <Button Content="Save" Command="{Binding SaveCustomCommand}" Width="80"/>
                         <Button Content="Load" Command="{Binding LoadCustomCommand}" Width="80" Margin="5,0,0,0"/>
                         <Separator Width="20" Opacity="0"/>
-                        <CheckBox Content="Continuous Read" IsChecked="{Binding GlobalMonitorEnabled}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <mah:ToggleSwitch IsOn="{Binding GlobalMonitorEnabled, Mode=TwoWay}" OnContent="Global Monitor" OffContent="Global Monitor" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <TextBlock VerticalAlignment="Center" Foreground="Gray">
                             <Run Text="Note:" FontWeight="SemiBold"/>
                             <Run Text=" Reads Trend-enabled rows."/>
@@ -364,7 +364,7 @@
 
                     <!-- Toolbar -->
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
-                        <CheckBox Content="Enable Simulation" IsChecked="{Binding SimulationEnabled}" VerticalAlignment="Center"/>
+                        <mah:ToggleSwitch IsOn="{Binding SimulationEnabled, Mode=TwoWay}" OnContent="Simulation Enabled" OffContent="Simulation Disabled" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding SimulationPeriodMs}"/>
                         <TextBlock VerticalAlignment="Center" Foreground="Gray" Margin="10,0,0,0">
@@ -378,7 +378,7 @@
                         <GroupBox Header="Holding Registers (Waveform)">
                             <StackPanel Orientation="Vertical" Margin="5">
                                 <StackPanel Orientation="Horizontal">
-                                    <CheckBox Content="Enable" IsChecked="{Binding SimHoldingsEnabled}" VerticalAlignment="Center"/>
+                                    <mah:ToggleSwitch IsOn="{Binding SimHoldingsEnabled, Mode=TwoWay}" OnContent="Enabled" OffContent="Disabled" VerticalAlignment="Center"/>
                                     <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                                     <TextBox Width="80" Text="{Binding SimHoldingStart}"/>
                                     <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
@@ -407,7 +407,7 @@
 
                         <GroupBox Header="Coils (Toggle)">
                             <StackPanel Orientation="Horizontal" Margin="5">
-                                <CheckBox Content="Enable" IsChecked="{Binding SimCoilsEnabled}" VerticalAlignment="Center"/>
+                                <mah:ToggleSwitch IsOn="{Binding SimCoilsEnabled, Mode=TwoWay}" OnContent="Enabled" OffContent="Disabled" VerticalAlignment="Center"/>
                                 <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                                 <TextBox Width="80" Text="{Binding SimCoilStart}"/>
                                 <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
@@ -417,7 +417,7 @@
 
                         <GroupBox Header="Input Registers (Ramp)">
                             <StackPanel Orientation="Horizontal" Margin="5">
-                                <CheckBox Content="Enable" IsChecked="{Binding SimInputsEnabled}" VerticalAlignment="Center"/>
+                                <mah:ToggleSwitch IsOn="{Binding SimInputsEnabled, Mode=TwoWay}" OnContent="Enabled" OffContent="Disabled" VerticalAlignment="Center"/>
                                 <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                                 <TextBox Width="80" Text="{Binding SimInputStart}"/>
                                 <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
@@ -431,7 +431,7 @@
 
                         <GroupBox Header="Discrete Inputs (Toggle)">
                             <StackPanel Orientation="Horizontal" Margin="5">
-                                <CheckBox Content="Enable" IsChecked="{Binding SimDiscreteEnabled}" VerticalAlignment="Center"/>
+                                <mah:ToggleSwitch IsOn="{Binding SimDiscreteEnabled, Mode=TwoWay}" OnContent="Enabled" OffContent="Disabled" VerticalAlignment="Center"/>
                                 <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                                 <TextBox Width="80" Text="{Binding SimDiscreteStart}"/>
                                 <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
@@ -449,7 +449,7 @@
 
                                 <!-- PLC Enable and Period -->
                                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
-                                    <CheckBox Content="Enable PLC Simulation" IsChecked="{Binding PlcSimulationEnabled}" VerticalAlignment="Center"/>
+                                    <mah:ToggleSwitch IsOn="{Binding PlcSimulationEnabled, Mode=TwoWay}" OnContent="PLC Simulation Enabled" OffContent="PLC Simulation Disabled" VerticalAlignment="Center"/>
                                     <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="15,0,5,0"/>
                                     <TextBox Width="80" Text="{Binding PlcSimulationPeriodMs}"/>
                                 </StackPanel>
