@@ -281,8 +281,20 @@ namespace ModbusForge.ViewModels
                 // If connected, disconnect current service when switching modes
                 if (IsConnected)
                 {
-                    try { _modbusService.DisconnectAsync().GetAwaiter().GetResult(); }
-                    catch { }
+                    var serviceToDisconnect = _modbusService;
+                    // Fire-and-forget disconnect to avoid blocking UI
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await serviceToDisconnect.DisconnectAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Error disconnecting previous service during mode switch");
+                        }
+                    });
+
                     IsConnected = false;
                     StatusMessage = "Disconnected";
                 }

@@ -45,7 +45,7 @@ namespace ModbusForge.Services
                 (client, protocolAddress) => client.ReadInputs(unitId, protocolAddress, (ushort)count));
         }
 
-        public bool IsConnected
+        public virtual bool IsConnected
         {
             get
             {
@@ -118,7 +118,7 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task DisconnectAsync()
+        public virtual async Task DisconnectAsync()
         {
             await _ioLock.WaitAsync().ConfigureAwait(false);
             try
