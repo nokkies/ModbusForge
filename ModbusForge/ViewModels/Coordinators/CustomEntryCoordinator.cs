@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Extensions.Logging;
+using ModbusForge.Helpers;
 using ModbusForge.Models;
 using ModbusForge.Services;
 
@@ -17,15 +18,21 @@ namespace ModbusForge.ViewModels.Coordinators
     {
         private readonly RegisterCoordinator _registerCoordinator;
         private readonly ICustomEntryService _customEntryService;
+        private readonly ModbusTcpService _clientService;
+        private readonly ModbusServerService _serverService;
         private readonly ILogger<CustomEntryCoordinator> _logger;
 
         public CustomEntryCoordinator(
             RegisterCoordinator registerCoordinator,
             ICustomEntryService customEntryService,
+            ModbusTcpService clientService,
+            ModbusServerService serverService,
             ILogger<CustomEntryCoordinator> logger)
         {
             _registerCoordinator = registerCoordinator ?? throw new ArgumentNullException(nameof(registerCoordinator));
             _customEntryService = customEntryService ?? throw new ArgumentNullException(nameof(customEntryService));
+            _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
+            _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -144,6 +151,143 @@ namespace ModbusForge.ViewModels.Coordinators
             {
                 setStatusMessage($"Invalid coil value: {entry.Value}. Use true/false or 1/0.");
             }
+        }
+
+        /// <summary>
+        /// Reads a custom entry value.
+        /// </summary>
+        public async Task ReadCustomNowAsync(CustomEntry entry, byte unitId, Action<string> setStatusMessage, bool isServerMode)
+        {
+            if (entry is null) return;
+            try
+            {
+                var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
+                switch (area)
+                {
+                    case "holdingregister":
+                        await ReadHoldingRegisterByTypeAsync(entry, unitId, setStatusMessage, isServerMode);
+                        break;
+                    case "inputregister":
+                        await ReadInputRegisterByTypeAsync(entry, unitId, setStatusMessage, isServerMode);
+                        break;
+                    case "coil":
+                        await ReadCoilAsync(entry, unitId, setStatusMessage, isServerMode);
+                        break;
+                    case "discreteinput":
+                        await ReadDiscreteInputAsync(entry, unitId, setStatusMessage, isServerMode);
+                        break;
+                    default:
+                        setStatusMessage($"Unknown area: {entry.Area}");
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reading custom entry");
+                setStatusMessage($"Custom read error: {ex.Message}");
+            }
+        }
+
+        private IModbusService GetService(bool isServerMode) => isServerMode ? _serverService : _clientService;
+
+        /// <summary>
+        /// Reads a holding register value based on the entry's data type.
+        /// </summary>
+        private async Task ReadHoldingRegisterByTypeAsync(CustomEntry entry, byte unitId, Action<string> setStatusMessage, bool isServerMode)
+        {
+            var type = (entry.Type ?? "uint").ToLowerInvariant();
+            var address = entry.Address;
+            var service = GetService(isServerMode);
+
+            switch (type)
+            {
+                case "real":
+                    var regsReal = await service.ReadHoldingRegistersAsync(unitId, address, 2);
+                    if (regsReal is null) return;
+                    entry.Value = DataTypeConverter.ToSingle(regsReal[0], regsReal[1]).ToString(CultureInfo.InvariantCulture);
+                    setStatusMessage($"Read REAL {entry.Value} from HR {address}");
+                    break;
+                case "int":
+                    var regsInt = await service.ReadHoldingRegistersAsync(unitId, address, 1);
+                    if (regsInt is null) return;
+                    entry.Value = unchecked((short)regsInt[0]).ToString(CultureInfo.InvariantCulture);
+                    setStatusMessage($"Read INT {entry.Value} from HR {address}");
+                    break;
+                case "string":
+                    var regsString = await service.ReadHoldingRegistersAsync(unitId, address, 1);
+                    if (regsString is null) return;
+                    entry.Value = DataTypeConverter.ToString(regsString[0]);
+                    setStatusMessage($"Read STRING '{entry.Value}' from HR {address}");
+                    break;
+                default: // uint
+                    var regsUInt = await service.ReadHoldingRegistersAsync(unitId, address, 1);
+                    if (regsUInt is null) return;
+                    entry.Value = regsUInt[0].ToString(CultureInfo.InvariantCulture);
+                    setStatusMessage($"Read UINT {entry.Value} from HR {address}");
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Reads an input register value based on the entry's data type.
+        /// </summary>
+        private async Task ReadInputRegisterByTypeAsync(CustomEntry entry, byte unitId, Action<string> setStatusMessage, bool isServerMode)
+        {
+            var type = (entry.Type ?? "uint").ToLowerInvariant();
+            var address = entry.Address;
+            var service = GetService(isServerMode);
+
+            switch (type)
+            {
+                case "real":
+                    var regsReal = await service.ReadInputRegistersAsync(unitId, address, 2);
+                    if (regsReal is null) return;
+                    entry.Value = DataTypeConverter.ToSingle(regsReal[0], regsReal[1]).ToString(CultureInfo.InvariantCulture);
+                    setStatusMessage($"Read REAL {entry.Value} from IR {address}");
+                    break;
+                case "int":
+                    var regsInt = await service.ReadInputRegistersAsync(unitId, address, 1);
+                    if (regsInt is null) return;
+                    entry.Value = unchecked((short)regsInt[0]).ToString(CultureInfo.InvariantCulture);
+                    setStatusMessage($"Read INT {entry.Value} from IR {address}");
+                    break;
+                case "string":
+                    var regsString = await service.ReadInputRegistersAsync(unitId, address, 1);
+                    if (regsString is null) return;
+                    entry.Value = DataTypeConverter.ToString(regsString[0]);
+                    setStatusMessage($"Read STRING '{entry.Value}' from IR {address}");
+                    break;
+                default: // uint
+                    var regsUInt = await service.ReadInputRegistersAsync(unitId, address, 1);
+                    if (regsUInt is null) return;
+                    entry.Value = regsUInt[0].ToString(CultureInfo.InvariantCulture);
+                    setStatusMessage($"Read UINT {entry.Value} from IR {address}");
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Reads a coil (boolean) value.
+        /// </summary>
+        private async Task ReadCoilAsync(CustomEntry entry, byte unitId, Action<string> setStatusMessage, bool isServerMode)
+        {
+            var service = GetService(isServerMode);
+            var states = await service.ReadCoilsAsync(unitId, entry.Address, 1);
+            if (states is null) return;
+            entry.Value = states[0] ? "1" : "0";
+            setStatusMessage($"Read COIL {entry.Value} from {entry.Address}");
+        }
+
+        /// <summary>
+        /// Reads a discrete input (boolean) value.
+        /// </summary>
+        private async Task ReadDiscreteInputAsync(CustomEntry entry, byte unitId, Action<string> setStatusMessage, bool isServerMode)
+        {
+            var service = GetService(isServerMode);
+            var states = await service.ReadDiscreteInputsAsync(unitId, entry.Address, 1);
+            if (states is null) return;
+            entry.Value = states[0] ? "1" : "0";
+            setStatusMessage($"Read DI {entry.Value} from {entry.Address}");
         }
 
         private static bool TryParseBool(string? value, out bool result)

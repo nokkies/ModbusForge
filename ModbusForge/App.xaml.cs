@@ -96,6 +96,7 @@ namespace ModbusForge
                 provider.GetRequiredService<ILogger<TrendCoordinator>>()
             ));
             services.AddSingleton<ConfigurationCoordinator>();
+            services.AddSingleton<SimulationCoordinator>();
             
             // Register ViewModels
             services.AddSingleton<MainViewModel>();
