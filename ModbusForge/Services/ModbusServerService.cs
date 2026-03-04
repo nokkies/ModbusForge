@@ -95,7 +95,10 @@ namespace ModbusForge.Services
                         if (_isRunning)
                             return true;
 
-                        var endpoint = new IPEndPoint(IPAddress.Any, port == 0 ? DefaultPort : port);
+                        if (!IPAddress.TryParse(ipAddress, out var address))
+                            throw new ArgumentException($"Invalid IP address: {ipAddress}");
+
+                        var endpoint = new IPEndPoint(address, port == 0 ? DefaultPort : port);
                     
                     // Create data store
                     _dataStore = new DataStore();
