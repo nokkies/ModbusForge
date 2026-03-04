@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using System.IO;
-using ModbusForge.Helpers;
 
 namespace ModbusForge.Services
 {
@@ -28,68 +27,22 @@ namespace ModbusForge.Services
 
         public async Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
         {
-            if (!IsConnected)
-                return null;
-
-            await _ioLock.WaitAsync().ConfigureAwait(false);
-            try
-            {
-                return await Task.Run(() =>
-                {
-                    try
-                    {
-                        _logger.LogDebug($"Reading {count} input registers starting at {startAddress} (Unit ID: {unitId})");
-                        // NModbus uses 0-based protocol addresses, convert from 1-based UI address
-                        ushort protocolAddress = (ushort)(startAddress > 0 ? startAddress - 1 : 0);
-                        var registers = _client?.ReadInputRegisters(unitId, protocolAddress, (ushort)count);
-                        if (registers == null) return Array.Empty<ushort>();
-                        return registers;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error reading input registers");
-                        HandleConnectionLoss();
-                        return null;
-                    }
-                }).ConfigureAwait(false);
-            }
-            finally
-            {
-                _ioLock.Release();
-            }
+            return await ExecuteReadAsync(
+                unitId,
+                startAddress,
+                $"Reading {count} input registers starting at {startAddress}",
+                "Error reading input registers",
+                (client, protocolAddress) => client.ReadInputRegisters(unitId, protocolAddress, (ushort)count));
         }
 
         public async Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
         {
-            if (!IsConnected)
-                return null;
-
-            await _ioLock.WaitAsync().ConfigureAwait(false);
-            try
-            {
-                return await Task.Run(() =>
-                {
-                    try
-                    {
-                        _logger.LogDebug($"Reading {count} discrete inputs starting at {startAddress} (Unit ID: {unitId})");
-                        // NModbus uses 0-based protocol addresses, convert from 1-based UI address
-                        ushort protocolAddress = (ushort)(startAddress > 0 ? startAddress - 1 : 0);
-                        var inputs = _client?.ReadInputs(unitId, protocolAddress, (ushort)count);
-                        if (inputs == null) return Array.Empty<bool>();
-                        return inputs;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error reading discrete inputs");
-                        HandleConnectionLoss();
-                        return null;
-                    }
-                }).ConfigureAwait(false);
-            }
-            finally
-            {
-                _ioLock.Release();
-            }
+            return await ExecuteReadAsync(
+                unitId,
+                startAddress,
+                $"Reading {count} discrete inputs starting at {startAddress}",
+                "Error reading discrete inputs",
+                (client, protocolAddress) => client.ReadInputs(unitId, protocolAddress, (ushort)count));
         }
 
         public bool IsConnected
@@ -193,67 +146,50 @@ namespace ModbusForge.Services
 
         public async Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count)
         {
-            if (!IsConnected)
-                return null;
-
-            await _ioLock.WaitAsync().ConfigureAwait(false);
-            try
-            {
-                return await Task.Run(() =>
-                {
-                    try
-                    {
-                        _logger.LogDebug($"Reading {count} holding registers starting at {startAddress} (Unit ID: {unitId})");
-                        // NModbus uses 0-based protocol addresses, convert from 1-based UI address
-                        ushort protocolAddress = (ushort)(startAddress > 0 ? startAddress - 1 : 0);
-                        var registers = _client?.ReadHoldingRegisters(unitId, protocolAddress, (ushort)count);
-                        if (registers == null) return Array.Empty<ushort>();
-                        return registers;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error reading holding registers");
-                        HandleConnectionLoss();
-                        return null;
-                    }
-                }).ConfigureAwait(false);
-            }
-            finally
-            {
-                _ioLock.Release();
-            }
+            return await ExecuteReadAsync(
+                unitId,
+                startAddress,
+                $"Reading {count} holding registers starting at {startAddress}",
+                "Error reading holding registers",
+                (client, protocolAddress) => client.ReadHoldingRegisters(unitId, protocolAddress, (ushort)count));
         }
 
         public async Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
         {
-            if (!IsConnected)
-                return;
-
-            await _ioLock.WaitAsync().ConfigureAwait(false);
-            try
-            {
-                await Task.Run(() =>
-                {
-                    try
-                    {
-                        // NModbus uses 0-based protocol addresses, convert from 1-based UI address
-                        ushort protocolAddress = (ushort)(registerAddress > 0 ? registerAddress - 1 : 0);
-                        _client?.WriteSingleRegister(unitId, protocolAddress, value);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error writing single register");
-                        HandleConnectionLoss();
-                    }
-                }).ConfigureAwait(false);
-            }
-            finally
-            {
-                _ioLock.Release();
-            }
+            await ExecuteWriteAsync(
+                unitId,
+                registerAddress,
+                $"Writing register at {registerAddress} = {value}",
+                "Error writing single register",
+                (client, protocolAddress) => client.WriteSingleRegister(unitId, protocolAddress, value));
         }
 
         public async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
+        {
+            return await ExecuteReadAsync(
+                unitId,
+                startAddress,
+                $"Reading {count} coils starting at {startAddress}",
+                "Error reading coils",
+                (client, protocolAddress) => client.ReadCoils(unitId, protocolAddress, (ushort)count));
+        }
+
+        public async Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)
+        {
+            await ExecuteWriteAsync(
+                unitId,
+                coilAddress,
+                $"Writing coil at {coilAddress} = {value}",
+                "Error writing single coil",
+                (client, protocolAddress) => client.WriteSingleCoil(unitId, protocolAddress, value));
+        }
+
+        private async Task<T[]?> ExecuteReadAsync<T>(
+            byte unitId,
+            int startAddress,
+            string debugLogMessage,
+            string errorLogContext,
+            Func<IModbusMaster, ushort, T[]> readFunc)
         {
             if (!IsConnected)
                 return null;
@@ -265,16 +201,19 @@ namespace ModbusForge.Services
                 {
                     try
                     {
-                        _logger.LogDebug($"Reading {count} coils starting at {startAddress} (Unit ID: {unitId})");
+                        _logger.LogDebug($"{debugLogMessage} (Unit ID: {unitId})");
                         // NModbus uses 0-based protocol addresses, convert from 1-based UI address
                         ushort protocolAddress = (ushort)(startAddress > 0 ? startAddress - 1 : 0);
-                        var coils = _client?.ReadCoils(unitId, protocolAddress, (ushort)count);
-                        if (coils == null) return Array.Empty<bool>();
-                        return coils;
+
+                        if (_client == null)
+                            return Array.Empty<T>();
+
+                        var result = readFunc(_client, protocolAddress);
+                        return result ?? Array.Empty<T>();
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error reading coils");
+                        _logger.LogError(ex, errorLogContext);
                         HandleConnectionLoss();
                         return null;
                     }
@@ -286,7 +225,12 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)
+        private async Task ExecuteWriteAsync(
+            byte unitId,
+            int address,
+            string debugLogMessage,
+            string errorLogContext,
+            Action<IModbusMaster, ushort> writeAction)
         {
             if (!IsConnected)
                 return;
@@ -298,14 +242,16 @@ namespace ModbusForge.Services
                 {
                     try
                     {
-                        _logger.LogDebug($"Writing coil at {coilAddress} = {value} (Unit ID: {unitId})");
+                        _logger.LogDebug($"{debugLogMessage} (Unit ID: {unitId})");
                         // NModbus uses 0-based protocol addresses, convert from 1-based UI address
-                        ushort protocolAddress = (ushort)(coilAddress > 0 ? coilAddress - 1 : 0);
-                        _client?.WriteSingleCoil(unitId, protocolAddress, value);
+                        ushort protocolAddress = (ushort)(address > 0 ? address - 1 : 0);
+
+                        if (_client != null)
+                            writeAction(_client, protocolAddress);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error writing single coil");
+                        _logger.LogError(ex, errorLogContext);
                         HandleConnectionLoss();
                     }
                 }).ConfigureAwait(false);
