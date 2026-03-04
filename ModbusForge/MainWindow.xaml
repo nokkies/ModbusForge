@@ -438,6 +438,101 @@
                                 <TextBox Width="80" Text="{Binding SimDiscreteCount}"/>
                             </StackPanel>
                         </GroupBox>
+
+                        <GroupBox Header="PLC Simulation (Logic Gates &amp; Timers)">
+                            <Grid Margin="5">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- PLC Enable and Period -->
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
+                                    <CheckBox Content="Enable PLC Simulation" IsChecked="{Binding PlcSimulationEnabled}" VerticalAlignment="Center"/>
+                                    <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="15,0,5,0"/>
+                                    <TextBox Width="80" Text="{Binding PlcSimulationPeriodMs}"/>
+                                </StackPanel>
+
+                                <!-- Add/Clear Buttons -->
+                                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Button Content="Add Element" Command="{Binding AddPlcElementCommand}" Padding="10,3" Margin="0,0,5,0"/>
+                                    <Button Content="Clear All" Command="{Binding ClearPlcElementsCommand}" Padding="10,3"/>
+                                </StackPanel>
+
+                                <!-- PLC Elements List -->
+                                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl ItemsSource="{Binding PlcSimulationElements}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,5" Padding="5">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <!-- Element Type -->
+                                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,10,0">
+                                                            <TextBlock Text="Type:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                                            <ComboBox Width="90" SelectedItem="{Binding ElementType}" 
+                                                                      ItemsSource="{Binding DataContext.PlcElementTypes, RelativeSource={RelativeSource AncestorType=MetroWindow}}"/>
+                                                        </StackPanel>
+
+                                                        <!-- Inputs and Output -->
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                            <!-- Input 1 -->
+                                                            <StackPanel Orientation="Horizontal" Margin="0,0,10,0">
+                                                                <TextBlock Text="IN1:" VerticalAlignment="Center" Margin="0,0,3,0"/>
+                                                                <ComboBox Width="80" SelectedItem="{Binding Input1.Area}" 
+                                                                          ItemsSource="{Binding DataContext.PlcAreas, RelativeSource={RelativeSource AncestorType=MetroWindow}}"/>
+                                                                <TextBox Width="50" Text="{Binding Input1.Address}" Margin="3,0,0,0"/>
+                                                                <CheckBox Content="NOT" IsChecked="{Binding Input1.Not}" VerticalAlignment="Center" Margin="3,0,0,0"/>
+                                                            </StackPanel>
+
+                                                            <!-- Input 2 (for AND/OR/RS) -->
+                                                            <StackPanel Orientation="Horizontal" Margin="0,0,10,0">
+                                                                <TextBlock Text="IN2:" VerticalAlignment="Center" Margin="0,0,3,0"/>
+                                                                <ComboBox Width="80" SelectedItem="{Binding Input2.Area}" 
+                                                                          ItemsSource="{Binding DataContext.PlcAreas, RelativeSource={RelativeSource AncestorType=MetroWindow}}"/>
+                                                                <TextBox Width="50" Text="{Binding Input2.Address}" Margin="3,0,0,0"/>
+                                                                <CheckBox Content="NOT" IsChecked="{Binding Input2.Not}" VerticalAlignment="Center" Margin="3,0,0,0"/>
+                                                            </StackPanel>
+
+                                                            <!-- Output -->
+                                                            <StackPanel Orientation="Horizontal" Margin="0,0,10,0">
+                                                                <TextBlock Text="OUT:" VerticalAlignment="Center" Margin="0,0,3,0"/>
+                                                                <ComboBox Width="80" SelectedItem="{Binding Output.Area}" 
+                                                                          ItemsSource="{Binding DataContext.PlcAreas, RelativeSource={RelativeSource AncestorType=MetroWindow}}"/>
+                                                                <TextBox Width="50" Text="{Binding Output.Address}" Margin="3,0,0,0"/>
+                                                                <CheckBox Content="NOT" IsChecked="{Binding Output.Not}" VerticalAlignment="Center" Margin="3,0,0,0"/>
+                                                            </StackPanel>
+
+                                                            <!-- Timer Preset (for timers) -->
+                                                            <StackPanel Orientation="Horizontal" Margin="0,0,10,0">
+                                                                <TextBlock Text="Timer (ms):" VerticalAlignment="Center" Margin="0,0,3,0"/>
+                                                                <TextBox Width="60" Text="{Binding TimerPresetMs}"/>
+                                                            </StackPanel>
+
+                                                            <!-- RS Set Dominant (for RS latch) -->
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="Set Dominant:" VerticalAlignment="Center" Margin="0,0,3,0"/>
+                                                                <CheckBox IsChecked="{Binding SetDominant}" VerticalAlignment="Center"/>
+                                                            </StackPanel>
+                                                        </StackPanel>
+
+                                                        <!-- Delete Button -->
+                                                        <Button Grid.Column="2" Content="X" Command="{Binding DataContext.RemovePlcElementCommand, RelativeSource={RelativeSource AncestorType=MetroWindow}}" 
+                                                                CommandParameter="{Binding}" Padding="5,2" VerticalAlignment="Center"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Grid>
+                        </GroupBox>
                     </StackPanel>
                 </Grid>
             </TabItem>

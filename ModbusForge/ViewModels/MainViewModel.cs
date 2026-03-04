@@ -179,6 +179,11 @@ namespace ModbusForge.ViewModels
             LoadCustomCommand = new RelayCommand(async () => await LoadCustomAsync());
             SaveAllConfigCommand = new RelayCommand(async () => await SaveAllConfigAsync());
             LoadAllConfigCommand = new RelayCommand(async () => await LoadAllConfigAsync());
+
+            // PLC Simulation commands
+            AddPlcElementCommand = new RelayCommand(AddPlcElement);
+            RemovePlcElementCommand = new RelayCommand<object?>(RemovePlcElement);
+            ClearPlcElementsCommand = new RelayCommand(ClearPlcElements);
         }
 
         /// <summary>
@@ -418,6 +423,11 @@ namespace ModbusForge.ViewModels
         public IRelayCommand LoadAllConfigCommand { get; private set; }
         public IAsyncRelayCommand<DataGridCellEditEndingEventArgs> UpdateHoldingRegisterCommand { get; private set; }
 
+        // PLC Simulation commands
+        public IRelayCommand AddPlcElementCommand { get; private set; }
+        public IRelayCommand RemovePlcElementCommand { get; private set; }
+        public IRelayCommand ClearPlcElementsCommand { get; private set; }
+
         // Global toggles for Custom tab
         [ObservableProperty]
         private bool _customMonitorEnabled = false;
@@ -525,6 +535,16 @@ namespace ModbusForge.ViewModels
 
         [ObservableProperty]
         private int _simDiscreteCount = 8;
+
+        // PLC Simulation properties
+        [ObservableProperty]
+        private bool _plcSimulationEnabled = false;
+
+        [ObservableProperty]
+        private int _plcSimulationPeriodMs = 100;
+
+        [ObservableProperty]
+        private ObservableCollection<PlcSimulationElement> _plcSimulationElements = new ObservableCollection<PlcSimulationElement>();
 
 
         private bool CanConnect() => _connectionCoordinator.CanConnect(IsConnected);
@@ -1355,5 +1375,45 @@ namespace ModbusForge.ViewModels
                 }
             }
         }
+
+        #region PLC Simulation Methods
+
+        private void AddPlcElement()
+        {
+            var element = new PlcSimulationElement
+            {
+                Id = Guid.NewGuid().ToString(),
+                ElementType = PlcElementType.Source,
+                Input1 = new PlcAddressReference { Area = PlcArea.Coil, Address = 0, Not = false },
+                Input2 = new PlcAddressReference { Area = PlcArea.Coil, Address = 0, Not = false },
+                Output = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 0, Not = false },
+                TimerPresetMs = 1000,
+                SetDominant = true
+            };
+            PlcSimulationElements.Add(element);
+        }
+
+        private void RemovePlcElement(object? param)
+        {
+            if (param is PlcSimulationElement element)
+            {
+                PlcSimulationElements.Remove(element);
+            }
+            else if (param is string elementId)
+            {
+                var toRemove = PlcSimulationElements.FirstOrDefault(e => e.Id == elementId);
+                if (toRemove != null)
+                {
+                    PlcSimulationElements.Remove(toRemove);
+                }
+            }
+        }
+
+        private void ClearPlcElements()
+        {
+            PlcSimulationElements.Clear();
+        }
+
+        #endregion
     }
 }
