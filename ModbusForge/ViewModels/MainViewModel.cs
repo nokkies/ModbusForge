@@ -730,7 +730,6 @@ namespace ModbusForge.ViewModels
             }
         }
 
-
         private static bool TryParseBool(string? value, out bool result)
         {
             result = false;
@@ -956,7 +955,6 @@ namespace ModbusForge.ViewModels
                 IsServerMode,
                 enabled => GlobalMonitorEnabled = enabled);
         }
-
 
         private async Task SaveCustomAsync()
         {
