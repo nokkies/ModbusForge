@@ -28,6 +28,7 @@ namespace ModbusForge.Tests.Performance
         private CustomEntryCoordinator _customEntryCoordinator;
         private TrendCoordinator _trendCoordinator;
         private ConfigurationCoordinator _configurationCoordinator;
+        private SimulationCoordinator _simulationCoordinator;
 
         public BlockingModeSwitchTests()
         {
@@ -68,6 +69,8 @@ namespace ModbusForge.Tests.Performance
             _customEntryCoordinator = new CustomEntryCoordinator(
                 _registerCoordinator,
                 _mockCustomEntryService.Object,
+                _mockClientService.Object,
+                _mockServerService.Object,
                 new Mock<ILogger<CustomEntryCoordinator>>().Object);
 
             _trendCoordinator = new TrendCoordinator(
@@ -78,10 +81,12 @@ namespace ModbusForge.Tests.Performance
 
             _configurationCoordinator = new ConfigurationCoordinator(
                 new Mock<ILogger<ConfigurationCoordinator>>().Object);
+
+            _simulationCoordinator = new SimulationCoordinator(_mockSimulationService.Object);
         }
 
         [Fact]
-        public void ModeSwitch_ShouldNotBlockUI_WhenDisconnecting()
+        public async Task ModeSwitch_ShouldNotBlockUI_WhenDisconnecting()
         {
             // Arrange
             // Simulate a slow disconnect on the Client service
@@ -96,14 +101,14 @@ namespace ModbusForge.Tests.Performance
                 _mockLogger.Object,
                 _mockOptions.Object,
                 _mockTrendLogger.Object,
-                _mockSimulationService.Object,
                 _mockCustomEntryService.Object,
                 _mockConsoleLogger.Object,
                 _connectionCoordinator,
                 _registerCoordinator,
                 _customEntryCoordinator,
                 _trendCoordinator,
-                _configurationCoordinator);
+                _configurationCoordinator,
+                _simulationCoordinator);
 
             // Set initial state
             viewModel.Mode = "Client";
@@ -126,6 +131,10 @@ namespace ModbusForge.Tests.Performance
                 $"Mode switch took {stopwatch.ElapsedMilliseconds}ms, expected < 500ms. The UI thread is blocked!");
 
             Assert.Equal("Server", viewModel.Mode);
+
+            // Allow time for the fire-and-forget Task.Run in OnModeChanged to execute
+            await Task.Delay(100);
+
             // We can't easily assert IsConnected state immediately if it's async,
             // but we can assert that DisconnectAsync was called.
             _mockClientService.Verify(s => s.DisconnectAsync(), Times.Once);

@@ -41,6 +41,7 @@ namespace ModbusForge.Tests
                 clientField.SetValue(_service, _modbusMasterMock.Object);
             }
 
+            // Inject the connected TcpClient
             var tcpClientField = typeof(ModbusService).GetField("_tcpClient", BindingFlags.NonPublic | BindingFlags.Instance);
             if (tcpClientField != null)
             {
@@ -49,7 +50,7 @@ namespace ModbusForge.Tests
         }
 
         [Fact]
-        public async Task WriteSingleRegisterAsync_ShouldNotLogSensitiveValue()
+        public async Task WriteSingleRegisterAsync_DoesNotLogSensitiveValue()
         {
             // Arrange
             byte unitId = 1;
@@ -60,8 +61,7 @@ namespace ModbusForge.Tests
             // Act
             await _service.WriteSingleRegisterAsync(unitId, registerAddress, sensitiveValue);
 
-            // Assert
-            // Verify that NO log message contains the sensitive value
+            // Assert - Check that the sensitive value is NOT logged
             _loggerMock.Verify(
                 x => x.Log(
                     LogLevel.Debug,
@@ -71,10 +71,20 @@ namespace ModbusForge.Tests
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Never,
                 $"Log message should NOT contain sensitive value '{sensitiveValueStr}'");
+
+            // Also assert that something WAS logged (to ensure we didn't just remove logging entirely)
+            _loggerMock.Verify(
+                x => x.Log(
+                    LogLevel.Debug,
+                    It.IsAny<EventId>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.AtLeastOnce);
         }
 
         [Fact]
-        public async Task WriteSingleCoilAsync_ShouldNotLogSensitiveValue()
+        public async Task WriteSingleCoilAsync_DoesNotLogSensitiveValue()
         {
             // Arrange
             byte unitId = 1;
@@ -85,13 +95,7 @@ namespace ModbusForge.Tests
             // Act
             await _service.WriteSingleCoilAsync(unitId, coilAddress, sensitiveValue);
 
-            // Assert
-            // Verify that NO log message contains the sensitive value
-            // Note: "True" might be common, so this test might be flaky if "True" appears elsewhere in the log message unrelated to the value.
-            // However, the current log message is: "Writing coil at {coilAddress} = {value} (Unit ID: {unitId})"
-            // and "Successfully wrote coil {coilAddress} with value {value}"
-            // If we remove {value}, "True" should disappear from these messages.
-
+            // Assert - Check that the sensitive value is NOT logged
             _loggerMock.Verify(
                 x => x.Log(
                     LogLevel.Debug,
@@ -101,13 +105,23 @@ namespace ModbusForge.Tests
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Never,
                 $"Log message should NOT contain sensitive value '{sensitiveValueStr}'");
+
+            // Also assert that something WAS logged
+            _loggerMock.Verify(
+                x => x.Log(
+                    LogLevel.Debug,
+                    It.IsAny<EventId>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.AtLeastOnce);
         }
 
         public void Dispose()
         {
-            _service.Dispose();
-            _tcpClient.Dispose();
-            _listener.Stop();
+            // ModbusService disposes the TcpClient, but we should clean up the listener
+            _service?.Dispose();
+            _listener?.Stop();
         }
     }
 }

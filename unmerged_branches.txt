@@ -1,0 +1,5 @@
+  origin/feature/plc-simulation
+  origin/add-tests-rundiagnosticsasync-5141960806733697848
+  origin/refactor/modbus-server-service-read-methods-9159750363552704174
+  origin/security-fix-modbus-logs-5516296848502351320
+  origin/refactor/main-view-model-duplication-15602244321426602813

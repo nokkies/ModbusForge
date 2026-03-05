@@ -207,6 +207,12 @@ namespace ModbusForge.Services
             GC.SuppressFinalize(this);
         }
 
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            return ValueTask.CompletedTask;
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposed)

@@ -1,0 +1,30 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  ModbusForge -> C:\Users\rvn\source\repos\ModbusForge\ModbusForge\ModbusForge\bin\Debug\net8.0-windows\ModbusForge.dll
+  ModbusForge.Tests -> C:\Users\rvn\source\repos\ModbusForge\ModbusForge\ModbusForge.Tests\bin\Debug\net8.0-windows\ModbusForge.Tests.dll
+Test run for C:\Users\rvn\source\repos\ModbusForge\ModbusForge\ModbusForge.Tests\bin\Debug\net8.0-windows\ModbusForge.Tests.dll (.NETCoreApp,Version=v8.0)
+Microsoft (R) Test Execution Command Line Tool Version 17.8.0 (x64)
+Copyright (c) Microsoft Corporation.  All rights reserved.
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+  Failed ModbusForge.Tests.Performance.BlockingModeSwitchTests.ModeSwitch_ShouldNotBlockUI_WhenDisconnecting [122 ms]
+  Error Message:
+   Moq.MockException : 
+Expected invocation on the mock once, but was 0 times: s => s.DisconnectAsync()
+
+Performed invocations:
+
+   Mock<ModbusTcpService:1> (s):
+
+      ModbusTcpService.IsConnected
+      ModbusTcpService.DisconnectAsync()
+
+  Stack Trace:
+     at Moq.Mock.Verify(Mock mock, LambdaExpression expression, Times times, String failMessage) in /_/src/Moq/Mock.cs:line 332
+   at Moq.Mock`1.Verify[TResult](Expression`1 expression, Func`1 times) in /_/src/Moq/Mock`1.cs:line 840
+   at ModbusForge.Tests.Performance.BlockingModeSwitchTests.ModeSwitch_ShouldNotBlockUI_WhenDisconnecting() in C:\Users\rvn\source\repos\ModbusForge\ModbusForge\ModbusForge.Tests\Performance\BlockingModeSwitchTests.cs:line 136
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+
+Failed!  - Failed:     1, Passed:    58, Skipped:     0, Total:    59, Duration: 246 ms - ModbusForge.Tests.dll (net8.0)
