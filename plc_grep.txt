@@ -1,0 +1,38 @@
+origin/feature/plc-simulation:ModbusForge/MainWindow.xaml:                                    <mah:ToggleSwitch IsOn="{Binding PlcSimulationEnabled, Mode=TwoWay}" OnContent="PLC Simulation Enabled" OffContent="PLC Simulation Disabled" VerticalAlignment="Center"/>
+origin/feature/plc-simulation:ModbusForge/MainWindow.xaml:                                    <TextBox Width="80" Text="{Binding PlcSimulationPeriodMs}"/>
+origin/feature/plc-simulation:ModbusForge/MainWindow.xaml:                                    <ItemsControl ItemsSource="{Binding PlcSimulationElements}">
+origin/feature/plc-simulation:ModbusForge/Models/PlcSimulationModels.cs:    public partial class PlcSimulationElement : ObservableObject
+origin/feature/plc-simulation:ModbusForge/Models/PlcSimulationModels.cs:    public partial class PlcSimulationConfig : ObservableObject
+origin/feature/plc-simulation:ModbusForge/Models/PlcSimulationModels.cs:        private ObservableCollection<PlcSimulationElement> _elements = new ObservableCollection<PlcSimulationElement>();
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:                if (_viewModel.PlcSimulationEnabled)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:                    RunPlcSimulation((int)(dt * 1000));
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private void RunPlcSimulation(int elapsedMs)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:            foreach (var element in _viewModel.PlcSimulationElements)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluatePlcElement(PlcSimulationElement element, DataStore dataStore, int elapsedMs)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateRsLatch(PlcSimulationElement element, DataStore dataStore)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateTonTimer(PlcSimulationElement element, DataStore dataStore, int elapsedMs)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateTofTimer(PlcSimulationElement element, DataStore dataStore, int elapsedMs)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateTpTimer(PlcSimulationElement element, DataStore dataStore, int elapsedMs)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateCtuCounter(PlcSimulationElement element, DataStore dataStore)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateCtdCounter(PlcSimulationElement element, DataStore dataStore)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateCtcCounter(PlcSimulationElement element, DataStore dataStore)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateCompareEq(PlcSimulationElement element, DataStore dataStore)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateCompareNe(PlcSimulationElement element, DataStore dataStore)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateCompareGt(PlcSimulationElement element, DataStore dataStore)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateCompareLt(PlcSimulationElement element, DataStore dataStore)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateCompareGe(PlcSimulationElement element, DataStore dataStore)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateCompareLe(PlcSimulationElement element, DataStore dataStore)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateMathAdd(PlcSimulationElement element, DataStore dataStore)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateMathSub(PlcSimulationElement element, DataStore dataStore)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateMathMul(PlcSimulationElement element, DataStore dataStore)
+origin/feature/plc-simulation:ModbusForge/Services/SimulationService.cs:        private bool EvaluateMathDiv(PlcSimulationElement element, DataStore dataStore)
+origin/feature/plc-simulation:ModbusForge/ViewModels/MainViewModel.cs:        private bool _plcSimulationEnabled = false;
+origin/feature/plc-simulation:ModbusForge/ViewModels/MainViewModel.cs:        private int _plcSimulationPeriodMs = 100;
+origin/feature/plc-simulation:ModbusForge/ViewModels/MainViewModel.cs:        private ObservableCollection<PlcSimulationElement> _plcSimulationElements = new ObservableCollection<PlcSimulationElement>();
+origin/feature/plc-simulation:ModbusForge/ViewModels/MainViewModel.cs:            var element = new PlcSimulationElement
+origin/feature/plc-simulation:ModbusForge/ViewModels/MainViewModel.cs:            PlcSimulationElements.Add(element);
+origin/feature/plc-simulation:ModbusForge/ViewModels/MainViewModel.cs:            if (param is PlcSimulationElement element)
+origin/feature/plc-simulation:ModbusForge/ViewModels/MainViewModel.cs:                PlcSimulationElements.Remove(element);
+origin/feature/plc-simulation:ModbusForge/ViewModels/MainViewModel.cs:                var toRemove = PlcSimulationElements.FirstOrDefault(e => e.Id == elementId);
+origin/feature/plc-simulation:ModbusForge/ViewModels/MainViewModel.cs:                    PlcSimulationElements.Remove(toRemove);
+origin/feature/plc-simulation:ModbusForge/ViewModels/MainViewModel.cs:            PlcSimulationElements.Clear();

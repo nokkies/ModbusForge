@@ -1,6 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using ModbusForge.Models;
 using ModbusForge.Services;
 using System;
+using System.Collections.ObjectModel;
 
 namespace ModbusForge.ViewModels.Coordinators
 {
@@ -94,5 +97,36 @@ namespace ModbusForge.ViewModels.Coordinators
 
         [ObservableProperty]
         private int _simDiscreteCount = 8;
+
+        // PLC simulation parameters
+        [ObservableProperty]
+        private bool _plcSimulationEnabled = false;
+
+        [ObservableProperty]
+        private int _plcSimulationPeriodMs = 100;
+
+        [ObservableProperty]
+        private ObservableCollection<PlcSimulationElement> _plcSimulationElements = new ObservableCollection<PlcSimulationElement>();
+
+        [RelayCommand]
+        private void AddPlcElement()
+        {
+            PlcSimulationElements.Add(new PlcSimulationElement());
+        }
+
+        [RelayCommand]
+        private void RemovePlcElement(object param)
+        {
+            if (param is PlcSimulationElement element)
+            {
+                PlcSimulationElements.Remove(element);
+            }
+        }
+
+        [RelayCommand]
+        private void ClearPlcElements()
+        {
+            PlcSimulationElements.Clear();
+        }
     }
 }

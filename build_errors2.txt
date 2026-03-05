@@ -1,0 +1,91 @@
+
+C:\Users\rvn\source\repos\M
+odbusForge\ModbusForge\Modb
+usForge\Services\Simulation
+Service.cs(187,34): error 
+CS1061: 
+'SimulationCoordinator' 
+does not contain a 
+definition for 
+'PlcSimulationEnabled' and 
+no accessible extension 
+method 
+'PlcSimulationEnabled' 
+accepting a first argument 
+of type 
+'SimulationCoordinator' 
+could be found (are you 
+missing a using directive 
+or an assembly reference?) 
+[C:\Users\rvn\source\repos\
+ModbusForge\ModbusForge\Mod
+busForge\ModbusForge_aww1bj
+pw_wpftmp.csproj]
+C:\Users\rvn\source\repos\M
+odbusForge\ModbusForge\Modb
+usForge\Services\Simulation
+Service.cs(328,50): error 
+CS1061: 
+'SimulationCoordinator' 
+does not contain a 
+definition for 
+'PlcSimulationElements' 
+and no accessible 
+extension method 
+'PlcSimulationElements' 
+accepting a first argument 
+of type 
+'SimulationCoordinator' 
+could be found (are you 
+missing a using directive 
+or an assembly reference?) 
+[C:\Users\rvn\source\repos\
+ModbusForge\ModbusForge\Mod
+busForge\ModbusForge_aww1bj
+pw_wpftmp.csproj]
+C:\Users\rvn\source\repos\M
+odbusForge\ModbusForge\Modb
+usForge\Services\Simulation
+Service.cs(187,34): error 
+CS1061: 
+'SimulationCoordinator' 
+does not contain a 
+definition for 
+'PlcSimulationEnabled' and 
+no accessible extension 
+method 
+'PlcSimulationEnabled' 
+accepting a first argument 
+of type 
+'SimulationCoordinator' 
+could be found (are you 
+missing a using directive 
+or an assembly reference?) 
+[C:\Users\rvn\source\repos\
+ModbusForge\ModbusForge\Mod
+busForge\ModbusForge_aww1bj
+pw_wpftmp.csproj]
+C:\Users\rvn\source\repos\M
+odbusForge\ModbusForge\Modb
+usForge\Services\Simulation
+Service.cs(328,50): error 
+CS1061: 
+'SimulationCoordinator' 
+does not contain a 
+definition for 
+'PlcSimulationElements' 
+and no accessible 
+extension method 
+'PlcSimulationElements' 
+accepting a first argument 
+of type 
+'SimulationCoordinator' 
+could be found (are you 
+missing a using directive 
+or an assembly reference?) 
+[C:\Users\rvn\source\repos\
+ModbusForge\ModbusForge\Mod
+busForge\ModbusForge_aww1bj
+pw_wpftmp.csproj]
+
+

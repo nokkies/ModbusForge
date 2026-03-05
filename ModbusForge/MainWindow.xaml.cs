@@ -11,6 +11,7 @@ using System.Diagnostics;
 using ModbusForge.Models;
 using ModbusForge.Services;
 using MahApps.Metro.Controls;
+using System.Collections.ObjectModel;
 
 namespace ModbusForge
 {
@@ -21,6 +22,12 @@ namespace ModbusForge
     {
         private readonly MainViewModel _viewModel;
         private bool _isCommittingCustom;
+
+        // PLC Simulation ComboBox data sources
+        public ObservableCollection<PlcElementType> PlcElementTypes { get; } = new ObservableCollection<PlcElementType>(
+            Enum.GetValues(typeof(PlcElementType)).Cast<PlcElementType>());
+        public ObservableCollection<PlcArea> PlcAreas { get; } = new ObservableCollection<PlcArea>(
+            Enum.GetValues(typeof(PlcArea)).Cast<PlcArea>());
 
         public MainWindow(MainViewModel viewModel)
         {
