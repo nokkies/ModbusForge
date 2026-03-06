@@ -1,0 +1,117 @@
+diff --cc ModbusForge/ViewModels/MainViewModel.cs
+index 2c281a2,7ff8720..0000000
+--- a/ModbusForge/ViewModels/MainViewModel.cs
++++ b/ModbusForge/ViewModels/MainViewModel.cs
+@@@ -775,6 -800,109 +775,112 @@@ namespace ModbusForge.ViewModel
+              }
+          }
+  
+++<<<<<<< HEAD
+++=======
++         private async Task ReadCustomNowAsync(CustomEntry entry)
++         {
++             if (entry is null) return;
++             try
++             {
++                 var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
++                 switch (area)
++                 {
++                     case "holdingregister":
++                         await ReadHoldingRegisterByTypeAsync(entry);
++                         break;
++                     case "inputregister":
++                         await ReadInputRegisterByTypeAsync(entry);
++                         break;
++                     case "coil":
++                         await ReadCoilAsync(entry);
++                         break;
++                     case "discreteinput":
++                         await ReadDiscreteInputAsync(entry);
++                         break;
++                     default:
++                         StatusMessage = $"Unknown area: {entry.Area}";
++                         break;
++                 }
++             }
++             catch (Exception ex)
++             {
++                 _logger.LogError(ex, "Error reading custom entry");
++                 StatusMessage = $"Custom read error: {ex.Message}";
++             }
++         }
++ 
++         /// <summary>
++         /// Reads a holding register value based on the entry's data type.
++         /// </summary>
++         private async Task ReadHoldingRegisterByTypeAsync(CustomEntry entry)
++         {
++             await ReadRegisterGenericAsync(entry, _modbusService.ReadHoldingRegistersAsync, "HR");
++         }
++ 
++         /// <summary>
++         /// Reads an input register value based on the entry's data type.
++         /// </summary>
++         private async Task ReadInputRegisterByTypeAsync(CustomEntry entry)
++         {
++             await ReadRegisterGenericAsync(entry, _modbusService.ReadInputRegistersAsync, "IR");
++         }
++ 
++         private async Task ReadRegisterGenericAsync(CustomEntry entry, Func<byte, int, int, Task<ushort[]?>> readFunc, string logPrefix)
++         {
++             var type = (entry.Type ?? "uint").ToLowerInvariant();
++             var address = entry.Address;
++             
++             switch (type)
++             {
++                 case "real":
++                     var regsReal = await readFunc(UnitId, address, 2);
++                     if (regsReal is null) return;
++                     entry.Value = DataTypeConverter.ToSingle(regsReal[0], regsReal[1]).ToString(CultureInfo.InvariantCulture);
++                     StatusMessage = $"Read REAL {entry.Value} from {logPrefix} {address}";
++                     break;
++                 case "int":
++                     var regsInt = await readFunc(UnitId, address, 1);
++                     if (regsInt is null) return;
++                     entry.Value = unchecked((short)regsInt[0]).ToString(CultureInfo.InvariantCulture);
++                     StatusMessage = $"Read INT {entry.Value} from {logPrefix} {address}";
++                     break;
++                 case "string":
++                     var regsString = await readFunc(UnitId, address, 1);
++                     if (regsString is null) return;
++                     entry.Value = DataTypeConverter.ToString(regsString[0]);
++                     StatusMessage = $"Read STRING '{entry.Value}' from {logPrefix} {address}";
++                     break;
++                 default: // uint
++                     var regsUInt = await readFunc(UnitId, address, 1);
++                     if (regsUInt is null) return;
++                     entry.Value = regsUInt[0].ToString(CultureInfo.InvariantCulture);
++                     StatusMessage = $"Read UINT {entry.Value} from {logPrefix} {address}";
++                     break;
++             }
++         }
++ 
++         /// <summary>
++         /// Reads a coil (boolean) value.
++         /// </summary>
++         private async Task ReadCoilAsync(CustomEntry entry)
++         {
++             var states = await _modbusService.ReadCoilsAsync(UnitId, entry.Address, 1);
++             if (states is null) return;
++             entry.Value = states[0] ? "1" : "0";
++             StatusMessage = $"Read COIL {entry.Value} from {entry.Address}";
++         }
++ 
++         /// <summary>
++         /// Reads a discrete input (boolean) value.
++         /// </summary>
++         private async Task ReadDiscreteInputAsync(CustomEntry entry)
++         {
++             var states = await _modbusService.ReadDiscreteInputsAsync(UnitId, entry.Address, 1);
++             if (states is null) return;
++             entry.Value = states[0] ? "1" : "0";
++             StatusMessage = $"Read DI {entry.Value} from {entry.Address}";
++         }
+++>>>>>>> origin/refactor/main-view-model-duplication-15602244321426602813
+  
+          private static bool TryParseBool(string? value, out bool result)
+          {
