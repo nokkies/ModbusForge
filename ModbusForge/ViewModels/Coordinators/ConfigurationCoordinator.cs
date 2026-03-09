@@ -36,7 +36,7 @@ namespace ModbusForge.ViewModels.Coordinators
             int port,
             byte unitId,
             ObservableCollection<CustomEntry> customEntries,
-            ObservableCollection<PlcElement> plcElements,
+            ObservableCollection<PlcSimulationElement> plcElements,
             Action<string> setStatusMessage)
         {
             try
@@ -123,7 +123,7 @@ namespace ModbusForge.ViewModels.Coordinators
             Action<int> setPort,
             Action<byte> setUnitId,
             ObservableCollection<CustomEntry> customEntries,
-            ObservableCollection<PlcElement> plcElements,
+            ObservableCollection<PlcSimulationElement> plcElements,
             Action subscribeCustomEntries)
         {
             if (config == null) return;

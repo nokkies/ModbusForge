@@ -1125,7 +1125,7 @@ namespace ModbusForge.ViewModels
         {
             await _configurationCoordinator.SaveAllConfigAsync(
                 Mode, ServerAddress, Port, UnitId, CustomEntries,
-                _simulationCoordinator.PlcElements,
+                SimulationCoordinator.PlcSimulationElements,
                 msg => StatusMessage = msg);
         }
 
@@ -1141,7 +1141,7 @@ namespace ModbusForge.ViewModels
                     p => Port = p,
                     u => UnitId = u,
                     CustomEntries,
-                    _simulationCoordinator.PlcElements,
+                    SimulationCoordinator.PlcSimulationElements,
                     SubscribeCustomEntries);
             }
         }
