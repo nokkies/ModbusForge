@@ -35,6 +35,8 @@ namespace ModbusForge.Services
 
         public bool IsRunning => _cts != null && !_cts.IsCancellationRequested;
 
+        public System.Net.EndPoint? LocalEndpoint => _listener?.LocalEndpoint;
+
         public DataStore GetOrCreateDataStore(byte unitId)
         {
             return _dataStores.GetOrAdd(unitId, id =>

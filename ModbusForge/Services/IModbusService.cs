@@ -35,6 +35,7 @@ namespace ModbusForge.Services
     public interface IModbusService : IDisposable, IAsyncDisposable
     {
         bool IsConnected { get; }
+        string BoundEndpoint { get; }
         
         // For client compatibility, but not used in server mode
         Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1");

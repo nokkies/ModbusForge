@@ -60,9 +60,22 @@ namespace ModbusForge.ViewModels.Coordinators
                 if (success)
                 {
                     setConnected(true);
-                    setStatusMessage(isServerMode ? "Server started" : "Connected to Modbus server");
-                    _logger.LogInformation(isServerMode ? "Successfully started Modbus server" : "Successfully connected to Modbus server");
-                    _consoleLoggerService.Log(isServerMode ? "Server started" : "Connected to Modbus server");
+                    if (isServerMode)
+                    {
+                        var ep = service is ModbusServerService srv ? srv.BoundEndpoint : string.Empty;
+                        var statusMsg = string.IsNullOrEmpty(ep)
+                            ? "Server started"
+                            : $"Server started on {ep}";
+                        setStatusMessage(statusMsg);
+                        _logger.LogInformation("Successfully started Modbus server");
+                        _consoleLoggerService.Log(statusMsg);
+                    }
+                    else
+                    {
+                        setStatusMessage("Connected to Modbus server");
+                        _logger.LogInformation("Successfully connected to Modbus server");
+                        _consoleLoggerService.Log("Connected to Modbus server");
+                    }
                     return true;
                 }
                 else
@@ -99,9 +112,13 @@ namespace ModbusForge.ViewModels.Coordinators
                                 if (retryOk)
                                 {
                                     setConnected(true);
-                                    setStatusMessage("Server started");
+                                    var ep2 = service is ModbusServerService srv2 ? srv2.BoundEndpoint : string.Empty;
+                                    var retryMsg = string.IsNullOrEmpty(ep2)
+                                        ? $"Server started on port {port}"
+                                        : $"Server started on {ep2}";
+                                    setStatusMessage(retryMsg);
                                     _logger.LogInformation("Successfully started Modbus server on alternative port {AltPort}", port);
-                                    _consoleLoggerService.Log($"Successfully started Modbus server on alternative port {port}");
+                                    _consoleLoggerService.Log(retryMsg);
                                 }
                                 else
                                 {

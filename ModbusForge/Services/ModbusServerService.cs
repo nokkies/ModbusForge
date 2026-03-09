@@ -88,6 +88,37 @@ namespace ModbusForge.Services
             _multiServer = null;
         }
 
+        public string BoundEndpoint
+        {
+            get
+            {
+                lock (_stateLock)
+                {
+                    if (_multiServer?.LocalEndpoint is System.Net.IPEndPoint ep)
+                    {
+                        var host = ep.Address.Equals(System.Net.IPAddress.Any)
+                            ? GetLocalNetworkIp()
+                            : ep.Address.ToString();
+                        return $"{host}:{ep.Port}";
+                    }
+                    return string.Empty;
+                }
+            }
+        }
+
+        private static string GetLocalNetworkIp()
+        {
+            try
+            {
+                var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
+                foreach (var ip in host.AddressList)
+                    if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                        return ip.ToString();
+            }
+            catch { }
+            return "0.0.0.0";
+        }
+
         // Returns the primary (first) unit ID's DataStore — used by SimulationService
         public DataStore? GetDataStore() => GetDataStore(_primaryUnitId);
 

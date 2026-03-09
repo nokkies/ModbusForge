@@ -45,6 +45,8 @@ namespace ModbusForge.Services
                 (client, protocolAddress) => client.ReadInputs(unitId, protocolAddress, (ushort)count));
         }
 
+        public virtual string BoundEndpoint => string.Empty;
+
         public virtual bool IsConnected
         {
             get
