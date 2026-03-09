@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Windows.Threading;
 using ModbusForge.ViewModels.Coordinators;
 using Microsoft.Extensions.Logging;
@@ -52,7 +53,8 @@ namespace ModbusForge.Services
             if (_coordinator == null) return;
             if (_isSimulating) return;
 
-            // Simulation only runs when server is running (connected)
+            // Simulation only runs when enabled and server is running (connected)
+            if (!_coordinator.SimulationEnabled) return;
             if (!_serverService.IsConnected) return;
 
             _isSimulating = true;
@@ -84,20 +86,45 @@ namespace ModbusForge.Services
         {
             if (_coordinator == null) return;
 
-            var dataStore = _serverService.GetDataStore();
-            if (dataStore == null) return;
+            var primaryDataStore = _serverService.GetDataStore();
+            if (primaryDataStore == null) return;
+
+            // Collect all unit ID DataStores to mirror outputs to
+            var allDataStores = new System.Collections.Generic.List<DataStore> { primaryDataStore };
+            foreach (var uid in _serverService.GetUnitIds())
+            {
+                var ds = _serverService.GetDataStore(uid);
+                if (ds != null && !ReferenceEquals(ds, primaryDataStore))
+                    allDataStores.Add(ds);
+            }
 
             // Evaluate each PLC element - Use ToList to avoid collection modification errors
             foreach (var element in _coordinator.PlcSimulationElements.ToList())
             {
                 try
                 {
-                    bool result = EvaluatePlcElement(element, dataStore, elapsedMs);
+                    bool result = EvaluatePlcElement(element, primaryDataStore, elapsedMs);
 
-                    // Write result to output if specified
-                    if (element.Output != null && element.Output.Address >= 0)
+                    // MATH types write their numeric output inside EvaluatePlcElement (via WriteNumericOutput).
+                    // Calling WritePlcOutput after would overwrite the numeric result with 0 or 1.
+                    bool isMathType = element.ElementType == PlcElementType.MATH_ADD
+                        || element.ElementType == PlcElementType.MATH_SUB
+                        || element.ElementType == PlcElementType.MATH_MUL
+                        || element.ElementType == PlcElementType.MATH_DIV;
+
+                    if (!isMathType && element.Output != null && element.Output.Address >= 0)
                     {
-                        WritePlcOutput(element.Output, result, dataStore);
+                        // Write to all unit IDs so every ID reflects the same simulation
+                        foreach (var ds in allDataStores)
+                            WritePlcOutput(element.Output, result, ds);
+                    }
+                    else if (isMathType && element.Output != null && element.Output.Address >= 0)
+                    {
+                        // MATH types already wrote the numeric value to primaryDataStore.
+                        // Read it back and mirror it to the other unit ID DataStores.
+                        ushort numericValue = ReadNumericFromDataStore(element.Output, primaryDataStore);
+                        foreach (var ds in allDataStores.Skip(1))
+                            WriteNumericOutput(element.Output, numericValue, ds);
                     }
                 }
                 catch (Exception ex)
@@ -567,6 +594,20 @@ namespace ModbusForge.Services
                         dataStore.InputRegisters[addr] = value;
                     break;
             }
+        }
+
+        private ushort ReadNumericFromDataStore(PlcAddressReference output, DataStore dataStore)
+        {
+            if (output == null || output.Address < 0) return 0;
+            int addr = output.Address;
+            return output.Area switch
+            {
+                PlcArea.HoldingRegister => addr < dataStore.HoldingRegisters.Count
+                    ? dataStore.HoldingRegisters[addr] : (ushort)0,
+                PlcArea.InputRegister => addr < dataStore.InputRegisters.Count
+                    ? dataStore.InputRegisters[addr] : (ushort)0,
+                _ => (ushort)0
+            };
         }
 
         #endregion

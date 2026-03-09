@@ -66,14 +66,14 @@
             </Style>
 
             <!-- Modern Button Style -->
-            <Style TargetType="Button" BasedOn="{StaticResource MahApps.Styles.Button}">
+            <Style TargetType="Button">
                 <Setter Property="Padding" Value="12,6"/>
                 <Setter Property="Margin" Value="4,2"/>
                 <Setter Property="FontWeight" Value="SemiBold"/>
             </Style>
 
             <!-- GroupBox Style -->
-            <Style TargetType="GroupBox" BasedOn="{StaticResource MahApps.Styles.GroupBox}">
+            <Style TargetType="GroupBox">
                 <Setter Property="Margin" Value="5"/>
                 <Setter Property="Padding" Value="8"/>
                 <Setter Property="BorderThickness" Value="1"/>
@@ -81,7 +81,7 @@
 
             <!-- StatusBar Style -->
             <Style TargetType="StatusBar">
-                <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Accent4}"/>
+                <Setter Property="Background" Value="#FF2D2D30"/>
                 <Setter Property="Foreground" Value="White"/>
                 <Setter Property="FontWeight" Value="Medium"/>
             </Style>
@@ -365,8 +365,12 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Toolbar -->
+                    <!-- Mode Selection -->
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
+                        <TextBlock Text="Editor Mode:" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
+                        <RadioButton Content="Visual Node Editor" x:Name="VisualModeRadio" IsChecked="True" Margin="0,0,15,0" VerticalAlignment="Center"/>
+                        <RadioButton Content="Classic Form Editor" x:Name="ClassicModeRadio" IsChecked="False" VerticalAlignment="Center"/>
+                        <Separator Margin="15,0"/>
                         <mah:ToggleSwitch IsOn="{Binding SimulationCoordinator.SimulationEnabled, Mode=TwoWay}" OnContent="Simulation Enabled" OffContent="Simulation Disabled" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding SimulationCoordinator.SimulationPeriodMs}"/>
@@ -377,36 +381,41 @@
                     </StackPanel>
 
                     <!-- Content -->
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                        <StackPanel Orientation="Vertical" >
-                            <GroupBox Header="PLC Simulation (Logic Gates &amp; Timers)">
-                                <Grid Margin="5">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-    
-                                    <!-- PLC Enable and Period -->
-                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                                        <mah:ToggleSwitch IsOn="{Binding SimulationCoordinator.PlcSimulationEnabled, Mode=TwoWay}" OnContent="PLC Simulation Enabled" OffContent="PLC Simulation Disabled" VerticalAlignment="Center"/>
-                                        <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                                        <TextBox Width="80" Text="{Binding SimulationCoordinator.PlcSimulationPeriodMs}"/>
-                                    </StackPanel>
-    
-                                    <!-- Add/Clear Buttons -->
-                                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,5">
-                                        <Button Content="Add Element" Command="{Binding SimulationCoordinator.AddPlcElementCommand}" Padding="10,3" Margin="0,0,5,0"/>
-                                        <Button Content="Clear All" Command="{Binding SimulationCoordinator.ClearPlcElementsCommand}" Padding="10,3"/>
-                                    </StackPanel>
-    
-                                    <!-- PLC Elements List (Inner ScrollViewer kept for localized scrolling if list is huge) -->
-                                    <ItemsControl Grid.Row="2" ItemsSource="{Binding SimulationCoordinator.PlcSimulationElements}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,5" Padding="5">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
+                    <Grid Grid.Row="1">
+                        <!-- Visual Node Editor -->
+                        <views:VisualNodeEditor x:Name="VisualEditor" DataContext="{Binding VisualNodeEditorViewModel}" Visibility="{Binding IsChecked, ElementName=VisualModeRadio, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        
+                        <!-- Classic Form Editor -->
+                        <ScrollViewer Visibility="{Binding IsChecked, ElementName=ClassicModeRadio, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel Orientation="Vertical" >
+                                <GroupBox Header="PLC Simulation (Logic Gates &amp; Timers)">
+                                    <Grid Margin="5">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+        
+                                        <!-- PLC Enable and Period -->
+                                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                            <mah:ToggleSwitch IsOn="{Binding SimulationCoordinator.PlcSimulationEnabled, Mode=TwoWay}" OnContent="PLC Simulation Enabled" OffContent="PLC Simulation Disabled" VerticalAlignment="Center"/>
+                                            <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="15,0,5,0"/>
+                                            <TextBox Width="80" Text="{Binding SimulationCoordinator.PlcSimulationPeriodMs}"/>
+                                        </StackPanel>
+        
+                                        <!-- Add/Clear Buttons -->
+                                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,5">
+                                            <Button Content="Add Element" Command="{Binding SimulationCoordinator.AddPlcElementCommand}" Padding="10,3" Margin="0,0,5,0"/>
+                                            <Button Content="Clear All" Command="{Binding SimulationCoordinator.ClearPlcElementsCommand}" Padding="10,3"/>
+                                        </StackPanel>
+        
+                                        <!-- PLC Elements List (Inner ScrollViewer kept for localized scrolling if list is huge) -->
+                                        <ItemsControl Grid.Row="2" ItemsSource="{Binding SimulationCoordinator.PlcSimulationElements}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,5" Padding="5">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="Auto"/>
                                                             <ColumnDefinition Width="*"/>
                                                             <ColumnDefinition Width="Auto"/>
@@ -485,6 +494,7 @@
                             </GroupBox>
                         </StackPanel>
                     </ScrollViewer>
+                    </Grid>
                 </Grid>
             </TabItem>
             <TabItem Header="Decode">

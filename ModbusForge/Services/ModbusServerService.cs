@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Modbus.Data;
-using Modbus.Device;
 using System.Net.Sockets;
 using ModbusForge.Helpers;
 
@@ -12,12 +11,8 @@ namespace ModbusForge.Services
 {
     public class ModbusServerService : IModbusService, IDisposable
     {
-        private ModbusTcpSlave? _slave;
-        private System.Collections.Generic.List<ModbusTcpSlave> _slaves = new();
-        private TcpListener? _listener;
-        private DataStore? _dataStore;
-        private Task? _listenTask;
-        private CancellationTokenSource? _cts;
+        private ModbusMultiUnitServer? _multiServer;
+        private byte _primaryUnitId = 1;
         private bool _disposed = false;
         private readonly ILogger<ModbusServerService> _logger;
         private volatile bool _isRunning = false;
@@ -25,7 +20,6 @@ namespace ModbusForge.Services
         private const int DefaultPort = 502;
         private const byte DefaultSlaveId = 1;
         private const int ShutdownTimeoutMs = 5000;
-        private const int DefaultDataStoreSize = 10000;
 
         public ModbusServerService(ILogger<ModbusServerService> logger)
         {
@@ -49,104 +43,33 @@ namespace ModbusForge.Services
                 {
                     try
                     {
-                        if (_isRunning)
-                            return true;
+                        if (_isRunning) return true;
 
                         if (!IPAddress.TryParse(ipAddress, out var address))
                             throw new ArgumentException($"Invalid IP address: {ipAddress}");
 
                         var endpoint = new IPEndPoint(address, port == 0 ? DefaultPort : port);
-                    
-                    // Create data store
-                    _dataStore = new DataStore();
-                    
-                    // Initialize holding registers to support addresses up to DefaultDataStoreSize
-                    for (int i = 0; i < DefaultDataStoreSize; i++)
-                    {
-                        _dataStore.HoldingRegisters.Add(0);
-                    }
-                                         
+                        var ids = ParseUnitIds(unitIds);
+                        if (ids.Count == 0) ids.Add(DefaultSlaveId);
+                        _primaryUnitId = ids[0];
 
-                        // Initialize input registers to support addresses up to DefaultDataStoreSize
-                        for (int i = 0; i < DefaultDataStoreSize; i++)
-                    {
-                        _dataStore.InputRegisters.Add(0);
-                    }
-                    
-                    // Initialize coils to support addresses up to DefaultDataStoreSize
-                    for (int i = 0; i < DefaultDataStoreSize; i++)
-                    {
-                        _dataStore.CoilDiscretes.Add(false);
-                    }
-                    
-                    // Initialize discrete inputs to support addresses up to DefaultDataStoreSize
-                    for (int i = 0; i < DefaultDataStoreSize; i++)
-                    {
-                        _dataStore.InputDiscretes.Add(false);
-                    }
-                    
-                    // Initialize some test data in holding registers
-                    for (ushort i = 1; i <= 16; i++)
-                        _dataStore.HoldingRegisters[i] = (ushort)(i * 10);
-                    
-                    // Create and start TCP listener
-                    _listener = new TcpListener(endpoint);
-                    _listener.Start();
-                    
-                    // Parse unit IDs (e.g., "1, 2, 5-10")
-                    var ids = ParseUnitIds(unitIds);
-                    if (ids.Count == 0) ids.Add(DefaultSlaveId);
+                        _multiServer = new ModbusMultiUnitServer(_logger);
+                        _multiServer.Start(endpoint, ids);
 
-                    // Create slaves sharing the same DataStore
-                    _slaves.Clear();
-                    foreach (var id in ids)
-                    {
-                        var slave = id == ids[0] 
-                            ? ModbusTcpSlave.CreateTcp(id, _listener) // First slave owns the listener/connection management in NModbus4 usually
-                            : ModbusTcpSlave.CreateTcp(id, _listener); // But for TCP we might need to add them to a SlaveNetwork or just create multiples?
-                        
-                        // NModbus4 ModbusTcpSlave.CreateTcp starts a listener internal to itself if we don't handle it carefully.
-                        // Actually, ModbusTcpSlave.CreateTcp(id, listener) is the way.
-                        
-                        slave.DataStore = _dataStore;
-                        _slaves.Add(slave);
-                    }
-                    _slave = _slaves[0]; // Keep reference for legacy compatibility if any
-
-                    // Start listening for connections on all slaves
-                    _cts = new CancellationTokenSource();
-                    _isRunning = true;
-                    
-                    _listenTask = Task.Run(() =>
-                    {
-                        try 
-                        { 
-                            // NModbus4 ModbusTcpSlave.Listen() handles the listener loop.
-                            // In Modbus TCP, the Unit ID is often ignored by the server as the IP/Port 
-                            // uniquely identifies the device. However, NModbus4's implementation 
-                            // will respond to requests for its own Unit ID.
-                            // To support multiple Unit IDs, we use the first slave to manage the listener.
-                            
-                            _slave.Listen(); 
-                        }
-                        catch (Exception ex) { _logger.LogError(ex, "Listen task failed"); }
-                    });
-                    
-                    _logger.LogInformation($"Modbus TCP server started on {endpoint} with Unit IDs: {string.Join(", ", ids)}");
-                    return true;
+                        _isRunning = true;
+                        _logger.LogInformation("Modbus TCP server started on {Endpoint} Unit IDs: {Ids}", endpoint, string.Join(",", ids));
+                        return true;
                     }
                     catch (SocketException sockEx) when (sockEx.SocketErrorCode == SocketError.AddressAlreadyInUse)
                     {
-                        CleanupResources();
                         _isRunning = false;
-                    int p = port == 0 ? DefaultPort : port;
-                    _logger.LogWarning(sockEx, "Port {Port} is already in use. Server could not start.", p);
-                    return false;
-                }
+                        int p = port == 0 ? DefaultPort : port;
+                        _logger.LogWarning(sockEx, "Port {Port} is already in use.", p);
+                        return false;
+                    }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Failed to start Modbus TCP server");
-                        CleanupResources();
                         _isRunning = false;
                         return false;
                     }
@@ -156,33 +79,28 @@ namespace ModbusForge.Services
 
         private void CleanupResources()
         {
-            try
-            {
-                _cts?.Cancel();
-                _slave?.Dispose();
-                _listener?.Stop();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Error during resource cleanup");
-            }
-            finally
-            {
-                foreach (var s in _slaves) s.Dispose();
-                _slaves.Clear();
-                _slave = null;
-                _listener = null;
-                _cts?.Dispose();
-                _cts = null;
-            }
+            try { _multiServer?.Stop(); } catch { }
+            _multiServer?.Dispose();
+            _multiServer = null;
         }
 
-        // Data store access for simulation service
-        public DataStore? GetDataStore()
+        // Returns the primary (first) unit ID's DataStore — used by SimulationService
+        public DataStore? GetDataStore() => GetDataStore(_primaryUnitId);
+
+        public DataStore? GetDataStore(byte unitId)
         {
             lock (_stateLock)
             {
-                return _dataStore;
+                return _multiServer?.TryGetDataStore(unitId);
+            }
+        }
+
+        public IEnumerable<byte> GetUnitIds()
+        {
+            lock (_stateLock)
+            {
+                if (_multiServer == null) return System.Array.Empty<byte>();
+                return new System.Collections.Generic.List<byte>(_multiServer.UnitIds);
             }
         }
 
@@ -192,30 +110,10 @@ namespace ModbusForge.Services
             {
                 lock (_stateLock)
                 {
-                    try
-                    {
-                        if (!_isRunning)
-                            return;
-
-                        _isRunning = false;
-                        _cts?.Cancel();
-                        _listener?.Stop();
-
-                        // Wait for listen task to complete
-                        if (_listenTask != null && !_listenTask.IsCompleted)
-                        {
-                            if (!_listenTask.Wait(ShutdownTimeoutMs))
-                                _logger.LogWarning("Listen task did not complete within timeout");
-                        }
-
-                        CleanupResources();
-                        _logger.LogInformation("Modbus TCP server stopped");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error stopping Modbus TCP server");
-                        throw;
-                    }
+                    if (!_isRunning) return;
+                    _isRunning = false;
+                    CleanupResources();
+                    _logger.LogInformation("Modbus TCP server stopped");
                 }
             });
         }
@@ -225,27 +123,13 @@ namespace ModbusForge.Services
 
         public async Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
         {
-            if (!_isRunning)
-                throw new InvalidOperationException("Modbus server is not running");
-
+            if (!_isRunning) throw new InvalidOperationException("Modbus server is not running");
             await Task.Run(() =>
             {
-                try
-                {
-                    _logger.LogDebug($"Writing value {value} to register {registerAddress} (Unit ID: {unitId})");
-
-                    var registers = _dataStore?.HoldingRegisters;
-                    if (registers == null || registerAddress < 1 || registerAddress > registers.Count)
-                        throw new ArgumentOutOfRangeException(nameof(registerAddress), "Register address is out of range");
-
-                    registers[(ushort)registerAddress] = value;
-                    _logger.LogDebug("Successfully wrote to register");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error writing to register");
-                    throw;
-                }
+                var ds = GetDataStore(unitId);
+                if (ds == null || registerAddress < 1 || registerAddress >= ds.HoldingRegisters.Count)
+                    throw new ArgumentOutOfRangeException(nameof(registerAddress));
+                ds.HoldingRegisters[(ushort)registerAddress] = value;
             });
         }
 
@@ -253,61 +137,34 @@ namespace ModbusForge.Services
             ReadFromDataStoreAsync(unitId, startAddress, count, ds => ds.CoilDiscretes, "coils");
 
         private async Task<T[]?> ReadFromDataStoreAsync<T>(
-            byte unitId,
-            int startAddress,
-            int count,
+            byte unitId, int startAddress, int count,
             Func<DataStore, ModbusDataCollection<T>> collectionSelector,
             string resourceName)
         {
-            if (!_isRunning)
-                throw new InvalidOperationException("Modbus server is not running");
-
+            if (!_isRunning) throw new InvalidOperationException("Modbus server is not running");
             return await Task.Run(() =>
             {
-                _logger.LogDebug($"Reading {count} {resourceName} starting at {startAddress} (Unit ID: {unitId})");
-
-                lock (_stateLock)
-                {
-                    if (_dataStore == null)
-                        throw new InvalidOperationException("Data store not initialized");
-
-                    var collection = collectionSelector(_dataStore);
-                    if (collection == null || startAddress < 1 || count < 0 || startAddress + count - 1 > collection.Count)
-                        throw new ArgumentOutOfRangeException(nameof(startAddress), $"Requested {resourceName} range is out of bounds");
-
-                    var result = new T[count];
-                    for (int i = 0; i < count; i++)
-                        result[i] = collection[(ushort)(startAddress + i)];
-
-                    _logger.LogDebug($"Successfully read {result.Length} {resourceName}");
-                    return result;
-                }
+                var ds = GetDataStore(unitId) ?? GetDataStore(_primaryUnitId);
+                if (ds == null) throw new InvalidOperationException("Data store not initialized");
+                var collection = collectionSelector(ds);
+                if (startAddress < 1 || count < 0 || startAddress + count - 1 > collection.Count)
+                    throw new ArgumentOutOfRangeException(nameof(startAddress), $"{resourceName} range out of bounds");
+                var result = new T[count];
+                for (int i = 0; i < count; i++)
+                    result[i] = collection[(ushort)(startAddress + i)];
+                return result;
             });
         }
 
         public Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)
         {
-            if (!_isRunning)
-                throw new InvalidOperationException("Modbus server is not running");
-
+            if (!_isRunning) throw new InvalidOperationException("Modbus server is not running");
             return Task.Run(() =>
             {
-                try
-                {
-                    _logger.LogDebug($"Writing coil at {coilAddress} = {value} (Unit ID: {unitId})");
-
-                    var coils = _dataStore?.CoilDiscretes;
-                    if (coils == null || coilAddress < 1 || coilAddress > coils.Count)
-                        throw new ArgumentOutOfRangeException(nameof(coilAddress), "Coil address is out of range");
-
-                    coils[(ushort)coilAddress] = value;
-                    _logger.LogDebug("Successfully wrote coil");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error writing single coil");
-                    throw;
-                }
+                var ds = GetDataStore(unitId);
+                if (ds == null || coilAddress < 1 || coilAddress >= ds.CoilDiscretes.Count)
+                    throw new ArgumentOutOfRangeException(nameof(coilAddress));
+                ds.CoilDiscretes[(ushort)coilAddress] = value;
             });
         }
 
@@ -346,21 +203,8 @@ namespace ModbusForge.Services
             {
                 if (disposing)
                 {
-                    try
-                    {
-                        _cts?.Cancel();
-                        _slave?.Dispose();
-                        _listener?.Stop();
-                    }
-                    catch { /* ignore on dispose */ }
-                    finally
-                    {
-                        _slave = null;
-                        _listener = null;
-                        _cts?.Dispose();
-                        _cts = null;
-                        _isRunning = false;
-                    }
+                    try { CleanupResources(); } catch { }
+                    _isRunning = false;
                 }
                 _disposed = true;
             }
@@ -368,14 +212,12 @@ namespace ModbusForge.Services
 
         public Task<ConnectionDiagnosticResult> RunDiagnosticsAsync(string ipAddress, int port, byte unitId)
         {
-            // Server mode diagnostics - check if server is running and listening
             var result = new ConnectionDiagnosticResult();
-            
-            if (_isRunning && _listener != null)
+            if (_isRunning && _multiServer != null)
             {
                 result.TcpConnected = true;
                 result.ModbusResponding = true;
-                result.LocalEndpoint = _listener.LocalEndpoint?.ToString() ?? $"0.0.0.0:{port}";
+                result.LocalEndpoint = $"{ipAddress}:{(port == 0 ? DefaultPort : port)}";
                 result.RemoteEndpoint = "Server Mode";
             }
             else
@@ -383,7 +225,6 @@ namespace ModbusForge.Services
                 result.TcpConnected = false;
                 result.TcpError = "Server is not running";
             }
-            
             return Task.FromResult(result);
         }
 

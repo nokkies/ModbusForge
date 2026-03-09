@@ -27,6 +27,11 @@ namespace ModbusForge.ViewModels.Coordinators
         }
 
         // Simulation configuration
+        [ObservableProperty]
+        private bool _simulationEnabled = false;
+
+        [ObservableProperty]
+        private int _simulationPeriodMs = 500;
 
         // PLC simulation parameters
         [ObservableProperty]

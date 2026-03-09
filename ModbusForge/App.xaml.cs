@@ -110,6 +110,7 @@ namespace ModbusForge
             services.AddSingleton<IConnectionManager, ConnectionManager>();
             services.AddSingleton<IScriptRunner, ScriptRunner>();
             services.AddSingleton<IScriptRuleService, ScriptRuleService>();
+            services.AddSingleton<IVisualSimulationService, VisualSimulationService>();
             
             // Register Coordinators
             services.AddSingleton<ConnectionCoordinator>(provider => new ConnectionCoordinator(

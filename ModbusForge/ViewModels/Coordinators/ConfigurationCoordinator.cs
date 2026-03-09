@@ -37,6 +37,8 @@ namespace ModbusForge.ViewModels.Coordinators
             byte unitId,
             ObservableCollection<CustomEntry> customEntries,
             ObservableCollection<PlcSimulationElement> plcElements,
+            ObservableCollection<VisualNode> visualNodes,
+            ObservableCollection<NodeConnection> visualConnections,
             Action<string> setStatusMessage)
         {
             try
@@ -57,7 +59,9 @@ namespace ModbusForge.ViewModels.Coordinators
                         Port = port,
                         UnitId = unitId,
                         CustomEntries = customEntries.ToList(),
-                        PlcElements = plcElements.ToList()
+                        PlcElements = plcElements.ToList(),
+                        VisualNodes = visualNodes.ToList(),
+                        VisualConnections = visualConnections.ToList()
                     };
 
                     var options = new JsonSerializerOptions { WriteIndented = true };
@@ -124,6 +128,8 @@ namespace ModbusForge.ViewModels.Coordinators
             Action<byte> setUnitId,
             ObservableCollection<CustomEntry> customEntries,
             ObservableCollection<PlcSimulationElement> plcElements,
+            ObservableCollection<VisualNode> visualNodes,
+            ObservableCollection<NodeConnection> visualConnections,
             Action subscribeCustomEntries)
         {
             if (config == null) return;
@@ -153,6 +159,20 @@ namespace ModbusForge.ViewModels.Coordinators
                 plcElements.Clear();
                 foreach (var pe in config.PlcElements)
                     plcElements.Add(pe);
+            }
+
+            if (config.VisualNodes != null && config.VisualNodes.Any())
+            {
+                visualNodes.Clear();
+                foreach (var vn in config.VisualNodes)
+                    visualNodes.Add(vn);
+            }
+
+            if (config.VisualConnections != null && config.VisualConnections.Any())
+            {
+                visualConnections.Clear();
+                foreach (var vc in config.VisualConnections)
+                    visualConnections.Add(vc);
             }
         }
     }

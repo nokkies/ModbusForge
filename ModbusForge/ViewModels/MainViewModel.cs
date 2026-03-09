@@ -43,6 +43,8 @@ namespace ModbusForge.ViewModels
         private readonly CustomEntryCoordinator _customEntryCoordinator;
         private readonly TrendCoordinator _trendCoordinator;
         private readonly ConfigurationCoordinator _configurationCoordinator;
+        private readonly VisualNodeEditorViewModel _visualNodeEditorViewModel;
+        private readonly IVisualSimulationService _visualSimulationService;
         private bool _disposed = false;
         // Mode-aware UI helpers
 
@@ -82,6 +84,7 @@ namespace ModbusForge.ViewModels
         }
 
         public SimulationCoordinator SimulationCoordinator { get; }
+        public VisualNodeEditorViewModel VisualNodeEditorViewModel => _visualNodeEditorViewModel;
 
         public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, SimulationCoordinator simulationCoordinator)
         {
@@ -98,6 +101,12 @@ namespace ModbusForge.ViewModels
             _trendCoordinator = trendCoordinator ?? throw new ArgumentNullException(nameof(trendCoordinator));
             _configurationCoordinator = configurationCoordinator ?? throw new ArgumentNullException(nameof(configurationCoordinator));
             SimulationCoordinator = simulationCoordinator ?? throw new ArgumentNullException(nameof(simulationCoordinator));
+            
+            // Initialize visual node editor
+            _visualNodeEditorViewModel = new VisualNodeEditorViewModel();
+            _visualSimulationService = App.ServiceProvider.GetRequiredService<IVisualSimulationService>();
+            _visualSimulationService.Start(_visualNodeEditorViewModel);
+            
             var settings = options?.Value ?? new ServerSettings();
 
             // Initialize in logical order
@@ -1126,6 +1135,8 @@ namespace ModbusForge.ViewModels
             await _configurationCoordinator.SaveAllConfigAsync(
                 Mode, ServerAddress, Port, UnitId, CustomEntries,
                 SimulationCoordinator.PlcSimulationElements,
+                _visualNodeEditorViewModel.Nodes,
+                _visualNodeEditorViewModel.Connections,
                 msg => StatusMessage = msg);
         }
 
@@ -1142,6 +1153,8 @@ namespace ModbusForge.ViewModels
                     u => UnitId = u,
                     CustomEntries,
                     SimulationCoordinator.PlcSimulationElements,
+                    _visualNodeEditorViewModel.Nodes,
+                    _visualNodeEditorViewModel.Connections,
                     SubscribeCustomEntries);
             }
         }
