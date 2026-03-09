@@ -48,6 +48,10 @@ namespace ModbusForge.Services
                         if (!IPAddress.TryParse(ipAddress, out var address))
                             throw new ArgumentException($"Invalid IP address: {ipAddress}");
 
+                        // Loopback or 0.0.0.0 → bind to all interfaces so external clients can connect
+                        if (address.Equals(IPAddress.Loopback) || address.Equals(IPAddress.Any))
+                            address = IPAddress.Any;
+
                         var endpoint = new IPEndPoint(address, port == 0 ? DefaultPort : port);
                         var ids = ParseUnitIds(unitIds);
                         if (ids.Count == 0) ids.Add(DefaultSlaveId);
