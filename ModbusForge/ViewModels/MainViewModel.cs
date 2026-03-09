@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Reflection;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -21,7 +22,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
 using System.IO;
-using System.Reflection;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -209,14 +209,14 @@ namespace ModbusForge.ViewModels
                 }
                 else
                 {
-                    Title = "ModbusForge v2.3.0";
-                    Version = "2.3.0";
+                    Title = "ModbusForge v3.0.3";
+                    Version = "3.0.3";
                 }
             }
             catch
             {
-                Title = "ModbusForge v2.3.0";
-                Version = "2.3.0";
+                Title = "ModbusForge v3.0.3";
+                Version = "3.0.3";
             }
         }
 
@@ -229,15 +229,16 @@ namespace ModbusForge.ViewModels
             var procPath = Environment.ProcessPath;
             if (!string.IsNullOrEmpty(procPath))
             {
-                var version = FileVersionInfo.GetVersionInfo(procPath)?.ProductVersion;
+                var version = System.Diagnostics.FileVersionInfo.GetVersionInfo(procPath)?.ProductVersion;
                 if (!string.IsNullOrWhiteSpace(version))
                     return version;
             }
 
-            // Fallback to assembly attribute
-            return Assembly.GetEntryAssembly()
-                ?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-                ?.InformationalVersion;
+            // Fallback to informational version or simple version
+            var entryAssembly = Assembly.GetEntryAssembly();
+            return entryAssembly?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion 
+                ?? entryAssembly?.GetName().Version?.ToString() 
+                ?? "3.0.3";
         }
 
         /// <summary>
@@ -270,7 +271,7 @@ namespace ModbusForge.ViewModels
         private string _title = "ModbusForge";
 
         [ObservableProperty]
-        private string _version = "2.1.1";
+        private string _version = "3.0.2";
 
         // UI-selectable mode: "Client" or "Server"
         [ObservableProperty]
@@ -338,6 +339,9 @@ namespace ModbusForge.ViewModels
         // Modbus addressing defaults
         [ObservableProperty]
         private byte _unitId = 1;
+
+        [ObservableProperty]
+        private string _serverUnitId = "1";
 
         // Registers UI state
         [ObservableProperty]
@@ -507,7 +511,7 @@ namespace ModbusForge.ViewModels
         private async Task ConnectAsync()
         {
             await _connectionCoordinator.ConnectAsync(ServerAddress, Port, IsServerMode,
-                msg => StatusMessage = msg, connected => IsConnected = connected);
+                msg => StatusMessage = msg, connected => IsConnected = connected, ServerUnitId);
         }
 
         private bool CanDisconnect() => _connectionCoordinator.CanDisconnect(IsConnected);
@@ -1121,6 +1125,7 @@ namespace ModbusForge.ViewModels
         {
             await _configurationCoordinator.SaveAllConfigAsync(
                 Mode, ServerAddress, Port, UnitId, CustomEntries,
+                _simulationCoordinator.PlcElements,
                 msg => StatusMessage = msg);
         }
 
@@ -1136,6 +1141,7 @@ namespace ModbusForge.ViewModels
                     p => Port = p,
                     u => UnitId = u,
                     CustomEntries,
+                    _simulationCoordinator.PlcElements,
                     SubscribeCustomEntries);
             }
         }

@@ -47,7 +47,7 @@ namespace ModbusForge.ViewModels.Coordinators
         /// Connects to the Modbus server or starts the Modbus server.
         /// </summary>
         public async Task<bool> ConnectAsync(string serverAddress, int port, bool isServerMode, 
-            Action<string> setStatusMessage, Action<bool> setConnected)
+            Action<string> setStatusMessage, Action<bool> setConnected, string unitIds = "1")
         {
             try
             {
@@ -55,7 +55,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 setStatusMessage(isServerMode ? "Starting server..." : "Connecting...");
                 _consoleLoggerService.Log(isServerMode ? "Starting server..." : "Connecting...");
                 
-                var success = await service.ConnectAsync(serverAddress, port);
+                var success = await service.ConnectAsync(serverAddress, port, unitIds);
 
                 if (success)
                 {

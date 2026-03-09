@@ -37,7 +37,7 @@ namespace ModbusForge.Services
         bool IsConnected { get; }
         
         // For client compatibility, but not used in server mode
-        Task<bool> ConnectAsync(string ipAddress, int port);
+        Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1");
         Task DisconnectAsync();
         
         /// <summary>

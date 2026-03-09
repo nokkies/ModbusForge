@@ -31,9 +31,40 @@ namespace ModbusForge
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            // Set up global exception handling
+            this.DispatcherUnhandledException += App_DispatcherUnhandledException;
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+
             // Create and show the main window
             var mainWindow = new MainWindow(ServiceProvider.GetRequiredService<MainViewModel>());
             mainWindow.Show();
+        }
+
+        private void App_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+        {
+            LogFatalException(e.Exception, "DispatcherUnhandledException");
+            e.Handled = true; // Prevent immediate crash to allow logger to finish
+            MessageBox.Show($"A fatal error occurred: {e.Exception.Message}\n\nDetails logged to crash.log", "Fatal Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            Application.Current.Shutdown();
+        }
+
+        private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            if (e.ExceptionObject is Exception ex)
+            {
+                LogFatalException(ex, "AppDomain.UnhandledException");
+            }
+        }
+
+        private void LogFatalException(Exception ex, string source)
+        {
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash.log");
+                var message = $"[{DateTime.Now}] FATAL ERROR ({source}): {ex}\n\n";
+                File.AppendAllText(logPath, message);
+            }
+            catch { /* can't even log */ }
         }
 
         private void ConfigureServices(IServiceCollection services)

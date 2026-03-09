@@ -27,76 +27,6 @@ namespace ModbusForge.ViewModels.Coordinators
         }
 
         // Simulation configuration
-        [ObservableProperty]
-        private bool _simulationEnabled = false;
-
-        [ObservableProperty]
-        private int _simulationPeriodMs = 500;
-
-        // Holding Registers ramp
-        [ObservableProperty]
-        private bool _simHoldingsEnabled = false;
-
-        [ObservableProperty]
-        private int _simHoldingStart = 1;
-
-        [ObservableProperty]
-        private int _simHoldingCount = 4;
-
-        [ObservableProperty]
-        private int _simHoldingMin = 0;
-
-        [ObservableProperty]
-        private int _simHoldingMax = 100;
-
-        // Holding Registers waveform parameters
-        [ObservableProperty]
-        private string _simHoldingWaveformType = "Ramp"; // Ramp, Sine, Triangle, Square
-
-        [ObservableProperty]
-        private double _simHoldingAmplitude = 1000.0;
-
-        [ObservableProperty]
-        private double _simHoldingFrequencyHz = 0.5;
-
-        [ObservableProperty]
-        private double _simHoldingOffset = 0.0;
-
-        // Coils toggle
-        [ObservableProperty]
-        private bool _simCoilsEnabled = false;
-
-        [ObservableProperty]
-        private int _simCoilStart = 1;
-
-        [ObservableProperty]
-        private int _simCoilCount = 8;
-
-        // Input Registers ramp
-        [ObservableProperty]
-        private bool _simInputsEnabled = false;
-
-        [ObservableProperty]
-        private int _simInputStart = 1;
-
-        [ObservableProperty]
-        private int _simInputCount = 4;
-
-        [ObservableProperty]
-        private int _simInputMin = 0;
-
-        [ObservableProperty]
-        private int _simInputMax = 100;
-
-        // Discrete Inputs toggle
-        [ObservableProperty]
-        private bool _simDiscreteEnabled = false;
-
-        [ObservableProperty]
-        private int _simDiscreteStart = 1;
-
-        [ObservableProperty]
-        private int _simDiscreteCount = 8;
 
         // PLC simulation parameters
         [ObservableProperty]
@@ -128,5 +58,9 @@ namespace ModbusForge.ViewModels.Coordinators
         {
             PlcSimulationElements.Clear();
         }
+
+        // Enum collections for UI binding
+        public PlcElementType[] PlcElementTypes => (PlcElementType[])Enum.GetValues(typeof(PlcElementType));
+        public PlcArea[] PlcAreas => (PlcArea[])Enum.GetValues(typeof(PlcArea));
     }
 }

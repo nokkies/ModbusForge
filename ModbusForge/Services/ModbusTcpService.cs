@@ -84,7 +84,7 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task<bool> ConnectAsync(string ipAddress, int port)
+        public async Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1")
         {
             await _ioLock.WaitAsync().ConfigureAwait(false);
             try

@@ -23,12 +23,6 @@ namespace ModbusForge
         private readonly MainViewModel _viewModel;
         private bool _isCommittingCustom;
 
-        // PLC Simulation ComboBox data sources
-        public ObservableCollection<PlcElementType> PlcElementTypes { get; } = new ObservableCollection<PlcElementType>(
-            Enum.GetValues(typeof(PlcElementType)).Cast<PlcElementType>());
-        public ObservableCollection<PlcArea> PlcAreas { get; } = new ObservableCollection<PlcArea>(
-            Enum.GetValues(typeof(PlcArea)).Cast<PlcArea>());
-
         public MainWindow(MainViewModel viewModel)
         {
             InitializeComponent();
@@ -97,28 +91,6 @@ namespace ModbusForge
             }
         }
 
-        private void MenuItem_ScriptEditor_Click(object sender, RoutedEventArgs e)
-        {
-            var scriptEditorViewModel = App.ServiceProvider.GetService(typeof(ScriptEditorViewModel)) as ScriptEditorViewModel;
-            if (scriptEditorViewModel != null)
-            {
-                var scriptEditorWindow = new Views.ScriptEditorWindow()
-                {
-                    Owner = this,
-                    DataContext = scriptEditorViewModel
-                };
-                scriptEditorWindow.Show();
-            }
-        }
-
-        private void MenuItem_ScriptRulesHelp_Click(object sender, RoutedEventArgs e)
-        {
-            var scriptEditorViewModel = App.ServiceProvider.GetService(typeof(ScriptEditorViewModel)) as ScriptEditorViewModel;
-            if (scriptEditorViewModel != null)
-            {
-                scriptEditorViewModel.ShowHelpCommand.Execute(null);
-            }
-        }
 
         private void Trend_ExportPng_Click(object sender, RoutedEventArgs e)
         {

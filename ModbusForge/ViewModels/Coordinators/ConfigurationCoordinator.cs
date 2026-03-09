@@ -36,6 +36,7 @@ namespace ModbusForge.ViewModels.Coordinators
             int port,
             byte unitId,
             ObservableCollection<CustomEntry> customEntries,
+            ObservableCollection<PlcElement> plcElements,
             Action<string> setStatusMessage)
         {
             try
@@ -55,7 +56,8 @@ namespace ModbusForge.ViewModels.Coordinators
                         ServerAddress = serverAddress,
                         Port = port,
                         UnitId = unitId,
-                        CustomEntries = customEntries.ToList()
+                        CustomEntries = customEntries.ToList(),
+                        PlcElements = plcElements.ToList()
                     };
 
                     var options = new JsonSerializerOptions { WriteIndented = true };
@@ -121,6 +123,7 @@ namespace ModbusForge.ViewModels.Coordinators
             Action<int> setPort,
             Action<byte> setUnitId,
             ObservableCollection<CustomEntry> customEntries,
+            ObservableCollection<PlcElement> plcElements,
             Action subscribeCustomEntries)
         {
             if (config == null) return;
@@ -143,6 +146,13 @@ namespace ModbusForge.ViewModels.Coordinators
                 foreach (var ce in config.CustomEntries)
                     customEntries.Add(ce);
                 subscribeCustomEntries();
+            }
+
+            if (config.PlcElements != null && config.PlcElements.Any())
+            {
+                plcElements.Clear();
+                foreach (var pe in config.PlcElements)
+                    plcElements.Add(pe);
             }
         }
     }

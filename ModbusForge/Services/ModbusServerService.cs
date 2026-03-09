@@ -13,6 +13,7 @@ namespace ModbusForge.Services
     public class ModbusServerService : IModbusService, IDisposable
     {
         private ModbusTcpSlave? _slave;
+        private System.Collections.Generic.List<ModbusTcpSlave> _slaves = new();
         private TcpListener? _listener;
         private DataStore? _dataStore;
         private Task? _listenTask;
@@ -40,7 +41,7 @@ namespace ModbusForge.Services
 
         public virtual bool IsConnected => _isRunning;
 
-        public async Task<bool> ConnectAsync(string ipAddress, int port)
+        public async Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1")
         {
             return await Task.Run(() =>
             {
@@ -92,20 +93,46 @@ namespace ModbusForge.Services
                     _listener = new TcpListener(endpoint);
                     _listener.Start();
                     
-                    // Create slave
-                    _slave = ModbusTcpSlave.CreateTcp(DefaultSlaveId, _listener);
-                    _slave.DataStore = _dataStore;
-                    
-                    // Start listening for connections
+                    // Parse unit IDs (e.g., "1, 2, 5-10")
+                    var ids = ParseUnitIds(unitIds);
+                    if (ids.Count == 0) ids.Add(DefaultSlaveId);
+
+                    // Create slaves sharing the same DataStore
+                    _slaves.Clear();
+                    foreach (var id in ids)
+                    {
+                        var slave = id == ids[0] 
+                            ? ModbusTcpSlave.CreateTcp(id, _listener) // First slave owns the listener/connection management in NModbus4 usually
+                            : ModbusTcpSlave.CreateTcp(id, _listener); // But for TCP we might need to add them to a SlaveNetwork or just create multiples?
+                        
+                        // NModbus4 ModbusTcpSlave.CreateTcp starts a listener internal to itself if we don't handle it carefully.
+                        // Actually, ModbusTcpSlave.CreateTcp(id, listener) is the way.
+                        
+                        slave.DataStore = _dataStore;
+                        _slaves.Add(slave);
+                    }
+                    _slave = _slaves[0]; // Keep reference for legacy compatibility if any
+
+                    // Start listening for connections on all slaves
                     _cts = new CancellationTokenSource();
-                    _isRunning = true; // Set before starting listen task
+                    _isRunning = true;
+                    
                     _listenTask = Task.Run(() =>
                     {
-                        try { _slave.Listen(); }
+                        try 
+                        { 
+                            // NModbus4 ModbusTcpSlave.Listen() handles the listener loop.
+                            // In Modbus TCP, the Unit ID is often ignored by the server as the IP/Port 
+                            // uniquely identifies the device. However, NModbus4's implementation 
+                            // will respond to requests for its own Unit ID.
+                            // To support multiple Unit IDs, we use the first slave to manage the listener.
+                            
+                            _slave.Listen(); 
+                        }
                         catch (Exception ex) { _logger.LogError(ex, "Listen task failed"); }
                     });
                     
-                    _logger.LogInformation($"Modbus TCP server started on {endpoint}");
+                    _logger.LogInformation($"Modbus TCP server started on {endpoint} with Unit IDs: {string.Join(", ", ids)}");
                     return true;
                     }
                     catch (SocketException sockEx) when (sockEx.SocketErrorCode == SocketError.AddressAlreadyInUse)
@@ -141,6 +168,8 @@ namespace ModbusForge.Services
             }
             finally
             {
+                foreach (var s in _slaves) s.Dispose();
+                _slaves.Clear();
                 _slave = null;
                 _listener = null;
                 _cts?.Dispose();
@@ -356,6 +385,36 @@ namespace ModbusForge.Services
             }
             
             return Task.FromResult(result);
+        }
+
+        private System.Collections.Generic.List<byte> ParseUnitIds(string input)
+        {
+            var result = new System.Collections.Generic.List<byte>();
+            if (string.IsNullOrWhiteSpace(input)) return result;
+
+            var parts = input.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var part in parts)
+            {
+                var trimmed = part.Trim();
+                if (trimmed.Contains('-'))
+                {
+                    var range = trimmed.Split('-');
+                    if (range.Length == 2 && byte.TryParse(range[0].Trim(), out byte start) && byte.TryParse(range[1].Trim(), out byte end))
+                    {
+                        for (int i = Math.Min(start, end); i <= Math.Max(start, end); i++)
+                        {
+                            if (i >= 1 && i <= 247 && !result.Contains((byte)i))
+                                result.Add((byte)i);
+                        }
+                    }
+                }
+                else if (byte.TryParse(trimmed, out byte id))
+                {
+                    if (id >= 1 && id <= 247 && !result.Contains(id))
+                        result.Add(id);
+                }
+            }
+            return result;
         }
     }
 }

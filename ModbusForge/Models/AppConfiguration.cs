@@ -9,5 +9,6 @@ namespace ModbusForge.Models
         public int Port { get; set; }
         public byte UnitId { get; set; }
         public List<CustomEntry>? CustomEntries { get; set; }
+        public List<PlcElement>? PlcElements { get; set; }
     }
 }
