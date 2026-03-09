@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -111,9 +112,12 @@ namespace ModbusForge.Services
             try
             {
                 var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
-                foreach (var ip in host.AddressList)
-                    if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-                        return ip.ToString();
+                var ips = host.AddressList
+                    .Where(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                    .Select(ip => ip.ToString())
+                    .ToList();
+                if (ips.Count > 0)
+                    return string.Join(", ", ips);
             }
             catch { }
             return "0.0.0.0";
