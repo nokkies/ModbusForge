@@ -146,6 +146,8 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="100"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="100"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
@@ -170,16 +172,22 @@
                              Margin="0,0,16,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"
                              ToolTip="Comma-separated list (e.g. 1, 2, 5-10)"/>
 
-                    <TextBlock Text="Mode:" Grid.Column="6" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <ComboBox Grid.Column="7" SelectedItem="{Binding Mode}" ItemsSource="{StaticResource ModeOptionsAll}"
+                    <TextBlock Text="Active ID:" Grid.Column="6" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"/>
+                    <ComboBox Grid.Column="7" ItemsSource="{Binding AvailableUnitIds}" SelectedItem="{Binding SelectedUnitId}" 
+                              IsEnabled="{Binding IsConnected}" 
+                              Margin="0,0,16,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"
+                              ToolTip="Select Unit ID for Custom entries and Simulation"/>
+
+                    <TextBlock Text="Mode:" Grid.Column="8" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox Grid.Column="9" SelectedItem="{Binding Mode}" ItemsSource="{StaticResource ModeOptionsAll}"
                               IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
                               Margin="0,0,16,0"/>
 
-                    <Button Grid.Column="8" Content="{Binding ConnectButtonText}" Command="{Binding ConnectCommand}" 
+                    <Button Grid.Column="10" Content="{Binding ConnectButtonText}" Command="{Binding ConnectCommand}" 
                             IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
                             Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"/>
 
-                    <StackPanel Grid.Column="9" Orientation="Horizontal">
+                    <StackPanel Grid.Column="11" Orientation="Horizontal">
                         <Button Content="Disconnect" Command="{Binding DisconnectCommand}" 
                                 IsEnabled="{Binding IsConnected}"
                                 Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"/>
@@ -368,8 +376,8 @@
                     <!-- Mode Selection -->
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
                         <TextBlock Text="Editor Mode:" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
-                        <RadioButton Content="Visual Node Editor" x:Name="VisualModeRadio" IsChecked="True" Margin="0,0,15,0" VerticalAlignment="Center"/>
-                        <RadioButton Content="Classic Form Editor" x:Name="ClassicModeRadio" IsChecked="False" VerticalAlignment="Center"/>
+                        <RadioButton Content="Visual Node Editor" x:Name="VisualModeRadio" IsChecked="False" Margin="0,0,15,0" VerticalAlignment="Center"/>
+                        <RadioButton Content="Classic Form Editor" x:Name="ClassicModeRadio" IsChecked="True" VerticalAlignment="Center"/>
                         <Separator Margin="15,0"/>
                         <mah:ToggleSwitch IsOn="{Binding SimulationCoordinator.SimulationEnabled, Mode=TwoWay}" OnContent="Simulation Enabled" OffContent="Simulation Disabled" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>

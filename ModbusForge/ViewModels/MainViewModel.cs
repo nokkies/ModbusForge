@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Windows;
 using System.Reflection;
 using System.Windows.Input;
@@ -77,7 +78,7 @@ namespace ModbusForge.ViewModels
             var snapshot = CustomEntries.ToList();
             foreach (var ce in snapshot)
             {
-                try { await _customEntryCoordinator.ReadCustomNowAsync(ce, UnitId, msg => StatusMessage = msg, IsServerMode); }
+                try { await _customEntryCoordinator.ReadCustomNowAsync(ce, EffectiveUnitId, msg => StatusMessage = msg, IsServerMode); }
                 catch (Exception ex) { _logger.LogDebug(ex, "ReadAllCustomNow: failed for {Area} {Address}", ce.Area, ce.Address); }
             }
             StatusMessage = $"Read {snapshot.Count} custom entries";
@@ -184,7 +185,7 @@ namespace ModbusForge.ViewModels
             ReadCustomNowCommand = new AsyncRelayCommand<object?>(async param =>
             {
                 if (param is CustomEntry ce)
-                    await _customEntryCoordinator.ReadCustomNowAsync(ce, UnitId, msg => StatusMessage = msg, IsServerMode);
+                    await _customEntryCoordinator.ReadCustomNowAsync(ce, EffectiveUnitId, msg => StatusMessage = msg, IsServerMode);
             });
             ReadAllCustomNowCommand = new RelayCommand(async () => await ReadAllCustomNowAsync());
             SaveCustomCommand = new RelayCommand(async () => await SaveCustomAsync());
@@ -446,6 +447,25 @@ namespace ModbusForge.ViewModels
         public IRelayCommand LoadAllConfigCommand { get; private set; }
         public IAsyncRelayCommand<DataGridCellEditEndingEventArgs> UpdateHoldingRegisterCommand { get; private set; }
 
+        // Unit ID selection for server mode
+        [ObservableProperty]
+        private byte _selectedUnitId = 1;
+
+        [ObservableProperty]
+        private ObservableCollection<byte> _availableUnitIds = new ObservableCollection<byte>();
+
+        // Helper to get the correct Unit ID based on mode
+        public byte EffectiveUnitId => IsServerMode ? SelectedUnitId : UnitId;
+
+        partial void OnSelectedUnitIdChanged(byte value)
+        {
+            // Refresh Custom entries when Unit ID changes in server mode
+            if (IsServerMode && IsConnected)
+            {
+                _ = Task.Run(async () => await ReadAllCustomNowAsync());
+            }
+        }
+
         // Global toggles for Custom tab
         [ObservableProperty]
         private bool _customMonitorEnabled = false;
@@ -520,7 +540,34 @@ namespace ModbusForge.ViewModels
         private async Task ConnectAsync()
         {
             await _connectionCoordinator.ConnectAsync(ServerAddress, Port, IsServerMode,
-                msg => StatusMessage = msg, connected => IsConnected = connected, ServerUnitId);
+                msg => StatusMessage = msg, 
+                connected => 
+                {
+                    IsConnected = connected;
+                    if (connected && IsServerMode)
+                    {
+                        PopulateAvailableUnitIds();
+                    }
+                }, 
+                ServerUnitId);
+        }
+
+        private void PopulateAvailableUnitIds()
+        {
+            AvailableUnitIds.Clear();
+            if (_serverService is ModbusServerService srv)
+            {
+                var unitIds = srv.GetUnitIds();
+                foreach (var id in unitIds.OrderBy(x => x))
+                {
+                    AvailableUnitIds.Add(id);
+                }
+                // Set selected to first available ID if current selection isn't in the list
+                if (!AvailableUnitIds.Contains(SelectedUnitId) && AvailableUnitIds.Count > 0)
+                {
+                    SelectedUnitId = AvailableUnitIds[0];
+                }
+            }
         }
 
         private bool CanDisconnect() => _connectionCoordinator.CanDisconnect(IsConnected);
@@ -533,47 +580,47 @@ namespace ModbusForge.ViewModels
 
         private async Task RunDiagnosticsAsync()
         {
-            await _connectionCoordinator.RunDiagnosticsAsync(ServerAddress, Port, UnitId,
+            await _connectionCoordinator.RunDiagnosticsAsync(ServerAddress, Port, EffectiveUnitId,
                 msg => StatusMessage = msg);
         }
 
         private async Task ReadRegistersAsync()
         {
-            await _registerCoordinator.ReadRegistersAsync(UnitId, RegisterStart, RegisterCount,
+            await _registerCoordinator.ReadRegistersAsync(EffectiveUnitId, RegisterStart, RegisterCount,
                 RegistersGlobalType, HoldingRegisters, msg => StatusMessage = msg,
                 hasError => _hasConnectionError = hasError, HoldingMonitorEnabled, IsServerMode);
         }
 
         private async Task ReadInputRegistersAsync()
         {
-            await _registerCoordinator.ReadInputRegistersAsync(UnitId, InputRegisterStart, InputRegisterCount,
+            await _registerCoordinator.ReadInputRegistersAsync(EffectiveUnitId, InputRegisterStart, InputRegisterCount,
                 InputRegistersGlobalType, InputRegisters, msg => StatusMessage = msg,
                 hasError => _hasConnectionError = hasError, InputRegistersMonitorEnabled, IsServerMode);
         }
 
         private async Task WriteRegisterAsync()
         {
-            await _registerCoordinator.WriteRegisterAsync(UnitId, WriteRegisterAddress, WriteRegisterValue,
+            await _registerCoordinator.WriteRegisterAsync(EffectiveUnitId, WriteRegisterAddress, WriteRegisterValue,
                 msg => StatusMessage = msg, async () => await ReadRegistersAsync(), IsServerMode);
         }
 
         private async Task ReadCoilsAsync()
         {
-            await _registerCoordinator.ReadCoilsAsync(UnitId, CoilStart, CoilCount,
+            await _registerCoordinator.ReadCoilsAsync(EffectiveUnitId, CoilStart, CoilCount,
                 Coils, msg => StatusMessage = msg,
                 hasError => _hasConnectionError = hasError, CoilsMonitorEnabled, IsServerMode);
         }
 
         private async Task ReadDiscreteInputsAsync()
         {
-            await _registerCoordinator.ReadDiscreteInputsAsync(UnitId, DiscreteInputStart, DiscreteInputCount,
+            await _registerCoordinator.ReadDiscreteInputsAsync(EffectiveUnitId, DiscreteInputStart, DiscreteInputCount,
                 DiscreteInputs, msg => StatusMessage = msg,
                 hasError => _hasConnectionError = hasError, DiscreteInputsMonitorEnabled, IsServerMode);
         }
 
         private async Task WriteCoilAsync()
         {
-            await _registerCoordinator.WriteCoilAsync(UnitId, WriteCoilAddress, WriteCoilState,
+            await _registerCoordinator.WriteCoilAsync(EffectiveUnitId, WriteCoilAddress, WriteCoilState,
                 msg => StatusMessage = msg, async () => await ReadCoilsAsync(), IsServerMode);
         }
 
@@ -586,22 +633,22 @@ namespace ModbusForge.ViewModels
         // Helper methods for inline editing from the view
         public async Task WriteRegisterAtAsync(int address, ushort value)
         {
-            await _registerCoordinator.WriteRegisterAtAsync(UnitId, address, value, IsServerMode);
+            await _registerCoordinator.WriteRegisterAtAsync(EffectiveUnitId, address, value, IsServerMode);
         }
 
         public async Task WriteFloatAtAsync(int address, float value)
         {
-            await _registerCoordinator.WriteFloatAtAsync(UnitId, address, value, IsServerMode);
+            await _registerCoordinator.WriteFloatAtAsync(EffectiveUnitId, address, value, IsServerMode);
         }
 
         public async Task WriteStringAtAsync(int address, string text)
         {
-            await _registerCoordinator.WriteStringAtAsync(UnitId, address, text, IsServerMode);
+            await _registerCoordinator.WriteStringAtAsync(EffectiveUnitId, address, text, IsServerMode);
         }
 
         public async Task WriteCoilAtAsync(int address, bool state)
         {
-            await _registerCoordinator.WriteCoilAtAsync(UnitId, address, state, IsServerMode);
+            await _registerCoordinator.WriteCoilAtAsync(EffectiveUnitId, address, state, IsServerMode);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -695,7 +742,7 @@ namespace ModbusForge.ViewModels
 
         private async Task WriteCustomNowAsync(CustomEntry entry)
         {
-            await _customEntryCoordinator.WriteCustomNowAsync(entry, UnitId, msg => StatusMessage = msg, IsServerMode);
+            await _customEntryCoordinator.WriteCustomNowAsync(entry, EffectiveUnitId, msg => StatusMessage = msg, IsServerMode);
         }
 
         /// <summary>

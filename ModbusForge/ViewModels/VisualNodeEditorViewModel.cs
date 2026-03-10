@@ -42,8 +42,7 @@ namespace ModbusForge.ViewModels
         
         public VisualNodeEditorViewModel()
         {
-            // Initialize with some default nodes for testing
-            InitializeSampleNodes();
+            // Start with empty canvas - no sample nodes
         }
         
         private void InitializeSampleNodes()
