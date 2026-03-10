@@ -98,11 +98,20 @@
 
         <Menu Grid.Row="0">
             <MenuItem Header="_File">
-                <MenuItem Header="_Load All Configuration..." Command="{Binding LoadAllConfigCommand}"/>
-                <MenuItem Header="_Save All Configuration..." Command="{Binding SaveAllConfigCommand}"/>
+                <MenuItem Header="_Open Project..." Command="{Binding LoadProjectCommand}" InputGestureText="Ctrl+O"/>
+                <MenuItem Header="_Save Project..." Command="{Binding SaveProjectCommand}" InputGestureText="Ctrl+S"/>
                 <Separator/>
-                <MenuItem Header="_Load Custom..." Command="{Binding LoadCustomCommand}"/>
-                <MenuItem Header="_Save Custom..." Command="{Binding SaveCustomCommand}"/>
+                <MenuItem Header="_Import Unit IDs..." Command="{Binding ImportUnitIdsCommand}"/>
+                <MenuItem Header="_Export Unit IDs..." Command="{Binding ExportUnitIdsCommand}"/>
+                <Separator/>
+                <MenuItem Header="Export Unit ID..." Command="{Binding ExportUnitIdCommand}"/>
+                <MenuItem Header="Import Unit ID As..." Command="{Binding ImportUnitIdAsCommand}"/>
+                <Separator/>
+                <!-- Legacy commands - hidden but kept for compatibility -->
+                <MenuItem Header="_Load All Configuration..." Command="{Binding LoadAllConfigCommand}" Visibility="Collapsed"/>
+                <MenuItem Header="_Save All Configuration..." Command="{Binding SaveAllConfigCommand}" Visibility="Collapsed"/>
+                <MenuItem Header="_Load Custom..." Command="{Binding LoadCustomCommand}" Visibility="Collapsed"/>
+                <MenuItem Header="_Save Custom..." Command="{Binding SaveCustomCommand}" Visibility="Collapsed"/>
                 <Separator/>
                 <MenuItem Header="_Exit" Click="MenuItem_Exit_Click"/>
             </MenuItem>

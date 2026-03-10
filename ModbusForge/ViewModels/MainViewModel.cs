@@ -30,11 +30,16 @@ using ModbusForge.Models;
 using System.Windows.Controls;
 using ModbusForge.Helpers;
 using ModbusForge.ViewModels.Coordinators;
+using ModbusForge.Controls;
 
 namespace ModbusForge.ViewModels
 {
     public partial class MainViewModel : ViewModelBase, IDisposable
     {
+        // Partial method declarations for delegated properties (required by CommunityToolkit.Mvvm)
+        partial void OnRegistersGlobalTypeChanged(string value);
+        partial void OnInputRegistersGlobalTypeChanged(string value);
+
         private IModbusService _modbusService;
         private readonly ModbusTcpService _clientService;
         private readonly ModbusServerService _serverService;
@@ -188,6 +193,15 @@ namespace ModbusForge.ViewModels
                     await _customEntryCoordinator.ReadCustomNowAsync(ce, EffectiveUnitId, msg => StatusMessage = msg, IsServerMode);
             });
             ReadAllCustomNowCommand = new RelayCommand(async () => await ReadAllCustomNowAsync());
+            // Project commands (replacing Custom save/load)
+            SaveProjectCommand = new RelayCommand(async () => await SaveProjectAsync());
+            LoadProjectCommand = new RelayCommand(async () => await LoadProjectAsync());
+            ImportUnitIdsCommand = new RelayCommand(async () => await ImportUnitIdsAsync());
+            ExportUnitIdsCommand = new RelayCommand(async () => await ExportUnitIdsAsync());
+            ExportUnitIdCommand = new RelayCommand(async () => await ExportUnitIdAsync());
+            ImportUnitIdAsCommand = new RelayCommand(async () => await ImportUnitIdAsAsync());
+            
+            // Legacy Custom commands (kept for compatibility but will be hidden)
             SaveCustomCommand = new RelayCommand(async () => await SaveCustomAsync());
             LoadCustomCommand = new RelayCommand(async () => await LoadCustomAsync());
             SaveAllConfigCommand = new RelayCommand(async () => await SaveAllConfigAsync());
@@ -346,67 +360,15 @@ namespace ModbusForge.ViewModels
         [ObservableProperty]
         private string _statusMessage = "Disconnected";
 
-        // Modbus addressing defaults
+        // Modbus addressing defaults (kept for client mode compatibility)
         [ObservableProperty]
         private byte _unitId = 1;
 
         [ObservableProperty]
         private string _serverUnitId = "1";
 
-        // Registers UI state
-        [ObservableProperty]
-        private int _registerStart = 1;
-
-        [ObservableProperty]
-        private int _registerCount = 10;
-
-        [ObservableProperty]
-        private int _writeRegisterAddress = 1;
-
-        [ObservableProperty]
-        private ushort _writeRegisterValue = 0;
-
-        public ObservableCollection<RegisterEntry> HoldingRegisters { get; } = new();
-
-        // Coils UI state
-        [ObservableProperty]
-        private int _coilStart = 1;
-
-        [ObservableProperty]
-        private int _coilCount = 16;
-
-        [ObservableProperty]
-        private int _writeCoilAddress = 1;
-
-        [ObservableProperty]
-        private bool _writeCoilState = false;
-
-        public ObservableCollection<CoilEntry> Coils { get; } = new();
-
-        // Input Registers UI state
-        [ObservableProperty]
-        private int _inputRegisterStart = 1;
-
-        [ObservableProperty]
-        private int _inputRegisterCount = 10;
-
-        public ObservableCollection<RegisterEntry> InputRegisters { get; } = new();
-
-        // Discrete Inputs UI state
-        [ObservableProperty]
-        private int _discreteInputStart = 1;
-
-        [ObservableProperty]
-        private int _discreteInputCount = 16;
-
-        public ObservableCollection<CoilEntry> DiscreteInputs { get; } = new();
-
-        // Global type selectors for registers
-        [ObservableProperty]
-        private string _registersGlobalType = "uint"; // options: uint,int,real,string
-
-        [ObservableProperty]
-        private string _inputRegistersGlobalType = "uint";
+        // Note: Register properties are now delegated to CurrentConfig.RegisterSettings
+        // See the delegated properties in the section above around line 497-511
 
         private IRelayCommand? _disconnectCommand;
         private readonly ILogger<MainViewModel> _logger;
@@ -432,108 +394,251 @@ namespace ModbusForge.ViewModels
         public IRelayCommand WriteCoilCommand { get; private set; }
         public IRelayCommand ReadInputRegistersCommand { get; private set; }
         public IRelayCommand ReadDiscreteInputsCommand { get; private set; }
-
-        public ObservableCollection<string> ConsoleMessages => _consoleLoggerService.LogMessages;
-
-        // Custom tab
-        public ObservableCollection<CustomEntry> CustomEntries { get; } = new();
         public ICommand AddCustomEntryCommand { get; private set; }
         public ICommand WriteCustomNowCommand { get; private set; }
         public ICommand ReadCustomNowCommand { get; private set; }
         public IRelayCommand ReadAllCustomNowCommand { get; private set; }
+        public ICommand SaveProjectCommand { get; private set; }
+        public ICommand LoadProjectCommand { get; private set; }
+        public ICommand ImportUnitIdsCommand { get; private set; }
+        public ICommand ExportUnitIdsCommand { get; private set; }
+        public ICommand ExportUnitIdCommand { get; private set; }
+        public ICommand ImportUnitIdAsCommand { get; private set; }
         public IRelayCommand SaveCustomCommand { get; private set; }
         public IRelayCommand LoadCustomCommand { get; private set; }
         public IRelayCommand SaveAllConfigCommand { get; private set; }
         public IRelayCommand LoadAllConfigCommand { get; private set; }
+
+        public ObservableCollection<string> ConsoleMessages => _consoleLoggerService.LogMessages;
+
+        // Register collections (shared across all Unit IDs for display)
+        public ObservableCollection<RegisterEntry> HoldingRegisters { get; } = new();
+        public ObservableCollection<CoilEntry> Coils { get; } = new();
+        public ObservableCollection<RegisterEntry> InputRegisters { get; } = new();
+        public ObservableCollection<CoilEntry> DiscreteInputs { get; } = new();
+
         public IAsyncRelayCommand<DataGridCellEditEndingEventArgs> UpdateHoldingRegisterCommand { get; private set; }
 
-        // Unit ID selection for server mode
+        // Unit ID configurations for complete isolation
+        [ObservableProperty]
+        private Dictionary<byte, UnitIdConfiguration> _unitConfigurations = new();
+
         [ObservableProperty]
         private byte _selectedUnitId = 1;
 
         [ObservableProperty]
         private ObservableCollection<byte> _availableUnitIds = new ObservableCollection<byte>();
 
+        // Current active configuration (binds to selected Unit ID)
+        public UnitIdConfiguration CurrentConfig
+        {
+            get
+            {
+                if (!UnitConfigurations.ContainsKey(SelectedUnitId))
+                {
+                    UnitConfigurations[SelectedUnitId] = new UnitIdConfiguration(SelectedUnitId);
+                }
+                return UnitConfigurations[SelectedUnitId];
+            }
+        }
+
         // Helper to get the correct Unit ID based on mode
         public byte EffectiveUnitId => IsServerMode ? SelectedUnitId : UnitId;
 
+        // Properties that now delegate to current configuration
+        public ObservableCollection<CustomEntry> CustomEntries => CurrentConfig.CustomEntries;
+        public bool SimulationEnabled => CurrentConfig.SimulationSettings.SimulationEnabled;
+        public int SimulationPeriodMs => CurrentConfig.SimulationSettings.SimulationPeriodMs;
+        public bool PlcSimulationEnabled => CurrentConfig.SimulationSettings.PlcSimulationEnabled;
+        public int PlcSimulationPeriodMs => CurrentConfig.SimulationSettings.PlcSimulationPeriodMs;
+        public ObservableCollection<PlcSimulationElement> PlcElements => CurrentConfig.SimulationSettings.PlcElements;
+        
+        // Monitoring properties that delegate to current configuration
+        public bool GlobalMonitorEnabled 
+        { 
+            get => CurrentConfig.MonitoringSettings.GlobalMonitorEnabled; 
+            set => SetGlobalMonitorEnabled(value); 
+        }
+        public bool HoldingMonitorEnabled 
+        { 
+            get => CurrentConfig.MonitoringSettings.HoldingMonitorEnabled; 
+            set => SetHoldingMonitorEnabled(value); 
+        }
+        public int HoldingMonitorPeriodMs 
+        { 
+            get => CurrentConfig.MonitoringSettings.HoldingMonitorPeriodMs; 
+            set => SetHoldingMonitorPeriodMs(value); 
+        }
+        public bool InputRegistersMonitorEnabled 
+        { 
+            get => CurrentConfig.MonitoringSettings.InputRegistersMonitorEnabled; 
+            set => SetInputRegistersMonitorEnabled(value); 
+        }
+        public int InputRegistersMonitorPeriodMs 
+        { 
+            get => CurrentConfig.MonitoringSettings.InputRegistersMonitorPeriodMs; 
+            set => SetInputRegistersMonitorPeriodMs(value); 
+        }
+        public bool CoilsMonitorEnabled 
+        { 
+            get => CurrentConfig.MonitoringSettings.CoilsMonitorEnabled; 
+            set => SetCoilsMonitorEnabled(value); 
+        }
+        public int CoilsMonitorPeriodMs 
+        { 
+            get => CurrentConfig.MonitoringSettings.CoilsMonitorPeriodMs; 
+            set => SetCoilsMonitorPeriodMs(value); 
+        }
+        public bool DiscreteInputsMonitorEnabled 
+        { 
+            get => CurrentConfig.MonitoringSettings.DiscreteInputsMonitorEnabled; 
+            set => SetDiscreteInputsMonitorEnabled(value); 
+        }
+        public int DiscreteInputsMonitorPeriodMs 
+        { 
+            get => CurrentConfig.MonitoringSettings.DiscreteInputsMonitorPeriodMs; 
+            set => SetDiscreteInputsMonitorPeriodMs(value); 
+        }
+        public bool CustomMonitorEnabled 
+        { 
+            get => CurrentConfig.MonitoringSettings.CustomMonitorEnabled; 
+            set => SetCustomMonitorEnabled(value); 
+        }
+        public bool CustomReadMonitorEnabled 
+        { 
+            get => CurrentConfig.MonitoringSettings.CustomReadMonitorEnabled; 
+            set => SetCustomReadMonitorEnabled(value); 
+        } 
+        public int RegisterStart 
+        { 
+            get => CurrentConfig.RegisterSettings.RegisterStart; 
+            set => SetRegisterStart(value); 
+        }
+        public int RegisterCount 
+        { 
+            get => CurrentConfig.RegisterSettings.RegisterCount; 
+            set => SetRegisterCount(value); 
+        }
+        public int WriteRegisterAddress 
+        { 
+            get => CurrentConfig.RegisterSettings.WriteRegisterAddress; 
+            set => SetWriteRegisterAddress(value); 
+        }
+        public ushort WriteRegisterValue 
+        { 
+            get => CurrentConfig.RegisterSettings.WriteRegisterValue; 
+            set => SetWriteRegisterValue(value); 
+        }
+        public string RegistersGlobalType 
+        { 
+            get => CurrentConfig.RegisterSettings.RegistersGlobalType; 
+            set => SetRegistersGlobalType(value); 
+        }
+        public int CoilStart 
+        { 
+            get => CurrentConfig.RegisterSettings.CoilStart; 
+            set => SetCoilStart(value); 
+        }
+        public int CoilCount 
+        { 
+            get => CurrentConfig.RegisterSettings.CoilCount; 
+            set => SetCoilCount(value); 
+        }
+        public int WriteCoilAddress 
+        { 
+            get => CurrentConfig.RegisterSettings.WriteCoilAddress; 
+            set => SetWriteCoilAddress(value); 
+        }
+        public bool WriteCoilState 
+        { 
+            get => CurrentConfig.RegisterSettings.WriteCoilState; 
+            set => SetWriteCoilState(value); 
+        }
+        public int InputRegisterStart 
+        { 
+            get => CurrentConfig.RegisterSettings.InputRegisterStart; 
+            set => SetInputRegisterStart(value); 
+        }
+        public int InputRegisterCount 
+        { 
+            get => CurrentConfig.RegisterSettings.InputRegisterCount; 
+            set => SetInputRegisterCount(value); 
+        }
+        public string InputRegistersGlobalType 
+        { 
+            get => CurrentConfig.RegisterSettings.InputRegistersGlobalType; 
+            set => SetInputRegistersGlobalType(value); 
+        }
+        public int DiscreteInputStart 
+        { 
+            get => CurrentConfig.RegisterSettings.DiscreteInputStart; 
+            set => SetDiscreteInputStart(value); 
+        }
+        public int DiscreteInputCount 
+        { 
+            get => CurrentConfig.RegisterSettings.DiscreteInputCount; 
+            set => SetDiscreteInputCount(value); 
+        }
+
         partial void OnSelectedUnitIdChanged(byte value)
         {
+            // Ensure configuration exists for the new Unit ID
+            if (!UnitConfigurations.ContainsKey(value))
+            {
+                UnitConfigurations[value] = new UnitIdConfiguration(value);
+            }
+            
             // Refresh Custom entries when Unit ID changes in server mode
             if (IsServerMode && IsConnected)
             {
                 _ = Task.Run(async () => await ReadAllCustomNowAsync());
             }
+            
+            // Notify all delegated properties that they may have changed
+            OnPropertyChanged(nameof(CustomEntries));
+            OnPropertyChanged(nameof(SimulationEnabled));
+            OnPropertyChanged(nameof(PlcSimulationEnabled));
+            OnPropertyChanged(nameof(GlobalMonitorEnabled));
+            OnPropertyChanged(nameof(HoldingMonitorEnabled));
+            OnPropertyChanged(nameof(InputRegistersMonitorEnabled));
+            OnPropertyChanged(nameof(CoilsMonitorEnabled));
+            OnPropertyChanged(nameof(DiscreteInputsMonitorEnabled));
+            OnPropertyChanged(nameof(CustomMonitorEnabled));
+            OnPropertyChanged(nameof(CustomReadMonitorEnabled));
         }
 
-        // Global toggles for Custom tab
-        [ObservableProperty]
-        private bool _customMonitorEnabled = false;
-
-        [ObservableProperty]
-        private bool _customReadMonitorEnabled = false;
-
-        // Global continuous read toggle (gates all periodic reads including trend sampling)
-        [ObservableProperty]
-        private bool _globalMonitorEnabled = false;
-
-        partial void OnGlobalMonitorEnabledChanged(bool value)
-        {
-            if (!value)
-            {
-                // When global is disabled, disable all individual monitors
-                HoldingMonitorEnabled = false;
-                InputRegistersMonitorEnabled = false;
-                CoilsMonitorEnabled = false;
-                DiscreteInputsMonitorEnabled = false;
-            }
-        }
-
-        // Monitoring toggles and periods
-        [ObservableProperty]
-        private bool _holdingMonitorEnabled = false;
-
-        partial void OnHoldingMonitorEnabledChanged(bool value)
-        {
-            if (value) GlobalMonitorEnabled = true;
-        }
-
-        [ObservableProperty]
-        private int _holdingMonitorPeriodMs = 1000;
-
-        [ObservableProperty]
-        private bool _inputRegistersMonitorEnabled = false;
-
-        partial void OnInputRegistersMonitorEnabledChanged(bool value)
-        {
-            if (value) GlobalMonitorEnabled = true;
-        }
-
-        [ObservableProperty]
-        private int _inputRegistersMonitorPeriodMs = 1000;
-
-        [ObservableProperty]
-        private bool _coilsMonitorEnabled = false;
-
-        partial void OnCoilsMonitorEnabledChanged(bool value)
-        {
-            if (value) GlobalMonitorEnabled = true;
-        }
-
-        [ObservableProperty]
-        private int _coilsMonitorPeriodMs = 1000;
-
-        [ObservableProperty]
-        private bool _discreteInputsMonitorEnabled = false;
-
-        partial void OnDiscreteInputsMonitorEnabledChanged(bool value)
-        {
-            if (value) GlobalMonitorEnabled = true;
-        }
-
-        [ObservableProperty]
-        private int _discreteInputsMonitorPeriodMs = 1000;
-
+        // Setters for delegated properties (needed for two-way binding)
+        private void SetSimulationEnabled(bool value) => CurrentConfig.SimulationSettings.SimulationEnabled = value;
+        private void SetSimulationPeriodMs(int value) => CurrentConfig.SimulationSettings.SimulationPeriodMs = value;
+        private void SetPlcSimulationEnabled(bool value) => CurrentConfig.SimulationSettings.PlcSimulationEnabled = value;
+        private void SetPlcSimulationPeriodMs(int value) => CurrentConfig.SimulationSettings.PlcSimulationPeriodMs = value;
+        
+        private void SetGlobalMonitorEnabled(bool value) => CurrentConfig.MonitoringSettings.GlobalMonitorEnabled = value;
+        private void SetHoldingMonitorEnabled(bool value) => CurrentConfig.MonitoringSettings.HoldingMonitorEnabled = value;
+        private void SetHoldingMonitorPeriodMs(int value) => CurrentConfig.MonitoringSettings.HoldingMonitorPeriodMs = value;
+        private void SetInputRegistersMonitorEnabled(bool value) => CurrentConfig.MonitoringSettings.InputRegistersMonitorEnabled = value;
+        private void SetInputRegistersMonitorPeriodMs(int value) => CurrentConfig.MonitoringSettings.InputRegistersMonitorPeriodMs = value;
+        private void SetCoilsMonitorEnabled(bool value) => CurrentConfig.MonitoringSettings.CoilsMonitorEnabled = value;
+        private void SetCoilsMonitorPeriodMs(int value) => CurrentConfig.MonitoringSettings.CoilsMonitorPeriodMs = value;
+        private void SetDiscreteInputsMonitorEnabled(bool value) => CurrentConfig.MonitoringSettings.DiscreteInputsMonitorEnabled = value;
+        private void SetDiscreteInputsMonitorPeriodMs(int value) => CurrentConfig.MonitoringSettings.DiscreteInputsMonitorPeriodMs = value;
+        private void SetCustomMonitorEnabled(bool value) => CurrentConfig.MonitoringSettings.CustomMonitorEnabled = value;
+        private void SetCustomReadMonitorEnabled(bool value) => CurrentConfig.MonitoringSettings.CustomReadMonitorEnabled = value;
+        
+        private void SetRegisterStart(int value) => CurrentConfig.RegisterSettings.RegisterStart = value;
+        private void SetRegisterCount(int value) => CurrentConfig.RegisterSettings.RegisterCount = value;
+        private void SetWriteRegisterAddress(int value) => CurrentConfig.RegisterSettings.WriteRegisterAddress = value;
+        private void SetWriteRegisterValue(ushort value) => CurrentConfig.RegisterSettings.WriteRegisterValue = value;
+        private void SetRegistersGlobalType(string value) => CurrentConfig.RegisterSettings.RegistersGlobalType = value;
+        private void SetCoilStart(int value) => CurrentConfig.RegisterSettings.CoilStart = value;
+        private void SetCoilCount(int value) => CurrentConfig.RegisterSettings.CoilCount = value;
+        private void SetWriteCoilAddress(int value) => CurrentConfig.RegisterSettings.WriteCoilAddress = value;
+        private void SetWriteCoilState(bool value) => CurrentConfig.RegisterSettings.WriteCoilState = value;
+        private void SetInputRegisterStart(int value) => CurrentConfig.RegisterSettings.InputRegisterStart = value;
+        private void SetInputRegisterCount(int value) => CurrentConfig.RegisterSettings.InputRegisterCount = value;
+        private void SetInputRegistersGlobalType(string value) => CurrentConfig.RegisterSettings.InputRegistersGlobalType = value;
+        private void SetDiscreteInputStart(int value) => CurrentConfig.RegisterSettings.DiscreteInputStart = value;
+        private void SetDiscreteInputCount(int value) => CurrentConfig.RegisterSettings.DiscreteInputCount = value;
 
         private bool CanConnect() => _connectionCoordinator.CanConnect(IsConnected);
 
@@ -730,6 +835,7 @@ namespace ModbusForge.ViewModels
             // No clamping - allow any valid byte value (0-255)
             _logger.LogDebug("UnitId changed to {Value}.", value);
         }
+
     }
 
     // Extensions to support the Custom tab logic within the ViewModel partial class
@@ -1162,7 +1268,7 @@ namespace ModbusForge.ViewModels
                 trendEntries,
                 UnitId,
                 IsServerMode,
-                enabled => GlobalMonitorEnabled = enabled);
+                enabled => SetGlobalMonitorEnabled(enabled));
         }
 
 
@@ -1203,6 +1309,434 @@ namespace ModbusForge.ViewModels
                     _visualNodeEditorViewModel.Nodes,
                     _visualNodeEditorViewModel.Connections,
                     SubscribeCustomEntries);
+            }
+        }
+
+        private string GenerateAutoFileName()
+        {
+            try
+            {
+                var ipAddress = IsServerMode ? "Server" : SanitizeIpAddress(ServerAddress);
+                var unitId = IsServerMode ? SelectedUnitId : UnitId;
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                
+                return $"MBIP{ipAddress}_ID{unitId}_{timestamp}";
+            }
+            catch
+            {
+                // Fallback to simple timestamp if IP address processing fails
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                var unitId = IsServerMode ? SelectedUnitId : UnitId;
+                return $"ModbusForge_ID{unitId}_{timestamp}";
+            }
+        }
+
+        private string SanitizeIpAddress(string ipAddress)
+        {
+            if (string.IsNullOrWhiteSpace(ipAddress))
+                return "Unknown";
+
+            // Remove invalid characters and replace dots with zeros for filename compatibility
+            var sanitized = ipAddress.Replace(".", "000");
+            
+            // Remove any remaining invalid filename characters
+            var invalidChars = Path.GetInvalidFileNameChars();
+            foreach (var c in invalidChars)
+            {
+                sanitized = sanitized.Replace(c, '_');
+            }
+            
+            // Ensure it doesn't start with a number (for filename compatibility)
+            if (char.IsDigit(sanitized[0]))
+            {
+                sanitized = "IP" + sanitized;
+            }
+            
+            return sanitized;
+        }
+
+        private async Task SaveProjectAsync()
+        {
+            try
+            {
+                var defaultFileName = GenerateAutoFileName();
+                var saveFileDialog = new SaveFileDialog
+                {
+                    Filter = "ModbusForge Project (*.mfp)|*.mfp|All Files (*.*)|*.*",
+                    DefaultExt = "mfp",
+                    Title = IsServerMode ? "Save Server Project" : "Save Client Project",
+                    FileName = defaultFileName
+                };
+
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    ProjectConfiguration projectConfig;
+
+                    if (IsServerMode)
+                    {
+                        // Server mode: Save all Unit ID configurations
+                        projectConfig = new ProjectConfiguration
+                        {
+                            ProjectInfo = new ProjectInfo
+                            {
+                                Name = System.IO.Path.GetFileNameWithoutExtension(saveFileDialog.FileName),
+                                Modified = DateTime.Now
+                            },
+                            GlobalSettings = new GlobalSettings
+                            {
+                                Mode = Mode,
+                                ServerAddress = ServerAddress,
+                                Port = Port,
+                                ServerUnitId = ServerUnitId,
+                                ClientUnitId = UnitId
+                            },
+                            UnitConfigurations = new Dictionary<byte, UnitIdConfiguration>(UnitConfigurations)
+                        };
+                    }
+                    else
+                    {
+                        // Client mode: Save only single client configuration
+                        projectConfig = new ProjectConfiguration
+                        {
+                            ProjectInfo = new ProjectInfo
+                            {
+                                Name = System.IO.Path.GetFileNameWithoutExtension(saveFileDialog.FileName),
+                                Modified = DateTime.Now
+                            },
+                            GlobalSettings = new GlobalSettings
+                            {
+                                Mode = Mode,
+                                ServerAddress = ServerAddress,
+                                Port = Port,
+                                ServerUnitId = ServerUnitId,
+                                ClientUnitId = UnitId
+                            },
+                            UnitConfigurations = new Dictionary<byte, UnitIdConfiguration>
+                            {
+                                [UnitId] = CurrentConfig.Clone()
+                            }
+                        };
+                    }
+
+                    var options = new JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    };
+
+                    var json = JsonSerializer.Serialize(projectConfig, options);
+                    await File.WriteAllTextAsync(saveFileDialog.FileName, json);
+                    StatusMessage = $"{(IsServerMode ? "Server" : "Client")} project saved to {System.IO.Path.GetFileName(saveFileDialog.FileName)}";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving project");
+                StatusMessage = $"Error saving project: {ex.Message}";
+            }
+        }
+
+        private async Task LoadProjectAsync()
+        {
+            try
+            {
+                var openFileDialog = new OpenFileDialog
+                {
+                    Filter = "ModbusForge Project (*.mfp)|*.mfp|All Files (*.*)|*.*",
+                    Title = "Load ModbusForge Project"
+                };
+
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    var json = await File.ReadAllTextAsync(openFileDialog.FileName);
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    };
+
+                    var projectConfig = JsonSerializer.Deserialize<ProjectConfiguration>(json, options);
+                    if (projectConfig != null)
+                    {
+                        // Apply global settings
+                        Mode = projectConfig.GlobalSettings.Mode;
+                        ServerAddress = projectConfig.GlobalSettings.ServerAddress;
+                        Port = projectConfig.GlobalSettings.Port;
+                        ServerUnitId = projectConfig.GlobalSettings.ServerUnitId;
+                        UnitId = projectConfig.GlobalSettings.ClientUnitId;
+
+                        // Apply Unit ID configurations
+                        UnitConfigurations.Clear();
+                        foreach (var kvp in projectConfig.UnitConfigurations)
+                        {
+                            UnitConfigurations[kvp.Key] = kvp.Value.Clone();
+                        }
+
+                        // Ensure we have a configuration for the selected Unit ID
+                        if (!UnitConfigurations.ContainsKey(SelectedUnitId))
+                        {
+                            SelectedUnitId = UnitConfigurations.Keys.First();
+                        }
+
+                        // Refresh UI
+                        OnPropertyChanged(nameof(CustomEntries));
+                        OnPropertyChanged(nameof(SimulationEnabled));
+                        OnPropertyChanged(nameof(PlcSimulationEnabled));
+                        OnPropertyChanged(nameof(GlobalMonitorEnabled));
+                        OnPropertyChanged(nameof(HoldingMonitorEnabled));
+                        OnPropertyChanged(nameof(InputRegistersMonitorEnabled));
+                        OnPropertyChanged(nameof(CoilsMonitorEnabled));
+                        OnPropertyChanged(nameof(DiscreteInputsMonitorEnabled));
+                        OnPropertyChanged(nameof(CustomMonitorEnabled));
+                        OnPropertyChanged(nameof(CustomReadMonitorEnabled));
+
+                        StatusMessage = $"Project loaded: {System.IO.Path.GetFileName(openFileDialog.FileName)}";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading project");
+                StatusMessage = $"Error loading project: {ex.Message}";
+            }
+        }
+
+        private async Task ImportUnitIdsAsync()
+        {
+            try
+            {
+                var openFileDialog = new OpenFileDialog
+                {
+                    Filter = "ModbusForge Project (*.mfp)|*.mfp|All Files (*.*)|*.*",
+                    Title = "Import Unit ID Configurations"
+                };
+
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    var json = await File.ReadAllTextAsync(openFileDialog.FileName);
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    };
+
+                    var projectConfig = JsonSerializer.Deserialize<ProjectConfiguration>(json, options);
+                    if (projectConfig?.UnitConfigurations != null)
+                    {
+                        var importedCount = 0;
+                        foreach (var kvp in projectConfig.UnitConfigurations)
+                        {
+                            // Import only Unit IDs that don't already exist
+                            if (!UnitConfigurations.ContainsKey(kvp.Key))
+                            {
+                                UnitConfigurations[kvp.Key] = kvp.Value.Clone();
+                                importedCount++;
+                            }
+                        }
+
+                        // Refresh AvailableUnitIds if in server mode
+                        if (IsServerMode)
+                        {
+                            PopulateAvailableUnitIds();
+                        }
+
+                        StatusMessage = $"Imported {importedCount} new Unit ID configurations";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error importing Unit IDs");
+                StatusMessage = $"Error importing Unit IDs: {ex.Message}";
+            }
+        }
+
+        private async Task ExportUnitIdsAsync()
+        {
+            try
+            {
+                var defaultFileName = GenerateAutoFileName() + "_AllUnitIDs";
+                var saveFileDialog = new SaveFileDialog
+                {
+                    Filter = "ModbusForge Project (*.mfp)|*.mfp|All Files (*.*)|*.*",
+                    DefaultExt = "mfp",
+                    Title = "Export Unit ID Configurations",
+                    FileName = defaultFileName
+                };
+
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    var projectConfig = new ProjectConfiguration
+                    {
+                        ProjectInfo = new ProjectInfo
+                        {
+                            Name = $"Exported Unit IDs - {DateTime.Now:yyyy-MM-dd HH:mm:ss}",
+                            Modified = DateTime.Now
+                        },
+                        GlobalSettings = new GlobalSettings
+                        {
+                            Mode = Mode,
+                            ServerAddress = ServerAddress,
+                            Port = Port,
+                            ServerUnitId = ServerUnitId,
+                            ClientUnitId = UnitId
+                        },
+                        UnitConfigurations = new Dictionary<byte, UnitIdConfiguration>()
+                    };
+
+                    // Export all Unit ID configurations
+                    foreach (var kvp in UnitConfigurations)
+                    {
+                        projectConfig.UnitConfigurations[kvp.Key] = kvp.Value.Clone();
+                    }
+
+                    var options = new JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    };
+
+                    var json = JsonSerializer.Serialize(projectConfig, options);
+                    await File.WriteAllTextAsync(saveFileDialog.FileName, json);
+                    StatusMessage = $"Exported {UnitConfigurations.Count} Unit ID configurations";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error exporting Unit IDs");
+                StatusMessage = $"Error exporting Unit IDs: {ex.Message}";
+            }
+        }
+
+        private async Task ExportUnitIdAsync()
+        {
+            try
+            {
+                if (!IsServerMode)
+                {
+                    MessageBox.Show("Export Unit ID is only available in Server mode.", "Export Unit ID", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var defaultFileName = GenerateAutoFileName() + $"_ID{SelectedUnitId}";
+                var saveFileDialog = new SaveFileDialog
+                {
+                    Filter = "ModbusForge Unit ID (*.mui)|*.mui|All Files (*.*)|*.*",
+                    DefaultExt = "mui",
+                    Title = $"Export Unit ID {SelectedUnitId}",
+                    FileName = defaultFileName
+                };
+
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    var unitConfig = CurrentConfig.Clone();
+                    
+                    var projectConfig = new ProjectConfiguration
+                    {
+                        ProjectInfo = new ProjectInfo
+                        {
+                            Name = $"Unit ID {SelectedUnitId} - {DateTime.Now:yyyy-MM-dd HH:mm:ss}",
+                            Modified = DateTime.Now
+                        },
+                        GlobalSettings = new GlobalSettings
+                        {
+                            Mode = Mode,
+                            ServerAddress = ServerAddress,
+                            Port = Port,
+                            ServerUnitId = ServerUnitId,
+                            ClientUnitId = UnitId
+                        },
+                        UnitConfigurations = new Dictionary<byte, UnitIdConfiguration>
+                        {
+                            [SelectedUnitId] = unitConfig
+                        }
+                    };
+
+                    var options = new JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    };
+
+                    var json = JsonSerializer.Serialize(projectConfig, options);
+                    await File.WriteAllTextAsync(saveFileDialog.FileName, json);
+                    StatusMessage = $"Unit ID {SelectedUnitId} exported to {System.IO.Path.GetFileName(saveFileDialog.FileName)}";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error exporting Unit ID");
+                StatusMessage = $"Error exporting Unit ID: {ex.Message}";
+            }
+        }
+
+        private async Task ImportUnitIdAsAsync()
+        {
+            try
+            {
+                if (!IsServerMode)
+                {
+                    MessageBox.Show("Import Unit ID As is only available in Server mode.", "Import Unit ID As", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var openFileDialog = new OpenFileDialog
+                {
+                    Filter = "ModbusForge Unit ID (*.mui)|*.mui|ModbusForge Project (*.mfp)|*.mfp|All Files (*.*)|*.*",
+                    Title = "Import Unit ID Configuration"
+                };
+
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    var json = await File.ReadAllTextAsync(openFileDialog.FileName);
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    };
+
+                    var projectConfig = JsonSerializer.Deserialize<ProjectConfiguration>(json, options);
+                    if (projectConfig?.UnitConfigurations != null && projectConfig.UnitConfigurations.Count > 0)
+                    {
+                        // Get the first Unit ID from the imported file
+                        var importedUnitId = projectConfig.UnitConfigurations.Keys.First();
+                        var importedConfig = projectConfig.UnitConfigurations[importedUnitId];
+
+                        // Ask user for target Unit ID
+                        var dialog = new InputDialog("Import Unit ID As", $"Enter target Unit ID (1-247) to import Unit ID {importedUnitId} as:", "1");
+                        if (dialog.ShowDialog() == true)
+                        {
+                            if (byte.TryParse(dialog.InputText, out byte targetUnitId) && targetUnitId >= 1 && targetUnitId <= 247)
+                            {
+                                // Clone the imported configuration and change its Unit ID
+                                var newConfig = importedConfig.Clone();
+                                // Note: We would need to add a method to change the Unit ID in the configuration
+                                // For now, we'll store it under the target Unit ID key
+
+                                UnitConfigurations[targetUnitId] = newConfig;
+                                SelectedUnitId = targetUnitId;
+
+                                // Refresh AvailableUnitIds
+                                PopulateAvailableUnitIds();
+
+                                StatusMessage = $"Unit ID {importedUnitId} imported as Unit ID {targetUnitId}";
+                            }
+                            else
+                            {
+                                MessageBox.Show("Invalid Unit ID. Please enter a value between 1 and 247.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("No Unit ID configurations found in the selected file.", "Import Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error importing Unit ID");
+                StatusMessage = $"Error importing Unit ID: {ex.Message}";
             }
         }
 
