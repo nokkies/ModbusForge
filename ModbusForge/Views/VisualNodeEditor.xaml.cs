@@ -6,8 +6,14 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
+using MahApps.Metro.Controls;
+using CommunityToolkit.Mvvm.ComponentModel;
 using ModbusForge.Models;
 using ModbusForge.ViewModels;
+using ModbusForge.Services;
+using Modbus.Data;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ModbusForge.Views
 {
@@ -19,6 +25,7 @@ namespace ModbusForge.Views
         private VisualNode? _draggedNode = null;
         private Point _dragStartPoint;
         private Point _originalNodePosition;
+        private DispatcherTimer? _liveUpdateTimer;
         
         public VisualNodeEditor()
         {
@@ -26,6 +33,13 @@ namespace ModbusForge.Views
             DataContextChanged += VisualNodeEditor_DataContextChanged;
             KeyDown += VisualNodeEditor_KeyDown;
             MouseUp += VisualNodeEditor_MouseUp;
+            
+            // Initialize live update timer
+            _liveUpdateTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(250) // Update 4 times per second
+            };
+            _liveUpdateTimer.Tick += LiveUpdateTimer_Tick;
         }
         
         private void VisualNodeEditor_MouseUp(object sender, MouseButtonEventArgs e)
@@ -41,11 +55,46 @@ namespace ModbusForge.Views
         
         private void VisualNodeEditor_KeyDown(object sender, KeyEventArgs e)
         {
-            // ESC key cancels connection mode
-            if (e.Key == Key.Escape && _isConnecting)
+            // Handle keyboard shortcuts
+            switch (e.Key)
             {
-                CancelConnection();
-                e.Handled = true;
+                case Key.Delete:
+                case Key.Back:
+                    DeleteSelectedNode();
+                    break;
+                case Key.Escape:
+                    CancelConnection();
+                    break;
+            }
+        }
+
+        private void DeleteSelectedNode()
+        {
+            if (_viewModel == null) return;
+
+            // Find selected node (simple implementation - could be enhanced with visual selection)
+            var nodeToDelete = _viewModel.Nodes.LastOrDefault(); // For now, delete last added node
+            if (nodeToDelete != null)
+            {
+                // Remove connections to this node first
+                var connectionsToRemove = _viewModel.Connections
+                    .Where(c => c.SourceNodeId == nodeToDelete.Id || c.TargetNodeId == nodeToDelete.Id)
+                    .ToList();
+                
+                foreach (var connection in connectionsToRemove)
+                {
+                    _viewModel.Connections.Remove(connection);
+                }
+
+                // Remove the node
+                _viewModel.Nodes.Remove(nodeToDelete);
+                
+                // Refresh canvas
+                RefreshCanvas();
+                RefreshConnections();
+                
+                System.Diagnostics.Debug.WriteLine($"Deleted node {nodeToDelete.Id} (type: {nodeToDelete.ElementType})");
+                AddDebugMessage($"Deleted node {nodeToDelete.Id} (type: {nodeToDelete.ElementType})");
             }
         }
         
@@ -113,6 +162,50 @@ namespace ModbusForge.Views
                 // Initial render of existing nodes and connections
                 RefreshCanvas();
                 RefreshConnections();
+                
+                // Subscribe to ShowLiveValues changes
+                _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+                
+                // Start timer if live values are enabled
+                if (_viewModel.ShowLiveValues)
+                {
+                    _liveUpdateTimer?.Start();
+                }
+            }
+        }
+        
+        private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(VisualNodeEditorViewModel.ShowLiveValues))
+            {
+                if (_viewModel?.ShowLiveValues == true)
+                {
+                    _liveUpdateTimer?.Start();
+                }
+                else
+                {
+                    _liveUpdateTimer?.Stop();
+                }
+            }
+        }
+        
+        private void LiveUpdateTimer_Tick(object? sender, EventArgs e)
+        {
+            if (_viewModel == null || !_viewModel.ShowLiveValues) return;
+            
+            // Update all InputInt and OutputInt nodes with current DataStore values
+            foreach (var node in _viewModel.Nodes)
+            {
+                if (node.ElementType == PlcElementType.InputInt || 
+                    node.ElementType == PlcElementType.OutputInt ||
+                    node.ElementType == PlcElementType.Input ||
+                    node.ElementType == PlcElementType.Output)
+                {
+                    // Toggle ShowLiveValues to force update
+                    var wasShowing = node.ShowLiveValues;
+                    node.ShowLiveValues = false;
+                    node.ShowLiveValues = wasShowing;
+                }
             }
         }
         
@@ -258,16 +351,35 @@ namespace ModbusForge.Views
             {
                 Background = new SolidColorBrush(GetElementColor(node.ElementType)),
                 CornerRadius = new CornerRadius(6, 6, 0, 0),
-                Padding = new Thickness(8, 4, 8, 4)
+                Padding = new Thickness(8, 6, 8, 6)
             };
+            var headerStack = new StackPanel();
             var headerText = new TextBlock 
             { 
                 Text = node.DisplayName, 
                 FontWeight = FontWeights.Bold, 
                 Foreground = Brushes.White,
-                FontSize = 12
+                FontSize = 14,
+                HorizontalAlignment = HorizontalAlignment.Center
             };
-            header.Child = headerText;
+            var addressText = new TextBlock 
+            { 
+                Text = node.AddressDisplay, 
+                FontWeight = FontWeights.Normal, 
+                Foreground = Brushes.White,
+                FontSize = 11,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 2, 0, 0)
+            };
+            headerStack.Children.Add(headerText);
+            if (!string.IsNullOrEmpty(node.AddressDisplay))
+            {
+                headerStack.Children.Add(addressText);
+            }
+            
+            // Capture references for updates
+            var capturedAddressText = addressText;
+            header.Child = headerStack;
             Grid.SetRow(header, 0);
             grid.Children.Add(header);
             
@@ -322,6 +434,31 @@ namespace ModbusForge.Views
             };
             contentStack.Children.Add(liveText);
             
+            // Add configure button for I/O blocks
+            if (node.ElementType == PlcElementType.Input || node.ElementType == PlcElementType.Output ||
+                node.ElementType == PlcElementType.InputBool || node.ElementType == PlcElementType.InputInt ||
+                node.ElementType == PlcElementType.OutputBool || node.ElementType == PlcElementType.OutputInt)
+            {
+                // DEBUG: Log that we're creating a configure button for this type
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Creating configure button for {node.ElementType}");
+                
+                var configureButton = new Button
+                {
+                    Content = "🔗",
+                    FontSize = 12,
+                    Width = 24,
+                    Height = 24,
+                    Margin = new Thickness(0, 4, 0, 0),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    ToolTip = (node.ElementType == PlcElementType.Input || node.ElementType == PlcElementType.InputBool || node.ElementType == PlcElementType.InputInt)
+                        ? "Configure input tag" 
+                        : "Configure output tag",
+                    Tag = node.Id
+                };
+                configureButton.Click += ConfigureButton_Click;
+                contentStack.Children.Add(configureButton);
+            }
+
             // React dynamically to CurrentValue / ShowLiveValues changes
             var capturedHeader = header;
             var capturedLiveText = liveText;
@@ -334,8 +471,65 @@ namespace ModbusForge.Views
                 {
                     if (node.ShowLiveValues)
                     {
-                        capturedLiveText.Text = node.CurrentValue ? "● ON" : "● OFF";
-                        capturedLiveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
+                        // Show appropriate live values based on element type
+                        switch (node.ElementType)
+                        {
+                            case PlcElementType.InputBool:
+                            case PlcElementType.OutputBool:
+                                // Boolean types - show ON/OFF
+                                capturedLiveText.Text = node.CurrentValue ? "● ON" : "● OFF";
+                                capturedLiveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
+                                break;
+                                
+                            case PlcElementType.InputInt:
+                                // Integer input - show actual register values from DataStore
+                                var actualValue = GetActualRegisterValue(node);
+                                capturedLiveText.Text = $"● VAL:{actualValue}";
+                                capturedLiveText.Foreground = Brushes.Cyan;
+                                
+                                // Debug output to both VS Debug and potential debug collection
+                                System.Diagnostics.Debug.WriteLine($"InputInt: Reading from {node.Input1Address?.Area}:{node.Input1Address?.Address} = {actualValue}");
+                                AddDebugMessage($"InputInt: Reading from {node.Input1Address?.Area}:{node.Input1Address?.Address} = {actualValue}");
+                                break;
+                                
+                            case PlcElementType.OutputInt:
+                                // Integer output - show the value being written to output address
+                                var outputValue = GetOutputRegisterValue(node);
+                                capturedLiveText.Text = $"● VAL:{outputValue}";
+                                capturedLiveText.Foreground = Brushes.Cyan;
+                                
+                                // Debug output
+                                System.Diagnostics.Debug.WriteLine($"OutputInt: Writing to {node.OutputAddress?.Area}:{node.OutputAddress?.Address} = {outputValue}");
+                                AddDebugMessage($"OutputInt: Writing to {node.OutputAddress?.Area}:{node.OutputAddress?.Address} = {outputValue}");
+                                break;
+                                
+                            case PlcElementType.Input:
+                            case PlcElementType.Output:
+                                // Legacy types - show based on address area
+                                if ((node.Input1Address?.Area == PlcArea.HoldingRegister) ||
+                                    (node.Input1Address?.Area == PlcArea.InputRegister))
+                                {
+                                    var actualLegacyValue = GetActualRegisterValue(node);
+                                    capturedLiveText.Text = $"● VAL:{actualLegacyValue}";
+                                    capturedLiveText.Foreground = Brushes.Cyan;
+                                    
+                                    // Debug output
+                                    System.Diagnostics.Debug.WriteLine($"Legacy Input/Output: Reading from {node.Input1Address?.Area}:{node.Input1Address?.Address} = {actualLegacyValue}");
+                                    AddDebugMessage($"Legacy Input/Output: Reading from {node.Input1Address?.Area}:{node.Input1Address?.Address} = {actualLegacyValue}");
+                                }
+                                else
+                                {
+                                    capturedLiveText.Text = node.CurrentValue ? "● ON" : "● OFF";
+                                    capturedLiveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
+                                }
+                                break;
+                                
+                            default:
+                                // Logic blocks - show ON/OFF
+                                capturedLiveText.Text = node.CurrentValue ? "● ON" : "● OFF";
+                                capturedLiveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
+                                break;
+                        }
                         capturedLiveText.Visibility = Visibility.Visible;
                         capturedHeader.Background = new SolidColorBrush(node.CurrentValue
                             ? Color.FromRgb(40, 160, 40)
@@ -347,16 +541,25 @@ namespace ModbusForge.Views
                         capturedHeader.Background = new SolidColorBrush(originalColor);
                     }
                 }
-                // Refresh header label when the source address changes
+                // Update header and address when properties change
                 if (e.PropertyName == nameof(VisualNode.Input1Address) ||
                     e.PropertyName == nameof(VisualNode.ElementType))
                 {
                     capturedHeaderText.Text = node.DisplayName;
+                    capturedAddressText.Text = node.AddressDisplay;
                 }
             };
-            // Also update header when inner address properties change (e.g. after right-click config)
-            node.Input1Address.PropertyChanged  += (s, e) => capturedHeaderText.Text = node.DisplayName;
-            node.OutputAddress.PropertyChanged  += (s, e) => capturedHeaderText.Text = node.DisplayName;
+            // Also update when inner address properties change (e.g. after right-click config)
+            node.Input1Address.PropertyChanged  += (s, e) => 
+            {
+                capturedHeaderText.Text = node.DisplayName;
+                capturedAddressText.Text = node.AddressDisplay;
+            };
+            node.OutputAddress.PropertyChanged  += (s, e) => 
+            {
+                capturedHeaderText.Text = node.DisplayName;
+                capturedAddressText.Text = node.AddressDisplay;
+            };
             
             Grid.SetColumn(contentStack, 1);
             contentGrid.Children.Add(contentStack);
@@ -405,86 +608,185 @@ namespace ModbusForge.Views
         
         private Ellipse CreateConnector(string nodeId, string connectorType, bool isInput)
         {
+            var node = _viewModel?.Nodes.FirstOrDefault(n => n.Id == nodeId);
+            string toolTipText = "Internal connection";
+            
+            // All connectors are now internal connections only
+            // Use the configure button on I/O blocks to set addresses
+            toolTipText = isInput ? "Internal input connector" : "Internal output connector";
+            
             var ellipse = new Ellipse
             {
                 Style = (Style)FindResource(isInput ? "InputConnectorStyle" : "OutputConnectorStyle"),
                 Tag = $"{nodeId},{connectorType}",
                 Cursor = System.Windows.Input.Cursors.Hand,
-                ToolTip = "Right-click to configure address"
+                ToolTip = toolTipText
             };
             ellipse.MouseLeftButtonDown += Connector_MouseLeftButtonDown;
             ellipse.MouseRightButtonDown += Connector_MouseRightButtonDown;
             return ellipse;
         }
 
-        private void Connector_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        
+        private void ConfigureButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel == null) return;
-            var ellipse = sender as Ellipse;
-            if (ellipse == null) return;
+            // DEBUG: Log that the button was clicked
+            System.Diagnostics.Debug.WriteLine("DEBUG: ConfigureButton_Click called!");
+            
+            var button = sender as Button;
+            if (button?.Tag == null)
+            {
+                System.Diagnostics.Debug.WriteLine("DEBUG: Button or Tag is null");
+                return;
+            }
 
-            var tag = ellipse.Tag as string;
-            if (string.IsNullOrEmpty(tag)) return;
+            var nodeId = button.Tag.ToString();
+            var node = _viewModel?.Nodes.FirstOrDefault(n => n.Id == nodeId);
+            if (node == null)
+            {
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Node not found for ID: {nodeId}");
+                return;
+            }
+            
+            System.Diagnostics.Debug.WriteLine($"DEBUG: Found node {node.ElementType} with ID {nodeId}"); // DEBUG: Track which node and button we're working with
+            System.Diagnostics.Debug.WriteLine($"DEBUG: Configure button clicked - Node: {node.Name} ({node.ElementType}), ID: {nodeId}");
 
-            var parts = tag.Split(',');
-            var nodeId = parts[0];
-            var connectorType = parts[1];
-
-            var node = _viewModel.Nodes.FirstOrDefault(n => n.Id == nodeId);
-            if (node == null) return;
+            // Only I/O blocks should have configure buttons
+            if (node.ElementType != PlcElementType.Input && node.ElementType != PlcElementType.Output &&
+                node.ElementType != PlcElementType.InputBool && node.ElementType != PlcElementType.InputInt &&
+                node.ElementType != PlcElementType.OutputBool && node.ElementType != PlcElementType.OutputInt)
+            {
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Node type {node.ElementType} not allowed for configure button");
+                return;
+            }
 
             // Grab custom entries from parent window so tags reflect real configuration
             var mainVm = Window.GetWindow(this)?.DataContext as MainViewModel;
             var customEntries = mainVm?.CustomEntries
                 ?? System.Linq.Enumerable.Empty<ModbusForge.Models.CustomEntry>();
 
-            var dialog = new ConnectorConfigWindow(nodeId, connectorType, node.Name, customEntries)
-            {
-                Owner = Window.GetWindow(this)
-            };
+            // Determine which address to configure based on block type
+            bool isInputType = node.ElementType == PlcElementType.Input || 
+                              node.ElementType == PlcElementType.InputBool || 
+                              node.ElementType == PlcElementType.InputInt;
+            
+            string connectorType = isInputType ? "Output" : "Input1";
+            string dialogTitle = isInputType ? "Configure Input Tag" : "Configure Output Tag";
 
-            // Pre-populate dialog with current address.
-            // Source nodes read FROM Input1Address; their output connector exposes that read source.
-            var addrRef = connectorType switch
+            // Pre-populate dialog with current address
+            var addrRef = isInputType ? node.Input1Address : node.OutputAddress;
+            
+            // DEBUG: Show current address before dialog and track object
+            System.Diagnostics.Debug.WriteLine($"DEBUG: Before dialog - {node.ElementType} address: {addrRef?.Area}:{addrRef?.Address}");
+            System.Diagnostics.Debug.WriteLine($"DEBUG: Address reference object: {addrRef?.GetHashCode()}");
+            System.Diagnostics.Debug.WriteLine($"DEBUG: Address reference is null: {addrRef == null}");
+            
+            // Simple debugging with MessageBox
+            MessageBox.Show($"Current address: {addrRef?.Area}:{addrRef?.Address}\nNode: {node.Name}\nType: {node.ElementType}", "Debug Info");
+            
+            // Also check the node's address properties directly
+            if (isInputType)
             {
-                "Input1" => node.Input1Address,
-                "Input2" => node.Input2Address,
-                "Output" when node.ElementType == PlcElementType.Source => node.Input1Address,
-                _ => node.OutputAddress
-            };
-            if (dialog.DataContext is ConnectorConfigViewModel vm && addrRef != null)
-            {
-                vm.IsLinkedToAddress = addrRef.Address >= 0;
-                vm.SelectedArea = addrRef.Area;
-                vm.Address = addrRef.Address;
-                vm.IsInverted = addrRef.Not;
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Node Input1Address - Area:{node.Input1Address?.Area}:{node.Input1Address?.Address}");
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Node Input1Address object: {node.Input1Address?.GetHashCode()}");
             }
-
-            // MetroWindow ShowDialog() may return null - check Result directly instead
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Node OutputAddress - Area:{node.OutputAddress?.Area}:{node.OutputAddress?.Address}");
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Node OutputAddress object: {node.OutputAddress?.GetHashCode()}");
+            }
+            
+            // Create dialog with initial values
+            var initiallyLinked = addrRef?.Address >= 0;
+            var initialArea = initiallyLinked ? addrRef.Area : PlcArea.HoldingRegister;
+            var initialAddress = initiallyLinked ? addrRef.Address : 0;
+            var initiallyInverted = addrRef?.Not ?? false;
+            
+            // TEMP: Use test dialog to isolate the issue
+            var testDialog = new TestDialog(initialArea, initialAddress)
+            {
+                Owner = Window.GetWindow(this),
+                Title = "TEST DIALOG"
+            };
+            
+            testDialog.ShowDialog();
+            if (testDialog.DialogResult == true)
+            {
+                // Update with test dialog results
+                addrRef.Area = testDialog.SelectedArea;
+                addrRef.Address = testDialog.SelectedAddress;
+                addrRef.Not = testDialog.SelectedAddress < 0; // Simplified
+                
+                // Refresh canvas to show the updated address
+                RefreshCanvas();
+            }
+            
+            return; // Skip the original dialog for now
+            
+            // Original dialog code (temporarily commented out)
+            /*
+            // DEBUG: Show what we're passing to dialog
+            System.Diagnostics.Debug.WriteLine($"DEBUG: Passing to dialog - Area:{initialArea}, Addr:{initialAddress}, Linked:{initiallyLinked}");
+            
+            var dialog = new ConnectorConfigWindow(nodeId, connectorType, node.Name, customEntries, initialArea, initialAddress, initiallyLinked, initiallyInverted)
+            {
+                Owner = Window.GetWindow(this),
+                Title = dialogTitle
+            };
+            
             dialog.ShowDialog();
             if (dialog.Result != null && dialog.Result.IsConfigured)
             {
                 var result = dialog.Result;
+                
+                // DEBUG: Show what we got from dialog
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Dialog result - Area:{result.Area}, Addr:{result.Address}");
+                
                 addrRef.Area = result.Area;
                 addrRef.Address = result.Address;
                 addrRef.Not = result.Not;
-                ellipse.ToolTip = $"{result.Area}:{result.Address}{(result.Not ? " NOT" : "")}"; 
+                
+                // DEBUG: Show what we saved to address reference
+                System.Diagnostics.Debug.WriteLine($"DEBUG: After save - {node.ElementType} address: {addrRef.Area}:{addrRef.Address}");
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Address reference object after save: {addrRef.GetHashCode()}");
+                
+                // DEBUG: Check if the node's address reference is still the same object
+                var checkAddrRef = isInputType ? node.Input1Address : node.OutputAddress;
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Node address ref check - Area:{checkAddrRef.Area}:{checkAddrRef.Address}, Same object: {checkAddrRef.GetHashCode() == addrRef.GetHashCode()}");
+                
+                // DEBUG: Check the node's address properties directly after save
+                if (isInputType)
+                {
+                    System.Diagnostics.Debug.WriteLine($"DEBUG: AFTER SAVE Node Input1Address - Area:{node.Input1Address?.Area}:{node.Input1Address?.Address}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"DEBUG: AFTER SAVE Node OutputAddress - Area:{node.OutputAddress?.Area}:{node.OutputAddress?.Address}");
+                }
+                
+                // DEBUG: Check if the DisplayName reflects the change
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Node DisplayName after save: {node.DisplayName}");
+                
+                // The address reference should trigger its own property changes automatically
+                
+                // Update button tooltip to show configured address
+                button.ToolTip = $"{node.ElementType}: {result.Area}:{result.Address}{(result.Not ? " NOT" : "")}";
             }
+            */
+        }
 
-            // Rebuild canvas so headers always reflect the latest address,
-            // regardless of PropertyChanged subscription timing
-            RefreshCanvas();
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded,
-                new Action(RefreshConnections));
-
+        private void Connector_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // Disable right-click configuration - use the configure button instead
             e.Handled = true;
         }
-        
+
         private Color GetElementColor(PlcElementType elementType)
         {
             return elementType switch
             {
-                PlcElementType.Source => Color.FromRgb(76, 175, 80),
+                PlcElementType.Input => Color.FromRgb(76, 175, 80),
+                PlcElementType.Output => Color.FromRgb(255, 87, 34),
                 PlcElementType.RS => Color.FromRgb(244, 67, 54),
                 PlcElementType.AND => Color.FromRgb(33, 150, 243),
                 PlcElementType.OR => Color.FromRgb(255, 152, 0),
@@ -786,6 +1088,138 @@ namespace ModbusForge.Views
                 "Input2" => new Point(node.X + 6, yBase + contentH * 2 / 3),
                 _        => new Point(node.X + 6, yBase + contentH / 3)   // Input1 or default
             };
+        }
+
+        private int GetOutputRegisterValue(VisualNode node)
+        {
+            try
+            {
+                // For OutputInt, we want to show the value that's being written to the output address
+                // This should match what the VisualSimulationService is writing
+                
+                // Get the visual simulation service to access DataStore
+                var serverService = App.ServiceProvider?.GetService<ModbusServerService>();
+                if (serverService == null) return 0;
+
+                // Check which Unit ID we're reading from
+                var mainViewModel = Window.GetWindow(this)?.DataContext as MainViewModel;
+                byte selectedUnitId = mainViewModel?.SelectedUnitId ?? 1;
+                
+                var dataStore = serverService.GetDataStore(selectedUnitId);
+                if (dataStore == null) return 0;
+
+                var outputAddress = node.OutputAddress;
+                if (outputAddress?.Area == PlcArea.HoldingRegister && outputAddress.Address >= 0 && outputAddress.Address < dataStore.HoldingRegisters.Count)
+                {
+                    return dataStore.HoldingRegisters[outputAddress.Address];
+                }
+                else if (outputAddress?.Area == PlcArea.InputRegister && outputAddress.Address >= 0 && outputAddress.Address < dataStore.InputRegisters.Count)
+                {
+                    return dataStore.InputRegisters[outputAddress.Address];
+                }
+                else if (outputAddress?.Area == PlcArea.Coil && outputAddress.Address >= 0 && outputAddress.Address < dataStore.CoilDiscretes.Count)
+                {
+                    return dataStore.CoilDiscretes[outputAddress.Address] ? 1 : 0;
+                }
+                else if (outputAddress?.Area == PlcArea.DiscreteInput && outputAddress.Address >= 0 && outputAddress.Address < dataStore.InputDiscretes.Count)
+                {
+                    return dataStore.InputDiscretes[outputAddress.Address] ? 1 : 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error reading output register value: {ex.Message}");
+                AddDebugMessage($"Error reading output register value: {ex.Message}");
+            }
+            return 0;
+        }
+
+        private int GetActualRegisterValue(VisualNode node)
+        {
+            try
+            {
+                // Get the visual simulation service to access DataStore
+                var visualSimulationService = App.ServiceProvider?.GetService<IVisualSimulationService>();
+                if (visualSimulationService == null) return 0;
+
+                // Access the DataStore through reflection or create a public method
+                // For now, we'll access it through the service's internal structure
+                var serverService = App.ServiceProvider?.GetService<ModbusServerService>();
+                if (serverService == null) return 0;
+
+                // Check which Unit ID we're reading from
+                var mainViewModel = Window.GetWindow(this)?.DataContext as MainViewModel;
+                byte selectedUnitId = mainViewModel?.SelectedUnitId ?? 1;
+                
+                var dataStore = serverService.GetDataStore(selectedUnitId);
+                if (dataStore == null) return 0;
+
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Reading from Unit ID {selectedUnitId}");
+                AddDebugMessage($"Reading from Unit ID {selectedUnitId}");
+
+                var address = node.Input1Address;
+                int value = 0;
+                
+                if (address?.Area == PlcArea.HoldingRegister && address.Address >= 0 && address.Address < dataStore.HoldingRegisters.Count)
+                {
+                    // Debug: Check both 0-based and 1-based addressing
+                    int directValue = dataStore.HoldingRegisters[address.Address];
+                    int offsetValue = address.Address > 0 ? dataStore.HoldingRegisters[address.Address - 1] : 0;
+                    
+                    System.Diagnostics.Debug.WriteLine($"DEBUG: Address={address.Address}, Direct={directValue}, Offset-1={offsetValue}");
+                    AddDebugMessage($"Address={address.Address}, Direct={directValue}, Offset-1={offsetValue}");
+                    
+                    // Use direct addressing for now, but we might need offset
+                    value = directValue;
+                    System.Diagnostics.Debug.WriteLine($"DEBUG: Read HoldingRegister[{address.Address}] = {value}");
+                    AddDebugMessage($"Read HoldingRegister[{address.Address}] = {value}");
+                }
+                else if (address?.Area == PlcArea.InputRegister && address.Address >= 0 && address.Address < dataStore.InputRegisters.Count)
+                {
+                    value = dataStore.InputRegisters[address.Address];
+                    System.Diagnostics.Debug.WriteLine($"DEBUG: Read InputRegister[{address.Address}] = {value}");
+                    AddDebugMessage($"Read InputRegister[{address.Address}] = {value}");
+                }
+                else if (address?.Area == PlcArea.Coil && address.Address >= 0 && address.Address < dataStore.CoilDiscretes.Count)
+                {
+                    value = dataStore.CoilDiscretes[address.Address] ? 1 : 0;
+                    System.Diagnostics.Debug.WriteLine($"DEBUG: Read Coil[{address.Address}] = {value}");
+                    AddDebugMessage($"Read Coil[{address.Address}] = {value}");
+                }
+                else if (address?.Area == PlcArea.DiscreteInput && address.Address >= 0 && address.Address < dataStore.InputDiscretes.Count)
+                {
+                    value = dataStore.InputDiscretes[address.Address] ? 1 : 0;
+                    System.Diagnostics.Debug.WriteLine($"DEBUG: Read DiscreteInput[{address.Address}] = {value}");
+                    AddDebugMessage($"Read DiscreteInput[{address.Address}] = {value}");
+                }
+                
+                return value;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error reading register value: {ex.Message}");
+                AddDebugMessage($"Error reading register value: {ex.Message}");
+            }
+            return 0;
+        }
+
+        private void AddDebugMessage(string message)
+        {
+            try
+            {
+                var mainViewModel = Window.GetWindow(this)?.DataContext as MainViewModel;
+                if (mainViewModel != null)
+                {
+                    // Use reflection to safely call AddDebugMessage if it exists
+                    var method = mainViewModel.GetType().GetMethod("AddDebugMessage");
+                    method?.Invoke(mainViewModel, new object[] { message });
+                }
+            }
+            catch
+            {
+                // Fallback to VS Debug output if reflection fails
+                System.Diagnostics.Debug.WriteLine($"DEBUG: {message}");
+            }
         }
     }
 }

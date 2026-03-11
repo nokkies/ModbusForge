@@ -138,7 +138,7 @@ namespace ModbusForge.Services
         {
             switch (element.ElementType)
             {
-                case PlcElementType.Source:
+                case PlcElementType.Input:
                     return EvaluateSource(element.Input1, dataStore);
 
                 case PlcElementType.NOT:

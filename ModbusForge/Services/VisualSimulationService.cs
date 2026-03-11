@@ -85,18 +85,27 @@ namespace ModbusForge.Services
 
         private void AnimationTimer_Tick(object? sender, EventArgs e)
         {
-            if (_viewModel == null || !_isAnimating) return;
-            if (!_viewModel.ShowLiveValues) return;
+            if (_viewModel == null || !_isAnimating) 
+            {
+                System.Diagnostics.Debug.WriteLine("DEBUG: AnimationTimer_Tick - Not animating or viewModel null");
+                return;
+            }
+            if (!_viewModel.ShowLiveValues) 
+            {
+                System.Diagnostics.Debug.WriteLine("DEBUG: AnimationTimer_Tick - ShowLiveValues is false");
+                return;
+            }
             
             // Only run when server is running
-            if (!_serverService.IsConnected) return;
+            if (!_serverService.IsConnected) 
+            {
+                System.Diagnostics.Debug.WriteLine("DEBUG: AnimationTimer_Tick - Server not connected");
+                return;
+            }
 
             try
             {
-                var now = DateTime.UtcNow;
-                var elapsedMs = (int)(now - _lastUpdate).TotalMilliseconds;
-                _lastUpdate = now;
-
+                System.Diagnostics.Debug.WriteLine("DEBUG: AnimationTimer_Tick - Starting UpdateNodeValues");
                 UpdateNodeValues();
             }
             catch (Exception ex)
@@ -107,17 +116,31 @@ namespace ModbusForge.Services
 
         public void UpdateNodeValues()
         {
-            if (_viewModel == null) return;
+            if (_viewModel == null) 
+            {
+                System.Diagnostics.Debug.WriteLine("DEBUG: UpdateNodeValues - ViewModel is null");
+                return;
+            }
 
             var dataStore = _serverService.GetDataStore();
-            if (dataStore == null) return;
+            if (dataStore == null) 
+            {
+                System.Diagnostics.Debug.WriteLine("DEBUG: UpdateNodeValues - DataStore is null");
+                return;
+            }
 
             var now = DateTime.UtcNow;
+            var elapsedMs = (int)(now - _lastUpdate).TotalMilliseconds;
+            _lastUpdate = now;
+
+            System.Diagnostics.Debug.WriteLine($"DEBUG: UpdateNodeValues - Processing {_viewModel.Nodes.Count} nodes");
 
             foreach (var node in _viewModel.Nodes)
             {
                 try
                 {
+                    System.Diagnostics.Debug.WriteLine($"DEBUG: Processing node {node.Id} (type: {node.ElementType})");
+                    
                     var newValue = GetNodeValueFromSimulation(node, dataStore);
                     
                     // Only update if value changed or it's been a while (to avoid flickering)
@@ -131,6 +154,90 @@ namespace ModbusForge.Services
                         node.CurrentValue = newValue;
                         _nodeValueCache[node.Id] = newValue;
                         _lastNodeUpdate[node.Id] = now;
+                        
+                        System.Diagnostics.Debug.WriteLine($"DEBUG: Node {node.Id} updated from {oldValue} to {newValue}");
+                        
+                        // For Output blocks, write the value to the configured Modbus address
+                        if (node.OutputAddress?.Address >= 0)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"DEBUG: Node {node.Id} has output address {node.OutputAddress.Area}:{node.OutputAddress.Address}");
+                            
+                            switch (node.ElementType)
+                            {
+                                case PlcElementType.Output:
+                                    // Legacy output - mixed logic (keep for compatibility)
+                                    if (node.OutputAddress?.Area == PlcArea.HoldingRegister || node.OutputAddress?.Area == PlcArea.InputRegister)
+                                    {
+                                        var inputInt = ReadModbusValueInt(node.Input1Address, dataStore);
+                                        WriteModbusValue(node.OutputAddress, (ushort)inputInt, dataStore);
+                                    }
+                                    else
+                                    {
+                                        WriteModbusValue(node.OutputAddress, newValue ? (ushort)1 : (ushort)0, dataStore);
+                                    }
+                                    break;
+                                    
+                                case PlcElementType.OutputBool:
+                                    // Boolean output - always write 1/0
+                                    WriteModbusValue(node.OutputAddress, newValue ? (ushort)1 : (ushort)0, dataStore);
+                                    break;
+                                    
+                                case PlcElementType.OutputInt:
+                                    // Integer output - write actual connected value
+                                    var inputIntValue = 0;
+                                    
+                                    // Find connections to this node's inputs
+                                    var nodeConnections = _viewModel?.Connections.Where(c => c.TargetNodeId == node.Id).ToList() ?? new List<NodeConnection>();
+                                    System.Diagnostics.Debug.WriteLine($"DEBUG: OutputInt {node.Id} has {nodeConnections.Count} connections");
+                                    
+                                    // Find the connected source node
+                                    var sourceConnection = nodeConnections.FirstOrDefault(c => c.TargetConnector == "Input1");
+                                    if (sourceConnection != null)
+                                    {
+                                        var sourceNode = _viewModel?.Nodes.FirstOrDefault(n => n.Id == sourceConnection.SourceNodeId);
+                                        if (sourceNode != null)
+                                        {
+                                            System.Diagnostics.Debug.WriteLine($"DEBUG: OutputInt {node.Id} found source node {sourceNode.Id} (type: {sourceNode.ElementType})");
+                                            
+                                            // If connected to InputInt, read the actual integer value from the source
+                                            if (sourceNode.ElementType == PlcElementType.InputInt)
+                                            {
+                                                inputIntValue = ReadModbusValueInt(sourceNode.Input1Address, dataStore);
+                                                System.Diagnostics.Debug.WriteLine($"DEBUG: OutputInt - Reading from connected InputInt node {sourceNode.Id}, address {sourceNode.Input1Address?.Area}:{sourceNode.Input1Address?.Address} = {inputIntValue}");
+                                            }
+                                            else
+                                            {
+                                                // For other node types, use the boolean value converted to int
+                                                var boolValue = GetNodeValueFromSimulation(sourceNode, dataStore);
+                                                inputIntValue = boolValue ? 1 : 0;
+                                                System.Diagnostics.Debug.WriteLine($"DEBUG: OutputInt - Reading from connected node {sourceNode.Id} (type {sourceNode.ElementType}), bool value = {boolValue}, converted to int = {inputIntValue}");
+                                            }
+                                        }
+                                        else
+                                        {
+                                            System.Diagnostics.Debug.WriteLine($"DEBUG: OutputInt {node.Id} - Source node not found");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // Fallback: read from Input1Address (legacy behavior)
+                                        inputIntValue = ReadModbusValueInt(node.Input1Address, dataStore);
+                                        System.Diagnostics.Debug.WriteLine($"DEBUG: OutputInt - No connection found, reading from Input1Address {node.Input1Address?.Area}:{node.Input1Address?.Address} = {inputIntValue}");
+                                    }
+                                    
+                                    System.Diagnostics.Debug.WriteLine($"DEBUG: OutputInt writing {inputIntValue} to {node.OutputAddress.Area}:{node.OutputAddress.Address}");
+                                    WriteModbusValue(node.OutputAddress, (ushort)inputIntValue, dataStore);
+                                    break;
+                            }
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine($"DEBUG: Node {node.Id} has no output address configured");
+                        }
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"DEBUG: Node {node.Id} not updated (value unchanged: {oldValue})");
                     }
                 }
                 catch (Exception ex)
@@ -143,7 +250,7 @@ namespace ModbusForge.Services
         private bool GetNodeValueFromSimulation(VisualNode node, DataStore dataStore)
         {
             // For input nodes, read directly from the configured address
-            if (node.ElementType == PlcElementType.Source)
+            if (node.ElementType == PlcElementType.Input)
             {
                 return ReadModbusValue(node.Input1Address, dataStore);
             }
@@ -175,6 +282,12 @@ namespace ModbusForge.Services
             // Evaluate based on node type
             return node.ElementType switch
             {
+                PlcElementType.Input => ReadModbusValue(node.Input1Address, dataStore),
+                PlcElementType.InputBool => ReadModbusValue(node.Input1Address, dataStore),
+                PlcElementType.InputInt => ReadModbusValueInt(node.Input1Address, dataStore) != 0, // Convert int to bool for logic
+                PlcElementType.Output => input1Value, // Output blocks just pass through the input value
+                PlcElementType.OutputBool => input1Value, // Boolean output
+                PlcElementType.OutputInt => input1Value, // Integer output (still bool for logic evaluation)
                 PlcElementType.NOT => !input1Value,
                 PlcElementType.AND => input1Value && input2Value,
                 PlcElementType.OR => input1Value || input2Value,

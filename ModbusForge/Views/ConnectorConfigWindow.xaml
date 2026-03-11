@@ -38,7 +38,7 @@
                 <!-- Link to Tag Option -->
                 <GroupBox Header="Link to Modbus Tag" Margin="0,0,0,15">
                     <StackPanel Orientation="Vertical">
-                        <CheckBox Content="Connect to Modbus address" IsChecked="{Binding IsLinkedToAddress}" Margin="0,0,0,10"/>
+                        <CheckBox x:Name="LinkCheckBox" Content="Connect to Modbus address" IsChecked="{Binding IsLinkedToAddress}" Margin="0,0,0,10"/>
                         
                         <Grid IsEnabled="{Binding IsLinkedToAddress}">
                             <Grid.ColumnDefinitions>
@@ -53,13 +53,13 @@
                             </Grid.RowDefinitions>
                             
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Area:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <ComboBox Grid.Row="0" Grid.Column="1" SelectedItem="{Binding SelectedArea}" 
+                            <ComboBox x:Name="AreaComboBox" Grid.Row="0" Grid.Column="1" SelectedItem="{Binding SelectedArea}" 
                                       ItemsSource="{Binding AvailableAreas}" Margin="0,0,10,5"/>
                             
                             <TextBlock Grid.Row="0" Grid.Column="2" Text="Address:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding Address}" Margin="0,0,0,5"/>
+                            <TextBox x:Name="AddressTextBox" Grid.Row="0" Grid.Column="3" Text="{Binding Address}" Margin="0,0,0,5"/>
                             
-                            <CheckBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Content="NOT (invert signal)" 
+                            <CheckBox x:Name="InvertCheckBox" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Content="NOT (invert signal)" 
                                       IsChecked="{Binding IsInverted}" Margin="0,5,0,0"/>
                             
                             <TextBlock Grid.Row="1" Grid.Column="2" Text="Tag Name:" VerticalAlignment="Center" Margin="0,5,10,0"/>
@@ -85,15 +85,26 @@
                         <DataGrid Grid.Row="1" ItemsSource="{Binding FilteredTags}" 
                                   SelectedItem="{Binding SelectedTag}"
                                   AutoGenerateColumns="False" 
-                                  IsReadOnly="True"
+                                  IsReadOnly="False"
                                   SelectionMode="Single"
                                   Height="150">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Tag Name" Binding="{Binding TagName}" Width="*"/>
-                                <DataGridTextColumn Header="Area" Binding="{Binding Area}" Width="80"/>
-                                <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80"/>
-                                <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="80"/>
-                                <DataGridTextColumn Header="Current Value" Binding="{Binding CurrentValue}" Width="100"/>
+                                <DataGridTextColumn Header="Tag Name" Binding="{Binding TagName}" Width="*" IsReadOnly="True"/>
+                                <DataGridTextColumn Header="Area" Binding="{Binding Area}" Width="80" IsReadOnly="True"/>
+                                <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" IsReadOnly="True"/>
+                                <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" Width="100">
+                                    <DataGridComboBoxColumn.ElementStyle>
+                                        <Style TargetType="ComboBox">
+                                            <Setter Property="ItemsSource" Value="{Binding AvailableTypes}"/>
+                                        </Style>
+                                    </DataGridComboBoxColumn.ElementStyle>
+                                    <DataGridComboBoxColumn.EditingElementStyle>
+                                        <Style TargetType="ComboBox">
+                                            <Setter Property="ItemsSource" Value="{Binding AvailableTypes}"/>
+                                        </Style>
+                                    </DataGridComboBoxColumn.EditingElementStyle>
+                                </DataGridComboBoxColumn>
+                                <DataGridTextColumn Header="Current Value" Binding="{Binding CurrentValue}" Width="100" IsReadOnly="True"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </Grid>

@@ -18,7 +18,7 @@ namespace ModbusForge.Models
         private string _name = "";
         
         [ObservableProperty]
-        private PlcElementType _elementType = PlcElementType.Source;
+        private PlcElementType _elementType = PlcElementType.Input;
         
         [ObservableProperty]
         private double _x = 100;
@@ -27,10 +27,10 @@ namespace ModbusForge.Models
         private double _y = 100;
         
         [ObservableProperty]
-        private double _width = 140;
+        private double _width = 160;
         
         [ObservableProperty]
-        private double _height = 80;
+        private double _height = 120;
         
         [ObservableProperty]
         private bool _isSelected = false;
@@ -77,7 +77,12 @@ namespace ModbusForge.Models
             {
                 return ElementType switch
                 {
-                    PlcElementType.Source => $"IN: {Input1Address.Area}:{Input1Address.Address}",
+                    PlcElementType.Input => "IN",
+                    PlcElementType.Output => "OUT",
+                    PlcElementType.InputBool => "IN BOOL",
+                    PlcElementType.InputInt => "IN INT",
+                    PlcElementType.OutputBool => "OUT BOOL",
+                    PlcElementType.OutputInt => "OUT INT",
                     PlcElementType.NOT => "NOT",
                     PlcElementType.AND => "AND",
                     PlcElementType.OR => "OR",
@@ -88,17 +93,34 @@ namespace ModbusForge.Models
                     PlcElementType.CTU => $"CTU ({CounterPreset})",
                     PlcElementType.CTD => $"CTD ({CounterPreset})",
                     PlcElementType.CTC => $"CTC ({CounterPreset})",
-                    PlcElementType.COMPARE_EQ => $"== {CompareValue}",
-                    PlcElementType.COMPARE_NE => $"!= {CompareValue}",
-                    PlcElementType.COMPARE_GT => $"&gt; {CompareValue}",
-                    PlcElementType.COMPARE_LT => $"&lt; {CompareValue}",
-                    PlcElementType.COMPARE_GE => $"&gt;= {CompareValue}",
-                    PlcElementType.COMPARE_LE => $"&lt;= {CompareValue}",
-                    PlcElementType.MATH_ADD => "ADD (+)",
-                    PlcElementType.MATH_SUB => "SUB (-)",
-                    PlcElementType.MATH_MUL => "MUL (*)",
-                    PlcElementType.MATH_DIV => "DIV (/)",
-                    _ => ElementType.ToString()
+                    PlcElementType.COMPARE_EQ => "EQ",
+                    PlcElementType.COMPARE_NE => "NE",
+                    PlcElementType.COMPARE_GT => "GT",
+                    PlcElementType.COMPARE_LT => "LT",
+                    PlcElementType.COMPARE_GE => "GE",
+                    PlcElementType.COMPARE_LE => "LE",
+                    PlcElementType.MATH_ADD => "ADD",
+                    PlcElementType.MATH_SUB => "SUB",
+                    PlcElementType.MATH_MUL => "MUL",
+                    PlcElementType.MATH_DIV => "DIV",
+                    _ => "Unknown"
+                };
+            }
+        }
+        
+        public string AddressDisplay
+        {
+            get
+            {
+                return ElementType switch
+                {
+                    PlcElementType.Input => Input1Address.Address >= 0 ? $"{Input1Address.Area}:{Input1Address.Address}" : "[Not Configured]",
+                    PlcElementType.Output => OutputAddress.Address >= 0 ? $"{OutputAddress.Area}:{OutputAddress.Address}" : "[Not Configured]",
+                    PlcElementType.InputBool => Input1Address.Address >= 0 ? $"{Input1Address.Area}:{Input1Address.Address}" : "[Not Configured]",
+                    PlcElementType.InputInt => Input1Address.Address >= 0 ? $"{Input1Address.Area}:{Input1Address.Address}" : "[Not Configured]",
+                    PlcElementType.OutputBool => OutputAddress.Address >= 0 ? $"{OutputAddress.Area}:{OutputAddress.Address}" : "[Not Configured]",
+                    PlcElementType.OutputInt => OutputAddress.Address >= 0 ? $"{OutputAddress.Area}:{OutputAddress.Address}" : "[Not Configured]",
+                    _ => ""
                 };
             }
         }
@@ -163,7 +185,7 @@ namespace ModbusForge.Models
             }
         }
         
-        public bool HasOutput => ElementType != PlcElementType.Source;
+        public bool HasOutput => ElementType != PlcElementType.Input;
     }
     
     /// <summary>

@@ -9,7 +9,12 @@ namespace ModbusForge.Models
     /// </summary>
     public enum PlcElementType
     {
-        Source,  // Read value from a Modbus address
+        Input,   // Input block - reads from a Modbus address
+        Output,  // Output block - writes to a Modbus address
+        InputBool,   // Boolean Input - reads coils/discrete inputs
+        InputInt,    // Integer Input - reads holding/input registers
+        OutputBool,  // Boolean Output - writes coils/discrete outputs  
+        OutputInt,   // Integer Output - writes holding/input registers
         NOT,     // Boolean inversion
         AND,     // Logical AND of multiple inputs
         OR,      // Logical OR of multiple inputs
@@ -70,7 +75,7 @@ namespace ModbusForge.Models
         private string _id = Guid.NewGuid().ToString();
 
         [ObservableProperty]
-        private PlcElementType _elementType = PlcElementType.Source;
+        private PlcElementType _elementType = PlcElementType.Input;
 
         // Input references (up to 2 for AND/OR, 1 for others)
         [ObservableProperty]

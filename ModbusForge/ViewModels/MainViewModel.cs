@@ -111,7 +111,7 @@ namespace ModbusForge.ViewModels
             // Initialize visual node editor
             _visualNodeEditorViewModel = new VisualNodeEditorViewModel();
             _visualSimulationService = App.ServiceProvider.GetRequiredService<IVisualSimulationService>();
-            _visualSimulationService.Start(_visualNodeEditorViewModel);
+            // VisualSimulationService will be started/stopped by ShowLiveValues toggle
             
             var settings = options?.Value ?? new ServerSettings();
 

@@ -1,10 +1,11 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ModbusForge.Models;
+using ModbusForge.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ModbusForge.ViewModels
 {
@@ -51,7 +52,7 @@ namespace ModbusForge.ViewModels
             var input1 = new VisualNode
             {
                 Name = "Input 1",
-                ElementType = PlcElementType.Source,
+                ElementType = PlcElementType.Input,
                 X = 50,
                 Y = 100,
                 Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 0 }
@@ -60,7 +61,7 @@ namespace ModbusForge.ViewModels
             var input2 = new VisualNode
             {
                 Name = "Input 2",
-                ElementType = PlcElementType.Source,
+                ElementType = PlcElementType.Input,
                 X = 50,
                 Y = 200,
                 Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 }
@@ -78,10 +79,10 @@ namespace ModbusForge.ViewModels
             var output = new VisualNode
             {
                 Name = "Output",
-                ElementType = PlcElementType.Source,
+                ElementType = PlcElementType.Output,
                 X = 450,
                 Y = 150,
-                Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 }
+                OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 }
             };
             
             Nodes.Add(input1);
@@ -113,6 +114,14 @@ namespace ModbusForge.ViewModels
                     // Set default parameters based on type
                     switch (elementType)
                     {
+                        case PlcElementType.Input:
+                            newNode.Name = "Input";
+                            newNode.Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                            break;
+                        case PlcElementType.Output:
+                            newNode.Name = "Output";
+                            newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                            break;
                         case PlcElementType.TON:
                         case PlcElementType.TOF:
                         case PlcElementType.TP:
@@ -402,6 +411,22 @@ namespace ModbusForge.ViewModels
         partial void OnShowLiveValuesChanged(bool value)
         {
             UpdateNodeValues(value);
+            
+            // Start or stop the visual simulation service based on the toggle
+            var visualSimulationService = App.ServiceProvider?.GetService<IVisualSimulationService>();
+            if (visualSimulationService != null)
+            {
+                if (value)
+                {
+                    visualSimulationService.Start(this);
+                    System.Diagnostics.Debug.WriteLine("VisualSimulationService started");
+                }
+                else
+                {
+                    visualSimulationService.Stop();
+                    System.Diagnostics.Debug.WriteLine("VisualSimulationService stopped");
+                }
+            }
         }
     }
 }

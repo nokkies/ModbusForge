@@ -529,6 +529,16 @@
                     <ListView ItemsSource="{Binding ConsoleMessages}" />
                 </Grid>
             </TabItem>
+            <TabItem Header="Debug">
+                <Grid Margin="5">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Live Register Values" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <ListView Grid.Row="1" ItemsSource="{Binding DebugMessages}" />
+                </Grid>
+            </TabItem>
         </TabControl>
 
         <StatusBar Grid.Row="3">

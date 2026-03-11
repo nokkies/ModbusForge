@@ -17,7 +17,8 @@ namespace ModbusForge.Converters
             {
                 return elementType switch
                 {
-                    PlcElementType.Source => new SolidColorBrush(Color.FromRgb(76, 175, 80)), // Green
+                    PlcElementType.Input => new SolidColorBrush(Color.FromRgb(76, 175, 80)), // Green
+                    PlcElementType.Output => new SolidColorBrush(Color.FromRgb(255, 87, 34)), // Orange
                     PlcElementType.NOT => new SolidColorBrush(Color.FromRgb(244, 67, 54)), // Red
                     PlcElementType.AND => new SolidColorBrush(Color.FromRgb(33, 150, 243)), // Blue
                     PlcElementType.OR => new SolidColorBrush(Color.FromRgb(156, 39, 176)), // Purple
@@ -122,7 +123,8 @@ namespace ModbusForge.Converters
             {
                 return elementType switch
                 {
-                    PlcElementType.Source => "📥",
+                    PlcElementType.Input => "📥",
+                    PlcElementType.Output => "�",
                     PlcElementType.NOT => "❌",
                     PlcElementType.AND => "∧",
                     PlcElementType.OR => "∨",
