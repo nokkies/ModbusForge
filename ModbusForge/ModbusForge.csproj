@@ -19,7 +19,7 @@
 
   <!-- Suppress package compatibility warnings for legacy packages -->
   <ItemGroup>
-    <PackageReference Include="NModbus4" Version="2.0.5516.31020" />
+    <PackageReference Include="NModbus" Version="3.0.81" />
     <PackageReference Include="OpenTK" Version="3.3.1" />
     <PackageReference Include="OpenTK.GLWpfControl" Version="3.3.0" />
   </ItemGroup>

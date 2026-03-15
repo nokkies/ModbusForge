@@ -3,7 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Modbus.Device;
+using NModbus;
 using Microsoft.Extensions.Logging;
 
 namespace ModbusForge.Services
@@ -12,6 +12,7 @@ namespace ModbusForge.Services
     {
         private readonly ILogger<ModbusService> _logger;
         private IModbusMaster? _client;
+        private readonly IModbusFactory _factory = new ModbusFactory();
         private TcpClient? _tcpClient;
         private bool _disposed = false;
 
@@ -84,7 +85,7 @@ namespace ModbusForge.Services
                     _logger.LogInformation($"Connecting to Modbus server at {ipAddress}:{port}");
                     _tcpClient = new TcpClient();
                     _tcpClient.Connect(ipAddress, port);
-                    _client = ModbusIpMaster.CreateIp(_tcpClient);
+                    _client = _factory.CreateMaster(_tcpClient);
                     _logger.LogInformation($"Connected to Modbus server: {IsConnected}");
                     return true;
                 }

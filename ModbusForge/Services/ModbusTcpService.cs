@@ -1,4 +1,4 @@
-using Modbus.Device;
+using NModbus;
 using System;
 using System.Net;
 using System.Net.Sockets;
@@ -13,6 +13,7 @@ namespace ModbusForge.Services
     public class ModbusTcpService : IModbusService, IDisposable
     {
         private IModbusMaster? _client;
+        private readonly IModbusFactory _factory = new ModbusFactory();
         private TcpClient? _tcpClient;
         private bool _disposed = false;
         private readonly ILogger<ModbusTcpService> _logger;
@@ -144,7 +145,7 @@ namespace ModbusForge.Services
                         _lastPort = port;
                         _tcpClient = new TcpClient();
                         _tcpClient.Connect(ipAddress, port);
-                        _client = ModbusIpMaster.CreateIp(_tcpClient);
+                        _client = _factory.CreateMaster(_tcpClient);
                         _logger.LogInformation($"Connected to Modbus server at {ipAddress}:{port}");
                         return true;
                     }
@@ -414,7 +415,7 @@ namespace ModbusForge.Services
                 sw.Restart();
                 _logger.LogInformation($"Diagnostics: Testing Modbus protocol with Unit ID {unitId}");
                 
-                var master = ModbusIpMaster.CreateIp(testClient);
+                var master = new ModbusFactory().CreateMaster(testClient);
                 master.Transport.ReadTimeout = 5000;
                 master.Transport.WriteTimeout = 5000;
 
@@ -426,7 +427,7 @@ namespace ModbusForge.Services
                     result.ModbusResponding = true;
                     _logger.LogInformation($"Diagnostics: Modbus responded in {result.ModbusLatencyMs}ms, read value: {registers[0]}");
                 }
-                catch (Modbus.SlaveException slaveEx)
+                catch (NModbus.SlaveException slaveEx)
                 {
                     // Slave responded with an exception - this means Modbus IS working, just the request was invalid
                     result.ModbusLatencyMs = (int)sw.ElapsedMilliseconds;

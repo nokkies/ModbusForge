@@ -3,8 +3,8 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Modbus.Data;
-using Modbus.Device;
+using NModbus.Data;
+using NModbus;
 using System.Net.Sockets;
 using ModbusForge.Helpers;
 
@@ -12,11 +12,12 @@ namespace ModbusForge.Services
 {
     public class ModbusServerService : IModbusService, IDisposable
     {
-        private ModbusTcpSlave? _slave;
+        private IModbusSlaveNetwork? _slaveNetwork;
         private TcpListener? _listener;
-        private DataStore? _dataStore;
+        private ISlaveDataStore? _dataStore;
         private Task? _listenTask;
         private CancellationTokenSource? _cts;
+        private readonly IModbusFactory _factory = new ModbusFactory();
         private bool _disposed = false;
         private readonly ILogger<ModbusServerService> _logger;
         private volatile bool _isRunning = false;
@@ -46,15 +47,17 @@ namespace ModbusForge.Services
                         throw new InvalidOperationException("Data store not initialized");
 
                     var registers = _dataStore.InputRegisters;
-                    if (startAddress < 1 || count < 0 || startAddress + count - 1 > registers.Count)
+                    // NModbus 3 uses 0-based indexing for limits. Let's just catch out of bounds or read directly.
+                    try
+                    {
+                        var result = registers.ReadPoints((ushort)(startAddress > 0 ? startAddress - 1 : 0), (ushort)count);
+                        _logger.LogDebug($"Successfully read {result.Length} input registers");
+                        return result;
+                    }
+                    catch (ArgumentOutOfRangeException)
+                    {
                         throw new ArgumentOutOfRangeException(nameof(startAddress), "Requested range is out of bounds");
-
-                    var result = new ushort[count];
-                    for (int i = 0; i < count; i++)
-                        result[i] = registers[(ushort)(startAddress + i)];
-
-                    _logger.LogDebug($"Successfully read {result.Length} input registers");
-                    return result;
+                    }
                 }
             });
         }
@@ -68,16 +71,20 @@ namespace ModbusForge.Services
             {
                 _logger.LogDebug($"Reading {count} discrete inputs starting at {startAddress} (Unit ID: {unitId})");
 
-                var inputs = _dataStore?.InputDiscretes;
-                if (inputs == null || startAddress < 1 || count < 0 || startAddress + count - 1 > inputs.Count)
+                var inputs = _dataStore?.CoilInputs;
+                if (inputs == null)
+                    throw new InvalidOperationException("Data store not initialized");
+
+                try
+                {
+                    var result = inputs.ReadPoints((ushort)(startAddress > 0 ? startAddress - 1 : 0), (ushort)count);
+                    _logger.LogDebug($"Successfully read {result.Length} discrete inputs");
+                    return result;
+                }
+                catch (ArgumentOutOfRangeException)
+                {
                     throw new ArgumentOutOfRangeException(nameof(startAddress), "Requested discrete input range is out of bounds");
-
-                var result = new bool[count];
-                for (int i = 0; i < count; i++)
-                    result[i] = inputs[(ushort)(startAddress + i)];
-
-                _logger.LogDebug($"Successfully read {result.Length} discrete inputs");
-                return result;
+                }
             });
         }
 
@@ -97,51 +104,31 @@ namespace ModbusForge.Services
                         var endpoint = new IPEndPoint(IPAddress.Any, port == 0 ? DefaultPort : port);
                     
                     // Create data store
-                    _dataStore = new DataStore();
-                    
-                    // Initialize holding registers to support addresses up to 10000
-                    for (int i = 0; i < 10000; i++)
-                    {
-                        _dataStore.HoldingRegisters.Add(0);
-                    }
-                                         
-
-                        // Initialize input registers to support addresses up to 10000
-                        for (int i = 0; i < 10000; i++)
-                    {
-                        _dataStore.InputRegisters.Add(0);
-                    }
-                    
-                    // Initialize coils to support addresses up to 10000
-                    for (int i = 0; i < 10000; i++)
-                    {
-                        _dataStore.CoilDiscretes.Add(false);
-                    }
-                    
-                    // Initialize discrete inputs to support addresses up to 10000
-                    for (int i = 0; i < 10000; i++)
-                    {
-                        _dataStore.InputDiscretes.Add(false);
-                    }
+                    _dataStore = new SlaveDataStore();
                     
                     // Initialize some test data in holding registers
+                    // NModbus 3 uses 0-based index for API
                     for (ushort i = 1; i <= 16; i++)
-                        _dataStore.HoldingRegisters[i] = (ushort)(i * 10);
+                    {
+                        _dataStore.HoldingRegisters.WritePoints((ushort)(i - 1), new ushort[] { (ushort)(i * 10) });
+                    }
                     
                     // Create and start TCP listener
                     _listener = new TcpListener(endpoint);
                     _listener.Start();
                     
-                    // Create slave
-                    _slave = ModbusTcpSlave.CreateTcp(DefaultSlaveId, _listener);
-                    _slave.DataStore = _dataStore;
+                    // Create slave network
+                    _slaveNetwork = _factory.CreateSlaveNetwork(_listener);
+                    IModbusSlave slave = _factory.CreateSlave(DefaultSlaveId, _dataStore);
+                    _slaveNetwork.AddSlave(slave);
                     
                     // Start listening for connections
                     _cts = new CancellationTokenSource();
                     _isRunning = true; // Set before starting listen task
-                    _listenTask = Task.Run(() =>
+                    _listenTask = Task.Run(async () =>
                     {
-                        try { _slave.Listen(); }
+                        try { await _slaveNetwork.ListenAsync(_cts.Token); }
+                        catch (OperationCanceledException) { }
                         catch (Exception ex) { _logger.LogError(ex, "Listen task failed"); }
                     });
                     
@@ -172,7 +159,7 @@ namespace ModbusForge.Services
             try
             {
                 _cts?.Cancel();
-                _slave?.Dispose();
+                _slaveNetwork?.Dispose();
                 _listener?.Stop();
             }
             catch (Exception ex)
@@ -181,7 +168,7 @@ namespace ModbusForge.Services
             }
             finally
             {
-                _slave = null;
+                _slaveNetwork = null;
                 _listener = null;
                 _cts?.Dispose();
                 _cts = null;
@@ -189,7 +176,7 @@ namespace ModbusForge.Services
         }
 
         // Data store access for simulation service
-        public DataStore? GetDataStore()
+        public ISlaveDataStore? GetDataStore()
         {
             lock (_stateLock)
             {
@@ -241,15 +228,19 @@ namespace ModbusForge.Services
                 _logger.LogDebug($"Reading {count} holding registers starting at {startAddress} (Unit ID: {unitId})");
 
                 var registers = _dataStore?.HoldingRegisters;
-                if (registers == null || startAddress < 1 || count < 0 || startAddress + count - 1 > registers.Count)
+                if (registers == null)
+                    throw new InvalidOperationException("Data store not initialized");
+
+                try
+                {
+                    var result = registers.ReadPoints((ushort)(startAddress > 0 ? startAddress - 1 : 0), (ushort)count);
+                    _logger.LogDebug($"Successfully read {result.Length} registers");
+                    return result;
+                }
+                catch (ArgumentOutOfRangeException)
+                {
                     throw new ArgumentOutOfRangeException(nameof(startAddress), "Requested range is out of bounds");
-
-                var result = new ushort[count];
-                for (int i = 0; i < count; i++)
-                    result[i] = registers[(ushort)(startAddress + i)];
-
-                _logger.LogDebug($"Successfully read {result.Length} registers");
-                return result;
+                }
             });
         }
 
@@ -265,11 +256,18 @@ namespace ModbusForge.Services
                     _logger.LogDebug($"Writing value {value} to register {registerAddress} (Unit ID: {unitId})");
 
                     var registers = _dataStore?.HoldingRegisters;
-                    if (registers == null || registerAddress < 1 || registerAddress > registers.Count)
-                        throw new ArgumentOutOfRangeException(nameof(registerAddress), "Register address is out of range");
+                    if (registers == null)
+                        throw new InvalidOperationException("Data store not initialized");
 
-                    registers[(ushort)registerAddress] = value;
-                    _logger.LogDebug("Successfully wrote to register");
+                    try
+                    {
+                        registers.WritePoints((ushort)(registerAddress > 0 ? registerAddress - 1 : 0), new ushort[] { value });
+                        _logger.LogDebug("Successfully wrote to register");
+                    }
+                    catch (ArgumentOutOfRangeException)
+                    {
+                        throw new ArgumentOutOfRangeException(nameof(registerAddress), "Register address is out of range");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -289,15 +287,19 @@ namespace ModbusForge.Services
                 _logger.LogDebug($"Reading {count} coils starting at {startAddress} (Unit ID: {unitId})");
 
                 var coils = _dataStore?.CoilDiscretes;
-                if (coils == null || startAddress < 1 || count < 0 || startAddress + count - 1 > coils.Count)
+                if (coils == null)
+                    throw new InvalidOperationException("Data store not initialized");
+
+                try
+                {
+                    var result = coils.ReadPoints((ushort)(startAddress > 0 ? startAddress - 1 : 0), (ushort)count);
+                    _logger.LogDebug($"Successfully read {result.Length} coils");
+                    return result;
+                }
+                catch (ArgumentOutOfRangeException)
+                {
                     throw new ArgumentOutOfRangeException(nameof(startAddress), "Requested coil range is out of bounds");
-
-                var result = new bool[count];
-                for (int i = 0; i < count; i++)
-                    result[i] = coils[(ushort)(startAddress + i)];
-
-                _logger.LogDebug($"Successfully read {result.Length} coils");
-                return result;
+                }
             });
         }
 
@@ -313,11 +315,18 @@ namespace ModbusForge.Services
                     _logger.LogDebug($"Writing coil at {coilAddress} = {value} (Unit ID: {unitId})");
 
                     var coils = _dataStore?.CoilDiscretes;
-                    if (coils == null || coilAddress < 1 || coilAddress > coils.Count)
-                        throw new ArgumentOutOfRangeException(nameof(coilAddress), "Coil address is out of range");
+                    if (coils == null)
+                        throw new InvalidOperationException("Data store not initialized");
 
-                    coils[(ushort)coilAddress] = value;
-                    _logger.LogDebug("Successfully wrote coil");
+                    try
+                    {
+                        coils.WritePoints((ushort)(coilAddress > 0 ? coilAddress - 1 : 0), new bool[] { value });
+                        _logger.LogDebug("Successfully wrote coil");
+                    }
+                    catch (ArgumentOutOfRangeException)
+                    {
+                        throw new ArgumentOutOfRangeException(nameof(coilAddress), "Coil address is out of range");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -342,13 +351,13 @@ namespace ModbusForge.Services
                     try
                     {
                         _cts?.Cancel();
-                        _slave?.Dispose();
+                        _slaveNetwork?.Dispose();
                         _listener?.Stop();
                     }
                     catch { /* ignore on dispose */ }
                     finally
                     {
-                        _slave = null;
+                        _slaveNetwork = null;
                         _listener = null;
                         _cts?.Dispose();
                         _cts = null;

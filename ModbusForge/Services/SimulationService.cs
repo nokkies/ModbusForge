@@ -96,8 +96,11 @@ namespace ModbusForge.Services
                             for (int i = 0; i < count; i++)
                             {
                                 int addr = start + i;
-                                if (addr >= 0 && addr < dataStore.HoldingRegisters.Count)
-                                    dataStore.HoldingRegisters[addr] = (ushort)iv;
+                                if (addr >= 1)
+                                {
+                                    try { dataStore.HoldingRegisters.WritePoints((ushort)(addr - 1), new ushort[] { (ushort)iv }); }
+                                    catch (ArgumentOutOfRangeException) { }
+                                }
                             }
                         }
                     }
@@ -114,8 +117,11 @@ namespace ModbusForge.Services
                                 if (val < 0) val = 0;
                                 if (val > 65535) val = 65535;
                                 int addr = start + i;
-                                if (addr >= 0 && addr < dataStore.HoldingRegisters.Count)
-                                    dataStore.HoldingRegisters[addr] = (ushort)val;
+                                if (addr >= 1)
+                                {
+                                    try { dataStore.HoldingRegisters.WritePoints((ushort)(addr - 1), new ushort[] { (ushort)val }); }
+                                    catch (ArgumentOutOfRangeException) { }
+                                }
                             }
                         }
                     }
@@ -131,8 +137,11 @@ namespace ModbusForge.Services
                         for (int i = 0; i < count; i++)
                         {
                             int addr = start + i;
-                            if (addr >= 0 && addr < dataStore.CoilDiscretes.Count)
-                                dataStore.CoilDiscretes[addr] = _simCoilState;
+                            if (addr >= 1)
+                            {
+                                try { dataStore.CoilDiscretes.WritePoints((ushort)(addr - 1), new bool[] { _simCoilState }); }
+                                catch (ArgumentOutOfRangeException) { }
+                            }
                         }
                         _simCoilState = !_simCoilState;
                     }
@@ -155,8 +164,11 @@ namespace ModbusForge.Services
                             if (val < 0) val = 0;
                             if (val > 65535) val = 65535;
                             int addr = start + i;
-                            if (addr >= 0 && addr < dataStore.InputRegisters.Count)
-                                dataStore.InputRegisters[addr] = (ushort)val;
+                            if (addr >= 1)
+                            {
+                                try { dataStore.InputRegisters.WritePoints((ushort)(addr - 1), new ushort[] { (ushort)val }); }
+                                catch (ArgumentOutOfRangeException) { }
+                            }
                         }
                     }
                 }
@@ -171,8 +183,11 @@ namespace ModbusForge.Services
                         for (int i = 0; i < count; i++)
                         {
                             int addr = start + i;
-                            if (addr >= 0 && addr < dataStore.InputDiscretes.Count)
-                                dataStore.InputDiscretes[addr] = _simDiscreteState;
+                            if (addr >= 1)
+                            {
+                                try { dataStore.CoilInputs.WritePoints((ushort)(addr - 1), new bool[] { _simDiscreteState }); }
+                                catch (ArgumentOutOfRangeException) { }
+                            }
                         }
                         _simDiscreteState = !_simDiscreteState;
                     }
