@@ -212,7 +212,6 @@ namespace ModbusForge.Services
             }
 
             // For other nodes, we need to evaluate the logic
-            // This is a simplified version - in production, we'd use the full simulation engine
             
             // Get input values from connected nodes
             var input1Value = false;
@@ -254,18 +253,65 @@ namespace ModbusForge.Services
                 PlcElementType.CTU => EvaluateCtuCounter(node, input1Value),
                 PlcElementType.CTD => EvaluateCtdCounter(node, input1Value),
                 PlcElementType.CTC => EvaluateCtcCounter(node, input1Value, input2Value),
-                PlcElementType.COMPARE_EQ => EvaluateCompare(node, dataStore, (a, b) => a == b),
-                PlcElementType.COMPARE_NE => EvaluateCompare(node, dataStore, (a, b) => a != b),
-                PlcElementType.COMPARE_GT => EvaluateCompare(node, dataStore, (a, b) => a > b),
-                PlcElementType.COMPARE_LT => EvaluateCompare(node, dataStore, (a, b) => a < b),
-                PlcElementType.COMPARE_GE => EvaluateCompare(node, dataStore, (a, b) => a >= b),
-                PlcElementType.COMPARE_LE => EvaluateCompare(node, dataStore, (a, b) => a <= b),
-                PlcElementType.MATH_ADD => EvaluateMath(node, dataStore, (a, b) => a + b),
-                PlcElementType.MATH_SUB => EvaluateMath(node, dataStore, (a, b) => a - b),
-                PlcElementType.MATH_MUL => EvaluateMath(node, dataStore, (a, b) => a * b),
-                PlcElementType.MATH_DIV => EvaluateMath(node, dataStore, (a, b) => b != 0 ? a / b : 0),
+                PlcElementType.COMPARE_EQ => EvaluateCompare(node, dataStore, connections, (a, b) => a == b),
+                PlcElementType.COMPARE_NE => EvaluateCompare(node, dataStore, connections, (a, b) => a != b),
+                PlcElementType.COMPARE_GT => EvaluateCompare(node, dataStore, connections, (a, b) => a > b),
+                PlcElementType.COMPARE_LT => EvaluateCompare(node, dataStore, connections, (a, b) => a < b),
+                PlcElementType.COMPARE_GE => EvaluateCompare(node, dataStore, connections, (a, b) => a >= b),
+                PlcElementType.COMPARE_LE => EvaluateCompare(node, dataStore, connections, (a, b) => a <= b),
+                PlcElementType.MATH_ADD => EvaluateMath(node, dataStore, connections, (a, b) => a + b),
+                PlcElementType.MATH_SUB => EvaluateMath(node, dataStore, connections, (a, b) => a - b),
+                PlcElementType.MATH_MUL => EvaluateMath(node, dataStore, connections, (a, b) => a * b),
+                PlcElementType.MATH_DIV => EvaluateMath(node, dataStore, connections, (a, b) => b != 0 ? a / b : 0),
                 _ => false
             };
+        }
+
+        /// <summary>
+        /// Resolves the integer value for a given input connector by checking visual connections first,
+        /// then falling back to the node's configured Modbus address reference.
+        /// </summary>
+        private int ResolveIntInput(string connectorName, PlcAddressReference? fallbackAddress, 
+            int fallbackConstant, List<NodeConnection> connections, DataStore dataStore)
+        {
+            // Check if there's a visual wire connected to this input
+            var connection = connections.FirstOrDefault(c => c.TargetConnector == connectorName);
+            if (connection != null)
+            {
+                var sourceNode = _viewModel?.Nodes.FirstOrDefault(n => n.Id == connection.SourceNodeId);
+                if (sourceNode != null)
+                {
+                    // For InputInt or Math nodes, read the actual integer value
+                    if (sourceNode.ElementType == PlcElementType.InputInt)
+                    {
+                        return ReadModbusValueInt(sourceNode.Input1Address, dataStore);
+                    }
+                    
+                    // For Math nodes that write to an output address, read from their output
+                    if (IsMathType(sourceNode.ElementType) && sourceNode.OutputAddress?.Address >= 0)
+                    {
+                        return ReadModbusValueInt(sourceNode.OutputAddress, dataStore);
+                    }
+                    
+                    // For boolean nodes, convert to 0/1
+                    var boolValue = GetNodeValueFromSimulation(sourceNode, dataStore, 0);
+                    return boolValue ? 1 : 0;
+                }
+            }
+
+            // No connection -- fall back to the node's configured address, or constant value
+            if (fallbackAddress != null && fallbackAddress.Address >= 0)
+            {
+                return ReadModbusValueInt(fallbackAddress, dataStore);
+            }
+            
+            return fallbackConstant;
+        }
+
+        private static bool IsMathType(PlcElementType type)
+        {
+            return type == PlcElementType.MATH_ADD || type == PlcElementType.MATH_SUB 
+                || type == PlcElementType.MATH_MUL || type == PlcElementType.MATH_DIV;
         }
 
         private bool ReadModbusValue(PlcAddressReference? address, DataStore dataStore)
@@ -426,29 +472,29 @@ namespace ModbusForge.Services
             return node.CounterValue >= node.CounterPreset;
         }
 
-        private bool EvaluateCompare(VisualNode node, DataStore dataStore, Func<int, int, bool> comparison)
+        private bool EvaluateCompare(VisualNode node, DataStore dataStore, List<NodeConnection> connections, Func<int, int, bool> comparison)
         {
-            var input1Val = ReadModbusValueInt(node.Input1Address, dataStore);
-            var input2Val = node.Input2Address?.Address >= 0 ? 
-                ReadModbusValueInt(node.Input2Address, dataStore) : 
-                node.CompareValue;
+            var input1Val = ResolveIntInput("Input1", node.Input1Address, 0, connections, dataStore);
+            var input2Val = ResolveIntInput("Input2", node.Input2Address, node.CompareValue, connections, dataStore);
             
             return comparison(input1Val, input2Val);
         }
 
-        private bool EvaluateMath(VisualNode node, DataStore dataStore, Func<int, int, int> operation)
+        private bool EvaluateMath(VisualNode node, DataStore dataStore, List<NodeConnection> connections, Func<int, int, int> operation)
         {
-            var input1Val = ReadModbusValueInt(node.Input1Address, dataStore);
-            var input2Val = node.Input2Address?.Address >= 0 ? 
-                ReadModbusValueInt(node.Input2Address, dataStore) : 
-                node.CompareValue;
+            var input1Val = ResolveIntInput("Input1", node.Input1Address, 0, connections, dataStore);
+            var input2Val = ResolveIntInput("Input2", node.Input2Address, node.CompareValue, connections, dataStore);
             
             var result = operation(input1Val, input2Val);
+            
+            // Clamp to ushort range (matching SimulationService behavior)
+            if (result < 0) result = 0;
+            if (result > 65535) result = 65535;
             
             // Write result to output if configured
             if (node.OutputAddress?.Address >= 0)
             {
-                WriteModbusValue(node.OutputAddress, (ushort)Math.Max(0, Math.Min(65535, result)), dataStore);
+                WriteModbusValue(node.OutputAddress, (ushort)result, dataStore);
             }
             
             return result != 0;
