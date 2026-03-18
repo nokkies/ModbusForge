@@ -185,7 +185,9 @@ namespace ModbusForge.Models
             }
         }
         
-        public bool HasOutput => ElementType != PlcElementType.Input;
+        public bool HasOutput => ElementType != PlcElementType.Input 
+            && ElementType != PlcElementType.InputBool 
+            && ElementType != PlcElementType.InputInt;
     }
     
     /// <summary>

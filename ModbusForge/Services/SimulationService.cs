@@ -288,19 +288,19 @@ namespace ModbusForge.Services
 
             if (element.SetDominant)
             {
-                // Set dominant: if both Set and Reset are true, Set wins
-                if (setInput)
-                    element.RsState = true;
+                // Set dominant: if both Set and Reset are true, Set wins (runs last)
                 if (resetInput)
                     element.RsState = false;
+                if (setInput)
+                    element.RsState = true;
             }
             else
             {
-                // Reset dominant: if both Set and Reset are true, Reset wins
-                if (resetInput)
-                    element.RsState = false;
+                // Reset dominant: if both Set and Reset are true, Reset wins (runs last)
                 if (setInput)
                     element.RsState = true;
+                if (resetInput)
+                    element.RsState = false;
             }
 
             return element.RsState;
