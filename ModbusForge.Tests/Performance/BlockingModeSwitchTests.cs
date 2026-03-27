@@ -18,7 +18,6 @@ namespace ModbusForge.Tests.Performance
         private Mock<ILogger<MainViewModel>> _mockLogger;
         private Mock<IOptions<ServerSettings>> _mockOptions;
         private Mock<ITrendLogger> _mockTrendLogger;
-        private Mock<ISimulationService> _mockSimulationService;
         private Mock<ICustomEntryService> _mockCustomEntryService;
         private Mock<IConsoleLoggerService> _mockConsoleLogger;
 
@@ -28,7 +27,6 @@ namespace ModbusForge.Tests.Performance
         private CustomEntryCoordinator _customEntryCoordinator;
         private TrendCoordinator _trendCoordinator;
         private ConfigurationCoordinator _configurationCoordinator;
-        private SimulationCoordinator _simulationCoordinator;
 
         public BlockingModeSwitchTests()
         {
@@ -39,7 +37,6 @@ namespace ModbusForge.Tests.Performance
             _mockOptions.Setup(o => o.Value).Returns(new ServerSettings());
 
             _mockTrendLogger = new Mock<ITrendLogger>();
-            _mockSimulationService = new Mock<ISimulationService>();
             _mockCustomEntryService = new Mock<ICustomEntryService>();
             _mockConsoleLogger = new Mock<IConsoleLoggerService>();
 
@@ -81,8 +78,6 @@ namespace ModbusForge.Tests.Performance
 
             _configurationCoordinator = new ConfigurationCoordinator(
                 new Mock<ILogger<ConfigurationCoordinator>>().Object);
-
-            _simulationCoordinator = new SimulationCoordinator(_mockSimulationService.Object);
         }
 
         [Fact]
@@ -107,8 +102,7 @@ namespace ModbusForge.Tests.Performance
                 _registerCoordinator,
                 _customEntryCoordinator,
                 _trendCoordinator,
-                _configurationCoordinator,
-                _simulationCoordinator);
+                _configurationCoordinator);
 
             // Set initial state
             viewModel.Mode = "Client";

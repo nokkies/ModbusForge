@@ -422,7 +422,13 @@ namespace ModbusForge.Views
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 ToolTip = node.Name
             };
-            contentStack.Children.Add(nameText);
+            // Only show name label for non-I/O nodes (I/O nodes have header + inline controls)
+            if (node.ElementType != PlcElementType.Input && node.ElementType != PlcElementType.Output &&
+                node.ElementType != PlcElementType.InputBool && node.ElementType != PlcElementType.InputInt &&
+                node.ElementType != PlcElementType.OutputBool && node.ElementType != PlcElementType.OutputInt)
+            {
+                contentStack.Children.Add(nameText);
+            }
             
             // Live value indicator — always present, hidden until ShowLiveValues is on
             var liveText = new TextBlock
@@ -434,29 +440,79 @@ namespace ModbusForge.Views
             };
             contentStack.Children.Add(liveText);
             
-            // Add configure button for I/O blocks
+            // Inline address editing for I/O blocks (replaces the old 🔗 popup)
             if (node.ElementType == PlcElementType.Input || node.ElementType == PlcElementType.Output ||
                 node.ElementType == PlcElementType.InputBool || node.ElementType == PlcElementType.InputInt ||
                 node.ElementType == PlcElementType.OutputBool || node.ElementType == PlcElementType.OutputInt)
             {
-                // DEBUG: Log that we're creating a configure button for this type
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Creating configure button for {node.ElementType}");
-                
-                var configureButton = new Button
+                var isInputType = node.ElementType == PlcElementType.Input ||
+                                  node.ElementType == PlcElementType.InputBool ||
+                                  node.ElementType == PlcElementType.InputInt;
+                var addrRef = isInputType ? node.Input1Address : node.OutputAddress;
+
+                var inlinePanel = new StackPanel
                 {
-                    Content = "🔗",
-                    FontSize = 12,
-                    Width = 24,
-                    Height = 24,
-                    Margin = new Thickness(0, 4, 0, 0),
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    ToolTip = (node.ElementType == PlcElementType.Input || node.ElementType == PlcElementType.InputBool || node.ElementType == PlcElementType.InputInt)
-                        ? "Configure input tag" 
-                        : "Configure output tag",
-                    Tag = node.Id
+                    Orientation = Orientation.Vertical,
+                    Margin = new Thickness(0, 2, 0, 0),
+                    HorizontalAlignment = HorizontalAlignment.Center
                 };
-                configureButton.Click += ConfigureButton_Click;
-                contentStack.Children.Add(configureButton);
+
+                // Area ComboBox
+                var areaCombo = new System.Windows.Controls.ComboBox
+                {
+                    Width = 200,
+                    Height = 26,
+                    FontSize = 11,
+                    ItemsSource = Enum.GetValues(typeof(PlcArea)),
+                    SelectedItem = addrRef.Area,
+                    ToolTip = "Modbus area"
+                };
+                areaCombo.SelectionChanged += (s, ev) =>
+                {
+                    if (areaCombo.SelectedItem is PlcArea area)
+                    {
+                        addrRef.Area = area;
+                        capturedAddressText.Text = node.AddressDisplay;
+                    }
+                };
+                inlinePanel.Children.Add(areaCombo);
+
+                // Address TextBox
+                var addrBox = new TextBox
+                {
+                    Width = 200,
+                    Height = 28,
+                    FontSize = 11,
+                    Text = addrRef.Address >= 0 ? addrRef.Address.ToString() : "",
+                    ToolTip = "Modbus address",
+                    Margin = new Thickness(0, 2, 0, 0),
+                    HorizontalContentAlignment = HorizontalAlignment.Center,
+                    VerticalContentAlignment = VerticalAlignment.Center
+                };
+                addrBox.LostFocus += (s, ev) =>
+                {
+                    if (int.TryParse(addrBox.Text, out int addr) && addr >= 0)
+                    {
+                        addrRef.Address = addr;
+                        capturedAddressText.Text = node.AddressDisplay;
+                    }
+                };
+                addrBox.KeyDown += (s, ev) =>
+                {
+                    if (ev.Key == System.Windows.Input.Key.Enter)
+                    {
+                        if (int.TryParse(addrBox.Text, out int addr) && addr >= 0)
+                        {
+                            addrRef.Address = addr;
+                            capturedAddressText.Text = node.AddressDisplay;
+                        }
+                        // Move focus away to commit
+                        System.Windows.Input.Keyboard.ClearFocus();
+                    }
+                };
+                inlinePanel.Children.Add(addrBox);
+
+                contentStack.Children.Add(inlinePanel);
             }
 
             // React dynamically to CurrentValue / ShowLiveValues changes
@@ -524,6 +580,31 @@ namespace ModbusForge.Views
                                 }
                                 break;
                                 
+                            case PlcElementType.MATH_ADD:
+                            case PlcElementType.MATH_SUB:
+                            case PlcElementType.MATH_MUL:
+                            case PlcElementType.MATH_DIV:
+                                // Math operations - show the result value from output address
+                                var mathResult = GetOutputRegisterValue(node);
+                                capturedLiveText.Text = $"● VAL:{mathResult}";
+                                capturedLiveText.Foreground = Brushes.Orange;
+                                
+                                // Debug output
+                                System.Diagnostics.Debug.WriteLine($"Math {node.ElementType}: Result = {mathResult}");
+                                AddDebugMessage($"Math {node.ElementType}: Result = {mathResult}");
+                                break;
+                                
+                            case PlcElementType.COMPARE_EQ:
+                            case PlcElementType.COMPARE_NE:
+                            case PlcElementType.COMPARE_GT:
+                            case PlcElementType.COMPARE_LT:
+                            case PlcElementType.COMPARE_GE:
+                            case PlcElementType.COMPARE_LE:
+                                // Comparison operations - show boolean result
+                                capturedLiveText.Text = node.CurrentValue ? "● TRUE" : "● FALSE";
+                                capturedLiveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
+                                break;
+                                
                             default:
                                 // Logic blocks - show ON/OFF
                                 capturedLiveText.Text = node.CurrentValue ? "● ON" : "● OFF";
@@ -582,8 +663,8 @@ namespace ModbusForge.Views
             Grid.SetRow(contentGrid, 1);
             grid.Children.Add(contentGrid);
             
-            // Footer
-            if (node.HasParameters)
+            // Footer with inline editable parameters
+            if (node.HasParameters || node.ElementType == PlcElementType.RS)
             {
                 var footer = new Border
                 {
@@ -591,13 +672,70 @@ namespace ModbusForge.Views
                     CornerRadius = new CornerRadius(0, 0, 6, 6),
                     Padding = new Thickness(4, 2, 4, 2)
                 };
-                var footerText = new TextBlock 
-                { 
-                    Text = node.ParameterDisplay, 
-                    FontSize = 10,
+                var footerPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
                     HorizontalAlignment = HorizontalAlignment.Center
                 };
-                footer.Child = footerText;
+
+                switch (node.ElementType)
+                {
+                    case PlcElementType.TON:
+                    case PlcElementType.TOF:
+                    case PlcElementType.TP:
+                    {
+                        footerPanel.Children.Add(new TextBlock { Text = "ms:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
+                        var timerBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.TimerPresetMs.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                        timerBox.LostFocus += (s, ev) => { if (int.TryParse(timerBox.Text, out int v) && v >= 0) node.TimerPresetMs = v; };
+                        footerPanel.Children.Add(timerBox);
+                        break;
+                    }
+                    case PlcElementType.CTU:
+                    case PlcElementType.CTD:
+                    case PlcElementType.CTC:
+                    {
+                        footerPanel.Children.Add(new TextBlock { Text = "Pre:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
+                        var counterBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.CounterPreset.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                        counterBox.LostFocus += (s, ev) => { if (int.TryParse(counterBox.Text, out int v)) node.CounterPreset = v; };
+                        footerPanel.Children.Add(counterBox);
+                        break;
+                    }
+                    case PlcElementType.COMPARE_EQ:
+                    case PlcElementType.COMPARE_NE:
+                    case PlcElementType.COMPARE_GT:
+                    case PlcElementType.COMPARE_LT:
+                    case PlcElementType.COMPARE_GE:
+                    case PlcElementType.COMPARE_LE:
+                    {
+                        footerPanel.Children.Add(new TextBlock { Text = "Val:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
+                        var cmpBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.CompareValue.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                        cmpBox.LostFocus += (s, ev) => { if (int.TryParse(cmpBox.Text, out int v)) node.CompareValue = v; };
+                        footerPanel.Children.Add(cmpBox);
+                        break;
+                    }
+                    case PlcElementType.MATH_ADD:
+                    case PlcElementType.MATH_SUB:
+                    case PlcElementType.MATH_MUL:
+                    case PlcElementType.MATH_DIV:
+                    {
+                        footerPanel.Children.Add(new TextBlock { Text = "Const:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
+                        var mathBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.CompareValue.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                        mathBox.LostFocus += (s, ev) => { if (int.TryParse(mathBox.Text, out int v)) node.CompareValue = v; };
+                        footerPanel.Children.Add(mathBox);
+                        break;
+                    }
+                    case PlcElementType.RS:
+                    {
+                        footerPanel.Children.Add(new TextBlock { Text = "Set Dom:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
+                        var setDomCheck = new System.Windows.Controls.CheckBox { IsChecked = node.SetDominant, VerticalAlignment = VerticalAlignment.Center };
+                        setDomCheck.Checked += (s, ev) => node.SetDominant = true;
+                        setDomCheck.Unchecked += (s, ev) => node.SetDominant = false;
+                        footerPanel.Children.Add(setDomCheck);
+                        break;
+                    }
+                }
+
+                footer.Child = footerPanel;
                 Grid.SetRow(footer, 2);
                 grid.Children.Add(footer);
             }

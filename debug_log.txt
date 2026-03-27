@@ -1,0 +1,132 @@
+[12:38:18.551] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:18.551] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:18.551] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:18.551] DEBUG: Math operation: 5 + 3 = 8
+[12:38:18.657] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:18.657] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:18.657] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:18.657] DEBUG: Math operation: 5 + 3 = 8
+[12:38:18.764] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:18.765] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:18.765] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:18.765] DEBUG: Math operation: 5 + 3 = 8
+[12:38:18.874] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:18.875] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:18.875] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:18.875] DEBUG: Math operation: 5 + 3 = 8
+[12:38:18.984] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:18.985] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:18.985] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:18.985] DEBUG: Math operation: 5 + 3 = 8
+[12:38:19.094] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:19.094] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:19.095] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:19.095] DEBUG: Math operation: 5 + 3 = 8
+[12:38:19.202] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:19.202] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:19.202] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:19.203] DEBUG: Math operation: 5 + 3 = 8
+[12:38:19.357] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:19.358] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:19.358] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:19.358] DEBUG: Math operation: 5 + 3 = 8
+[12:38:19.466] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:19.467] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:19.467] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:19.468] DEBUG: Math operation: 5 + 3 = 8
+[12:38:19.575] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:19.576] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:19.576] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:19.577] DEBUG: Math operation: 5 + 3 = 8
+[12:38:19.685] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:19.686] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:19.686] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:19.687] DEBUG: Math operation: 5 + 3 = 8
+[12:38:19.795] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:19.795] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:19.796] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:19.796] DEBUG: Math operation: 5 + 3 = 8
+[12:38:19.921] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:19.922] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:19.922] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:19.923] DEBUG: Math operation: 5 + 3 = 8
+[12:38:20.026] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:20.026] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:20.027] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:20.027] DEBUG: Math operation: 5 + 3 = 8
+[12:38:20.173] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:20.174] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:20.174] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:20.175] DEBUG: Math operation: 5 + 3 = 8
+[12:38:20.291] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:20.292] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:20.292] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:20.292] DEBUG: Math operation: 5 + 3 = 8
+[12:38:20.409] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:20.409] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:20.409] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:20.409] DEBUG: Math operation: 5 + 3 = 8
+[12:38:20.534] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:20.534] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:20.535] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:20.535] DEBUG: Math operation: 5 + 3 = 8
+[12:38:20.643] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:20.644] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:20.644] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:20.644] DEBUG: Math operation: 5 + 3 = 8
+[12:38:20.752] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:20.752] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:20.753] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:20.753] DEBUG: Math operation: 5 + 3 = 8
+[12:38:20.861] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:20.862] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:20.862] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:20.862] DEBUG: Math operation: 5 + 3 = 8
+[12:38:20.970] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:20.971] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:20.971] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:20.971] DEBUG: Math operation: 5 + 3 = 8
+[12:38:21.100] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:21.101] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:21.101] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:21.101] DEBUG: Math operation: 5 + 3 = 8
+[12:38:21.251] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:21.251] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:21.251] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:21.252] DEBUG: Math operation: 5 + 3 = 8
+[12:38:21.422] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:21.423] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:21.423] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:21.423] DEBUG: Math operation: 5 + 3 = 8
+[12:38:21.531] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:21.532] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:21.532] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:21.533] DEBUG: Math operation: 5 + 3 = 8
+[12:38:21.647] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:21.647] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:21.648] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:21.648] DEBUG: Math operation: 5 + 3 = 8
+[12:38:21.777] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:21.778] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:21.778] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:21.778] DEBUG: Math operation: 5 + 3 = 8
+[12:38:21.891] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:21.891] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:21.892] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:21.892] DEBUG: Math operation: 5 + 3 = 8
+[12:38:22.002] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:22.002] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:22.002] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:22.002] DEBUG: Math operation: 5 + 3 = 8
+[12:38:22.126] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:22.127] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:22.127] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:22.127] DEBUG: Math operation: 5 + 3 = 8
+[12:38:22.236] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:22.236] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:22.237] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:22.237] DEBUG: Math operation: 5 + 3 = 8
+[12:38:22.347] DEBUG: EvaluateMath MATH_ADD - Node ID: 7961ccfc-39cb-4708-9262-f8b9cff9c750
+[12:38:22.348] DEBUG: Input1 reading from connected InputInt HoldingRegister:1 = 5
+[12:38:22.348] DEBUG: Input2 reading from connected InputInt HoldingRegister:2 = 3
+[12:38:22.348] DEBUG: Math operation: 5 + 3 = 8
