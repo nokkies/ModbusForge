@@ -398,80 +398,9 @@ namespace ModbusForge.ViewModels
         
         public void RefreshSimulationValues()
         {
-            // This method will be called by the simulation service to update node values
+            // This method is called by the simulation service to update node values
+            // The actual value updates are handled via the IVisualSimulationService
             if (!ShowLiveValues) return;
-            
-            foreach (var node in Nodes)
-            {
-                // Update the CurrentValue property based on simulation state
-                // This will be implemented when integrating with the simulation service
-                node.CurrentValue = GetNodeSimulationValue(node);
-            }
-        }
-        
-        private bool GetNodeSimulationValue(VisualNode node)
-        {
-            // Placeholder for simulation value retrieval
-            // This will be connected to the actual simulation service
-            return false;
-        }
-        
-        // Convert visual nodes to PLC simulation elements for the simulation engine
-        public ObservableCollection<PlcSimulationElement> ConvertToSimulationElements()
-        {
-            var elements = new ObservableCollection<PlcSimulationElement>();
-            
-            foreach (var visualNode in Nodes)
-            {
-                var element = new PlcSimulationElement
-                {
-                    Id = visualNode.Id,
-                    ElementType = visualNode.ElementType,
-                    Input1 = visualNode.Input1Address,
-                    Input2 = visualNode.Input2Address,
-                    Output = visualNode.OutputAddress,
-                    TimerPresetMs = visualNode.TimerPresetMs,
-                    SetDominant = visualNode.SetDominant,
-                    CounterPreset = visualNode.CounterPreset,
-                    CompareValue = visualNode.CompareValue
-                };
-                
-                // Map connections to input addresses
-                MapConnectionsToInputs(visualNode, element);
-                
-                elements.Add(element);
-            }
-            
-            return elements;
-        }
-        
-        private void MapConnectionsToInputs(VisualNode visualNode, PlcSimulationElement element)
-        {
-            // Find connections that target this node
-            var inputConnections = Connections.Where(c => c.TargetNodeId == visualNode.Id).ToList();
-            
-            foreach (var connection in inputConnections)
-            {
-                var sourceNode = Nodes.FirstOrDefault(n => n.Id == connection.SourceNodeId);
-                if (sourceNode != null)
-                {
-                    var targetAddress = new PlcAddressReference
-                    {
-                        Area = sourceNode.OutputAddress.Area,
-                        Address = sourceNode.OutputAddress.Address,
-                        Not = sourceNode.OutputAddress.Not
-                    };
-                    
-                    if (connection.TargetConnector == "Input1")
-                    {
-                        element.Input1 = targetAddress;
-                    }
-                    else if (connection.TargetConnector == "Input2")
-                    {
-                        element.Input2 = targetAddress;
-                    }
-                }
-            }
         }
         
         partial void OnShowLiveValuesChanged(bool value)
@@ -485,12 +414,10 @@ namespace ModbusForge.ViewModels
                 if (value)
                 {
                     visualSimulationService.Start(this);
-                    System.Diagnostics.Debug.WriteLine("VisualSimulationService started");
                 }
                 else
                 {
                     visualSimulationService.Stop();
-                    System.Diagnostics.Debug.WriteLine("VisualSimulationService stopped");
                 }
             }
         }

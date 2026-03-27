@@ -93,7 +93,6 @@ namespace ModbusForge.Views
                 RefreshCanvas();
                 RefreshConnections();
                 
-                System.Diagnostics.Debug.WriteLine($"Deleted node {nodeToDelete.Id} (type: {nodeToDelete.ElementType})");
                 AddDebugMessage($"Deleted node {nodeToDelete.Id} (type: {nodeToDelete.ElementType})");
             }
         }
@@ -211,8 +210,6 @@ namespace ModbusForge.Views
         
         private void Connections_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
-            // Debug: Log collection changes
-            System.Diagnostics.Debug.WriteLine($"Connections collection changed: {e.Action}");
             RefreshConnections();
         }
         
@@ -542,10 +539,6 @@ namespace ModbusForge.Views
                                 var actualValue = GetActualRegisterValue(node);
                                 capturedLiveText.Text = $"● VAL:{actualValue}";
                                 capturedLiveText.Foreground = Brushes.Cyan;
-                                
-                                // Debug output to both VS Debug and potential debug collection
-                                System.Diagnostics.Debug.WriteLine($"InputInt: Reading from {node.Input1Address?.Area}:{node.Input1Address?.Address} = {actualValue}");
-                                AddDebugMessage($"InputInt: Reading from {node.Input1Address?.Area}:{node.Input1Address?.Address} = {actualValue}");
                                 break;
                                 
                             case PlcElementType.OutputInt:
@@ -553,10 +546,6 @@ namespace ModbusForge.Views
                                 var outputValue = GetOutputRegisterValue(node);
                                 capturedLiveText.Text = $"● VAL:{outputValue}";
                                 capturedLiveText.Foreground = Brushes.Cyan;
-                                
-                                // Debug output
-                                System.Diagnostics.Debug.WriteLine($"OutputInt: Writing to {node.OutputAddress?.Area}:{node.OutputAddress?.Address} = {outputValue}");
-                                AddDebugMessage($"OutputInt: Writing to {node.OutputAddress?.Area}:{node.OutputAddress?.Address} = {outputValue}");
                                 break;
                                 
                             case PlcElementType.Input:
@@ -568,10 +557,6 @@ namespace ModbusForge.Views
                                     var actualLegacyValue = GetActualRegisterValue(node);
                                     capturedLiveText.Text = $"● VAL:{actualLegacyValue}";
                                     capturedLiveText.Foreground = Brushes.Cyan;
-                                    
-                                    // Debug output
-                                    System.Diagnostics.Debug.WriteLine($"Legacy Input/Output: Reading from {node.Input1Address?.Area}:{node.Input1Address?.Address} = {actualLegacyValue}");
-                                    AddDebugMessage($"Legacy Input/Output: Reading from {node.Input1Address?.Area}:{node.Input1Address?.Address} = {actualLegacyValue}");
                                 }
                                 else
                                 {
@@ -588,10 +573,6 @@ namespace ModbusForge.Views
                                 var mathResult = GetOutputRegisterValue(node);
                                 capturedLiveText.Text = $"● VAL:{mathResult}";
                                 capturedLiveText.Foreground = Brushes.Orange;
-                                
-                                // Debug output
-                                System.Diagnostics.Debug.WriteLine($"Math {node.ElementType}: Result = {mathResult}");
-                                AddDebugMessage($"Math {node.ElementType}: Result = {mathResult}");
                                 break;
                                 
                             case PlcElementType.COMPARE_EQ:
@@ -653,9 +634,6 @@ namespace ModbusForge.Views
             };
             var output = CreateConnector(node.Id, "Output", false);
             outputStack.Children.Add(output);
-            
-            // Debug: Verify output connector creation
-            System.Diagnostics.Debug.WriteLine($"Created output connector for {node.Id}, style: {output.Style}, actual width: {output.ActualWidth}, actual height: {output.ActualHeight}");
             
             Grid.SetColumn(outputStack, 2);
             contentGrid.Children.Add(outputStack);
@@ -768,13 +746,9 @@ namespace ModbusForge.Views
         
         private void ConfigureButton_Click(object sender, RoutedEventArgs e)
         {
-            // DEBUG: Log that the button was clicked
-            System.Diagnostics.Debug.WriteLine("DEBUG: ConfigureButton_Click called!");
-            
             var button = sender as Button;
             if (button?.Tag == null)
             {
-                System.Diagnostics.Debug.WriteLine("DEBUG: Button or Tag is null");
                 return;
             }
 
@@ -782,19 +756,14 @@ namespace ModbusForge.Views
             var node = _viewModel?.Nodes.FirstOrDefault(n => n.Id == nodeId);
             if (node == null)
             {
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Node not found for ID: {nodeId}");
                 return;
             }
-            
-            System.Diagnostics.Debug.WriteLine($"DEBUG: Found node {node.ElementType} with ID {nodeId}"); // DEBUG: Track which node and button we're working with
-            System.Diagnostics.Debug.WriteLine($"DEBUG: Configure button clicked - Node: {node.Name} ({node.ElementType}), ID: {nodeId}");
 
             // Only I/O blocks should have configure buttons
             if (node.ElementType != PlcElementType.Input && node.ElementType != PlcElementType.Output &&
                 node.ElementType != PlcElementType.InputBool && node.ElementType != PlcElementType.InputInt &&
                 node.ElementType != PlcElementType.OutputBool && node.ElementType != PlcElementType.OutputInt)
             {
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Node type {node.ElementType} not allowed for configure button");
                 return;
             }
 
@@ -814,31 +783,9 @@ namespace ModbusForge.Views
             // Pre-populate dialog with current address
             var addrRef = isInputType ? node.Input1Address : node.OutputAddress;
             
-            // DEBUG: Show current address before dialog and track object
-            System.Diagnostics.Debug.WriteLine($"DEBUG: Before dialog - {node.ElementType} address: {addrRef?.Area}:{addrRef?.Address}");
-            System.Diagnostics.Debug.WriteLine($"DEBUG: Address reference object: {addrRef?.GetHashCode()}");
-            System.Diagnostics.Debug.WriteLine($"DEBUG: Address reference is null: {addrRef == null}");
-            
-            // Simple debugging with MessageBox
-            MessageBox.Show($"Current address: {addrRef?.Area}:{addrRef?.Address}\nNode: {node.Name}\nType: {node.ElementType}", "Debug Info");
-            
-            // Also check the node's address properties directly
-            if (isInputType)
-            {
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Node Input1Address - Area:{node.Input1Address?.Area}:{node.Input1Address?.Address}");
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Node Input1Address object: {node.Input1Address?.GetHashCode()}");
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Node OutputAddress - Area:{node.OutputAddress?.Area}:{node.OutputAddress?.Address}");
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Node OutputAddress object: {node.OutputAddress?.GetHashCode()}");
-            }
-            
-            // Create dialog with initial values
-            var initiallyLinked = addrRef?.Address >= 0;
-            var initialArea = initiallyLinked ? addrRef.Area : PlcArea.HoldingRegister;
-            var initialAddress = initiallyLinked ? addrRef.Address : 0;
-            var initiallyInverted = addrRef?.Not ?? false;
+            // Create dialog with initial values from the address reference
+            var initialArea = addrRef?.Area ?? PlcArea.HoldingRegister;
+            var initialAddress = addrRef?.Address ?? 0;
             
             // TEMP: Use test dialog to isolate the issue
             var testDialog = new TestDialog(initialArea, initialAddress)
@@ -858,59 +805,6 @@ namespace ModbusForge.Views
                 // Refresh canvas to show the updated address
                 RefreshCanvas();
             }
-            
-            return; // Skip the original dialog for now
-            
-            // Original dialog code (temporarily commented out)
-            /*
-            // DEBUG: Show what we're passing to dialog
-            System.Diagnostics.Debug.WriteLine($"DEBUG: Passing to dialog - Area:{initialArea}, Addr:{initialAddress}, Linked:{initiallyLinked}");
-            
-            var dialog = new ConnectorConfigWindow(nodeId, connectorType, node.Name, customEntries, initialArea, initialAddress, initiallyLinked, initiallyInverted)
-            {
-                Owner = Window.GetWindow(this),
-                Title = dialogTitle
-            };
-            
-            dialog.ShowDialog();
-            if (dialog.Result != null && dialog.Result.IsConfigured)
-            {
-                var result = dialog.Result;
-                
-                // DEBUG: Show what we got from dialog
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Dialog result - Area:{result.Area}, Addr:{result.Address}");
-                
-                addrRef.Area = result.Area;
-                addrRef.Address = result.Address;
-                addrRef.Not = result.Not;
-                
-                // DEBUG: Show what we saved to address reference
-                System.Diagnostics.Debug.WriteLine($"DEBUG: After save - {node.ElementType} address: {addrRef.Area}:{addrRef.Address}");
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Address reference object after save: {addrRef.GetHashCode()}");
-                
-                // DEBUG: Check if the node's address reference is still the same object
-                var checkAddrRef = isInputType ? node.Input1Address : node.OutputAddress;
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Node address ref check - Area:{checkAddrRef.Area}:{checkAddrRef.Address}, Same object: {checkAddrRef.GetHashCode() == addrRef.GetHashCode()}");
-                
-                // DEBUG: Check the node's address properties directly after save
-                if (isInputType)
-                {
-                    System.Diagnostics.Debug.WriteLine($"DEBUG: AFTER SAVE Node Input1Address - Area:{node.Input1Address?.Area}:{node.Input1Address?.Address}");
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine($"DEBUG: AFTER SAVE Node OutputAddress - Area:{node.OutputAddress?.Area}:{node.OutputAddress?.Address}");
-                }
-                
-                // DEBUG: Check if the DisplayName reflects the change
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Node DisplayName after save: {node.DisplayName}");
-                
-                // The address reference should trigger its own property changes automatically
-                
-                // Update button tooltip to show configured address
-                button.ToolTip = $"{node.ElementType}: {result.Area}:{result.Address}{(result.Not ? " NOT" : "")}";
-            }
-            */
         }
 
         private void Connector_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -1102,9 +996,6 @@ namespace ModbusForge.Views
             var nodeId = parts[0];
             var connectorType = parts[1];
             
-            // Debug: Log connector clicks
-            System.Diagnostics.Debug.WriteLine($"Connector clicked: {nodeId}, {connectorType}");
-            
             if (connectorType == "Output")
             {
                 // Start connection from output
@@ -1120,13 +1011,10 @@ namespace ModbusForge.Views
                     var startParts = _viewModel.PendingConnectionStart.Split(',');
                     var startNodeId = startParts[0];
                     
-                    // Debug: Log connection creation attempt
-                    System.Diagnostics.Debug.WriteLine($"Creating connection: {startNodeId} -> {nodeId}");
-                    
-                    if (startNodeId != nodeId) // Don't connect to self
-                    {
-                        _viewModel.CreateConnection(startNodeId, nodeId, connectorType);
-                    }
+                if (startNodeId != nodeId) // Don't connect to self
+                {
+                    _viewModel.CreateConnection(startNodeId, nodeId, connectorType);
+                }
                     
                     // Reset connection state
                     _viewModel.PendingConnectionStart = null;
@@ -1266,7 +1154,6 @@ namespace ModbusForge.Views
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error reading output register value: {ex.Message}");
                 AddDebugMessage($"Error reading output register value: {ex.Message}");
             }
             return 0;
@@ -1292,9 +1179,6 @@ namespace ModbusForge.Views
                 var dataStore = serverService.GetDataStore(selectedUnitId);
                 if (dataStore == null) return 0;
 
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Reading from Unit ID {selectedUnitId}");
-                AddDebugMessage($"Reading from Unit ID {selectedUnitId}");
-
                 var address = node.Input1Address;
                 int value = 0;
                 
@@ -1304,38 +1188,25 @@ namespace ModbusForge.Views
                     int directValue = dataStore.HoldingRegisters[address.Address];
                     int offsetValue = address.Address > 0 ? dataStore.HoldingRegisters[address.Address - 1] : 0;
                     
-                    System.Diagnostics.Debug.WriteLine($"DEBUG: Address={address.Address}, Direct={directValue}, Offset-1={offsetValue}");
-                    AddDebugMessage($"Address={address.Address}, Direct={directValue}, Offset-1={offsetValue}");
-                    
-                    // Use direct addressing for now, but we might need offset
                     value = directValue;
-                    System.Diagnostics.Debug.WriteLine($"DEBUG: Read HoldingRegister[{address.Address}] = {value}");
-                    AddDebugMessage($"Read HoldingRegister[{address.Address}] = {value}");
                 }
                 else if (address?.Area == PlcArea.InputRegister && address.Address >= 0 && address.Address < dataStore.InputRegisters.Count)
                 {
                     value = dataStore.InputRegisters[address.Address];
-                    System.Diagnostics.Debug.WriteLine($"DEBUG: Read InputRegister[{address.Address}] = {value}");
-                    AddDebugMessage($"Read InputRegister[{address.Address}] = {value}");
                 }
                 else if (address?.Area == PlcArea.Coil && address.Address >= 0 && address.Address < dataStore.CoilDiscretes.Count)
                 {
                     value = dataStore.CoilDiscretes[address.Address] ? 1 : 0;
-                    System.Diagnostics.Debug.WriteLine($"DEBUG: Read Coil[{address.Address}] = {value}");
-                    AddDebugMessage($"Read Coil[{address.Address}] = {value}");
                 }
                 else if (address?.Area == PlcArea.DiscreteInput && address.Address >= 0 && address.Address < dataStore.InputDiscretes.Count)
                 {
                     value = dataStore.InputDiscretes[address.Address] ? 1 : 0;
-                    System.Diagnostics.Debug.WriteLine($"DEBUG: Read DiscreteInput[{address.Address}] = {value}");
-                    AddDebugMessage($"Read DiscreteInput[{address.Address}] = {value}");
                 }
                 
                 return value;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error reading register value: {ex.Message}");
                 AddDebugMessage($"Error reading register value: {ex.Message}");
             }
             return 0;
@@ -1355,8 +1226,7 @@ namespace ModbusForge.Views
             }
             catch
             {
-                // Fallback to VS Debug output if reflection fails
-                System.Diagnostics.Debug.WriteLine($"DEBUG: {message}");
+                // Reflection failed, ignore
             }
         }
     }
