@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -19,6 +20,17 @@ namespace ModbusForge.Views
 {
     public partial class VisualNodeEditor : UserControl
     {
+        #region Layout Constants
+        // Node layout constants
+        private const double NodeHeaderHeight = 24;
+        private const double ConnectorOffset = 6;  // Distance from node edge to connector center
+        
+        // Vertical positioning ratios for connectors (relative to content height)
+        private const double SingleInputVerticalRatio = 0.5;     // Center (1/2)
+        private const double DualInputTopRatio = 0.333;          // Upper third (1/3)
+        private const double DualInputBottomRatio = 0.667;       // Lower two-thirds (2/3)
+        #endregion
+        
         private VisualNodeEditorViewModel? _viewModel;
         private bool _isDraggingNode = false;
         private bool _isConnecting = false;
@@ -26,6 +38,9 @@ namespace ModbusForge.Views
         private Point _dragStartPoint;
         private Point _originalNodePosition;
         private DispatcherTimer? _liveUpdateTimer;
+        
+        // Track event handlers for cleanup to prevent memory leaks
+        private readonly Dictionary<string, List<(object Target, PropertyChangedEventHandler Handler)>> _nodeEventHandlers = new();
         
         public VisualNodeEditor()
         {
@@ -86,6 +101,9 @@ namespace ModbusForge.Views
                     _viewModel.Connections.Remove(connection);
                 }
 
+                // Clean up event handlers before removing node
+                CleanupNodeEventHandlers(nodeToDelete);
+
                 // Remove the node
                 _viewModel.Nodes.Remove(nodeToDelete);
                 
@@ -94,6 +112,28 @@ namespace ModbusForge.Views
                 RefreshConnections();
                 
                 AddDebugMessage($"Deleted node {nodeToDelete.Id} (type: {nodeToDelete.ElementType})");
+            }
+        }
+        
+        /// <summary>
+        /// Detaches event handlers from a node and its address references to prevent memory leaks.
+        /// </summary>
+        private void CleanupNodeEventHandlers(VisualNode node)
+        {
+            if (_nodeEventHandlers.TryGetValue(node.Id, out var handlers))
+            {
+                foreach (var (target, handler) in handlers)
+                {
+                    if (target is VisualNode n)
+                    {
+                        n.PropertyChanged -= handler;
+                    }
+                    else if (target is PlcAddressReference addr)
+                    {
+                        addr.PropertyChanged -= handler;
+                    }
+                }
+                _nodeEventHandlers.Remove(node.Id);
             }
         }
         
@@ -335,6 +375,7 @@ namespace ModbusForge.Views
             };
             
             border.MouseLeftButtonDown += Node_MouseLeftButtonDown;
+            border.MouseRightButtonDown += Node_MouseRightButtonDown;
             border.MouseMove += Node_MouseMove;
             border.MouseLeftButtonUp += Node_MouseLeftButtonUp;
             
@@ -343,13 +384,45 @@ namespace ModbusForge.Views
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             
-            // Header
-            var header = new Border
+            // Header row
+            var (header, headerText, addressText) = CreateNodeHeader(node);
+            var capturedAddressText = addressText;
+            var capturedHeaderText = headerText;
+            Grid.SetRow(header, 0);
+            grid.Children.Add(header);
+            
+            // Content row
+            var (contentGrid, contentStack, liveText) = CreateNodeContent(node);
+            Grid.SetRow(contentGrid, 1);
+            grid.Children.Add(contentGrid);
+            
+            // Setup inline I/O controls if applicable
+            if (IsIoNode(node.ElementType))
             {
-                Background = new SolidColorBrush(GetElementColor(node.ElementType)),
-                CornerRadius = new CornerRadius(6, 6, 0, 0),
-                Padding = new Thickness(8, 6, 8, 6)
-            };
+                var (inlinePanel, isInputType) = CreateInlineAddressEditor(node, capturedAddressText);
+                contentStack.Children.Add(inlinePanel);
+            }
+            
+            // Setup event handlers for live value updates
+            var capturedHeader = header;
+            var capturedLiveText = liveText;
+            var originalColor = GetElementColor(node.ElementType);
+            SetupNodeEventHandlers(node, capturedHeader, capturedLiveText, capturedHeaderText, capturedAddressText, originalColor);
+            
+            // Footer row (if needed)
+            var footer = CreateNodeFooter(node);
+            if (footer != null)
+            {
+                Grid.SetRow(footer, 2);
+                grid.Children.Add(footer);
+            }
+            
+            border.Child = grid;
+            return border;
+        }
+
+        private (Border header, TextBlock headerText, TextBlock addressText) CreateNodeHeader(VisualNode node)
+        {
             var headerStack = new StackPanel();
             var headerText = new TextBlock 
             { 
@@ -374,13 +447,143 @@ namespace ModbusForge.Views
                 headerStack.Children.Add(addressText);
             }
             
-            // Capture references for updates
-            var capturedAddressText = addressText;
-            header.Child = headerStack;
-            Grid.SetRow(header, 0);
-            grid.Children.Add(header);
+            var header = new Border
+            {
+                Background = new SolidColorBrush(GetElementColor(node.ElementType)),
+                CornerRadius = new CornerRadius(6, 6, 0, 0),
+                Padding = new Thickness(8, 6, 8, 6),
+                Child = headerStack
+            };
             
-            // Content
+            return (header, headerText, addressText);
+        }
+
+        private bool IsIoNode(PlcElementType elementType) =>
+            elementType == PlcElementType.Input || elementType == PlcElementType.Output ||
+            elementType == PlcElementType.InputBool || elementType == PlcElementType.InputInt ||
+            elementType == PlcElementType.OutputBool || elementType == PlcElementType.OutputInt;
+
+        private (StackPanel inlinePanel, bool isInputType) CreateInlineAddressEditor(VisualNode node, TextBlock capturedAddressText)
+        {
+            var isInputType = node.ElementType == PlcElementType.Input ||
+                              node.ElementType == PlcElementType.InputBool ||
+                              node.ElementType == PlcElementType.InputInt;
+            var addrRef = isInputType ? node.Input1Address : node.OutputAddress;
+
+            var inlinePanel = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(0, 2, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            // Area ComboBox
+            var areaCombo = new System.Windows.Controls.ComboBox
+            {
+                Width = 200,
+                Height = 26,
+                FontSize = 11,
+                ItemsSource = Enum.GetValues(typeof(PlcArea)),
+                SelectedItem = addrRef.Area,
+                ToolTip = "Modbus area"
+            };
+            areaCombo.SelectionChanged += (s, ev) =>
+            {
+                if (areaCombo.SelectedItem is PlcArea area)
+                {
+                    addrRef.Area = area;
+                    capturedAddressText.Text = node.AddressDisplay;
+                }
+            };
+            inlinePanel.Children.Add(areaCombo);
+
+            // Address TextBox with validation
+            var addrBox = new TextBox
+            {
+                Width = 200,
+                Height = 28,
+                FontSize = 11,
+                Text = addrRef.Address >= 0 ? addrRef.Address.ToString() : "",
+                ToolTip = "Enter a non-negative integer address (0-65535)",
+                Margin = new Thickness(0, 2, 0, 0),
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            
+            // Input validation - only allow digits
+            addrBox.PreviewTextInput += (s, ev) =>
+            {
+                // Only allow digits
+                if (!char.IsDigit(ev.Text, 0))
+                {
+                    ev.Handled = true;
+                }
+            };
+            
+            // Prevent paste of invalid content
+            addrBox.PreviewKeyDown += (s, ev) =>
+            {
+                if (ev.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+                {
+                    // Let Ctrl+V through, we'll validate on LostFocus
+                }
+            };
+            
+            addrBox.LostFocus += (s, ev) =>
+            {
+                ValidateAndUpdateAddress(addrBox, addrRef, node, capturedAddressText);
+            };
+            addrBox.KeyDown += (s, ev) =>
+            {
+                if (ev.Key == System.Windows.Input.Key.Enter)
+                {
+                    if (ValidateAndUpdateAddress(addrBox, addrRef, node, capturedAddressText))
+                    {
+                        System.Windows.Input.Keyboard.ClearFocus();
+                    }
+                }
+            };
+            inlinePanel.Children.Add(addrBox);
+
+            return (inlinePanel, isInputType);
+        }
+        
+        /// <summary>
+        /// Validates address input and updates the model. Returns true if valid.
+        /// </summary>
+        private bool ValidateAndUpdateAddress(TextBox addrBox, PlcAddressReference addrRef, VisualNode node, TextBlock addressTextDisplay)
+        {
+            var text = addrBox.Text.Trim();
+            
+            // Empty is treated as invalid - restore previous value
+            if (string.IsNullOrEmpty(text))
+            {
+                addrBox.Text = addrRef.Address >= 0 ? addrRef.Address.ToString() : "0";
+                addrBox.BorderBrush = SystemColors.ControlDarkBrush;
+                addrBox.ToolTip = "Enter a non-negative integer address (0-65535)";
+                return false;
+            }
+            
+            // Check if valid integer
+            if (!int.TryParse(text, out int addr) || addr < 0)
+            {
+                // Invalid - show visual feedback
+                addrBox.BorderBrush = Brushes.Red;
+                addrBox.ToolTip = "Invalid address. Must be a non-negative integer (0-65535)";
+                addrBox.SelectAll();
+                return false;
+            }
+            
+            // Valid input - clear error state and update
+            addrBox.BorderBrush = SystemColors.ControlDarkBrush;
+            addrBox.ToolTip = "Enter a non-negative integer address (0-65535)";
+            addrRef.Address = addr;
+            addressTextDisplay.Text = node.AddressDisplay;
+            return true;
+        }
+
+        private (Grid contentGrid, StackPanel contentStack, TextBlock liveText) CreateNodeContent(VisualNode node)
+        {
             var contentGrid = new Grid();
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -405,29 +608,27 @@ namespace ModbusForge.Views
             Grid.SetColumn(inputStack, 0);
             contentGrid.Children.Add(inputStack);
             
-            // Node content — vertically centred so it never overlaps the connector dots
+            // Center content
             var contentStack = new StackPanel 
             { 
                 Margin = new Thickness(4, 0, 4, 0),
                 VerticalAlignment = VerticalAlignment.Center
             };
-            var nameText = new TextBlock 
-            { 
-                Text = node.Name, 
-                FontWeight = FontWeights.SemiBold,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                ToolTip = node.Name
-            };
-            // Only show name label for non-I/O nodes (I/O nodes have header + inline controls)
-            if (node.ElementType != PlcElementType.Input && node.ElementType != PlcElementType.Output &&
-                node.ElementType != PlcElementType.InputBool && node.ElementType != PlcElementType.InputInt &&
-                node.ElementType != PlcElementType.OutputBool && node.ElementType != PlcElementType.OutputInt)
+            
+            // Name label for non-I/O nodes
+            if (!IsIoNode(node.ElementType))
             {
-                contentStack.Children.Add(nameText);
+                contentStack.Children.Add(new TextBlock 
+                { 
+                    Text = node.Name, 
+                    FontWeight = FontWeights.SemiBold,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    ToolTip = node.Name
+                });
             }
             
-            // Live value indicator — always present, hidden until ShowLiveValues is on
+            // Live value indicator
             var liveText = new TextBlock
             {
                 Text = "",
@@ -436,192 +637,6 @@ namespace ModbusForge.Views
                 Visibility = Visibility.Collapsed
             };
             contentStack.Children.Add(liveText);
-            
-            // Inline address editing for I/O blocks (replaces the old 🔗 popup)
-            if (node.ElementType == PlcElementType.Input || node.ElementType == PlcElementType.Output ||
-                node.ElementType == PlcElementType.InputBool || node.ElementType == PlcElementType.InputInt ||
-                node.ElementType == PlcElementType.OutputBool || node.ElementType == PlcElementType.OutputInt)
-            {
-                var isInputType = node.ElementType == PlcElementType.Input ||
-                                  node.ElementType == PlcElementType.InputBool ||
-                                  node.ElementType == PlcElementType.InputInt;
-                var addrRef = isInputType ? node.Input1Address : node.OutputAddress;
-
-                var inlinePanel = new StackPanel
-                {
-                    Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0, 2, 0, 0),
-                    HorizontalAlignment = HorizontalAlignment.Center
-                };
-
-                // Area ComboBox
-                var areaCombo = new System.Windows.Controls.ComboBox
-                {
-                    Width = 200,
-                    Height = 26,
-                    FontSize = 11,
-                    ItemsSource = Enum.GetValues(typeof(PlcArea)),
-                    SelectedItem = addrRef.Area,
-                    ToolTip = "Modbus area"
-                };
-                areaCombo.SelectionChanged += (s, ev) =>
-                {
-                    if (areaCombo.SelectedItem is PlcArea area)
-                    {
-                        addrRef.Area = area;
-                        capturedAddressText.Text = node.AddressDisplay;
-                    }
-                };
-                inlinePanel.Children.Add(areaCombo);
-
-                // Address TextBox
-                var addrBox = new TextBox
-                {
-                    Width = 200,
-                    Height = 28,
-                    FontSize = 11,
-                    Text = addrRef.Address >= 0 ? addrRef.Address.ToString() : "",
-                    ToolTip = "Modbus address",
-                    Margin = new Thickness(0, 2, 0, 0),
-                    HorizontalContentAlignment = HorizontalAlignment.Center,
-                    VerticalContentAlignment = VerticalAlignment.Center
-                };
-                addrBox.LostFocus += (s, ev) =>
-                {
-                    if (int.TryParse(addrBox.Text, out int addr) && addr >= 0)
-                    {
-                        addrRef.Address = addr;
-                        capturedAddressText.Text = node.AddressDisplay;
-                    }
-                };
-                addrBox.KeyDown += (s, ev) =>
-                {
-                    if (ev.Key == System.Windows.Input.Key.Enter)
-                    {
-                        if (int.TryParse(addrBox.Text, out int addr) && addr >= 0)
-                        {
-                            addrRef.Address = addr;
-                            capturedAddressText.Text = node.AddressDisplay;
-                        }
-                        // Move focus away to commit
-                        System.Windows.Input.Keyboard.ClearFocus();
-                    }
-                };
-                inlinePanel.Children.Add(addrBox);
-
-                contentStack.Children.Add(inlinePanel);
-            }
-
-            // React dynamically to CurrentValue / ShowLiveValues changes
-            var capturedHeader = header;
-            var capturedLiveText = liveText;
-            var capturedHeaderText = headerText;
-            var originalColor = GetElementColor(node.ElementType);
-            node.PropertyChanged += (s, e) =>
-            {
-                if (e.PropertyName == nameof(VisualNode.CurrentValue) ||
-                    e.PropertyName == nameof(VisualNode.ShowLiveValues))
-                {
-                    if (node.ShowLiveValues)
-                    {
-                        // Show appropriate live values based on element type
-                        switch (node.ElementType)
-                        {
-                            case PlcElementType.InputBool:
-                            case PlcElementType.OutputBool:
-                                // Boolean types - show ON/OFF
-                                capturedLiveText.Text = node.CurrentValue ? "● ON" : "● OFF";
-                                capturedLiveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
-                                break;
-                                
-                            case PlcElementType.InputInt:
-                                // Integer input - show actual register values from DataStore
-                                var actualValue = GetActualRegisterValue(node);
-                                capturedLiveText.Text = $"● VAL:{actualValue}";
-                                capturedLiveText.Foreground = Brushes.Cyan;
-                                break;
-                                
-                            case PlcElementType.OutputInt:
-                                // Integer output - show the value being written to output address
-                                var outputValue = GetOutputRegisterValue(node);
-                                capturedLiveText.Text = $"● VAL:{outputValue}";
-                                capturedLiveText.Foreground = Brushes.Cyan;
-                                break;
-                                
-                            case PlcElementType.Input:
-                            case PlcElementType.Output:
-                                // Legacy types - show based on address area
-                                if ((node.Input1Address?.Area == PlcArea.HoldingRegister) ||
-                                    (node.Input1Address?.Area == PlcArea.InputRegister))
-                                {
-                                    var actualLegacyValue = GetActualRegisterValue(node);
-                                    capturedLiveText.Text = $"● VAL:{actualLegacyValue}";
-                                    capturedLiveText.Foreground = Brushes.Cyan;
-                                }
-                                else
-                                {
-                                    capturedLiveText.Text = node.CurrentValue ? "● ON" : "● OFF";
-                                    capturedLiveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
-                                }
-                                break;
-                                
-                            case PlcElementType.MATH_ADD:
-                            case PlcElementType.MATH_SUB:
-                            case PlcElementType.MATH_MUL:
-                            case PlcElementType.MATH_DIV:
-                                // Math operations - show the result value from output address
-                                var mathResult = GetOutputRegisterValue(node);
-                                capturedLiveText.Text = $"● VAL:{mathResult}";
-                                capturedLiveText.Foreground = Brushes.Orange;
-                                break;
-                                
-                            case PlcElementType.COMPARE_EQ:
-                            case PlcElementType.COMPARE_NE:
-                            case PlcElementType.COMPARE_GT:
-                            case PlcElementType.COMPARE_LT:
-                            case PlcElementType.COMPARE_GE:
-                            case PlcElementType.COMPARE_LE:
-                                // Comparison operations - show boolean result
-                                capturedLiveText.Text = node.CurrentValue ? "● TRUE" : "● FALSE";
-                                capturedLiveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
-                                break;
-                                
-                            default:
-                                // Logic blocks - show ON/OFF
-                                capturedLiveText.Text = node.CurrentValue ? "● ON" : "● OFF";
-                                capturedLiveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
-                                break;
-                        }
-                        capturedLiveText.Visibility = Visibility.Visible;
-                        capturedHeader.Background = new SolidColorBrush(node.CurrentValue
-                            ? Color.FromRgb(40, 160, 40)
-                            : Color.FromRgb(160, 40, 40));
-                    }
-                    else
-                    {
-                        capturedLiveText.Visibility = Visibility.Collapsed;
-                        capturedHeader.Background = new SolidColorBrush(originalColor);
-                    }
-                }
-                // Update header and address when properties change
-                if (e.PropertyName == nameof(VisualNode.Input1Address) ||
-                    e.PropertyName == nameof(VisualNode.ElementType))
-                {
-                    capturedHeaderText.Text = node.DisplayName;
-                    capturedAddressText.Text = node.AddressDisplay;
-                }
-            };
-            // Also update when inner address properties change (e.g. after right-click config)
-            node.Input1Address.PropertyChanged  += (s, e) => 
-            {
-                capturedHeaderText.Text = node.DisplayName;
-                capturedAddressText.Text = node.AddressDisplay;
-            };
-            node.OutputAddress.PropertyChanged  += (s, e) => 
-            {
-                capturedHeaderText.Text = node.DisplayName;
-                capturedAddressText.Text = node.AddressDisplay;
-            };
             
             Grid.SetColumn(contentStack, 1);
             contentGrid.Children.Add(contentStack);
@@ -638,88 +653,201 @@ namespace ModbusForge.Views
             Grid.SetColumn(outputStack, 2);
             contentGrid.Children.Add(outputStack);
             
-            Grid.SetRow(contentGrid, 1);
-            grid.Children.Add(contentGrid);
+            return (contentGrid, contentStack, liveText);
+        }
+
+        private void SetupNodeEventHandlers(VisualNode node, Border header, TextBlock liveText, 
+            TextBlock headerText, TextBlock addressText, Color originalColor)
+        {
+            _nodeEventHandlers[node.Id] = new List<(object, PropertyChangedEventHandler)>();
             
-            // Footer with inline editable parameters
-            if (node.HasParameters || node.ElementType == PlcElementType.RS)
+            PropertyChangedEventHandler nodePropertyHandler = (s, e) =>
             {
-                var footer = new Border
+                if (e.PropertyName == nameof(VisualNode.CurrentValue) ||
+                    e.PropertyName == nameof(VisualNode.ShowLiveValues))
                 {
-                    Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
-                    CornerRadius = new CornerRadius(0, 0, 6, 6),
-                    Padding = new Thickness(4, 2, 4, 2)
-                };
-                var footerPanel = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    HorizontalAlignment = HorizontalAlignment.Center
-                };
-
-                switch (node.ElementType)
-                {
-                    case PlcElementType.TON:
-                    case PlcElementType.TOF:
-                    case PlcElementType.TP:
-                    {
-                        footerPanel.Children.Add(new TextBlock { Text = "ms:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
-                        var timerBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.TimerPresetMs.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
-                        timerBox.LostFocus += (s, ev) => { if (int.TryParse(timerBox.Text, out int v) && v >= 0) node.TimerPresetMs = v; };
-                        footerPanel.Children.Add(timerBox);
-                        break;
-                    }
-                    case PlcElementType.CTU:
-                    case PlcElementType.CTD:
-                    case PlcElementType.CTC:
-                    {
-                        footerPanel.Children.Add(new TextBlock { Text = "Pre:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
-                        var counterBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.CounterPreset.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
-                        counterBox.LostFocus += (s, ev) => { if (int.TryParse(counterBox.Text, out int v)) node.CounterPreset = v; };
-                        footerPanel.Children.Add(counterBox);
-                        break;
-                    }
-                    case PlcElementType.COMPARE_EQ:
-                    case PlcElementType.COMPARE_NE:
-                    case PlcElementType.COMPARE_GT:
-                    case PlcElementType.COMPARE_LT:
-                    case PlcElementType.COMPARE_GE:
-                    case PlcElementType.COMPARE_LE:
-                    {
-                        footerPanel.Children.Add(new TextBlock { Text = "Val:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
-                        var cmpBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.CompareValue.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
-                        cmpBox.LostFocus += (s, ev) => { if (int.TryParse(cmpBox.Text, out int v)) node.CompareValue = v; };
-                        footerPanel.Children.Add(cmpBox);
-                        break;
-                    }
-                    case PlcElementType.MATH_ADD:
-                    case PlcElementType.MATH_SUB:
-                    case PlcElementType.MATH_MUL:
-                    case PlcElementType.MATH_DIV:
-                    {
-                        footerPanel.Children.Add(new TextBlock { Text = "Const:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
-                        var mathBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.CompareValue.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
-                        mathBox.LostFocus += (s, ev) => { if (int.TryParse(mathBox.Text, out int v)) node.CompareValue = v; };
-                        footerPanel.Children.Add(mathBox);
-                        break;
-                    }
-                    case PlcElementType.RS:
-                    {
-                        footerPanel.Children.Add(new TextBlock { Text = "Set Dom:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
-                        var setDomCheck = new System.Windows.Controls.CheckBox { IsChecked = node.SetDominant, VerticalAlignment = VerticalAlignment.Center };
-                        setDomCheck.Checked += (s, ev) => node.SetDominant = true;
-                        setDomCheck.Unchecked += (s, ev) => node.SetDominant = false;
-                        footerPanel.Children.Add(setDomCheck);
-                        break;
-                    }
+                    UpdateLiveValueDisplay(node, liveText, header, originalColor);
                 }
-
-                footer.Child = footerPanel;
-                Grid.SetRow(footer, 2);
-                grid.Children.Add(footer);
-            }
+                
+                if (e.PropertyName == nameof(VisualNode.Input1Address) ||
+                    e.PropertyName == nameof(VisualNode.ElementType))
+                {
+                    headerText.Text = node.DisplayName;
+                    addressText.Text = node.AddressDisplay;
+                }
+            };
+            node.PropertyChanged += nodePropertyHandler;
+            _nodeEventHandlers[node.Id].Add((node, nodePropertyHandler));
             
-            border.Child = grid;
-            return border;
+            PropertyChangedEventHandler addressHandler = (s, e) => 
+            {
+                headerText.Text = node.DisplayName;
+                addressText.Text = node.AddressDisplay;
+            };
+            node.Input1Address.PropertyChanged += addressHandler;
+            _nodeEventHandlers[node.Id].Add((node.Input1Address, addressHandler));
+            
+            node.OutputAddress.PropertyChanged += addressHandler;
+            _nodeEventHandlers[node.Id].Add((node.OutputAddress, addressHandler));
+        }
+
+        private void UpdateLiveValueDisplay(VisualNode node, TextBlock liveText, Border header, Color originalColor)
+        {
+            if (node.ShowLiveValues)
+            {
+                UpdateLiveTextForElementType(node, liveText);
+                liveText.Visibility = Visibility.Visible;
+                header.Background = new SolidColorBrush(node.CurrentValue
+                    ? Color.FromRgb(40, 160, 40)
+                    : Color.FromRgb(160, 40, 40));
+            }
+            else
+            {
+                liveText.Visibility = Visibility.Collapsed;
+                header.Background = new SolidColorBrush(originalColor);
+            }
+        }
+
+        private void UpdateLiveTextForElementType(VisualNode node, TextBlock liveText)
+        {
+            switch (node.ElementType)
+            {
+                case PlcElementType.InputBool:
+                case PlcElementType.OutputBool:
+                    liveText.Text = node.CurrentValue ? "● ON" : "● OFF";
+                    liveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
+                    break;
+                    
+                case PlcElementType.InputInt:
+                    var actualValue = GetActualRegisterValue(node);
+                    liveText.Text = $"● VAL:{actualValue}";
+                    liveText.Foreground = Brushes.Cyan;
+                    break;
+                    
+                case PlcElementType.OutputInt:
+                    var outputValue = GetOutputRegisterValue(node);
+                    liveText.Text = $"● VAL:{outputValue}";
+                    liveText.Foreground = Brushes.Cyan;
+                    break;
+                    
+                case PlcElementType.Input:
+                case PlcElementType.Output:
+                    if (node.Input1Address?.Area == PlcArea.HoldingRegister ||
+                        node.Input1Address?.Area == PlcArea.InputRegister)
+                    {
+                        var actualLegacyValue = GetActualRegisterValue(node);
+                        liveText.Text = $"● VAL:{actualLegacyValue}";
+                        liveText.Foreground = Brushes.Cyan;
+                    }
+                    else
+                    {
+                        liveText.Text = node.CurrentValue ? "● ON" : "● OFF";
+                        liveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
+                    }
+                    break;
+                    
+                case PlcElementType.MATH_ADD:
+                case PlcElementType.MATH_SUB:
+                case PlcElementType.MATH_MUL:
+                case PlcElementType.MATH_DIV:
+                    var mathResult = GetOutputRegisterValue(node);
+                    liveText.Text = $"● VAL:{mathResult}";
+                    liveText.Foreground = Brushes.Orange;
+                    break;
+                    
+                case PlcElementType.COMPARE_EQ:
+                case PlcElementType.COMPARE_NE:
+                case PlcElementType.COMPARE_GT:
+                case PlcElementType.COMPARE_LT:
+                case PlcElementType.COMPARE_GE:
+                case PlcElementType.COMPARE_LE:
+                    liveText.Text = node.CurrentValue ? "● TRUE" : "● FALSE";
+                    liveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
+                    break;
+                    
+                default:
+                    liveText.Text = node.CurrentValue ? "● ON" : "● OFF";
+                    liveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
+                    break;
+            }
+        }
+
+        private Border? CreateNodeFooter(VisualNode node)
+        {
+            if (!node.HasParameters && node.ElementType != PlcElementType.RS)
+                return null;
+            
+            var footerPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            AddFooterControls(node, footerPanel);
+
+            var footer = new Border
+            {
+                Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
+                CornerRadius = new CornerRadius(0, 0, 6, 6),
+                Padding = new Thickness(4, 2, 4, 2),
+                Child = footerPanel
+            };
+            
+            return footer;
+        }
+
+        private void AddFooterControls(VisualNode node, StackPanel footerPanel)
+        {
+            switch (node.ElementType)
+            {
+                case PlcElementType.TON:
+                case PlcElementType.TOF:
+                case PlcElementType.TP:
+                    footerPanel.Children.Add(new TextBlock { Text = "ms:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
+                    var timerBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.TimerPresetMs.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                    timerBox.LostFocus += (s, ev) => { if (int.TryParse(timerBox.Text, out int v) && v >= 0) node.TimerPresetMs = v; };
+                    footerPanel.Children.Add(timerBox);
+                    break;
+                    
+                case PlcElementType.CTU:
+                case PlcElementType.CTD:
+                case PlcElementType.CTC:
+                    footerPanel.Children.Add(new TextBlock { Text = "Pre:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
+                    var counterBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.CounterPreset.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                    counterBox.LostFocus += (s, ev) => { if (int.TryParse(counterBox.Text, out int v)) node.CounterPreset = v; };
+                    footerPanel.Children.Add(counterBox);
+                    break;
+                    
+                case PlcElementType.COMPARE_EQ:
+                case PlcElementType.COMPARE_NE:
+                case PlcElementType.COMPARE_GT:
+                case PlcElementType.COMPARE_LT:
+                case PlcElementType.COMPARE_GE:
+                case PlcElementType.COMPARE_LE:
+                    footerPanel.Children.Add(new TextBlock { Text = "Val:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
+                    var cmpBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.CompareValue.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                    cmpBox.LostFocus += (s, ev) => { if (int.TryParse(cmpBox.Text, out int v)) node.CompareValue = v; };
+                    footerPanel.Children.Add(cmpBox);
+                    break;
+                    
+                case PlcElementType.MATH_ADD:
+                case PlcElementType.MATH_SUB:
+                case PlcElementType.MATH_MUL:
+                case PlcElementType.MATH_DIV:
+                    footerPanel.Children.Add(new TextBlock { Text = "Const:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
+                    var mathBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.CompareValue.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                    mathBox.LostFocus += (s, ev) => { if (int.TryParse(mathBox.Text, out int v)) node.CompareValue = v; };
+                    footerPanel.Children.Add(mathBox);
+                    break;
+                    
+                case PlcElementType.RS:
+                    footerPanel.Children.Add(new TextBlock { Text = "Set Dom:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
+                    var setDomCheck = new System.Windows.Controls.CheckBox { IsChecked = node.SetDominant, VerticalAlignment = VerticalAlignment.Center };
+                    setDomCheck.Checked += (s, ev) => node.SetDominant = true;
+                    setDomCheck.Unchecked += (s, ev) => node.SetDominant = false;
+                    footerPanel.Children.Add(setDomCheck);
+                    break;
+            }
         }
         
         private Ellipse CreateConnector(string nodeId, string connectorType, bool isInput)
@@ -767,11 +895,6 @@ namespace ModbusForge.Views
                 return;
             }
 
-            // Grab custom entries from parent window so tags reflect real configuration
-            var mainVm = Window.GetWindow(this)?.DataContext as MainViewModel;
-            var customEntries = mainVm?.CustomEntries
-                ?? System.Linq.Enumerable.Empty<ModbusForge.Models.CustomEntry>();
-
             // Determine which address to configure based on block type
             bool isInputType = node.ElementType == PlcElementType.Input || 
                               node.ElementType == PlcElementType.InputBool || 
@@ -787,11 +910,10 @@ namespace ModbusForge.Views
             var initialArea = addrRef?.Area ?? PlcArea.HoldingRegister;
             var initialAddress = addrRef?.Address ?? 0;
             
-            // TEMP: Use test dialog to isolate the issue
             var testDialog = new TestDialog(initialArea, initialAddress)
             {
                 Owner = Window.GetWindow(this),
-                Title = "TEST DIALOG"
+                Title = dialogTitle
             };
             
             testDialog.ShowDialog();
@@ -965,6 +1087,40 @@ namespace ModbusForge.Views
             e.Handled = true;
         }
         
+        private void Node_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_viewModel == null) return;
+            
+            var border = sender as Border;
+            if (border?.DataContext is not VisualNode node) return;
+            
+            // Select the node first
+            _viewModel.SelectNode(node);
+            
+            // Create context menu
+            var contextMenu = new ContextMenu();
+            
+            // Delete menu item
+            var deleteItem = new MenuItem
+            {
+                Header = "Delete",
+                Icon = new TextBlock { Text = "🗑️", FontSize = 12 }
+            };
+            deleteItem.Click += (s, ev) =>
+            {
+                _viewModel.DeleteNodeCommand.Execute(node);
+                AddDebugMessage($"Deleted node {node.Id} via context menu");
+            };
+            contextMenu.Items.Add(deleteItem);
+            
+            // Show the context menu
+            contextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+            contextMenu.PlacementTarget = border;
+            contextMenu.IsOpen = true;
+            
+            e.Handled = true;
+        }
+        
         private void Node_MouseMove(object sender, MouseEventArgs e)
         {
             if (_isDraggingNode && _draggedNode != null)
@@ -1101,18 +1257,15 @@ namespace ModbusForge.Views
             var node = _viewModel?.Nodes.FirstOrDefault(n => n.Id == nodeId);
             if (node == null) return new Point(0, 0);
             
-            // Header ~24px, content fills remaining space.
-            // Output & single-input nodes: vertical centre of content.
-            // Input1 on dual-input nodes: upper third. Input2: lower two-thirds.
-            double headerH = 24;
-            double contentH = node.Height - headerH;
-            double yBase = node.Y + headerH;
+            // Use constants for layout calculations
+            double contentH = node.Height - NodeHeaderHeight;
+            double yBase = node.Y + NodeHeaderHeight;
 
             return connectorType switch
             {
-                "Output" => new Point(node.X + node.Width - 6, yBase + contentH / 2),
-                "Input2" => new Point(node.X + 6, yBase + contentH * 2 / 3),
-                _        => new Point(node.X + 6, yBase + contentH / 3)   // Input1 or default
+                "Output" => new Point(node.X + node.Width - ConnectorOffset, yBase + contentH * SingleInputVerticalRatio),
+                "Input2" => new Point(node.X + ConnectorOffset, yBase + contentH * DualInputBottomRatio),
+                _        => new Point(node.X + ConnectorOffset, yBase + contentH * DualInputTopRatio)   // Input1 or default
             };
         }
 

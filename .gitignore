@@ -367,3 +367,20 @@ ModbusForge-*.zip
 ModbusForge-*.zip.sha256
 ModbusForge-*.msix
 installers/
+
+# Temporary/debug files
+*.txt
+*.diff
+*_diff.txt
+*_ascii.cs
+plc_*.cs
+plc_*.txt
+*_branches.txt
+*_rbranches.txt
+*_new_branches.txt
+debug_log.txt
+out.txt
+test_output.txt
+test_results*.txt
+features_test_results.txt
+build_*.txt

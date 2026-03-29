@@ -154,7 +154,7 @@ namespace ModbusForge.ViewModels
                     }
                 }
             }
-            catch { /* best-effort defaults from config */ }
+            catch (Exception ex) { _logger.LogDebug(ex, "Failed to load settings, using defaults"); }
         }
 
         /// <summary>
@@ -282,7 +282,7 @@ namespace ModbusForge.ViewModels
             _trendTimer.Start();
 
             // Start services
-            try { _trendLogger.Start(); } catch { }
+            try { _trendLogger.Start(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to start trend logger"); }
             SubscribeCustomEntries();
         }
 
@@ -755,7 +755,7 @@ namespace ModbusForge.ViewModels
                         _monitorTimer.Tick -= MonitorTimer_Tick;
                         _trendTimer.Stop();
                         _trendTimer.Tick -= TrendTimer_Tick;
-                        try { _trendLogger.Stop(); } catch { }
+                        try { _trendLogger.Stop(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to stop trend logger"); }
                         try
                         {
                             CustomEntries.CollectionChanged -= CustomEntries_CollectionChanged;
@@ -764,9 +764,9 @@ namespace ModbusForge.ViewModels
                                 ce.PropertyChanged -= CustomEntry_PropertyChanged;
                             }
                         }
-                        catch { }
+                        catch (Exception ex) { _logger.LogDebug(ex, "Error detaching event handlers during disposal"); }
                     }
-                    catch { }
+                    catch (Exception ex) { _logger.LogDebug(ex, "Error during timer cleanup in Dispose"); }
                     try
                     {
                         // Attempt a graceful disconnect with timeout to avoid freezing

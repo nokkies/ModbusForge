@@ -10,6 +10,7 @@
         xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="1073" Width="1556"
+        WindowState="Maximized"
         Icon="pack://application:,,,/Resources/ModbusForge.ico"
         BorderThickness="1"
         Background="{StaticResource LightMetallicWhiteBrush}"
