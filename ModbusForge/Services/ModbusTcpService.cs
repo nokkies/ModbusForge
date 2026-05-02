@@ -165,7 +165,7 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task DisconnectAsync()
+        public virtual async Task DisconnectAsync()
         {
             await _ioLock.WaitAsync().ConfigureAwait(false);
             try
