@@ -1291,6 +1291,9 @@ namespace ModbusForge.ViewModels
                     _visualNodeEditorViewModel.Nodes,
                     _visualNodeEditorViewModel.Connections,
                     SubscribeCustomEntries);
+
+                // Fix old nodes with invalid addresses (migration)
+                _visualNodeEditorViewModel.MigrateNodes();
             }
         }
 
@@ -1468,10 +1471,10 @@ namespace ModbusForge.ViewModels
                         {
                             foreach (var node in projectConfig.VisualNodes)
                             {
-                                // Fix old nodes with invalid addresses (migration)
-                                MigrateOldNodeAddresses(node);
                                 _visualNodeEditorViewModel.Nodes.Add(node);
                             }
+                            // Fix old nodes with invalid addresses (migration)
+                            _visualNodeEditorViewModel.MigrateNodes();
                         }
                         
                         if (projectConfig.VisualConnections != null)
@@ -1676,45 +1679,6 @@ namespace ModbusForge.ViewModels
             {
                 _logger.LogError(ex, "Error exporting Unit ID");
                 StatusMessage = $"Error exporting Unit ID: {ex.Message}";
-            }
-        }
-
-        private void MigrateOldNodeAddresses(VisualNode node)
-        {
-            // Fix InputInt nodes with missing OutputAddress
-            if (node.ElementType == PlcElementType.InputInt && node.OutputAddress == null)
-            {
-                node.OutputAddress = new PlcAddressReference 
-                { 
-                    Area = PlcArea.HoldingRegister, 
-                    Address = node.Input1Address?.Address ?? 1 
-                };
-            }
-            
-            // Fix InputBool nodes with missing OutputAddress
-            if (node.ElementType == PlcElementType.InputBool && node.OutputAddress == null)
-            {
-                node.OutputAddress = new PlcAddressReference 
-                { 
-                    Area = PlcArea.Coil, 
-                    Address = node.Input1Address?.Address ?? 1 
-                };
-            }
-            
-            // Fix any nodes with Coil:0 addresses (invalid)
-            if (node.OutputAddress?.Area == PlcArea.Coil && node.OutputAddress.Address == 0)
-            {
-                node.OutputAddress.Address = 1;
-            }
-            
-            if (node.Input1Address?.Area == PlcArea.Coil && node.Input1Address.Address == 0)
-            {
-                node.Input1Address.Address = 1;
-            }
-            
-            if (node.Input2Address?.Area == PlcArea.Coil && node.Input2Address.Address == 0)
-            {
-                node.Input2Address.Address = 1;
             }
         }
 
