@@ -158,7 +158,10 @@ namespace ModbusForge.ViewModels
                     }
                 }
             }
-            catch { /* best-effort defaults from config */ }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to initialize defaults from config");
+            }
         }
 
         /// <summary>
@@ -286,7 +289,14 @@ namespace ModbusForge.ViewModels
             _trendTimer.Start();
 
             // Start services
-            try { _trendLogger.Start(); } catch { }
+            try
+            {
+                _trendLogger.Start();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to start trend logger");
+            }
             SubscribeCustomEntries();
             SimulationCoordinator.Start();
         }
@@ -771,7 +781,14 @@ namespace ModbusForge.ViewModels
                         _trendTimer.Stop();
                         _trendTimer.Tick -= TrendTimer_Tick;
                         SimulationCoordinator.Stop();
-                        try { _trendLogger.Stop(); } catch { }
+                        try
+                        {
+                            _trendLogger.Stop();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Error stopping trend logger during disposal");
+                        }
                         try
                         {
                             CustomEntries.CollectionChanged -= CustomEntries_CollectionChanged;
@@ -780,9 +797,15 @@ namespace ModbusForge.ViewModels
                                 ce.PropertyChanged -= CustomEntry_PropertyChanged;
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Error detaching custom entry events during disposal");
+                        }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error during cleanup in Dispose");
+                    }
                     try
                     {
                         // Attempt a graceful disconnect with timeout to avoid freezing
@@ -1204,7 +1227,10 @@ namespace ModbusForge.ViewModels
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to subscribe to custom entries");
+            }
         }
 
         private void CustomEntries_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
