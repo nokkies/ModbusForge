@@ -80,13 +80,7 @@ namespace ModbusForge.ViewModels
         private async Task ReadAllCustomNowAsync()
         {
             if (!IsConnected) return;
-            var snapshot = CustomEntries.ToList();
-            foreach (var ce in snapshot)
-            {
-                try { await _customEntryCoordinator.ReadCustomNowAsync(ce, EffectiveUnitId, msg => StatusMessage = msg, IsServerMode); }
-                catch (Exception ex) { _logger.LogDebug(ex, "ReadAllCustomNow: failed for {Area} {Address}", ce.Area, ce.Address); }
-            }
-            StatusMessage = $"Read {snapshot.Count} custom entries";
+            await _customEntryCoordinator.ReadCustomEntriesAsync(CustomEntries, EffectiveUnitId, msg => StatusMessage = msg, IsServerMode);
         }
 
         public SimulationCoordinator SimulationCoordinator { get; }
