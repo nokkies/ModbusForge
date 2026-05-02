@@ -80,12 +80,8 @@ namespace ModbusForge.ViewModels
         {
             if (!IsConnected) return;
             var snapshot = CustomEntries.ToList();
-            foreach (var ce in snapshot)
-            {
-                try { await _customEntryCoordinator.ReadCustomNowAsync(ce, EffectiveUnitId, msg => StatusMessage = msg, IsServerMode); }
-                catch (Exception ex) { _logger.LogDebug(ex, "ReadAllCustomNow: failed for {Area} {Address}", ce.Area, ce.Address); }
-            }
-            StatusMessage = $"Read {snapshot.Count} custom entries";
+            if (snapshot.Count == 0) return;
+            await _customEntryCoordinator.ReadCustomEntriesAsync(snapshot, EffectiveUnitId, msg => StatusMessage = msg, IsServerMode);
         }
 
         public VisualNodeEditorViewModel VisualNodeEditorViewModel => _visualNodeEditorViewModel;
