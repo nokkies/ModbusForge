@@ -380,29 +380,28 @@ namespace ModbusForge.ViewModels
         private bool _hasConnectionError = false;
         private DateTime _lastErrorTime = DateTime.MinValue;
 
-        public ICommand ConnectCommand { get; private set; }
-        public IRelayCommand DisconnectCommand { get; private set; }
-        public ICommand RunDiagnosticsCommand { get; private set; }
-        public IRelayCommand ReadRegistersCommand { get; private set; }
-        public IRelayCommand WriteRegisterCommand { get; private set; }
-        public IRelayCommand ReadCoilsCommand { get; private set; }
-        public IRelayCommand WriteCoilCommand { get; private set; }
-        public IRelayCommand ReadInputRegistersCommand { get; private set; }
-        public IRelayCommand ReadDiscreteInputsCommand { get; private set; }
-        public ICommand AddCustomEntryCommand { get; private set; }
-        public ICommand WriteCustomNowCommand { get; private set; }
-        public ICommand ReadCustomNowCommand { get; private set; }
-        public IRelayCommand ReadAllCustomNowCommand { get; private set; }
-        public ICommand SaveProjectCommand { get; private set; }
-        public ICommand LoadProjectCommand { get; private set; }
-        public ICommand ImportUnitIdsCommand { get; private set; }
-        public ICommand ExportUnitIdsCommand { get; private set; }
-        public ICommand ExportUnitIdCommand { get; private set; }
-        public ICommand ImportUnitIdAsCommand { get; private set; }
-        public IRelayCommand SaveCustomCommand { get; private set; }
-        public IRelayCommand LoadCustomCommand { get; private set; }
-        public IRelayCommand SaveAllConfigCommand { get; private set; }
-        public IRelayCommand LoadAllConfigCommand { get; private set; }
+        public IRelayCommand DisconnectCommand { get; private set; } = null!;
+        public ICommand RunDiagnosticsCommand { get; private set; } = null!;
+        public IRelayCommand ReadRegistersCommand { get; private set; } = null!;
+        public IRelayCommand WriteRegisterCommand { get; private set; } = null!;
+        public IRelayCommand ReadCoilsCommand { get; private set; } = null!;
+        public IRelayCommand WriteCoilCommand { get; private set; } = null!;
+        public IRelayCommand ReadInputRegistersCommand { get; private set; } = null!;
+        public IRelayCommand ReadDiscreteInputsCommand { get; private set; } = null!;
+        public ICommand AddCustomEntryCommand { get; private set; } = null!;
+        public ICommand WriteCustomNowCommand { get; private set; } = null!;
+        public ICommand ReadCustomNowCommand { get; private set; } = null!;
+        public IRelayCommand ReadAllCustomNowCommand { get; private set; } = null!;
+        public ICommand SaveProjectCommand { get; private set; } = null!;
+        public ICommand LoadProjectCommand { get; private set; } = null!;
+        public ICommand ImportUnitIdsCommand { get; private set; } = null!;
+        public ICommand ExportUnitIdsCommand { get; private set; } = null!;
+        public ICommand ExportUnitIdCommand { get; private set; } = null!;
+        public ICommand ImportUnitIdAsCommand { get; private set; } = null!;
+        public IRelayCommand SaveCustomCommand { get; private set; } = null!;
+        public IRelayCommand LoadCustomCommand { get; private set; } = null!;
+        public IRelayCommand SaveAllConfigCommand { get; private set; } = null!;
+        public IRelayCommand LoadAllConfigCommand { get; private set; } = null!;
 
         public ObservableCollection<string> ConsoleMessages => _consoleLoggerService.LogMessages;
 
@@ -412,7 +411,8 @@ namespace ModbusForge.ViewModels
         public ObservableCollection<RegisterEntry> InputRegisters { get; } = new();
         public ObservableCollection<CoilEntry> DiscreteInputs { get; } = new();
 
-        public IAsyncRelayCommand<DataGridCellEditEndingEventArgs> UpdateHoldingRegisterCommand { get; private set; }
+        public IAsyncRelayCommand<DataGridCellEditEndingEventArgs> UpdateHoldingRegisterCommand { get; private set; } = null!;
+        public ICommand ConnectCommand { get; private set; } = null!;
 
         // Unit ID configurations for complete isolation
         [ObservableProperty]
