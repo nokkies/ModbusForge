@@ -513,8 +513,6 @@ namespace ModbusForge.ViewModels
                     }
                 }
             }
-=======
->>>>>>> origin/master
         }
         
         partial void OnShowLiveValuesChanged(bool value)

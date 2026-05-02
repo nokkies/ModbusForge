@@ -82,12 +82,6 @@ namespace ModbusForge.ViewModels.Coordinators
                 });
 
                 await Task.WhenAll(tasks);
-=======
-                    await ProcessAreaAsync(group.Key.ToLowerInvariant(), group, unitId, isServerMode, now,
-                        onSuccess: () => successCount++,
-                        onError: () => errorCount++);
-                }
->>>>>>> origin/master
 
                 // If all trend reads failed, disable monitoring and show error
                 if (errorCount[0] > 0 && successCount[0] == 0)
