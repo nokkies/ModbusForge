@@ -56,7 +56,7 @@ namespace ModbusForge.ViewModels
                 ElementType = PlcElementType.Input,
                 X = 50,
                 Y = 100,
-                Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 0 }
+                Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 }
             };
             
             var input2 = new VisualNode
@@ -65,7 +65,7 @@ namespace ModbusForge.ViewModels
                 ElementType = PlcElementType.Input,
                 X = 50,
                 Y = 200,
-                Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 }
+                Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 2 }
             };
             
             var andGate = new VisualNode
@@ -280,16 +280,15 @@ namespace ModbusForge.ViewModels
             UpdateAllConnections();
         }
         
-        public void SelectNode(VisualNode node)
+        public void SelectNode(VisualNode? node)
         {
-            // Clear previous selection
-            foreach (var n in Nodes)
+            ClearSelection();
+
+            if (node != null)
             {
-                n.IsSelected = false;
+                node.IsSelected = true;
+                SelectedNode = node;
             }
-            
-            node.IsSelected = true;
-            SelectedNode = node;
         }
         
         public void ClearSelection()
@@ -299,6 +298,57 @@ namespace ModbusForge.ViewModels
                 node.IsSelected = false;
             }
             SelectedNode = null;
+        }
+
+        /// <summary>
+        /// Migrates old node configurations to the latest format, fixing missing or invalid addresses.
+        /// </summary>
+        public void MigrateNodes()
+        {
+            foreach (var node in Nodes)
+            {
+                // Fix InputInt nodes with missing or default OutputAddress (should match Input1)
+                if (node.ElementType == PlcElementType.InputInt)
+                {
+                    if (node.OutputAddress == null || (node.OutputAddress.Area == PlcArea.Coil && node.OutputAddress.Address == 0))
+                    {
+                        node.OutputAddress = new PlcAddressReference
+                        {
+                            Area = PlcArea.HoldingRegister,
+                            Address = (node.Input1Address != null && node.Input1Address.Address >= 0) ? node.Input1Address.Address : 1
+                        };
+                    }
+                }
+
+                // Fix InputBool nodes with missing or default OutputAddress (should match Input1)
+                if (node.ElementType == PlcElementType.InputBool)
+                {
+                    if (node.OutputAddress == null || (node.OutputAddress.Area == PlcArea.Coil && node.OutputAddress.Address == 0))
+                    {
+                        node.OutputAddress = new PlcAddressReference
+                        {
+                            Area = PlcArea.Coil,
+                            Address = (node.Input1Address != null && node.Input1Address.Address >= 0) ? node.Input1Address.Address : 1
+                        };
+                    }
+                }
+
+                // Fix any nodes with Coil:0 addresses (invalid - should be at least 1)
+                if (node.OutputAddress != null && node.OutputAddress.Area == PlcArea.Coil && node.OutputAddress.Address == 0)
+                {
+                    node.OutputAddress.Address = 1;
+                }
+
+                if (node.Input1Address != null && node.Input1Address.Area == PlcArea.Coil && node.Input1Address.Address == 0)
+                {
+                    node.Input1Address.Address = 1;
+                }
+
+                if (node.Input2Address != null && node.Input2Address.Area == PlcArea.Coil && node.Input2Address.Address == 0)
+                {
+                    node.Input2Address.Address = 1;
+                }
+            }
         }
         
         public void CreateConnection(string sourceNodeId, string targetNodeId, string targetConnector = "Input1")
@@ -401,6 +451,70 @@ namespace ModbusForge.ViewModels
             // This method is called by the simulation service to update node values
             // The actual value updates are handled via the IVisualSimulationService
             if (!ShowLiveValues) return;
+        }
+        public ObservableCollection<PlcSimulationElement> ConvertToSimulationElements()
+        {
+            var elements = new ObservableCollection<PlcSimulationElement>();
+            
+            // Pre-calculate lookups for O(1) retrieval
+            var nodeDict = Nodes.ToDictionary(n => n.Id);
+            var connectionLookup = Connections.ToLookup(c => c.TargetNodeId);
+
+            foreach (var visualNode in Nodes)
+            {
+                var element = new PlcSimulationElement
+                {
+                    Id = visualNode.Id,
+                    ElementType = visualNode.ElementType,
+                    Input1 = visualNode.Input1Address,
+                    Input2 = visualNode.Input2Address,
+                    Output = visualNode.OutputAddress,
+                    TimerPresetMs = visualNode.TimerPresetMs,
+                    SetDominant = visualNode.SetDominant,
+                    CounterPreset = visualNode.CounterPreset,
+                    CompareValue = visualNode.CompareValue
+                };
+                
+                // Map connections to input addresses using optimized lookups
+                MapConnectionsToInputs(visualNode, element, nodeDict, connectionLookup);
+                
+                elements.Add(element);
+            }
+            
+            return elements;
+        }
+        
+        private void MapConnectionsToInputs(VisualNode visualNode, PlcSimulationElement element,
+            System.Collections.Generic.Dictionary<string, VisualNode> nodeDict,
+            System.Linq.ILookup<string, NodeConnection> connectionLookup)
+        {
+            // Find connections that target this node using optimized lookup - O(1)
+            var inputConnections = connectionLookup[visualNode.Id];
+            
+            foreach (var connection in inputConnections)
+            {
+                // Find source node using optimized dictionary - O(1)
+                if (nodeDict.TryGetValue(connection.SourceNodeId, out var sourceNode))
+                {
+                    var targetAddress = new PlcAddressReference
+                    {
+                        Area = sourceNode.OutputAddress.Area,
+                        Address = sourceNode.OutputAddress.Address,
+                        Not = sourceNode.OutputAddress.Not
+                    };
+                    
+                    if (connection.TargetConnector == "Input1")
+                    {
+                        element.Input1 = targetAddress;
+                    }
+                    else if (connection.TargetConnector == "Input2")
+                    {
+                        element.Input2 = targetAddress;
+                    }
+                }
+            }
+=======
+>>>>>>> origin/master
         }
         
         partial void OnShowLiveValuesChanged(bool value)

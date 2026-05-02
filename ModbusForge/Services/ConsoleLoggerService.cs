@@ -1,18 +1,14 @@
-using System.Collections.ObjectModel;
-using System.Windows;
+using System;
 
 namespace ModbusForge.Services
 {
     public class ConsoleLoggerService : IConsoleLoggerService
     {
-        public ObservableCollection<string> LogMessages { get; } = new ObservableCollection<string>();
+        public event EventHandler<LogMessageEventArgs>? LogMessageReceived;
 
         public void Log(string message)
         {
-            Application.Current.Dispatcher.Invoke(() =>
-            {
-                LogMessages.Add(message);
-            });
+            LogMessageReceived?.Invoke(this, new LogMessageEventArgs(message));
         }
     }
 }

@@ -150,13 +150,9 @@ public class ConnectionManager : IConnectionManager
 
     public async Task DisconnectAllAsync()
     {
-        foreach (var profile in Profiles)
-        {
-            if (profile.IsConnected)
-            {
-                await DisconnectProfileAsync(profile);
-            }
-        }
+        var connectedProfiles = Profiles.Where(p => p.IsConnected).ToList();
+        var tasks = connectedProfiles.Select(DisconnectProfileAsync);
+        await Task.WhenAll(tasks);
     }
 
     public IModbusService? GetServiceForProfile(ConnectionProfile profile)

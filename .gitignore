@@ -387,3 +387,9 @@ test_output.txt
 test_results*.txt
 features_test_results.txt
 build_*.txt
+
+# Exceptions (keep these .txt files)
+!README.md
+!LICENSE
+!AGENTS.md
+!*.md
