@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Extensions.Logging;
@@ -21,18 +22,21 @@ namespace ModbusForge.ViewModels.Coordinators
         private readonly IModbusService _serverService;
         private readonly ITrendLogger _trendLogger;
         private readonly ILogger<TrendCoordinator> _logger;
+        private readonly ISettingsService _settingsService;
         private bool _isTrending;
 
         public TrendCoordinator(
             IModbusService clientService,
             IModbusService serverService,
             ITrendLogger trendLogger,
-            ILogger<TrendCoordinator> logger)
+            ILogger<TrendCoordinator> logger,
+            ISettingsService settingsService)
         {
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
             _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
             _trendLogger = trendLogger ?? throw new ArgumentNullException(nameof(trendLogger));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         }
 
         /// <summary>
@@ -53,21 +57,40 @@ namespace ModbusForge.ViewModels.Coordinators
             try
             {
                 var now = DateTime.UtcNow;
-                int totalEntries = snapshot.Count;
-                int successCount = 0;
-                int errorCount = 0;
+                int[] successCount = new int[1];
+                int[] errorCount = new int[1];
 
-                var groups = snapshot.GroupBy(ce => (ce.Area ?? "HoldingRegister").ToLowerInvariant());
+                var groups = snapshot.GroupBy(ce => ce.Area ?? "HoldingRegister", StringComparer.OrdinalIgnoreCase);
 
-                foreach (var group in groups)
+                // Create a semaphore based on settings, default to 8 if invalid
+                int maxConcurrent = _settingsService.MaxConcurrentTrendRequests > 0 ? _settingsService.MaxConcurrentTrendRequests : 8;
+                using var semaphore = new SemaphoreSlim(maxConcurrent, maxConcurrent);
+
+                var tasks = groups.Select(async group =>
                 {
-                    await ProcessAreaAsync(group.Key, group, unitId, isServerMode, now,
+                    await semaphore.WaitAsync();
+                    try
+                    {
+                        await ProcessAreaAsync(group.Key, group, unitId, isServerMode, now,
+                            onSuccess: () => Interlocked.Increment(ref successCount[0]),
+                            onError: () => Interlocked.Increment(ref errorCount[0]));
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                });
+
+                await Task.WhenAll(tasks);
+=======
+                    await ProcessAreaAsync(group.Key.ToLowerInvariant(), group, unitId, isServerMode, now,
                         onSuccess: () => successCount++,
                         onError: () => errorCount++);
                 }
+>>>>>>> origin/master
 
                 // If all trend reads failed, disable monitoring and show error
-                if (errorCount > 0 && successCount == 0)
+                if (errorCount[0] > 0 && successCount[0] == 0)
                 {
                     setGlobalMonitorEnabled(false);
                     MessageBox.Show(
@@ -187,8 +210,9 @@ namespace ModbusForge.ViewModels.Coordinators
 
         private int GetSize(CustomEntry entry)
         {
-            var type = (entry.Type ?? "uint").ToLowerInvariant();
-            if (type == "real" || type == "float") return 2;
+            var type = entry.Type ?? "uint";
+            if (string.Equals(type, "real", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(type, "float", StringComparison.OrdinalIgnoreCase)) return 2;
             return 1;
         }
 
@@ -255,14 +279,14 @@ namespace ModbusForge.ViewModels.Coordinators
         {
             if (offset < 0 || offset >= data.Length) return null;
 
-            var type = (entry.Type ?? "uint").ToLowerInvariant();
+            var type = entry.Type ?? "uint";
 
-            if (type == "real")
+            if (string.Equals(type, "real", StringComparison.OrdinalIgnoreCase))
             {
                 if (offset + 1 >= data.Length) return null;
                 return DataTypeConverter.ToSingle(data[offset], data[offset + 1]);
             }
-            else if (type == "int")
+            else if (string.Equals(type, "int", StringComparison.OrdinalIgnoreCase))
             {
                 return (double)unchecked((short)data[offset]);
             }
@@ -276,19 +300,20 @@ namespace ModbusForge.ViewModels.Coordinators
         {
              _trendLogger.Publish(GetTrendKey(ce), val, now);
 
-            var area = (ce.Area ?? "HoldingRegister").ToLowerInvariant();
-            var type = (ce.Type ?? "uint").ToLowerInvariant();
+            var area = ce.Area ?? "HoldingRegister";
+            var type = ce.Type ?? "uint";
             string display;
 
-            if (area == "coil" || area == "discreteinput")
+            if (string.Equals(area, "coil", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(area, "discreteinput", StringComparison.OrdinalIgnoreCase))
             {
                 display = val != 0.0 ? "1" : "0";
             }
-            else if (type == "real")
+            else if (string.Equals(type, "real", StringComparison.OrdinalIgnoreCase))
             {
                 display = val.ToString("G9", CultureInfo.InvariantCulture);
             }
-            else if (type == "int")
+            else if (string.Equals(type, "int", StringComparison.OrdinalIgnoreCase))
             {
                 display = ((short)val).ToString(CultureInfo.InvariantCulture);
             }
@@ -307,53 +332,50 @@ namespace ModbusForge.ViewModels.Coordinators
         private async Task<double?> ReadValueForTrendAsync(CustomEntry entry, byte unitId, bool isServerMode)
         {
             var service = isServerMode ? _serverService : _clientService;
-            var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
+            var area = entry.Area ?? "HoldingRegister";
 
-            switch (area)
+            if (string.Equals(area, "holdingregister", StringComparison.OrdinalIgnoreCase))
             {
-                case "holdingregister":
-                    return await ReadHoldingRegisterForTrendAsync(service, entry, unitId);
-
-                case "inputregister":
-                    return await ReadInputRegisterForTrendAsync(service, entry, unitId);
-
-                case "coil":
-                    {
-                        var states = await service.ReadCoilsAsync(unitId, entry.Address, 1);
-                        if (states is null) return null;
-                        return states[0] ? 1.0 : 0.0;
-                    }
-
-                case "discreteinput":
-                    {
-                        var states = await service.ReadDiscreteInputsAsync(unitId, entry.Address, 1);
-                        if (states is null) return null;
-                        return states[0] ? 1.0 : 0.0;
-                    }
-
-                default:
-                    return null;
+                return await ReadHoldingRegisterForTrendAsync(service, entry, unitId);
             }
+            else if (string.Equals(area, "inputregister", StringComparison.OrdinalIgnoreCase))
+            {
+                return await ReadInputRegisterForTrendAsync(service, entry, unitId);
+            }
+            else if (string.Equals(area, "coil", StringComparison.OrdinalIgnoreCase))
+            {
+                var states = await service.ReadCoilsAsync(unitId, entry.Address, 1);
+                if (states is null) return null;
+                return states[0] ? 1.0 : 0.0;
+            }
+            else if (string.Equals(area, "discreteinput", StringComparison.OrdinalIgnoreCase))
+            {
+                var states = await service.ReadDiscreteInputsAsync(unitId, entry.Address, 1);
+                if (states is null) return null;
+                return states[0] ? 1.0 : 0.0;
+            }
+
+            return null;
         }
 
         private async Task<double?> ReadHoldingRegisterForTrendAsync(IModbusService service, CustomEntry entry, byte unitId)
         {
-            var type = (entry.Type ?? "uint").ToLowerInvariant();
+            var type = entry.Type ?? "uint";
 
-            if (type == "real")
+            if (string.Equals(type, "real", StringComparison.OrdinalIgnoreCase))
             {
                 var regs = await service.ReadHoldingRegistersAsync(unitId, entry.Address, 2);
                 if (regs is null) return null;
                 return DataTypeConverter.ToSingle(regs[0], regs[1]);
             }
-            else if (type == "int")
+            else if (string.Equals(type, "int", StringComparison.OrdinalIgnoreCase))
             {
                 var regs = await service.ReadHoldingRegistersAsync(unitId, entry.Address, 1);
                 if (regs is null) return null;
                 short sv = unchecked((short)regs[0]);
                 return (double)sv;
             }
-            else if (type == "string")
+            else if (string.Equals(type, "string", StringComparison.OrdinalIgnoreCase))
             {
                 return null;
             }
@@ -367,22 +389,22 @@ namespace ModbusForge.ViewModels.Coordinators
 
         private async Task<double?> ReadInputRegisterForTrendAsync(IModbusService service, CustomEntry entry, byte unitId)
         {
-            var type = (entry.Type ?? "uint").ToLowerInvariant();
+            var type = entry.Type ?? "uint";
 
-            if (type == "real")
+            if (string.Equals(type, "real", StringComparison.OrdinalIgnoreCase))
             {
                 var regs = await service.ReadInputRegistersAsync(unitId, entry.Address, 2);
                 if (regs is null) return null;
                 return DataTypeConverter.ToSingle(regs[0], regs[1]);
             }
-            else if (type == "int")
+            else if (string.Equals(type, "int", StringComparison.OrdinalIgnoreCase))
             {
                 var regs = await service.ReadInputRegistersAsync(unitId, entry.Address, 1);
                 if (regs is null) return null;
                 short sv = unchecked((short)regs[0]);
                 return (double)sv;
             }
-            else if (type == "string")
+            else if (string.Equals(type, "string", StringComparison.OrdinalIgnoreCase))
             {
                 return null;
             }

@@ -1,10 +1,10 @@
-using System.Collections.ObjectModel;
+using System;
 
 namespace ModbusForge.Services
 {
     public interface IConsoleLoggerService
     {
-        ObservableCollection<string> LogMessages { get; }
+        event EventHandler<LogMessageEventArgs>? LogMessageReceived;
         void Log(string message);
     }
 }

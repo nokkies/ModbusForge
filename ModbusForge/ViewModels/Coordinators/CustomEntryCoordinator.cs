@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
@@ -185,6 +186,182 @@ namespace ModbusForge.ViewModels.Coordinators
             {
                 _logger.LogError(ex, "Error reading custom entry");
                 setStatusMessage($"Custom read error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Reads multiple custom entries using a batched approach for better performance.
+        /// </summary>
+        public async Task ReadCustomEntriesAsync(IEnumerable<CustomEntry> entries, byte unitId, Action<string> setStatusMessage, bool isServerMode)
+        {
+            var snapshot = entries.ToList();
+            if (snapshot.Count == 0) return;
+
+            try
+            {
+                var groups = snapshot.GroupBy(ce => (ce.Area ?? "HoldingRegister").ToLowerInvariant());
+
+                foreach (var group in groups)
+                {
+                    await ProcessAreaBatchAsync(group.Key, group, unitId, isServerMode, setStatusMessage);
+                }
+                setStatusMessage($"Read {snapshot.Count} custom entries");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reading batched custom entries");
+                setStatusMessage($"Batch read error: {ex.Message}");
+            }
+        }
+
+        private async Task ProcessAreaBatchAsync(string area, IEnumerable<CustomEntry> entries, byte unitId, bool isServerMode, Action<string> setStatusMessage)
+        {
+            var service = GetService(isServerMode);
+            var sorted = entries.OrderBy(e => e.Address).ToList();
+            var chunks = CreateChunks(sorted);
+
+            foreach (var chunk in chunks)
+            {
+                try
+                {
+                    await ReadChunkAsync(area, chunk, service, unitId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Batch read failed for chunk in {Area}, falling back to individual reads", area);
+                    foreach (var entry in chunk)
+                    {
+                        try { await ReadCustomNowAsync(entry, unitId, setStatusMessage, isServerMode); }
+                        catch { /* suppress individual fallback errors to continue with others */ }
+                    }
+                }
+            }
+        }
+
+        private List<List<CustomEntry>> CreateChunks(List<CustomEntry> sortedEntries)
+        {
+            var chunks = new List<List<CustomEntry>>();
+            if (sortedEntries.Count == 0) return chunks;
+
+            var currentChunk = new List<CustomEntry> { sortedEntries[0] };
+
+            int chunkStart = sortedEntries[0].Address;
+            int chunkEnd = chunkStart + GetSize(sortedEntries[0]);
+
+            for (int i = 1; i < sortedEntries.Count; i++)
+            {
+                var entry = sortedEntries[i];
+                int entryStart = entry.Address;
+                int entryEnd = entryStart + GetSize(entry);
+
+                int potentialNewEnd = Math.Max(chunkEnd, entryEnd);
+                int potentialCount = potentialNewEnd - chunkStart;
+
+                // Allow gap of up to 10 registers/coils.
+                bool gapOk = (entryStart - chunkEnd) <= 10;
+                // Max count: 120 (safe margin below 125/253 limits)
+                bool countOk = potentialCount <= 120;
+
+                if (gapOk && countOk)
+                {
+                    currentChunk.Add(entry);
+                    chunkEnd = potentialNewEnd;
+                }
+                else
+                {
+                    chunks.Add(currentChunk);
+                    currentChunk = new List<CustomEntry> { entry };
+                    chunkStart = entryStart;
+                    chunkEnd = entryEnd;
+                }
+            }
+            chunks.Add(currentChunk);
+            return chunks;
+        }
+
+        private int GetSize(CustomEntry entry)
+        {
+            var type = (entry.Type ?? "uint").ToLowerInvariant();
+            if (type == "real" || type == "float") return 2;
+            return 1;
+        }
+
+        private async Task ReadChunkAsync(string area, List<CustomEntry> chunk, IModbusService service, byte unitId)
+        {
+            if (chunk.Count == 0) return;
+
+            int startAddress = chunk[0].Address;
+            int endAddress = chunk.Max(e => e.Address + GetSize(e));
+            int count = endAddress - startAddress;
+
+            if (area == "holdingregister")
+            {
+                var data = await service.ReadHoldingRegistersAsync(unitId, startAddress, count);
+                if (data == null) throw new Exception("Read returned null");
+                foreach (var entry in chunk)
+                {
+                    int offset = entry.Address - startAddress;
+                    var val = ExtractValue(entry, data, offset);
+                    if (val != null) entry.Value = val;
+                }
+            }
+            else if (area == "inputregister")
+            {
+                var data = await service.ReadInputRegistersAsync(unitId, startAddress, count);
+                if (data == null) throw new Exception("Read returned null");
+                foreach (var entry in chunk)
+                {
+                    int offset = entry.Address - startAddress;
+                    var val = ExtractValue(entry, data, offset);
+                    if (val != null) entry.Value = val;
+                }
+            }
+            else if (area == "coil")
+            {
+                var data = await service.ReadCoilsAsync(unitId, startAddress, count);
+                if (data == null) throw new Exception("Read returned null");
+                foreach (var entry in chunk)
+                {
+                    int offset = entry.Address - startAddress;
+                    if (offset < data.Length)
+                        entry.Value = data[offset] ? "1" : "0";
+                }
+            }
+            else if (area == "discreteinput")
+            {
+                var data = await service.ReadDiscreteInputsAsync(unitId, startAddress, count);
+                if (data == null) throw new Exception("Read returned null");
+                foreach (var entry in chunk)
+                {
+                    int offset = entry.Address - startAddress;
+                    if (offset < data.Length)
+                        entry.Value = data[offset] ? "1" : "0";
+                }
+            }
+        }
+
+        private string? ExtractValue(CustomEntry entry, ushort[] data, int offset)
+        {
+            if (offset < 0 || offset >= data.Length) return null;
+
+            var type = (entry.Type ?? "uint").ToLowerInvariant();
+
+            if (type == "real")
+            {
+                if (offset + 1 >= data.Length) return null;
+                return DataTypeConverter.ToSingle(data[offset], data[offset + 1]).ToString(CultureInfo.InvariantCulture);
+            }
+            else if (type == "int")
+            {
+                return unchecked((short)data[offset]).ToString(CultureInfo.InvariantCulture);
+            }
+            else if (type == "string")
+            {
+                return DataTypeConverter.ToString(data[offset]);
+            }
+            else // uint
+            {
+                return data[offset].ToString(CultureInfo.InvariantCulture);
             }
         }
 
