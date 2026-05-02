@@ -1054,28 +1054,35 @@ namespace ModbusForge.ViewModels
 
         private async void CustomTimer_Tick(object? sender, EventArgs e)
         {
-            if (!IsConnected) return;
-            var now = DateTime.UtcNow;
-            var snapshot = CustomEntries.ToList();
-            foreach (var entry in snapshot)
+            try
             {
-                if (!entry.Continuous) continue;
-                int period = entry.PeriodMs <= 0 ? 1000 : entry.PeriodMs;
-                if ((now - entry._lastWriteUtc).TotalMilliseconds >= period)
+                if (!IsConnected) return;
+                var now = DateTime.UtcNow;
+                var snapshot = CustomEntries.ToList();
+                foreach (var entry in snapshot)
                 {
-                    try
+                    if (!entry.Continuous) continue;
+                    int period = entry.PeriodMs <= 0 ? 1000 : entry.PeriodMs;
+                    if ((now - entry._lastWriteUtc).TotalMilliseconds >= period)
                     {
-                        await WriteCustomNowAsync(entry);
-                        entry._lastWriteUtc = now;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Continuous write failed for {Area} {Address}", entry.Area, entry.Address);
-                        entry.Continuous = false;
-                        MessageBox.Show($"Continuous write failed for {entry.Area} {entry.Address}: {ex.Message}\n\nContinuous write has been paused for this entry. Fix the issue and re-enable if needed.", "Write Error",
-                            MessageBoxButton.OK, MessageBoxImage.Error);
+                        try
+                        {
+                            await WriteCustomNowAsync(entry);
+                            entry._lastWriteUtc = now;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Continuous write failed for {Area} {Address}", entry.Area, entry.Address);
+                            entry.Continuous = false;
+                            MessageBox.Show($"Continuous write failed for {entry.Area} {entry.Address}: {ex.Message}\n\nContinuous write has been paused for this entry. Fix the issue and re-enable if needed.", "Write Error",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in CustomTimer_Tick");
             }
         }
 
@@ -1168,6 +1175,10 @@ namespace ModbusForge.ViewModels
                 // Continuous reads for Custom entries are handled exclusively by TrendTimer_Tick
                 // for rows where ce.Trend == true, gated by GlobalMonitorEnabled.
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in MonitorTimer_Tick");
+            }
             finally
             {
                 _isMonitoring = false;
@@ -1256,15 +1267,22 @@ namespace ModbusForge.ViewModels
 
         private async void TrendTimer_Tick(object? sender, EventArgs e)
         {
-            if (!IsConnected) return;
-            if (!GlobalMonitorEnabled) return;
+            try
+            {
+                if (!IsConnected) return;
+                if (!GlobalMonitorEnabled) return;
 
-            var trendEntries = CustomEntries.Where(c => c.Trend);
-            await _trendCoordinator.ProcessTrendSamplingAsync(
-                trendEntries,
-                UnitId,
-                IsServerMode,
-                enabled => SetGlobalMonitorEnabled(enabled));
+                var trendEntries = CustomEntries.Where(c => c.Trend);
+                await _trendCoordinator.ProcessTrendSamplingAsync(
+                    trendEntries,
+                    UnitId,
+                    IsServerMode,
+                    enabled => SetGlobalMonitorEnabled(enabled));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in TrendTimer_Tick");
+            }
         }
 
 
