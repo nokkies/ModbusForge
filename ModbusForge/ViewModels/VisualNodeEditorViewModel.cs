@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -101,53 +102,121 @@ namespace ModbusForge.ViewModels
         {
             try
             {
-                if (Enum.TryParse<PlcElementType>(nodeType, out var elementType))
+                System.Diagnostics.Debug.WriteLine($"DEBUG: AddNode called with nodeType: {nodeType}");
+                
+                if (!Enum.TryParse<PlcElementType>(nodeType, out var elementType))
                 {
-                    var newNode = new VisualNode
-                    {
-                        Name = $"{elementType} Node",
-                        ElementType = elementType,
-                        X = 100 + (Nodes.Count * 30) % 400,
-                        Y = 100 + (Nodes.Count * 30) % 300
-                    };
-                    
-                    // Set default parameters based on type
-                    switch (elementType)
-                    {
-                        case PlcElementType.Input:
-                            newNode.Name = "Input";
-                            newNode.Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
-                            break;
-                        case PlcElementType.Output:
-                            newNode.Name = "Output";
-                            newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
-                            break;
-                        case PlcElementType.TON:
-                        case PlcElementType.TOF:
-                        case PlcElementType.TP:
-                            newNode.TimerPresetMs = 1000;
-                            break;
-                        case PlcElementType.CTU:
-                        case PlcElementType.CTD:
-                        case PlcElementType.CTC:
-                            newNode.CounterPreset = 10;
-                            break;
-                        case PlcElementType.MATH_ADD:
-                        case PlcElementType.MATH_SUB:
-                        case PlcElementType.MATH_MUL:
-                        case PlcElementType.MATH_DIV:
-                            newNode.CompareValue = 0;
-                            break;
-                    }
-                    
-                    Nodes.Add(newNode);
-                    SelectedNode = newNode;
+                    System.Diagnostics.Debug.WriteLine($"DEBUG: Failed to parse nodeType: {nodeType}");
+                    return;
                 }
+                
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Successfully parsed elementType: {elementType}");
+                
+                var newNode = new VisualNode
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    ElementType = elementType,
+                    X = 100 + Nodes.Count * 30,
+                    Y = 100 + Nodes.Count * 30,
+                    Width = 240,
+                    Height = 140
+                };
+                
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Created new node with ID: {newNode.Id}");
+                
+                // Set default parameters based on type
+                switch (elementType)
+                {
+                    case PlcElementType.Input:
+                        newNode.Name = "Input";
+                        newNode.Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        break;
+                    case PlcElementType.Output:
+                        newNode.Name = "Output";
+                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        break;
+                    case PlcElementType.InputBool:
+                        newNode.Name = "Input BOOL";
+                        newNode.Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = GetNextAvailableAddress(PlcArea.Coil) };
+                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = newNode.Input1Address.Address };
+                        break;
+                    case PlcElementType.InputInt:
+                        newNode.Name = "Input INT";
+                        newNode.Input1Address = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = GetNextAvailableAddress(PlcArea.HoldingRegister) };
+                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = newNode.Input1Address.Address };
+                        break;
+                    case PlcElementType.OutputBool:
+                        newNode.Name = "Output BOOL";
+                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = GetNextAvailableAddress(PlcArea.Coil) };
+                        break;
+                    case PlcElementType.OutputInt:
+                        newNode.Name = "Output INT";
+                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = GetNextAvailableAddress(PlcArea.HoldingRegister) };
+                        break;
+                    case PlcElementType.TON:
+                    case PlcElementType.TOF:
+                    case PlcElementType.TP:
+                        newNode.TimerPresetMs = 1000;
+                        break;
+                    case PlcElementType.CTU:
+                    case PlcElementType.CTD:
+                    case PlcElementType.CTC:
+                        newNode.CounterPreset = 10;
+                        break;
+                    case PlcElementType.MATH_ADD:
+                        newNode.Name = "ADD";
+                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = GetNextAvailableAddress(PlcArea.HoldingRegister) };
+                        break;
+                    case PlcElementType.MATH_SUB:
+                        newNode.Name = "SUB";
+                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = GetNextAvailableAddress(PlcArea.HoldingRegister) };
+                        break;
+                    case PlcElementType.MATH_MUL:
+                        newNode.Name = "MUL";
+                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = GetNextAvailableAddress(PlcArea.HoldingRegister) };
+                        break;
+                    case PlcElementType.MATH_DIV:
+                        newNode.Name = "DIV";
+                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = GetNextAvailableAddress(PlcArea.HoldingRegister) };
+                        break;
+                }
+                
+                System.Diagnostics.Debug.WriteLine($"DEBUG: About to add node to Nodes collection. Current count: {Nodes.Count}");
+                Nodes.Add(newNode);
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Node added successfully. New count: {Nodes.Count}");
+                SelectedNode = newNode;
+                System.Diagnostics.Debug.WriteLine($"DEBUG: SelectedNode set to: {newNode.Id}");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error adding node: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Exception in AddNode: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"DEBUG: Stack trace: {ex.StackTrace}");
             }
+        }
+        
+        private int GetNextAvailableAddress(PlcArea area)
+        {
+            // Get all existing addresses for this area
+            var existingAddresses = new List<int>();
+            
+            foreach (var node in Nodes)
+            {
+                if (node.Input1Address?.Area == area && node.Input1Address.Address >= 0)
+                    existingAddresses.Add(node.Input1Address.Address);
+                if (node.Input2Address?.Area == area && node.Input2Address.Address >= 0)
+                    existingAddresses.Add(node.Input2Address.Address);
+                if (node.OutputAddress?.Area == area && node.OutputAddress.Address >= 0)
+                    existingAddresses.Add(node.OutputAddress.Address);
+            }
+            
+            // Start from address 1 and find the first available
+            int nextAddress = 1;
+            while (existingAddresses.Contains(nextAddress))
+            {
+                nextAddress++;
+            }
+            
+            return nextAddress;
         }
         
         [RelayCommand]
@@ -306,16 +375,13 @@ namespace ModbusForge.ViewModels
         
         private void UpdateConnectionPoints(NodeConnection connection, VisualNode sourceNode, VisualNode targetNode)
         {
-            // For now, use fixed calculations until we can properly access actual positions
-            // This ensures connections work while we debug the positioning issue
-            
             // Source point (output connector on right side of source node)
-            connection.StartX = sourceNode.X + 114;  // 120 - 6 = center of output connector
-            connection.StartY = sourceNode.Y + 30;   // 60 / 2 = vertical center
+            connection.StartX = sourceNode.X + sourceNode.Width - 6;
+            connection.StartY = sourceNode.Y + sourceNode.Height / 2;
             
             // Target point (input connector on left side of target node)
-            connection.EndX = targetNode.X + 6;      // center of input connector
-            connection.EndY = targetNode.Y + 30;    // vertical center
+            connection.EndX = targetNode.X + 6;
+            connection.EndY = targetNode.Y + targetNode.Height / 2;
             
             System.Diagnostics.Debug.WriteLine($"Updated connection points: Start({connection.StartX}, {connection.StartY}) -> End({connection.EndX}, {connection.EndY})");
         }
@@ -332,80 +398,9 @@ namespace ModbusForge.ViewModels
         
         public void RefreshSimulationValues()
         {
-            // This method will be called by the simulation service to update node values
+            // This method is called by the simulation service to update node values
+            // The actual value updates are handled via the IVisualSimulationService
             if (!ShowLiveValues) return;
-            
-            foreach (var node in Nodes)
-            {
-                // Update the CurrentValue property based on simulation state
-                // This will be implemented when integrating with the simulation service
-                node.CurrentValue = GetNodeSimulationValue(node);
-            }
-        }
-        
-        private bool GetNodeSimulationValue(VisualNode node)
-        {
-            // Placeholder for simulation value retrieval
-            // This will be connected to the actual simulation service
-            return false;
-        }
-        
-        // Convert visual nodes to PLC simulation elements for the simulation engine
-        public ObservableCollection<PlcSimulationElement> ConvertToSimulationElements()
-        {
-            var elements = new ObservableCollection<PlcSimulationElement>();
-            
-            foreach (var visualNode in Nodes)
-            {
-                var element = new PlcSimulationElement
-                {
-                    Id = visualNode.Id,
-                    ElementType = visualNode.ElementType,
-                    Input1 = visualNode.Input1Address,
-                    Input2 = visualNode.Input2Address,
-                    Output = visualNode.OutputAddress,
-                    TimerPresetMs = visualNode.TimerPresetMs,
-                    SetDominant = visualNode.SetDominant,
-                    CounterPreset = visualNode.CounterPreset,
-                    CompareValue = visualNode.CompareValue
-                };
-                
-                // Map connections to input addresses
-                MapConnectionsToInputs(visualNode, element);
-                
-                elements.Add(element);
-            }
-            
-            return elements;
-        }
-        
-        private void MapConnectionsToInputs(VisualNode visualNode, PlcSimulationElement element)
-        {
-            // Find connections that target this node
-            var inputConnections = Connections.Where(c => c.TargetNodeId == visualNode.Id).ToList();
-            
-            foreach (var connection in inputConnections)
-            {
-                var sourceNode = Nodes.FirstOrDefault(n => n.Id == connection.SourceNodeId);
-                if (sourceNode != null)
-                {
-                    var targetAddress = new PlcAddressReference
-                    {
-                        Area = sourceNode.OutputAddress.Area,
-                        Address = sourceNode.OutputAddress.Address,
-                        Not = sourceNode.OutputAddress.Not
-                    };
-                    
-                    if (connection.TargetConnector == "Input1")
-                    {
-                        element.Input1 = targetAddress;
-                    }
-                    else if (connection.TargetConnector == "Input2")
-                    {
-                        element.Input2 = targetAddress;
-                    }
-                }
-            }
         }
         
         partial void OnShowLiveValuesChanged(bool value)
@@ -419,12 +414,10 @@ namespace ModbusForge.ViewModels
                 if (value)
                 {
                     visualSimulationService.Start(this);
-                    System.Diagnostics.Debug.WriteLine("VisualSimulationService started");
                 }
                 else
                 {
                     visualSimulationService.Stop();
-                    System.Diagnostics.Debug.WriteLine("VisualSimulationService stopped");
                 }
             }
         }

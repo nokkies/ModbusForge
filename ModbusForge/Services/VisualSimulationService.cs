@@ -17,57 +17,81 @@ namespace ModbusForge.Services
         bool GetNodeValue(string nodeId);
     }
 
+    /// <summary>
+    /// Carries both boolean and integer results from node evaluation,
+    /// preventing bool/int cross-contamination in the data stores.
+    /// </summary>
+    public struct NodeResult
+    {
+        public bool BoolValue;
+        public int IntValue;
+
+        public static NodeResult FromBool(bool b) => new NodeResult { BoolValue = b, IntValue = b ? 1 : 0 };
+        public static NodeResult FromInt(int i) => new NodeResult { BoolValue = i != 0, IntValue = i };
+    }
+
     public class VisualSimulationService : IVisualSimulationService, IDisposable
     {
         private readonly ILogger<VisualSimulationService> _logger;
-        private readonly ISimulationService _simulationService;
         private readonly ModbusServerService _serverService;
-        
+
         private VisualNodeEditorViewModel? _viewModel;
         private DispatcherTimer? _animationTimer;
         private bool _isAnimating;
         private DateTime _lastUpdate;
-        
-        // Cache for node values to avoid excessive updates
-        private readonly Dictionary<string, bool> _nodeValueCache = new Dictionary<string, bool>();
-        private readonly Dictionary<string, DateTime> _lastNodeUpdate = new Dictionary<string, DateTime>();
+
+        // Cache for node values to avoid excessive UI updates
+        private readonly Dictionary<string, bool> _nodeValueCache = new();
+        private readonly Dictionary<string, DateTime> _lastNodeUpdate = new();
+
+        // Evaluated results per tick (phase 1 cache)
+        private readonly Dictionary<string, NodeResult> _evaluatedResults = new();
+
+        // Topological evaluation order (rebuilt when graph changes)
+        private List<VisualNode>? _topoOrder;
+        private int _lastNodeCount;
+        private int _lastConnectionCount;
+
+#if DEBUG
+        private static bool _debugLogging = true;
+#else
+        private static bool _debugLogging = false;
+#endif
 
         public VisualSimulationService(
             ILogger<VisualSimulationService> logger,
-            ISimulationService simulationService,
             ModbusServerService serverService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _simulationService = simulationService ?? throw new ArgumentNullException(nameof(simulationService));
             _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
         }
 
         public void Start(VisualNodeEditorViewModel viewModel)
         {
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
-            
+
             if (_animationTimer == null)
             {
                 _animationTimer = new DispatcherTimer
                 {
-                    Interval = TimeSpan.FromMilliseconds(100) // Update 10 times per second for smooth animation
+                    Interval = TimeSpan.FromMilliseconds(100)
                 };
                 _animationTimer.Tick += AnimationTimer_Tick;
             }
-            
+
             _lastUpdate = DateTime.UtcNow;
+            _topoOrder = null; // force rebuild
             _animationTimer.Start();
             _isAnimating = true;
-            
-            _logger.LogInformation("Visual simulation animation started");
+
+            _logger.LogInformation("Visual simulation started");
         }
 
         public void Stop()
         {
             _animationTimer?.Stop();
             _isAnimating = false;
-            
-            // Clear all node values to reset visual state
+
             if (_viewModel != null)
             {
                 foreach (var node in _viewModel.Nodes)
@@ -76,19 +100,19 @@ namespace ModbusForge.Services
                     node.ShowLiveValues = false;
                 }
             }
-            
+
             _nodeValueCache.Clear();
             _lastNodeUpdate.Clear();
-            
-            _logger.LogInformation("Visual simulation animation stopped");
+            _evaluatedResults.Clear();
+            _topoOrder = null;
+
+            _logger.LogInformation("Visual simulation stopped");
         }
 
         private void AnimationTimer_Tick(object? sender, EventArgs e)
         {
             if (_viewModel == null || !_isAnimating) return;
             if (!_viewModel.ShowLiveValues) return;
-            
-            // Only run when server is running
             if (!_serverService.IsConnected) return;
 
             try
@@ -101,6 +125,75 @@ namespace ModbusForge.Services
             }
         }
 
+        // ───────────────────────── TOPOLOGICAL SORT (Kahn's) ─────────────────────────
+
+        private List<VisualNode> BuildTopologicalOrder()
+        {
+            if (_viewModel == null) return new List<VisualNode>();
+
+            var nodes = _viewModel.Nodes.ToList();
+            var connections = _viewModel.Connections.ToList();
+
+            // Build adjacency: source → targets
+            var inDegree = nodes.ToDictionary(n => n.Id, _ => 0);
+            var adjacency = nodes.ToDictionary(n => n.Id, _ => new List<string>());
+
+            foreach (var conn in connections)
+            {
+                if (inDegree.ContainsKey(conn.TargetNodeId) && adjacency.ContainsKey(conn.SourceNodeId))
+                {
+                    inDegree[conn.TargetNodeId]++;
+                    adjacency[conn.SourceNodeId].Add(conn.TargetNodeId);
+                }
+            }
+
+            var queue = new Queue<string>(inDegree.Where(kv => kv.Value == 0).Select(kv => kv.Key));
+            var sorted = new List<VisualNode>();
+            var nodeMap = nodes.ToDictionary(n => n.Id);
+
+            while (queue.Count > 0)
+            {
+                var id = queue.Dequeue();
+                if (nodeMap.TryGetValue(id, out var node))
+                    sorted.Add(node);
+
+                foreach (var neighbor in adjacency[id])
+                {
+                    inDegree[neighbor]--;
+                    if (inDegree[neighbor] == 0)
+                        queue.Enqueue(neighbor);
+                }
+            }
+
+            // Nodes not in sorted list are part of a cycle — append them with a warning
+            if (sorted.Count < nodes.Count)
+            {
+                var cycleNodes = nodes.Where(n => !sorted.Contains(n)).ToList();
+                _logger.LogWarning("Simulation graph has {Count} nodes in cycles — they will be evaluated last", cycleNodes.Count);
+                sorted.AddRange(cycleNodes);
+            }
+
+            return sorted;
+        }
+
+        private void EnsureTopoOrder()
+        {
+            if (_viewModel == null) return;
+
+            var nodeCount = _viewModel.Nodes.Count;
+            var connCount = _viewModel.Connections.Count;
+
+            if (_topoOrder == null || nodeCount != _lastNodeCount || connCount != _lastConnectionCount)
+            {
+                _topoOrder = BuildTopologicalOrder();
+                _lastNodeCount = nodeCount;
+                _lastConnectionCount = connCount;
+                DebugLog($"Rebuilt topo order: {_topoOrder.Count} nodes");
+            }
+        }
+
+        // ───────────────────────── TWO-PHASE UPDATE ─────────────────────────
+
         public void UpdateNodeValues()
         {
             if (_viewModel == null) return;
@@ -109,214 +202,385 @@ namespace ModbusForge.Services
             if (dataStore == null) return;
 
             var now = DateTime.UtcNow;
-            var elapsedMs = (int)(now - _lastUpdate).TotalMilliseconds;
             _lastUpdate = now;
 
-            foreach (var node in _viewModel.Nodes)
+            EnsureTopoOrder();
+            if (_topoOrder == null || _topoOrder.Count == 0) return;
+
+            // ── Phase 1: Evaluate all nodes (no DataStore writes) ──
+            _evaluatedResults.Clear();
+
+            foreach (var node in _topoOrder)
             {
                 try
                 {
-                    var newValue = GetNodeValueFromSimulation(node, dataStore, elapsedMs);
-                    
-                    // Only update if value changed or it's been a while (to avoid flickering)
+                    var result = EvaluateNode(node, dataStore);
+                    _evaluatedResults[node.Id] = result;
+
+                    // Update UI-visible properties
                     var oldValue = _nodeValueCache.GetValueOrDefault(node.Id, false);
-                    var lastUpdate = _lastNodeUpdate.GetValueOrDefault(node.Id, DateTime.MinValue);
-                    var shouldUpdate = newValue != oldValue || 
-                                      (now - lastUpdate).TotalMilliseconds > 500; // Force update every 500ms
+                    var lastUpd = _lastNodeUpdate.GetValueOrDefault(node.Id, DateTime.MinValue);
+                    var shouldUpdate = result.BoolValue != oldValue || (now - lastUpd).TotalMilliseconds > 500;
 
                     if (shouldUpdate)
                     {
-                        node.CurrentValue = newValue;
-                        _nodeValueCache[node.Id] = newValue;
+                        node.CurrentValue = result.BoolValue;
+                        node.IntValue = result.IntValue;
+                        _nodeValueCache[node.Id] = result.BoolValue;
                         _lastNodeUpdate[node.Id] = now;
-                        
-                        // For Output blocks, write the value to the configured Modbus address
-                        if (node.OutputAddress?.Address >= 0)
-                        {
-                            switch (node.ElementType)
-                            {
-                                case PlcElementType.Output:
-                                    // Legacy output - mixed logic (keep for compatibility)
-                                    if (node.OutputAddress?.Area == PlcArea.HoldingRegister || node.OutputAddress?.Area == PlcArea.InputRegister)
-                                    {
-                                        var inputInt = ReadModbusValueInt(node.Input1Address, dataStore);
-                                        WriteModbusValue(node.OutputAddress, (ushort)inputInt, dataStore);
-                                    }
-                                    else
-                                    {
-                                        WriteModbusValue(node.OutputAddress, newValue ? (ushort)1 : (ushort)0, dataStore);
-                                    }
-                                    break;
-                                    
-                                case PlcElementType.OutputBool:
-                                    // Boolean output - always write 1/0
-                                    WriteModbusValue(node.OutputAddress, newValue ? (ushort)1 : (ushort)0, dataStore);
-                                    break;
-                                    
-                                case PlcElementType.OutputInt:
-                                    // Integer output - write actual connected value
-                                    var inputIntValue = 0;
-                                    
-                                    // Find connections to this node's inputs
-                                    var nodeConnections = _viewModel?.Connections.Where(c => c.TargetNodeId == node.Id).ToList() ?? new List<NodeConnection>();
-                                    
-                                    // Find the connected source node
-                                    var sourceConnection = nodeConnections.FirstOrDefault(c => c.TargetConnector == "Input1");
-                                    if (sourceConnection != null)
-                                    {
-                                        var sourceNode = _viewModel?.Nodes.FirstOrDefault(n => n.Id == sourceConnection.SourceNodeId);
-                                        if (sourceNode != null)
-                                        {
-                                            // If connected to InputInt, read the actual integer value from the source
-                                            if (sourceNode.ElementType == PlcElementType.InputInt)
-                                            {
-                                                inputIntValue = ReadModbusValueInt(sourceNode.Input1Address, dataStore);
-                                            }
-                                            else
-                                            {
-                                                // For other node types, use the boolean value converted to int
-                                                var boolValue = GetNodeValueFromSimulation(sourceNode, dataStore, elapsedMs);
-                                                inputIntValue = boolValue ? 1 : 0;
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        // Fallback: read from Input1Address (legacy behavior)
-                                        inputIntValue = ReadModbusValueInt(node.Input1Address, dataStore);
-                                    }
-                                    
-                                    WriteModbusValue(node.OutputAddress, (ushort)inputIntValue, dataStore);
-                                    break;
-                            }
-                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogDebug(ex, "Failed to update value for node {NodeId}", node.Id);
+                    _logger.LogDebug(ex, "Failed to evaluate node {NodeId}", node.Id);
+                }
+            }
+
+            // ── Phase 2: Write only output nodes to DataStore ──
+            foreach (var node in _topoOrder)
+            {
+                try
+                {
+                    if (!IsOutputNode(node.ElementType)) continue;
+                    if (node.OutputAddress?.Address < 0) continue;
+                    if (!_evaluatedResults.TryGetValue(node.Id, out var result)) continue;
+
+                    WriteOutputToDataStore(node, result, dataStore);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Failed to write output for node {NodeId}", node.Id);
                 }
             }
         }
 
-        private bool GetNodeValueFromSimulation(VisualNode node, DataStore dataStore, int elapsedMs, HashSet<string>? visited = null)
-        {
-            visited ??= new HashSet<string>();
-            if (!visited.Add(node.Id))
-                return false; // Circular reference - break the cycle
+        private static bool IsOutputNode(PlcElementType type) =>
+            type == PlcElementType.Output || type == PlcElementType.OutputBool || type == PlcElementType.OutputInt;
 
-            // For input nodes, read directly from the configured address
-            if (node.ElementType == PlcElementType.Input)
+        // ───────────────────────── PHASE 1: EVALUATE ─────────────────────────
+
+        private NodeResult EvaluateNode(VisualNode node, DataStore dataStore)
+        {
+            switch (node.ElementType)
             {
-                return ReadModbusValue(node.Input1Address, dataStore);
+                // ── Input nodes: read from DataStore ──
+                case PlcElementType.Input:
+                case PlcElementType.InputBool:
+                    return NodeResult.FromBool(ReadModbusValue(node.Input1Address, dataStore));
+
+                case PlcElementType.InputInt:
+                    return NodeResult.FromInt(ReadModbusValueInt(node.Input1Address, dataStore));
+
+                // ── Output nodes: pass-through from connected input ──
+                case PlcElementType.Output:
+                case PlcElementType.OutputBool:
+                {
+                    var input = GetConnectedResult(node, "Input1");
+                    return input ?? NodeResult.FromBool(false);
+                }
+                case PlcElementType.OutputInt:
+                {
+                    var input = GetConnectedResult(node, "Input1");
+                    return input ?? NodeResult.FromInt(0);
+                }
+
+                // ── Logic gates ──
+                case PlcElementType.NOT:
+                {
+                    var in1 = GetConnectedBool(node, "Input1");
+                    return NodeResult.FromBool(!in1);
+                }
+                case PlcElementType.AND:
+                {
+                    var in1 = GetConnectedBool(node, "Input1");
+                    var in2 = GetConnectedBool(node, "Input2");
+                    return NodeResult.FromBool(in1 && in2);
+                }
+                case PlcElementType.OR:
+                {
+                    var in1 = GetConnectedBool(node, "Input1");
+                    var in2 = GetConnectedBool(node, "Input2");
+                    return NodeResult.FromBool(in1 || in2);
+                }
+
+                // ── RS Latch ──
+                case PlcElementType.RS:
+                {
+                    var set = GetConnectedBool(node, "Input1");
+                    var reset = GetConnectedBool(node, "Input2");
+                    return NodeResult.FromBool(EvaluateRsLatch(node, set, reset));
+                }
+
+                // ── Timers ──
+                case PlcElementType.TON:
+                    return NodeResult.FromBool(EvaluateTonTimer(node, GetConnectedBool(node, "Input1")));
+                case PlcElementType.TOF:
+                    return NodeResult.FromBool(EvaluateTofTimer(node, GetConnectedBool(node, "Input1")));
+                case PlcElementType.TP:
+                    return NodeResult.FromBool(EvaluateTpTimer(node, GetConnectedBool(node, "Input1")));
+
+                // ── Counters ──
+                case PlcElementType.CTU:
+                    return NodeResult.FromBool(EvaluateCtuCounter(node, GetConnectedBool(node, "Input1")));
+                case PlcElementType.CTD:
+                    return NodeResult.FromBool(EvaluateCtdCounter(node, GetConnectedBool(node, "Input1")));
+                case PlcElementType.CTC:
+                    return NodeResult.FromBool(EvaluateCtcCounter(node, GetConnectedBool(node, "Input1"), GetConnectedBool(node, "Input2")));
+
+                // ── Comparators ──
+                case PlcElementType.COMPARE_EQ:
+                case PlcElementType.COMPARE_NE:
+                case PlcElementType.COMPARE_GT:
+                case PlcElementType.COMPARE_LT:
+                case PlcElementType.COMPARE_GE:
+                case PlcElementType.COMPARE_LE:
+                    return NodeResult.FromBool(EvaluateCompare(node, dataStore));
+
+                // ── Math ──
+                case PlcElementType.MATH_ADD:
+                case PlcElementType.MATH_SUB:
+                case PlcElementType.MATH_MUL:
+                case PlcElementType.MATH_DIV:
+                    return NodeResult.FromInt(EvaluateMathInt(node, dataStore));
+
+                default:
+                    return NodeResult.FromBool(false);
+            }
+        }
+
+        /// <summary>
+        /// Gets the already-evaluated result of the node connected to the specified input connector.
+        /// Because we evaluate in topological order, upstream nodes are already in _evaluatedResults.
+        /// </summary>
+        private NodeResult? GetConnectedResult(VisualNode node, string connector)
+        {
+            var conn = _viewModel?.Connections.FirstOrDefault(c => c.TargetNodeId == node.Id && c.TargetConnector == connector);
+            if (conn == null) return null;
+            return _evaluatedResults.TryGetValue(conn.SourceNodeId, out var result) ? result : null;
+        }
+
+        private bool GetConnectedBool(VisualNode node, string connector)
+        {
+            return GetConnectedResult(node, connector)?.BoolValue ?? false;
+        }
+
+        private int GetConnectedInt(VisualNode node, string connector)
+        {
+            return GetConnectedResult(node, connector)?.IntValue ?? 0;
+        }
+
+        // ───────────────────────── PHASE 2: WRITE (with area guards) ─────────────────────────
+
+        private void WriteOutputToDataStore(VisualNode node, NodeResult result, DataStore dataStore)
+        {
+            var addr = node.OutputAddress;
+            if (addr == null || addr.Address < 0) return;
+
+            switch (node.ElementType)
+            {
+                case PlcElementType.OutputBool:
+                    // Area guard: bool outputs should write to Coil or DiscreteInput
+                    if (addr.Area == PlcArea.Coil || addr.Area == PlcArea.DiscreteInput)
+                    {
+                        WriteModbusValue(addr, result.BoolValue ? (ushort)1 : (ushort)0, dataStore);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("OutputBool node {NodeId} targets {Area}:{Address} — expected Coil or DiscreteInput",
+                            node.Id, addr.Area, addr.Address);
+                        WriteModbusValue(addr, result.BoolValue ? (ushort)1 : (ushort)0, dataStore);
+                    }
+                    break;
+
+                case PlcElementType.OutputInt:
+                    // Area guard: int outputs should write to HoldingRegister or InputRegister
+                    if (addr.Area == PlcArea.HoldingRegister || addr.Area == PlcArea.InputRegister)
+                    {
+                        WriteModbusValue(addr, (ushort)Math.Clamp(result.IntValue, 0, 65535), dataStore);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("OutputInt node {NodeId} targets {Area}:{Address} — expected HoldingRegister or InputRegister",
+                            node.Id, addr.Area, addr.Address);
+                        WriteModbusValue(addr, (ushort)Math.Clamp(result.IntValue, 0, 65535), dataStore);
+                    }
+                    break;
+
+                case PlcElementType.Output:
+                    // Legacy output: auto-detect based on area
+                    if (addr.Area == PlcArea.HoldingRegister || addr.Area == PlcArea.InputRegister)
+                    {
+                        WriteModbusValue(addr, (ushort)Math.Clamp(result.IntValue, 0, 65535), dataStore);
+                    }
+                    else
+                    {
+                        WriteModbusValue(addr, result.BoolValue ? (ushort)1 : (ushort)0, dataStore);
+                    }
+                    break;
+            }
+        }
+
+        // ───────────────────────── EVALUATORS ─────────────────────────
+
+        private bool EvaluateRsLatch(VisualNode node, bool setInput, bool resetInput)
+        {
+            if (node.SetDominant)
+            {
+                if (resetInput) node.RsState = false;
+                if (setInput) node.RsState = true;
+            }
+            else
+            {
+                if (setInput) node.RsState = true;
+                if (resetInput) node.RsState = false;
+            }
+            return node.RsState;
+        }
+
+        private bool EvaluateTonTimer(VisualNode node, bool input)
+        {
+            var now = DateTime.UtcNow;
+            var elapsedMs = (int)(now - _lastUpdate).TotalMilliseconds;
+
+            if (input)
+            {
+                node.TimerAccumulatorMs += elapsedMs;
+                if (node.TimerAccumulatorMs >= node.TimerPresetMs)
+                    node.TimerOutput = true;
+            }
+            else
+            {
+                node.TimerAccumulatorMs = 0;
+                node.TimerOutput = false;
             }
 
-            // For other nodes, we need to evaluate the logic
-            
-            // Get input values from connected nodes
-            var input1Value = false;
-            var input2Value = false;
+            node.TimerLastInput = input;
+            return node.TimerOutput;
+        }
 
-            // Find connections to this node's inputs
-            var connections = _viewModel?.Connections.Where(c => c.TargetNodeId == node.Id).ToList() ?? new List<NodeConnection>();
+        private bool EvaluateTofTimer(VisualNode node, bool input)
+        {
+            var now = DateTime.UtcNow;
+            var elapsedMs = (int)(now - _lastUpdate).TotalMilliseconds;
 
-            foreach (var connection in connections)
+            if (input)
             {
-                var sourceNode = _viewModel?.Nodes.FirstOrDefault(n => n.Id == connection.SourceNodeId);
-                if (sourceNode != null)
+                node.TimerAccumulatorMs = 0;
+                node.TimerOutput = true;
+            }
+            else if (node.TimerOutput)
+            {
+                node.TimerAccumulatorMs += elapsedMs;
+                if (node.TimerAccumulatorMs >= node.TimerPresetMs)
                 {
-                    var sourceValue = GetNodeValueFromSimulation(sourceNode, dataStore, elapsedMs, visited);
-                    
-                    if (connection.TargetConnector == "Input1")
-                        input1Value = sourceValue;
-                    else if (connection.TargetConnector == "Input2")
-                        input2Value = sourceValue;
+                    node.TimerOutput = false;
+                    node.TimerAccumulatorMs = 0;
                 }
             }
 
-            // Evaluate based on node type
+            node.TimerLastInput = input;
+            return node.TimerOutput;
+        }
+
+        private bool EvaluateTpTimer(VisualNode node, bool input)
+        {
+            var now = DateTime.UtcNow;
+            var elapsedMs = (int)(now - _lastUpdate).TotalMilliseconds;
+            var risingEdge = input && !node.TimerLastInput;
+
+            if (risingEdge)
+            {
+                node.TimerAccumulatorMs = 0;
+                node.TimerOutput = true;
+            }
+
+            if (node.TimerOutput)
+            {
+                node.TimerAccumulatorMs += elapsedMs;
+                if (node.TimerAccumulatorMs >= node.TimerPresetMs)
+                    node.TimerOutput = false;
+            }
+
+            node.TimerLastInput = input;
+            return node.TimerOutput;
+        }
+
+        private bool EvaluateCtuCounter(VisualNode node, bool input)
+        {
+            if (input && !node.CounterLastInput) node.CounterValue++;
+            node.CounterLastInput = input;
+            return node.CounterValue >= node.CounterPreset;
+        }
+
+        private bool EvaluateCtdCounter(VisualNode node, bool input)
+        {
+            if (input && !node.CounterLastInput) node.CounterValue--;
+            node.CounterLastInput = input;
+            return node.CounterValue <= 0;
+        }
+
+        private bool EvaluateCtcCounter(VisualNode node, bool input, bool direction)
+        {
+            if (input && !node.CounterLastInput)
+            {
+                if (direction) node.CounterValue++;
+                else node.CounterValue--;
+            }
+            node.CounterLastInput = input;
+            return node.CounterValue >= node.CounterPreset;
+        }
+
+        private bool EvaluateCompare(VisualNode node, DataStore dataStore)
+        {
+            var in1 = GetConnectedInt(node, "Input1");
+            // If no connection on Input1, fallback to direct address read
+            if (GetConnectedResult(node, "Input1") == null)
+                in1 = ReadModbusValueInt(node.Input1Address, dataStore);
+
+            var in2 = GetConnectedInt(node, "Input2");
+            if (GetConnectedResult(node, "Input2") == null)
+                in2 = node.Input2Address?.Address >= 0 ? ReadModbusValueInt(node.Input2Address, dataStore) : node.CompareValue;
+
             return node.ElementType switch
             {
-                PlcElementType.Input => ReadModbusValue(node.Input1Address, dataStore),
-                PlcElementType.InputBool => ReadModbusValue(node.Input1Address, dataStore),
-                PlcElementType.InputInt => ReadModbusValueInt(node.Input1Address, dataStore) != 0, // Convert int to bool for logic
-                PlcElementType.Output => input1Value, // Output blocks just pass through the input value
-                PlcElementType.OutputBool => input1Value, // Boolean output
-                PlcElementType.OutputInt => input1Value, // Integer output (still bool for logic evaluation)
-                PlcElementType.NOT => !input1Value,
-                PlcElementType.AND => input1Value && input2Value,
-                PlcElementType.OR => input1Value || input2Value,
-                PlcElementType.RS => EvaluateRsLatch(node, input1Value, input2Value),
-                PlcElementType.TON => EvaluateTonTimer(node, input1Value, elapsedMs),
-                PlcElementType.TOF => EvaluateTofTimer(node, input1Value, elapsedMs),
-                PlcElementType.TP => EvaluateTpTimer(node, input1Value, elapsedMs),
-                PlcElementType.CTU => EvaluateCtuCounter(node, input1Value),
-                PlcElementType.CTD => EvaluateCtdCounter(node, input1Value),
-                PlcElementType.CTC => EvaluateCtcCounter(node, input1Value, input2Value),
-                PlcElementType.COMPARE_EQ => EvaluateCompare(node, dataStore, connections, (a, b) => a == b),
-                PlcElementType.COMPARE_NE => EvaluateCompare(node, dataStore, connections, (a, b) => a != b),
-                PlcElementType.COMPARE_GT => EvaluateCompare(node, dataStore, connections, (a, b) => a > b),
-                PlcElementType.COMPARE_LT => EvaluateCompare(node, dataStore, connections, (a, b) => a < b),
-                PlcElementType.COMPARE_GE => EvaluateCompare(node, dataStore, connections, (a, b) => a >= b),
-                PlcElementType.COMPARE_LE => EvaluateCompare(node, dataStore, connections, (a, b) => a <= b),
-                PlcElementType.MATH_ADD => EvaluateMath(node, dataStore, connections, (a, b) => a + b),
-                PlcElementType.MATH_SUB => EvaluateMath(node, dataStore, connections, (a, b) => a - b),
-                PlcElementType.MATH_MUL => EvaluateMath(node, dataStore, connections, (a, b) => a * b),
-                PlcElementType.MATH_DIV => EvaluateMath(node, dataStore, connections, (a, b) => b != 0 ? a / b : 0),
+                PlcElementType.COMPARE_EQ => in1 == in2,
+                PlcElementType.COMPARE_NE => in1 != in2,
+                PlcElementType.COMPARE_GT => in1 > in2,
+                PlcElementType.COMPARE_LT => in1 < in2,
+                PlcElementType.COMPARE_GE => in1 >= in2,
+                PlcElementType.COMPARE_LE => in1 <= in2,
                 _ => false
             };
         }
 
         /// <summary>
-        /// Resolves the integer value for a given input connector by checking visual connections first,
-        /// then falling back to the node's configured Modbus address reference.
+        /// Evaluates a math node and returns only the integer result — no DataStore writes.
         /// </summary>
-        private int ResolveIntInput(string connectorName, PlcAddressReference? fallbackAddress, 
-            int fallbackConstant, List<NodeConnection> connections, DataStore dataStore)
+        private int EvaluateMathInt(VisualNode node, DataStore dataStore)
         {
-            // Check if there's a visual wire connected to this input
-            var connection = connections.FirstOrDefault(c => c.TargetConnector == connectorName);
-            if (connection != null)
-            {
-                var sourceNode = _viewModel?.Nodes.FirstOrDefault(n => n.Id == connection.SourceNodeId);
-                if (sourceNode != null)
-                {
-                    // For InputInt or Math nodes, read the actual integer value
-                    if (sourceNode.ElementType == PlcElementType.InputInt)
-                    {
-                        return ReadModbusValueInt(sourceNode.Input1Address, dataStore);
-                    }
-                    
-                    // For Math nodes that write to an output address, read from their output
-                    if (IsMathType(sourceNode.ElementType) && sourceNode.OutputAddress?.Address >= 0)
-                    {
-                        return ReadModbusValueInt(sourceNode.OutputAddress, dataStore);
-                    }
-                    
-                    // For boolean nodes, convert to 0/1
-                    var boolValue = GetNodeValueFromSimulation(sourceNode, dataStore, 0);
-                    return boolValue ? 1 : 0;
-                }
-            }
+            var in1 = GetConnectedInt(node, "Input1");
+            if (GetConnectedResult(node, "Input1") == null)
+                in1 = ReadModbusValueInt(node.Input1Address, dataStore);
 
-            // No connection -- fall back to the node's configured address, or constant value
-            if (fallbackAddress != null && fallbackAddress.Address >= 0)
+            var in2 = GetConnectedInt(node, "Input2");
+            if (GetConnectedResult(node, "Input2") == null)
+                in2 = node.Input2Address?.Address >= 0 ? ReadModbusValueInt(node.Input2Address, dataStore) : node.CompareValue;
+
+            return node.ElementType switch
             {
-                return ReadModbusValueInt(fallbackAddress, dataStore);
-            }
-            
-            return fallbackConstant;
+                PlcElementType.MATH_ADD => in1 + in2,
+                PlcElementType.MATH_SUB => in1 - in2,
+                PlcElementType.MATH_MUL => in1 * in2,
+                PlcElementType.MATH_DIV => in2 != 0 ? in1 / in2 : 0,
+                _ => 0
+            };
         }
 
-        private static bool IsMathType(PlcElementType type)
-        {
-            return type == PlcElementType.MATH_ADD || type == PlcElementType.MATH_SUB 
-                || type == PlcElementType.MATH_MUL || type == PlcElementType.MATH_DIV;
-        }
+        // ───────────────────────── MODBUS I/O ─────────────────────────
 
-        private bool ReadModbusValue(PlcAddressReference? address, DataStore dataStore)
+        private bool ReadModbusValue(PlcAddressReference address, DataStore dataStore)
         {
-            if (address == null || address.Address < 0) return false;
+            if (address.Address < 0) return false;
 
             var value = address.Area switch
             {
@@ -330,9 +594,9 @@ namespace ModbusForge.Services
             return address.Not ? !value : value;
         }
 
-        private int ReadModbusValueInt(PlcAddressReference? address, DataStore dataStore)
+        private int ReadModbusValueInt(PlcAddressReference address, DataStore dataStore)
         {
-            if (address == null || address.Address < 0) return 0;
+            if (address.Address < 0) return 0;
 
             var value = address.Area switch
             {
@@ -346,163 +610,9 @@ namespace ModbusForge.Services
             return address.Not ? (value == 0 ? 1 : 0) : value;
         }
 
-        private bool EvaluateRsLatch(VisualNode node, bool setInput, bool resetInput)
+        private void WriteModbusValue(PlcAddressReference output, ushort value, DataStore dataStore)
         {
-            if (node.SetDominant)
-            {
-                // Set dominant: if both Set and Reset are true, Set wins (runs last)
-                if (resetInput) node.RsState = false;
-                if (setInput) node.RsState = true;
-            }
-            else
-            {
-                // Reset dominant: if both Set and Reset are true, Reset wins (runs last)
-                if (setInput) node.RsState = true;
-                if (resetInput) node.RsState = false;
-            }
-            return node.RsState;
-        }
-
-        private bool EvaluateTonTimer(VisualNode node, bool input, int elapsedMs)
-        {
-            if (input)
-            {
-                node.TimerAccumulatorMs += elapsedMs;
-                if (node.TimerAccumulatorMs >= node.TimerPresetMs)
-                {
-                    node.TimerOutput = true;
-                }
-            }
-            else
-            {
-                node.TimerAccumulatorMs = 0;
-                node.TimerOutput = false;
-            }
-
-            node.TimerLastInput = input;
-            return node.TimerOutput;
-        }
-
-        private bool EvaluateTofTimer(VisualNode node, bool input, int elapsedMs)
-        {
-            if (input)
-            {
-                node.TimerAccumulatorMs = 0;
-                node.TimerOutput = true;
-            }
-            else
-            {
-                if (node.TimerOutput)
-                {
-                    node.TimerAccumulatorMs += elapsedMs;
-                    if (node.TimerAccumulatorMs >= node.TimerPresetMs)
-                    {
-                        node.TimerOutput = false;
-                        node.TimerAccumulatorMs = 0;
-                    }
-                }
-            }
-
-            node.TimerLastInput = input;
-            return node.TimerOutput;
-        }
-
-        private bool EvaluateTpTimer(VisualNode node, bool input, int elapsedMs)
-        {
-            var risingEdge = input && !node.TimerLastInput;
-
-            if (risingEdge)
-            {
-                node.TimerAccumulatorMs = 0;
-                node.TimerOutput = true;
-            }
-
-            if (node.TimerOutput)
-            {
-                node.TimerAccumulatorMs += elapsedMs;
-                if (node.TimerAccumulatorMs >= node.TimerPresetMs)
-                {
-                    node.TimerOutput = false;
-                }
-            }
-
-            node.TimerLastInput = input;
-            return node.TimerOutput;
-        }
-
-        private bool EvaluateCtuCounter(VisualNode node, bool input)
-        {
-            var risingEdge = input && !node.CounterLastInput;
-
-            if (risingEdge)
-            {
-                node.CounterValue++;
-            }
-
-            node.CounterLastInput = input;
-            return node.CounterValue >= node.CounterPreset;
-        }
-
-        private bool EvaluateCtdCounter(VisualNode node, bool input)
-        {
-            var risingEdge = input && !node.CounterLastInput;
-
-            if (risingEdge)
-            {
-                node.CounterValue--;
-            }
-
-            node.CounterLastInput = input;
-            return node.CounterValue <= 0;
-        }
-
-        private bool EvaluateCtcCounter(VisualNode node, bool input, bool direction)
-        {
-            var risingEdge = input && !node.CounterLastInput;
-
-            if (risingEdge)
-            {
-                if (direction)
-                    node.CounterValue++;
-                else
-                    node.CounterValue--;
-            }
-
-            node.CounterLastInput = input;
-            return node.CounterValue >= node.CounterPreset;
-        }
-
-        private bool EvaluateCompare(VisualNode node, DataStore dataStore, List<NodeConnection> connections, Func<int, int, bool> comparison)
-        {
-            var input1Val = ResolveIntInput("Input1", node.Input1Address, 0, connections, dataStore);
-            var input2Val = ResolveIntInput("Input2", node.Input2Address, node.CompareValue, connections, dataStore);
-            
-            return comparison(input1Val, input2Val);
-        }
-
-        private bool EvaluateMath(VisualNode node, DataStore dataStore, List<NodeConnection> connections, Func<int, int, int> operation)
-        {
-            var input1Val = ResolveIntInput("Input1", node.Input1Address, 0, connections, dataStore);
-            var input2Val = ResolveIntInput("Input2", node.Input2Address, node.CompareValue, connections, dataStore);
-            
-            var result = operation(input1Val, input2Val);
-            
-            // Clamp to ushort range (matching SimulationService behavior)
-            if (result < 0) result = 0;
-            if (result > 65535) result = 65535;
-            
-            // Write result to output if configured
-            if (node.OutputAddress?.Address >= 0)
-            {
-                WriteModbusValue(node.OutputAddress, (ushort)result, dataStore);
-            }
-            
-            return result != 0;
-        }
-
-        private void WriteModbusValue(PlcAddressReference? output, ushort value, DataStore dataStore)
-        {
-            if (output == null || output.Address < 0) return;
+            if (output?.Address < 0) return;
 
             var finalValue = output.Not ? (value == 0 ? (ushort)1 : (ushort)0) : value;
 
@@ -527,9 +637,17 @@ namespace ModbusForge.Services
             }
         }
 
+        // ───────────────────────── MISC ─────────────────────────
+
         public bool GetNodeValue(string nodeId)
         {
             return _nodeValueCache.GetValueOrDefault(nodeId, false);
+        }
+
+        private void DebugLog(string message)
+        {
+            if (_debugLogging)
+                System.Diagnostics.Debug.WriteLine($"[VisualSim] {message}");
         }
 
         public void Dispose()

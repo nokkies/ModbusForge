@@ -27,10 +27,10 @@ namespace ModbusForge.Models
         private double _y = 100;
         
         [ObservableProperty]
-        private double _width = 160;
+        private double _width = 240;
         
         [ObservableProperty]
-        private double _height = 120;
+        private double _height = 140;
         
         [ObservableProperty]
         private bool _isSelected = false;
@@ -70,6 +70,11 @@ namespace ModbusForge.Models
         public bool RsState { get; set; } = false;
         public int CounterValue { get; set; } = 0;
         public bool CounterLastInput { get; set; } = false;
+        
+        /// <summary>
+        /// Cached integer value from the last simulation tick (used by the two-phase evaluator).
+        /// </summary>
+        public int IntValue { get; set; } = 0;
         
         public string DisplayName
         {

@@ -10,6 +10,7 @@
         xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="1073" Width="1556"
+        WindowState="Maximized"
         Icon="pack://application:,,,/Resources/ModbusForge.ico"
         BorderThickness="1"
         Background="{StaticResource LightMetallicWhiteBrush}"
@@ -376,143 +377,7 @@
                 </Grid>
             </TabItem>
             <TabItem Header="Simulation">
-                <Grid Margin="5">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Mode Selection -->
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
-                        <TextBlock Text="Editor Mode:" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
-                        <RadioButton Content="Visual Node Editor" x:Name="VisualModeRadio" IsChecked="False" Margin="0,0,15,0" VerticalAlignment="Center"/>
-                        <RadioButton Content="Classic Form Editor" x:Name="ClassicModeRadio" IsChecked="True" VerticalAlignment="Center"/>
-                        <Separator Margin="15,0"/>
-                        <mah:ToggleSwitch IsOn="{Binding SimulationCoordinator.SimulationEnabled, Mode=TwoWay}" OnContent="Simulation Enabled" OffContent="Simulation Disabled" VerticalAlignment="Center"/>
-                        <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding SimulationCoordinator.SimulationPeriodMs}"/>
-                        <TextBlock VerticalAlignment="Center" Foreground="Gray" Margin="10,0,0,0">
-                            <Run Text="Note:" FontWeight="SemiBold"/>
-                            <Run Text=" Server mode only."/>
-                        </TextBlock>
-                    </StackPanel>
-
-                    <!-- Content -->
-                    <Grid Grid.Row="1">
-                        <!-- Visual Node Editor -->
-                        <views:VisualNodeEditor x:Name="VisualEditor" DataContext="{Binding VisualNodeEditorViewModel}" Visibility="{Binding IsChecked, ElementName=VisualModeRadio, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                        
-                        <!-- Classic Form Editor -->
-                        <ScrollViewer Visibility="{Binding IsChecked, ElementName=ClassicModeRadio, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <StackPanel Orientation="Vertical" >
-                                <GroupBox Header="PLC Simulation (Logic Gates &amp; Timers)">
-                                    <Grid Margin="5">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                        </Grid.RowDefinitions>
-        
-                                        <!-- PLC Enable and Period -->
-                                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                                            <mah:ToggleSwitch IsOn="{Binding SimulationCoordinator.PlcSimulationEnabled, Mode=TwoWay}" OnContent="PLC Simulation Enabled" OffContent="PLC Simulation Disabled" VerticalAlignment="Center"/>
-                                            <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                                            <TextBox Width="80" Text="{Binding SimulationCoordinator.PlcSimulationPeriodMs}"/>
-                                        </StackPanel>
-        
-                                        <!-- Add/Clear Buttons -->
-                                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,5">
-                                            <Button Content="Add Element" Command="{Binding SimulationCoordinator.AddPlcElementCommand}" Padding="10,3" Margin="0,0,5,0"/>
-                                            <Button Content="Clear All" Command="{Binding SimulationCoordinator.ClearPlcElementsCommand}" Padding="10,3"/>
-                                        </StackPanel>
-        
-                                        <!-- PLC Elements List (Inner ScrollViewer kept for localized scrolling if list is huge) -->
-                                        <ItemsControl Grid.Row="2" ItemsSource="{Binding SimulationCoordinator.PlcSimulationElements}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,5" Padding="5">
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-    
-                                                        <!-- Element Type -->
-                                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,10,0">
-                                                            <TextBlock Text="Type:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                                            <ComboBox Width="100" SelectedItem="{Binding ElementType}" 
-                                                                        ItemsSource="{Binding DataContext.SimulationCoordinator.PlcElementTypes, RelativeSource={RelativeSource AncestorType={x:Type mah:MetroWindow}}}"/>
-                                                        </StackPanel>
-    
-                                                        <!-- Inputs and Output -->
-                                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                                            <!-- Input 1 -->
-                                                            <StackPanel Orientation="Horizontal" Margin="0,0,8,0">
-                                                                <TextBlock Text="IN1:" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                                                                <ComboBox Width="75" SelectedItem="{Binding Input1.Area}" 
-                                                                            ItemsSource="{Binding DataContext.SimulationCoordinator.PlcAreas, RelativeSource={RelativeSource AncestorType={x:Type mah:MetroWindow}}}"/>
-                                                                <TextBox Width="45" Text="{Binding Input1.Address}" Margin="3,0,0,0"/>
-                                                                <CheckBox Content="NOT" IsChecked="{Binding Input1.Not}" VerticalAlignment="Center" Margin="3,0,0,0"/>
-                                                            </StackPanel>
-    
-                                                            <!-- Input 2 (for AND/OR/RS/CTC/Compare/Math) -->
-                                                            <StackPanel Orientation="Horizontal" Margin="0,0,8,0">
-                                                                <TextBlock Text="IN2:" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                                                                <ComboBox Width="75" SelectedItem="{Binding Input2.Area}" 
-                                                                            ItemsSource="{Binding DataContext.SimulationCoordinator.PlcAreas, RelativeSource={RelativeSource AncestorType={x:Type mah:MetroWindow}}}"/>
-                                                                <TextBox Width="45" Text="{Binding Input2.Address}" Margin="3,0,0,0"/>
-                                                                <CheckBox Content="NOT" IsChecked="{Binding Input2.Not}" VerticalAlignment="Center" Margin="3,0,0,0"/>
-                                                            </StackPanel>
-    
-                                                            <!-- Output -->
-                                                            <StackPanel Orientation="Horizontal" Margin="0,0,8,0">
-                                                                <TextBlock Text="OUT:" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                                                                <ComboBox Width="75" SelectedItem="{Binding Output.Area}" 
-                                                                            ItemsSource="{Binding DataContext.SimulationCoordinator.PlcAreas, RelativeSource={RelativeSource AncestorType={x:Type mah:MetroWindow}}}"/>
-                                                                <TextBox Width="45" Text="{Binding Output.Address}" Margin="3,0,0,0"/>
-                                                                <CheckBox Content="NOT" IsChecked="{Binding Output.Not}" VerticalAlignment="Center" Margin="3,0,0,0"/>
-                                                            </StackPanel>
-    
-                                                            <!-- Timer Preset (for timers: TON, TOF, TP) -->
-                                                            <StackPanel Orientation="Horizontal" Margin="0,0,8,0">
-                                                                <TextBlock Text="Timer (ms):" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                                                                <TextBox Width="55" Text="{Binding TimerPresetMs}"/>
-                                                            </StackPanel>
-    
-                                                            <!-- Counter Preset (for counters: CTU, CTD, CTC) -->
-                                                            <StackPanel Orientation="Horizontal" Margin="0,0,8,0">
-                                                                <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                                                                <TextBox Width="45" Text="{Binding CounterPreset}"/>
-                                                            </StackPanel>
-    
-                                                            <!-- Compare Value (for comparators) -->
-                                                            <StackPanel Orientation="Horizontal" Margin="0,0,8,0">
-                                                                <TextBlock Text="CmpVal:" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                                                                <TextBox Width="45" Text="{Binding CompareValue}"/>
-                                                            </StackPanel>
-    
-                                                            <!-- RS Set Dominant (for RS latch) -->
-                                                            <StackPanel Orientation="Horizontal">
-                                                                <TextBlock Text="Set Dom:" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                                                                <CheckBox IsChecked="{Binding SetDominant}" VerticalAlignment="Center"/>
-                                                            </StackPanel>
-                                                        </StackPanel>
-    
-                                                        <!-- Delete Button -->
-                                                        <Button Grid.Column="2" Content="X" Command="{Binding DataContext.SimulationCoordinator.RemovePlcElementCommand, RelativeSource={RelativeSource AncestorType={x:Type mah:MetroWindow}}}" 
-                                                                CommandParameter="{Binding}" Padding="5,2" VerticalAlignment="Center"/>
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </Grid>
-                            </GroupBox>
-                        </StackPanel>
-                    </ScrollViewer>
-                    </Grid>
-                </Grid>
+                <views:VisualNodeEditor x:Name="VisualEditor" DataContext="{Binding VisualNodeEditorViewModel}"/>
             </TabItem>
             <TabItem Header="Decode">
                 <Grid Margin="5">

@@ -1,15 +1,16 @@
-# ModbusForge v2.2.0
+# ModbusForge v4.5.14
 
 A professional Modbus TCP client/server application built with .NET 8.0 and WPF. ModbusForge provides comprehensive tools for testing, monitoring, and automating Modbus communications.
 
 ![ModbusForge](ModbusForge/Resources/ModbusForgeLOGO.png)
 
-## ✨ What's New in v2.2.0
+## ✨ What's New in v4.5.14
 
-- **🔧 Options Menu** - Preferences dialog for application settings persistence
-- **🔗 Multi-Device Connections** - Connect to multiple Modbus servers simultaneously with the new Connection Manager
-- **📜 Scripting/Automation** - Create and run automated test sequences with the Script Editor
-- **🎨 UI Modernization** - Enhanced theme with smooth animations and modern styling
+- **� Maximized Startup** - Application now starts maximized for better usability
+- **� Input Validation** - Address TextBoxes now validate numeric input with visual feedback
+- **♻️ Code Quality** - Refactored 350-line method, fixed memory leaks, standardized logging
+- **🛠️ Bug Fixes** - Fixed empty catch blocks, extracted magic numbers to constants
+- **🖱️ Right-Click Delete** - Delete nodes via right-click context menu
 
 ## Key Features
 
@@ -136,7 +137,7 @@ Access via **Options → Preferences**
 
 ## Versioning
 
-- The window title displays the application version from the assembly ProductVersion (fallback to `v2.2.0`).
+- The window title displays the application version from the assembly ProductVersion (fallback to `v4.5.14`).
 
 ## Build and Release
 
@@ -165,7 +166,7 @@ dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-con
 4. Create a ZIP artifact:
 
 ```powershell
-$version = "2.2.0"
+$version = "4.5.14"
 Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
 # or for self-contained
 Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$version-win-x64-sc.zip -Force
@@ -174,7 +175,7 @@ Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$ve
 5. Tag and create a GitHub Release (optional):
 
 ```powershell
-$version = "2.2.0"
+$version = "4.5.14"
 git tag v$version
 git push origin v$version
 
@@ -198,6 +199,15 @@ This project uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create a si
    The installer will be created in the `installers` directory.
 
 ## Changelog
+
+- 4.5.14 (2025-03-27)
+  - **Maximized Startup** - Application now starts maximized for better usability
+  - **Input Validation** - Address TextBoxes now validate numeric input with visual feedback (red border on invalid)
+  - **Code Quality** - Refactored 350-line `CreateNodeElement` method into 10+ focused sub-methods
+  - **Memory Leak Fix** - Proper event handler cleanup to prevent memory leaks
+  - **Logging Standardization** - Consolidated to `ILogger` only, removed mixed logging approaches
+  - **Bug Fixes** - Fixed empty catch blocks, extracted magic numbers to constants
+  - **Right-Click Delete** - Delete nodes via right-click context menu
 
 - 2.2.0 (2025-01-09)
   - **Options Menu**: Added Preferences dialog for application settings persistence
@@ -360,9 +370,9 @@ If you encounter build issues:
 ## Roadmap
 
 - [ ] Batch operations for multiple registers
-- [ ] Enhanced logging with file export
-- [ ] Simulation function blocks (AND, OR, timers)
-- [ ] Visual block editor for simulation
+- [x] Enhanced logging with file export (v4.5.x - partial, standardized to ILogger)
+- [x] Simulation function blocks (AND, OR, timers) (v4.5.x - implemented)
+- [x] Visual block editor for simulation (v4.5.x - implemented)
 - [ ] Unit and integration tests
 - [ ] Code signing for installers
 

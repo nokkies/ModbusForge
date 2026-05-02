@@ -103,7 +103,6 @@ namespace ModbusForge
             });
             services.AddSingleton<ITrendLogger, TrendLoggingService>();
             services.AddSingleton<IFileDialogService, FileDialogService>();
-            services.AddSingleton<ISimulationService, SimulationService>();
             services.AddSingleton<ICustomEntryService, CustomEntryService>();
             services.AddSingleton<IConsoleLoggerService, ConsoleLoggerService>();
             services.AddSingleton<ISettingsService, SettingsService>();
@@ -128,7 +127,6 @@ namespace ModbusForge
                 provider.GetRequiredService<ILogger<TrendCoordinator>>()
             ));
             services.AddSingleton<ConfigurationCoordinator>();
-            services.AddSingleton<SimulationCoordinator>();
             
             // Register ViewModels
             services.AddSingleton<MainViewModel>();

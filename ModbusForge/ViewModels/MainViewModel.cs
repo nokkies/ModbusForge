@@ -72,8 +72,7 @@ namespace ModbusForge.ViewModels
             App.ServiceProvider.GetRequiredService<RegisterCoordinator>(),
             App.ServiceProvider.GetRequiredService<CustomEntryCoordinator>(),
             App.ServiceProvider.GetRequiredService<TrendCoordinator>(),
-            App.ServiceProvider.GetRequiredService<ConfigurationCoordinator>(),
-            App.ServiceProvider.GetRequiredService<SimulationCoordinator>())
+            App.ServiceProvider.GetRequiredService<ConfigurationCoordinator>())
         {
         }
 
@@ -89,10 +88,9 @@ namespace ModbusForge.ViewModels
             StatusMessage = $"Read {snapshot.Count} custom entries";
         }
 
-        public SimulationCoordinator SimulationCoordinator { get; }
         public VisualNodeEditorViewModel VisualNodeEditorViewModel => _visualNodeEditorViewModel;
 
-        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, SimulationCoordinator simulationCoordinator)
+        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator)
         {
             // Store dependencies
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
@@ -106,8 +104,6 @@ namespace ModbusForge.ViewModels
             _customEntryCoordinator = customEntryCoordinator ?? throw new ArgumentNullException(nameof(customEntryCoordinator));
             _trendCoordinator = trendCoordinator ?? throw new ArgumentNullException(nameof(trendCoordinator));
             _configurationCoordinator = configurationCoordinator ?? throw new ArgumentNullException(nameof(configurationCoordinator));
-            SimulationCoordinator = simulationCoordinator ?? throw new ArgumentNullException(nameof(simulationCoordinator));
-            
             // Initialize visual node editor
             _visualNodeEditorViewModel = new VisualNodeEditorViewModel();
             _visualSimulationService = App.ServiceProvider.GetRequiredService<IVisualSimulationService>();
@@ -158,7 +154,7 @@ namespace ModbusForge.ViewModels
                     }
                 }
             }
-            catch { /* best-effort defaults from config */ }
+            catch (Exception ex) { _logger.LogDebug(ex, "Failed to load settings, using defaults"); }
         }
 
         /// <summary>
@@ -286,9 +282,8 @@ namespace ModbusForge.ViewModels
             _trendTimer.Start();
 
             // Start services
-            try { _trendLogger.Start(); } catch { }
+            try { _trendLogger.Start(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to start trend logger"); }
             SubscribeCustomEntries();
-            SimulationCoordinator.Start();
         }
 
         [ObservableProperty]
@@ -449,10 +444,7 @@ namespace ModbusForge.ViewModels
         public ObservableCollection<CustomEntry> CustomEntries => CurrentConfig.CustomEntries;
         public bool SimulationEnabled => CurrentConfig.SimulationSettings.SimulationEnabled;
         public int SimulationPeriodMs => CurrentConfig.SimulationSettings.SimulationPeriodMs;
-        public bool PlcSimulationEnabled => CurrentConfig.SimulationSettings.PlcSimulationEnabled;
-        public int PlcSimulationPeriodMs => CurrentConfig.SimulationSettings.PlcSimulationPeriodMs;
-        public ObservableCollection<PlcSimulationElement> PlcElements => CurrentConfig.SimulationSettings.PlcElements;
-        
+
         // Monitoring properties that delegate to current configuration
         public bool GlobalMonitorEnabled 
         { 
@@ -596,8 +588,6 @@ namespace ModbusForge.ViewModels
             
             // Notify all delegated properties that they may have changed
             OnPropertyChanged(nameof(CustomEntries));
-            OnPropertyChanged(nameof(SimulationEnabled));
-            OnPropertyChanged(nameof(PlcSimulationEnabled));
             OnPropertyChanged(nameof(GlobalMonitorEnabled));
             OnPropertyChanged(nameof(HoldingMonitorEnabled));
             OnPropertyChanged(nameof(InputRegistersMonitorEnabled));
@@ -608,11 +598,6 @@ namespace ModbusForge.ViewModels
         }
 
         // Setters for delegated properties (needed for two-way binding)
-        private void SetSimulationEnabled(bool value) => CurrentConfig.SimulationSettings.SimulationEnabled = value;
-        private void SetSimulationPeriodMs(int value) => CurrentConfig.SimulationSettings.SimulationPeriodMs = value;
-        private void SetPlcSimulationEnabled(bool value) => CurrentConfig.SimulationSettings.PlcSimulationEnabled = value;
-        private void SetPlcSimulationPeriodMs(int value) => CurrentConfig.SimulationSettings.PlcSimulationPeriodMs = value;
-        
         private void SetGlobalMonitorEnabled(bool value) => CurrentConfig.MonitoringSettings.GlobalMonitorEnabled = value;
         private void SetHoldingMonitorEnabled(bool value) => CurrentConfig.MonitoringSettings.HoldingMonitorEnabled = value;
         private void SetHoldingMonitorPeriodMs(int value) => CurrentConfig.MonitoringSettings.HoldingMonitorPeriodMs = value;
@@ -770,8 +755,7 @@ namespace ModbusForge.ViewModels
                         _monitorTimer.Tick -= MonitorTimer_Tick;
                         _trendTimer.Stop();
                         _trendTimer.Tick -= TrendTimer_Tick;
-                        SimulationCoordinator.Stop();
-                        try { _trendLogger.Stop(); } catch { }
+                        try { _trendLogger.Stop(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to stop trend logger"); }
                         try
                         {
                             CustomEntries.CollectionChanged -= CustomEntries_CollectionChanged;
@@ -780,9 +764,9 @@ namespace ModbusForge.ViewModels
                                 ce.PropertyChanged -= CustomEntry_PropertyChanged;
                             }
                         }
-                        catch { }
+                        catch (Exception ex) { _logger.LogDebug(ex, "Error detaching event handlers during disposal"); }
                     }
-                    catch { }
+                    catch (Exception ex) { _logger.LogDebug(ex, "Error during timer cleanup in Dispose"); }
                     try
                     {
                         // Attempt a graceful disconnect with timeout to avoid freezing
@@ -1287,7 +1271,6 @@ namespace ModbusForge.ViewModels
         {
             await _configurationCoordinator.SaveAllConfigAsync(
                 Mode, ServerAddress, Port, UnitId, CustomEntries,
-                SimulationCoordinator.PlcSimulationElements,
                 _visualNodeEditorViewModel.Nodes,
                 _visualNodeEditorViewModel.Connections,
                 msg => StatusMessage = msg);
@@ -1305,7 +1288,6 @@ namespace ModbusForge.ViewModels
                     p => Port = p,
                     u => UnitId = u,
                     CustomEntries,
-                    SimulationCoordinator.PlcSimulationElements,
                     _visualNodeEditorViewModel.Nodes,
                     _visualNodeEditorViewModel.Connections,
                     SubscribeCustomEntries);
@@ -1390,7 +1372,10 @@ namespace ModbusForge.ViewModels
                                 ServerUnitId = ServerUnitId,
                                 ClientUnitId = UnitId
                             },
-                            UnitConfigurations = new Dictionary<byte, UnitIdConfiguration>(UnitConfigurations)
+                            UnitConfigurations = new Dictionary<byte, UnitIdConfiguration>(UnitConfigurations),
+                            // Save visual simulation data
+                            VisualNodes = new List<VisualNode>(_visualNodeEditorViewModel.Nodes),
+                            VisualConnections = new List<NodeConnection>(_visualNodeEditorViewModel.Connections)
                         };
                     }
                     else
@@ -1414,7 +1399,10 @@ namespace ModbusForge.ViewModels
                             UnitConfigurations = new Dictionary<byte, UnitIdConfiguration>
                             {
                                 [UnitId] = CurrentConfig.Clone()
-                            }
+                            },
+                            // Save visual simulation data
+                            VisualNodes = new List<VisualNode>(_visualNodeEditorViewModel.Nodes),
+                            VisualConnections = new List<NodeConnection>(_visualNodeEditorViewModel.Connections)
                         };
                     }
 
@@ -1472,6 +1460,28 @@ namespace ModbusForge.ViewModels
                             UnitConfigurations[kvp.Key] = kvp.Value.Clone();
                         }
 
+                        // Restore visual simulation data
+                        _visualNodeEditorViewModel.Nodes.Clear();
+                        _visualNodeEditorViewModel.Connections.Clear();
+                        
+                        if (projectConfig.VisualNodes != null)
+                        {
+                            foreach (var node in projectConfig.VisualNodes)
+                            {
+                                // Fix old nodes with invalid addresses (migration)
+                                MigrateOldNodeAddresses(node);
+                                _visualNodeEditorViewModel.Nodes.Add(node);
+                            }
+                        }
+                        
+                        if (projectConfig.VisualConnections != null)
+                        {
+                            foreach (var connection in projectConfig.VisualConnections)
+                            {
+                                _visualNodeEditorViewModel.Connections.Add(connection);
+                            }
+                        }
+
                         // Ensure we have a configuration for the selected Unit ID
                         if (!UnitConfigurations.ContainsKey(SelectedUnitId))
                         {
@@ -1481,7 +1491,6 @@ namespace ModbusForge.ViewModels
                         // Refresh UI
                         OnPropertyChanged(nameof(CustomEntries));
                         OnPropertyChanged(nameof(SimulationEnabled));
-                        OnPropertyChanged(nameof(PlcSimulationEnabled));
                         OnPropertyChanged(nameof(GlobalMonitorEnabled));
                         OnPropertyChanged(nameof(HoldingMonitorEnabled));
                         OnPropertyChanged(nameof(InputRegistersMonitorEnabled));
@@ -1667,6 +1676,45 @@ namespace ModbusForge.ViewModels
             {
                 _logger.LogError(ex, "Error exporting Unit ID");
                 StatusMessage = $"Error exporting Unit ID: {ex.Message}";
+            }
+        }
+
+        private void MigrateOldNodeAddresses(VisualNode node)
+        {
+            // Fix InputInt nodes with missing OutputAddress
+            if (node.ElementType == PlcElementType.InputInt && node.OutputAddress == null)
+            {
+                node.OutputAddress = new PlcAddressReference 
+                { 
+                    Area = PlcArea.HoldingRegister, 
+                    Address = node.Input1Address?.Address ?? 1 
+                };
+            }
+            
+            // Fix InputBool nodes with missing OutputAddress
+            if (node.ElementType == PlcElementType.InputBool && node.OutputAddress == null)
+            {
+                node.OutputAddress = new PlcAddressReference 
+                { 
+                    Area = PlcArea.Coil, 
+                    Address = node.Input1Address?.Address ?? 1 
+                };
+            }
+            
+            // Fix any nodes with Coil:0 addresses (invalid)
+            if (node.OutputAddress?.Area == PlcArea.Coil && node.OutputAddress.Address == 0)
+            {
+                node.OutputAddress.Address = 1;
+            }
+            
+            if (node.Input1Address?.Area == PlcArea.Coil && node.Input1Address.Address == 0)
+            {
+                node.Input1Address.Address = 1;
+            }
+            
+            if (node.Input2Address?.Area == PlcArea.Coil && node.Input2Address.Address == 0)
+            {
+                node.Input2Address.Address = 1;
             }
         }
 
