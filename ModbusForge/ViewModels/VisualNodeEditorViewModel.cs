@@ -211,16 +211,15 @@ namespace ModbusForge.ViewModels
             UpdateAllConnections();
         }
         
-        public void SelectNode(VisualNode node)
+        public void SelectNode(VisualNode? node)
         {
-            // Clear previous selection
-            foreach (var n in Nodes)
+            ClearSelection();
+
+            if (node != null)
             {
-                n.IsSelected = false;
+                node.IsSelected = true;
+                SelectedNode = node;
             }
-            
-            node.IsSelected = true;
-            SelectedNode = node;
         }
         
         public void ClearSelection()
