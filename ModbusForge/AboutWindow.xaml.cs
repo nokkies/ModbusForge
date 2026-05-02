@@ -1,8 +1,10 @@
 using System;
 using System.Diagnostics;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Navigation;
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ModbusForge
 {
@@ -33,7 +35,14 @@ namespace ModbusForge
                     ver = Assembly.GetEntryAssembly()?.GetName()?.Version?.ToString();
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                if (App.ServiceProvider != null)
+                {
+                    var logger = App.ServiceProvider.GetService<ILogger<AboutWindow>>();
+                    logger?.LogWarning(ex, "Failed to retrieve application version information.");
+                }
+            }
             VersionText.Text = !string.IsNullOrWhiteSpace(ver) ? $"ModbusForge v{ver}" : "ModbusForge v2.1.3";
         }
 
