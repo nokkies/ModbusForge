@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace ModbusForge.Services;
 
@@ -11,6 +12,7 @@ public class SettingsService : ISettingsService
         "ModbusForge",
         "settings.json");
 
+    private readonly ILogger<SettingsService> _logger;
     private SettingsData _settings = new();
 
     public bool AutoReconnect
@@ -51,12 +53,13 @@ public class SettingsService : ISettingsService
 
     public event EventHandler? SettingsChanged;
 
-    public SettingsService()
+    public SettingsService(ILogger<SettingsService> logger)
     {
+        _logger = logger;
         Load();
     }
 
-    public void Save()
+    public bool Save()
     {
         try
         {
@@ -68,10 +71,12 @@ public class SettingsService : ISettingsService
 
             var json = JsonSerializer.Serialize(_settings, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(SettingsFilePath, json);
+            return true;
         }
-        catch
+        catch (Exception ex)
         {
-            // Silently fail if we can't save settings
+            _logger.LogError(ex, "Failed to save settings to {SettingsFilePath}", SettingsFilePath);
+            return false;
         }
     }
 
@@ -89,9 +94,9 @@ public class SettingsService : ISettingsService
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Use defaults if we can't load
+            _logger.LogWarning(ex, "Failed to load settings from {SettingsFilePath}. Using defaults.", SettingsFilePath);
             _settings = new SettingsData();
         }
     }
