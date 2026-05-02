@@ -300,6 +300,57 @@ namespace ModbusForge.ViewModels
             }
             SelectedNode = null;
         }
+
+        /// <summary>
+        /// Migrates old node configurations to the latest format, fixing missing or invalid addresses.
+        /// </summary>
+        public void MigrateNodes()
+        {
+            foreach (var node in Nodes)
+            {
+                // Fix InputInt nodes with missing or default OutputAddress (should match Input1)
+                if (node.ElementType == PlcElementType.InputInt)
+                {
+                    if (node.OutputAddress == null || (node.OutputAddress.Area == PlcArea.Coil && node.OutputAddress.Address == 0))
+                    {
+                        node.OutputAddress = new PlcAddressReference
+                        {
+                            Area = PlcArea.HoldingRegister,
+                            Address = (node.Input1Address != null && node.Input1Address.Address >= 0) ? node.Input1Address.Address : 1
+                        };
+                    }
+                }
+
+                // Fix InputBool nodes with missing or default OutputAddress (should match Input1)
+                if (node.ElementType == PlcElementType.InputBool)
+                {
+                    if (node.OutputAddress == null || (node.OutputAddress.Area == PlcArea.Coil && node.OutputAddress.Address == 0))
+                    {
+                        node.OutputAddress = new PlcAddressReference
+                        {
+                            Area = PlcArea.Coil,
+                            Address = (node.Input1Address != null && node.Input1Address.Address >= 0) ? node.Input1Address.Address : 1
+                        };
+                    }
+                }
+
+                // Fix any nodes with Coil:0 addresses (invalid - should be at least 1)
+                if (node.OutputAddress != null && node.OutputAddress.Area == PlcArea.Coil && node.OutputAddress.Address == 0)
+                {
+                    node.OutputAddress.Address = 1;
+                }
+
+                if (node.Input1Address != null && node.Input1Address.Area == PlcArea.Coil && node.Input1Address.Address == 0)
+                {
+                    node.Input1Address.Address = 1;
+                }
+
+                if (node.Input2Address != null && node.Input2Address.Area == PlcArea.Coil && node.Input2Address.Address == 0)
+                {
+                    node.Input2Address.Address = 1;
+                }
+            }
+        }
         
         public void CreateConnection(string sourceNodeId, string targetNodeId, string targetConnector = "Input1")
         {
