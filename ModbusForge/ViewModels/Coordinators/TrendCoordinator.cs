@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Extensions.Logging;
@@ -21,18 +22,21 @@ namespace ModbusForge.ViewModels.Coordinators
         private readonly IModbusService _serverService;
         private readonly ITrendLogger _trendLogger;
         private readonly ILogger<TrendCoordinator> _logger;
+        private readonly ISettingsService _settingsService;
         private bool _isTrending;
 
         public TrendCoordinator(
             IModbusService clientService,
             IModbusService serverService,
             ITrendLogger trendLogger,
-            ILogger<TrendCoordinator> logger)
+            ILogger<TrendCoordinator> logger,
+            ISettingsService settingsService)
         {
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
             _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
             _trendLogger = trendLogger ?? throw new ArgumentNullException(nameof(trendLogger));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         }
 
         /// <summary>
@@ -53,21 +57,40 @@ namespace ModbusForge.ViewModels.Coordinators
             try
             {
                 var now = DateTime.UtcNow;
-                int totalEntries = snapshot.Count;
-                int successCount = 0;
-                int errorCount = 0;
+                int[] successCount = new int[1];
+                int[] errorCount = new int[1];
 
                 var groups = snapshot.GroupBy(ce => ce.Area ?? "HoldingRegister", StringComparer.OrdinalIgnoreCase);
 
-                foreach (var group in groups)
+                // Create a semaphore based on settings, default to 8 if invalid
+                int maxConcurrent = _settingsService.MaxConcurrentTrendRequests > 0 ? _settingsService.MaxConcurrentTrendRequests : 8;
+                using var semaphore = new SemaphoreSlim(maxConcurrent, maxConcurrent);
+
+                var tasks = groups.Select(async group =>
                 {
+                    await semaphore.WaitAsync();
+                    try
+                    {
+                        await ProcessAreaAsync(group.Key, group, unitId, isServerMode, now,
+                            onSuccess: () => Interlocked.Increment(ref successCount[0]),
+                            onError: () => Interlocked.Increment(ref errorCount[0]));
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                });
+
+                await Task.WhenAll(tasks);
+=======
                     await ProcessAreaAsync(group.Key.ToLowerInvariant(), group, unitId, isServerMode, now,
                         onSuccess: () => successCount++,
                         onError: () => errorCount++);
                 }
+>>>>>>> origin/master
 
                 // If all trend reads failed, disable monitoring and show error
-                if (errorCount > 0 && successCount == 0)
+                if (errorCount[0] > 0 && successCount[0] == 0)
                 {
                     setGlobalMonitorEnabled(false);
                     MessageBox.Show(
