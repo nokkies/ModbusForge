@@ -166,6 +166,16 @@ namespace ModbusForge.Services
                 (client, protocolAddress) => client.WriteSingleRegister(unitId, protocolAddress, value));
         }
 
+        public async Task WriteRegistersAsync(byte unitId, int startAddress, ushort[] values)
+        {
+            await ExecuteWriteAsync(
+                unitId,
+                startAddress,
+                $"Writing {values.Length} registers starting at {startAddress}",
+                "Error writing multiple registers",
+                (client, protocolAddress) => client.WriteMultipleRegisters(unitId, protocolAddress, values));
+        }
+
         public async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
         {
             return await ExecuteReadAsync(
@@ -319,21 +329,39 @@ namespace ModbusForge.Services
             {
                 if (disposing)
                 {
-                    // For synchronous dispose, try to acquire the lock with a timeout to avoid blocking indefinitely.
-                    // Callers are encouraged to use DisposeAsync to avoid blocking.
-                    bool lockAcquired = _ioLock.Wait(TimeSpan.FromMilliseconds(100));
-                    try
+                    // Try to acquire the lock immediately without blocking to allow fast-path dispose.
+                    bool lockAcquired = _ioLock.Wait(0);
+
+                    // Force clean up underlying resources immediately to abort pending I/O operations
+                    try { _client?.Dispose(); } catch { }
+                    try { _tcpClient?.Close(); } catch { }
+
+                    if (lockAcquired)
                     {
-                        _client?.Dispose();
-                        _tcpClient?.Close();
-                    }
-                    finally
-                    {
-                        if (lockAcquired)
+                        // Fast path: lock was available, safe to dispose now
+                        try
                         {
                             _ioLock.Release();
+                            _ioLock.Dispose();
                         }
-                        _ioLock.Dispose();
+                        catch { }
+                    }
+                    else
+                    {
+                        // Lock is held by an active I/O operation.
+                        // We must not block the calling thread, but we also can't dispose the lock yet,
+                        // otherwise the active operation will throw ObjectDisposedException when it releases.
+                        // We schedule a background task to await and clean up the lock safely.
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await _ioLock.WaitAsync().ConfigureAwait(false);
+                                _ioLock.Release();
+                                _ioLock.Dispose();
+                            }
+                            catch { }
+                        });
                     }
                 }
                 _disposed = true;
