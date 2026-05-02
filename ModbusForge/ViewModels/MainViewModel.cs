@@ -260,6 +260,9 @@ namespace ModbusForge.ViewModels
         /// </summary>
         private void InitializeTimersAndServices()
         {
+            // Subscribe to console log events
+            _consoleLoggerService.LogMessageReceived += ConsoleLoggerService_LogMessageReceived;
+
             // Custom writer timer
             _customTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             _customTimer.Tick += CustomTimer_Tick;
@@ -278,6 +281,20 @@ namespace ModbusForge.ViewModels
             // Start services
             try { _trendLogger.Start(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to start trend logger"); }
             SubscribeCustomEntries();
+        }
+
+        private void ConsoleLoggerService_LogMessageReceived(object? sender, LogMessageEventArgs e)
+        {
+            Application.Current?.Dispatcher?.Invoke(() =>
+            {
+                ConsoleMessages.Add(e.Message);
+
+                // Keep the last 1000 messages by default
+                while (ConsoleMessages.Count > 1000)
+                {
+                    ConsoleMessages.RemoveAt(0);
+                }
+            });
         }
 
         [ObservableProperty]
@@ -397,7 +414,7 @@ namespace ModbusForge.ViewModels
         public IRelayCommand SaveAllConfigCommand { get; private set; } = null!;
         public IRelayCommand LoadAllConfigCommand { get; private set; } = null!;
 
-        public ObservableCollection<string> ConsoleMessages => _consoleLoggerService.LogMessages;
+        public ObservableCollection<string> ConsoleMessages { get; } = new();
 
         // Register collections (shared across all Unit IDs for display)
         public ObservableCollection<RegisterEntry> HoldingRegisters { get; } = new();
@@ -743,6 +760,7 @@ namespace ModbusForge.ViewModels
                 {
                     try
                     {
+                        _consoleLoggerService.LogMessageReceived -= ConsoleLoggerService_LogMessageReceived;
                         _customTimer.Stop();
                         _customTimer.Tick -= CustomTimer_Tick;
                         _monitorTimer.Stop();
