@@ -31,13 +31,13 @@ namespace ModbusForge.ViewModels
 
             _readNowCommand = new AsyncRelayCommand(ReadAsync, CanRead);
             // Ensure initial enable/disable state reflects current connection
-            try { _readNowCommand.NotifyCanExecuteChanged(); } catch { }
+            try { _readNowCommand.NotifyCanExecuteChanged(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to notify CanExecuteChanged during initialization"); }
             _main.PropertyChanged += (s, e) =>
             {
                 if (string.Equals(e.PropertyName, nameof(MainViewModel.IsConnected), StringComparison.Ordinal) ||
                     string.Equals(e.PropertyName, nameof(MainViewModel.Mode), StringComparison.Ordinal))
                 {
-                    try { _readNowCommand.NotifyCanExecuteChanged(); } catch { }
+                    try { _readNowCommand.NotifyCanExecuteChanged(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to notify CanExecuteChanged on PropertyChanged"); }
                 }
             };
         }
@@ -119,12 +119,12 @@ namespace ModbusForge.ViewModels
 
         private bool CanRead()
         {
-            try { return _main.IsConnected && !IsBusy; } catch { return false; }
+            try { return _main.IsConnected && !IsBusy; } catch (Exception ex) { _logger.LogWarning(ex, "Error checking CanRead status"); return false; }
         }
 
         partial void OnIsBusyChanged(bool value)
         {
-            try { _readNowCommand.NotifyCanExecuteChanged(); } catch { }
+            try { _readNowCommand.NotifyCanExecuteChanged(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to notify CanExecuteChanged on IsBusy changed"); }
         }
 
         private async Task ReadAsync()

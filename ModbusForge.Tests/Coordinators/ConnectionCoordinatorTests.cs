@@ -90,7 +90,7 @@ namespace ModbusForge.Tests.Coordinators
             string? statusMessage = null;
             bool? connectedState = null;
 
-            _mockClientService.Setup(s => s.ConnectAsync(serverAddress, port))
+            _mockClientService.Setup(s => s.ConnectAsync(serverAddress, port, It.IsAny<string>()))
                 .ReturnsAsync(true);
 
             // Act
@@ -102,7 +102,7 @@ namespace ModbusForge.Tests.Coordinators
                 connected => connectedState = connected);
 
             // Assert
-            _mockClientService.Verify(s => s.ConnectAsync(serverAddress, port), Times.Once);
+            _mockClientService.Verify(s => s.ConnectAsync(serverAddress, port, It.IsAny<string>()), Times.Once);
             Assert.NotNull(statusMessage);
             Assert.True(connectedState);
         }

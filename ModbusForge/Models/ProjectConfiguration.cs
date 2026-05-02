@@ -14,6 +14,10 @@ namespace ModbusForge.Models
         public GlobalSettings GlobalSettings { get; set; } = new();
         public Dictionary<byte, UnitIdConfiguration> UnitConfigurations { get; set; } = new();
         
+        // Visual Simulation Data
+        public List<VisualNode> VisualNodes { get; set; } = new();
+        public List<NodeConnection> VisualConnections { get; set; } = new();
+        
         public ProjectConfiguration()
         {
             // Initialize with default Unit ID 1 configuration
