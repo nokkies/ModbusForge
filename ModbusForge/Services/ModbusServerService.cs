@@ -84,7 +84,15 @@ namespace ModbusForge.Services
 
         private void CleanupResources()
         {
-            try { _multiServer?.Stop(); } catch { }
+            try
+            {
+                _multiServer?.Stop();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error stopping Modbus server during resource cleanup");
+            }
+
             _multiServer?.Dispose();
             _multiServer = null;
         }
@@ -107,7 +115,7 @@ namespace ModbusForge.Services
             }
         }
 
-        private static string GetLocalNetworkIp()
+        private string GetLocalNetworkIp()
         {
             try
             {
@@ -119,7 +127,10 @@ namespace ModbusForge.Services
                 if (ips.Count > 0)
                     return string.Join(", ", ips);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error resolving local network IP addresses");
+            }
             return "0.0.0.0";
         }
 
@@ -242,7 +253,15 @@ namespace ModbusForge.Services
             {
                 if (disposing)
                 {
-                    try { CleanupResources(); } catch { }
+                    try
+                    {
+                        CleanupResources();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error during synchronous Dispose");
+                    }
+
                     _isRunning = false;
                 }
                 _disposed = true;
