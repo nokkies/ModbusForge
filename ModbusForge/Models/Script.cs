@@ -7,6 +7,9 @@ namespace ModbusForge.Models;
 public partial class Script : ObservableObject
 {
     [ObservableProperty]
+    private string _id = Guid.NewGuid().ToString();
+
+    [ObservableProperty]
     private string _name = "New Script";
 
     [ObservableProperty]

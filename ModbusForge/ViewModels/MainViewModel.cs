@@ -79,13 +79,7 @@ namespace ModbusForge.ViewModels
         private async Task ReadAllCustomNowAsync()
         {
             if (!IsConnected) return;
-            var snapshot = CustomEntries.ToList();
-            foreach (var ce in snapshot)
-            {
-                try { await _customEntryCoordinator.ReadCustomNowAsync(ce, EffectiveUnitId, msg => StatusMessage = msg, IsServerMode); }
-                catch (Exception ex) { _logger.LogDebug(ex, "ReadAllCustomNow: failed for {Area} {Address}", ce.Area, ce.Address); }
-            }
-            StatusMessage = $"Read {snapshot.Count} custom entries";
+            await _customEntryCoordinator.ReadCustomEntriesAsync(CustomEntries, EffectiveUnitId, msg => StatusMessage = msg, IsServerMode);
         }
 
         public VisualNodeEditorViewModel VisualNodeEditorViewModel => _visualNodeEditorViewModel;
@@ -266,6 +260,9 @@ namespace ModbusForge.ViewModels
         /// </summary>
         private void InitializeTimersAndServices()
         {
+            // Subscribe to console log events
+            _consoleLoggerService.LogMessageReceived += ConsoleLoggerService_LogMessageReceived;
+
             // Custom writer timer
             _customTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             _customTimer.Tick += CustomTimer_Tick;
@@ -284,6 +281,20 @@ namespace ModbusForge.ViewModels
             // Start services
             try { _trendLogger.Start(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to start trend logger"); }
             SubscribeCustomEntries();
+        }
+
+        private void ConsoleLoggerService_LogMessageReceived(object? sender, LogMessageEventArgs e)
+        {
+            Application.Current?.Dispatcher?.Invoke(() =>
+            {
+                ConsoleMessages.Add(e.Message);
+
+                // Keep the last 1000 messages by default
+                while (ConsoleMessages.Count > 1000)
+                {
+                    ConsoleMessages.RemoveAt(0);
+                }
+            });
         }
 
         [ObservableProperty]
@@ -380,31 +391,30 @@ namespace ModbusForge.ViewModels
         private bool _hasConnectionError = false;
         private DateTime _lastErrorTime = DateTime.MinValue;
 
-        public ICommand ConnectCommand { get; private set; }
-        public IRelayCommand DisconnectCommand { get; private set; }
-        public ICommand RunDiagnosticsCommand { get; private set; }
-        public IRelayCommand ReadRegistersCommand { get; private set; }
-        public IRelayCommand WriteRegisterCommand { get; private set; }
-        public IRelayCommand ReadCoilsCommand { get; private set; }
-        public IRelayCommand WriteCoilCommand { get; private set; }
-        public IRelayCommand ReadInputRegistersCommand { get; private set; }
-        public IRelayCommand ReadDiscreteInputsCommand { get; private set; }
-        public ICommand AddCustomEntryCommand { get; private set; }
-        public ICommand WriteCustomNowCommand { get; private set; }
-        public ICommand ReadCustomNowCommand { get; private set; }
-        public IRelayCommand ReadAllCustomNowCommand { get; private set; }
-        public ICommand SaveProjectCommand { get; private set; }
-        public ICommand LoadProjectCommand { get; private set; }
-        public ICommand ImportUnitIdsCommand { get; private set; }
-        public ICommand ExportUnitIdsCommand { get; private set; }
-        public ICommand ExportUnitIdCommand { get; private set; }
-        public ICommand ImportUnitIdAsCommand { get; private set; }
-        public IRelayCommand SaveCustomCommand { get; private set; }
-        public IRelayCommand LoadCustomCommand { get; private set; }
-        public IRelayCommand SaveAllConfigCommand { get; private set; }
-        public IRelayCommand LoadAllConfigCommand { get; private set; }
+        public IRelayCommand DisconnectCommand { get; private set; } = null!;
+        public ICommand RunDiagnosticsCommand { get; private set; } = null!;
+        public IRelayCommand ReadRegistersCommand { get; private set; } = null!;
+        public IRelayCommand WriteRegisterCommand { get; private set; } = null!;
+        public IRelayCommand ReadCoilsCommand { get; private set; } = null!;
+        public IRelayCommand WriteCoilCommand { get; private set; } = null!;
+        public IRelayCommand ReadInputRegistersCommand { get; private set; } = null!;
+        public IRelayCommand ReadDiscreteInputsCommand { get; private set; } = null!;
+        public ICommand AddCustomEntryCommand { get; private set; } = null!;
+        public ICommand WriteCustomNowCommand { get; private set; } = null!;
+        public ICommand ReadCustomNowCommand { get; private set; } = null!;
+        public IRelayCommand ReadAllCustomNowCommand { get; private set; } = null!;
+        public ICommand SaveProjectCommand { get; private set; } = null!;
+        public ICommand LoadProjectCommand { get; private set; } = null!;
+        public ICommand ImportUnitIdsCommand { get; private set; } = null!;
+        public ICommand ExportUnitIdsCommand { get; private set; } = null!;
+        public ICommand ExportUnitIdCommand { get; private set; } = null!;
+        public ICommand ImportUnitIdAsCommand { get; private set; } = null!;
+        public IRelayCommand SaveCustomCommand { get; private set; } = null!;
+        public IRelayCommand LoadCustomCommand { get; private set; } = null!;
+        public IRelayCommand SaveAllConfigCommand { get; private set; } = null!;
+        public IRelayCommand LoadAllConfigCommand { get; private set; } = null!;
 
-        public ObservableCollection<string> ConsoleMessages => _consoleLoggerService.LogMessages;
+        public ObservableCollection<string> ConsoleMessages { get; } = new();
 
         // Register collections (shared across all Unit IDs for display)
         public ObservableCollection<RegisterEntry> HoldingRegisters { get; } = new();
@@ -412,7 +422,8 @@ namespace ModbusForge.ViewModels
         public ObservableCollection<RegisterEntry> InputRegisters { get; } = new();
         public ObservableCollection<CoilEntry> DiscreteInputs { get; } = new();
 
-        public IAsyncRelayCommand<DataGridCellEditEndingEventArgs> UpdateHoldingRegisterCommand { get; private set; }
+        public IAsyncRelayCommand<DataGridCellEditEndingEventArgs> UpdateHoldingRegisterCommand { get; private set; } = null!;
+        public ICommand ConnectCommand { get; private set; } = null!;
 
         // Unit ID configurations for complete isolation
         [ObservableProperty]
@@ -749,6 +760,7 @@ namespace ModbusForge.ViewModels
                 {
                     try
                     {
+                        _consoleLoggerService.LogMessageReceived -= ConsoleLoggerService_LogMessageReceived;
                         _customTimer.Stop();
                         _customTimer.Tick -= CustomTimer_Tick;
                         _monitorTimer.Stop();
@@ -1291,6 +1303,9 @@ namespace ModbusForge.ViewModels
                     _visualNodeEditorViewModel.Nodes,
                     _visualNodeEditorViewModel.Connections,
                     SubscribeCustomEntries);
+
+                // Fix old nodes with invalid addresses (migration)
+                _visualNodeEditorViewModel.MigrateNodes();
             }
         }
 
@@ -1468,10 +1483,10 @@ namespace ModbusForge.ViewModels
                         {
                             foreach (var node in projectConfig.VisualNodes)
                             {
-                                // Fix old nodes with invalid addresses (migration)
-                                MigrateOldNodeAddresses(node);
                                 _visualNodeEditorViewModel.Nodes.Add(node);
                             }
+                            // Fix old nodes with invalid addresses (migration)
+                            _visualNodeEditorViewModel.MigrateNodes();
                         }
                         
                         if (projectConfig.VisualConnections != null)
@@ -1679,7 +1694,7 @@ namespace ModbusForge.ViewModels
             }
         }
 
-        private void MigrateOldNodeAddresses(VisualNode node)
+        internal void MigrateOldNodeAddresses(VisualNode node)
         {
             // Fix InputInt nodes with missing OutputAddress
             if (node.ElementType == PlcElementType.InputInt && node.OutputAddress == null)
@@ -1701,23 +1716,31 @@ namespace ModbusForge.ViewModels
                 };
             }
             
-            // Fix any nodes with Coil:0 addresses (invalid)
-            if (node.OutputAddress?.Area == PlcArea.Coil && node.OutputAddress.Address == 0)
+            // Fix any nodes with address 0 (invalid in UI's 1-based convention)
+            MigrateAddress(node.OutputAddress);
+            MigrateAddress(node.Input1Address);
+            MigrateAddress(node.Input2Address);
+
+            // Also fix any associated connector configurations
+            if (_visualNodeEditorViewModel?.ConnectorConfigs != null)
             {
-                node.OutputAddress.Address = 1;
-            }
-            
-            if (node.Input1Address?.Area == PlcArea.Coil && node.Input1Address.Address == 0)
-            {
-                node.Input1Address.Address = 1;
-            }
-            
-            if (node.Input2Address?.Area == PlcArea.Coil && node.Input2Address.Address == 0)
-            {
-                node.Input2Address.Address = 1;
+                foreach (var config in _visualNodeEditorViewModel.ConnectorConfigs.Where(c => c.NodeId == node.Id))
+                {
+                    if (config.Address == 0)
+                    {
+                        config.Address = 1;
+                    }
+                }
             }
         }
 
+        internal void MigrateAddress(PlcAddressReference? address)
+        {
+            if (address != null && address.Address == 0)
+            {
+                address.Address = 1;
+            }
+        }
         private async Task ImportUnitIdAsAsync()
         {
             try

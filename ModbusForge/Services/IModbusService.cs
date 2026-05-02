@@ -50,6 +50,7 @@ namespace ModbusForge.Services
         Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count);
         Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count);
         Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value);
+        Task WriteRegistersAsync(byte unitId, int startAddress, ushort[] values);
 
         // Coil operations
         Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count);
