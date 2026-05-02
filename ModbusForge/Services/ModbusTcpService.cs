@@ -319,9 +319,9 @@ namespace ModbusForge.Services
             {
                 if (disposing)
                 {
-                    // For synchronous dispose, we have to wait synchronously.
+                    // For synchronous dispose, try to acquire the lock with a timeout to avoid blocking indefinitely.
                     // Callers are encouraged to use DisposeAsync to avoid blocking.
-                    _ioLock.Wait();
+                    bool lockAcquired = _ioLock.Wait(TimeSpan.FromMilliseconds(100));
                     try
                     {
                         _client?.Dispose();
@@ -329,7 +329,10 @@ namespace ModbusForge.Services
                     }
                     finally
                     {
-                        _ioLock.Release();
+                        if (lockAcquired)
+                        {
+                            _ioLock.Release();
+                        }
                         _ioLock.Dispose();
                     }
                 }

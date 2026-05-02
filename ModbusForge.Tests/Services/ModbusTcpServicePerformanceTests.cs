@@ -54,7 +54,7 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
-        public async Task Dispose_BlocksCallingThread_WhenLockIsHeld()
+        public async Task Dispose_DoesNotBlockIndefinitely_WhenLockIsHeld()
         {
             // Arrange
             var mockLogger = new Mock<ILogger<ModbusTcpService>>();
@@ -71,18 +71,17 @@ namespace ModbusForge.Tests.Services
                 // Act
                 var sw = Stopwatch.StartNew();
 
-                // Run Dispose in a separate task and check if it blocks
+                // Run Dispose in a separate task and check if it finishes reasonably quickly
                 var disposeTask = Task.Run(() => service.Dispose());
 
-                await Task.Delay(100);
-                Assert.False(disposeTask.IsCompleted);
-
-                ioLock.Release();
+                // We're expecting it to wait at most 100ms
                 await disposeTask;
                 sw.Stop();
 
                 // Assert
-                Assert.True(sw.ElapsedMilliseconds >= 100);
+                Assert.True(disposeTask.IsCompletedSuccessfully);
+                // The delay should be around 100ms, definitely less than 500ms
+                Assert.True(sw.ElapsedMilliseconds < 500, $"Dispose should not block indefinitely, but took {sw.ElapsedMilliseconds}ms");
             }
             finally
             {
