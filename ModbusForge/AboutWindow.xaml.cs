@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Navigation;
 using System.Reflection;
+using ModbusForge.Helpers;
 
 namespace ModbusForge
 {
@@ -41,7 +42,7 @@ namespace ModbusForge
         {
             try
             {
-                Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+                UrlHelper.OpenUrl(e.Uri.AbsoluteUri);
             }
             catch (Exception ex)
             {
