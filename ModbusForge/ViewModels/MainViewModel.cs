@@ -1681,24 +1681,30 @@ namespace ModbusForge.ViewModels
 
         private void MigrateOldNodeAddresses(VisualNode node)
         {
-            // Fix InputInt nodes with missing OutputAddress
-            if (node.ElementType == PlcElementType.InputInt && node.OutputAddress == null)
+            // Fix InputInt nodes with missing or default OutputAddress (Coil:0)
+            if (node.ElementType == PlcElementType.InputInt)
             {
-                node.OutputAddress = new PlcAddressReference 
-                { 
-                    Area = PlcArea.HoldingRegister, 
-                    Address = node.Input1Address?.Address ?? 1 
-                };
+                if (node.OutputAddress == null || (node.OutputAddress.Area == PlcArea.Coil && node.OutputAddress.Address == 0))
+                {
+                    node.OutputAddress = new PlcAddressReference
+                    {
+                        Area = PlcArea.HoldingRegister,
+                        Address = (node.Input1Address != null && node.Input1Address.Address > 0) ? node.Input1Address.Address : 1
+                    };
+                }
             }
             
-            // Fix InputBool nodes with missing OutputAddress
-            if (node.ElementType == PlcElementType.InputBool && node.OutputAddress == null)
+            // Fix InputBool nodes with missing or default OutputAddress (Coil:0)
+            if (node.ElementType == PlcElementType.InputBool)
             {
-                node.OutputAddress = new PlcAddressReference 
-                { 
-                    Area = PlcArea.Coil, 
-                    Address = node.Input1Address?.Address ?? 1 
-                };
+                if (node.OutputAddress == null || (node.OutputAddress.Area == PlcArea.Coil && node.OutputAddress.Address == 0))
+                {
+                    node.OutputAddress = new PlcAddressReference
+                    {
+                        Area = PlcArea.Coil,
+                        Address = (node.Input1Address != null && node.Input1Address.Address > 0) ? node.Input1Address.Address : 1
+                    };
+                }
             }
             
             // Fix any nodes with Coil:0 addresses (invalid)
