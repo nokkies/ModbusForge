@@ -124,7 +124,13 @@ namespace ModbusForge.Services
                         ushort length = (ushort)((header[4] << 8) | header[5]);
                         byte unitId = header[6];
 
-                        if (length < 1) continue;
+                        // Max Modbus TCP frame size is 260 bytes (7-byte MBAP + 253-byte PDU)
+                        // MBAP length includes UnitID (1 byte) + PDU (up to 253 bytes)
+                        if (length < 1 || length > 254)
+                        {
+                            _logger.LogWarning("Invalid Modbus MBAP length: {Length} for Unit ID {UnitId}. Closing connection.", length, unitId);
+                            break;
+                        }
 
                         // Read PDU (length - 1 because length includes unit ID byte)
                         var pdu = new byte[length - 1];
