@@ -16,6 +16,9 @@ public interface ISettingsService
     bool EnableConsoleLogging { get; set; }
     int MaxConsoleMessages { get; set; }
     
+    // Trend settings
+    int MaxConcurrentTrendRequests { get; set; }
+
     // Save/Load
     void Save();
     void Load();

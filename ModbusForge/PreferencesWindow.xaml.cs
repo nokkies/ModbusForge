@@ -1,4 +1,5 @@
 using MahApps.Metro.Controls;
+using System;
 using ModbusForge.Services;
 
 namespace ModbusForge;
@@ -21,6 +22,7 @@ public partial class PreferencesWindow : MetroWindow
         ShowDiagnosticsOnErrorCheckBox.IsChecked = _settingsService.ShowConnectionDiagnosticsOnError;
         EnableConsoleLoggingCheckBox.IsChecked = _settingsService.EnableConsoleLogging;
         MaxConsoleMessagesTextBox.Text = _settingsService.MaxConsoleMessages.ToString();
+        MaxConcurrentTrendRequestsTextBox.Text = _settingsService.MaxConcurrentTrendRequests.ToString();
         ConfirmOnExitCheckBox.IsChecked = _settingsService.ConfirmOnExit;
     }
 
@@ -39,6 +41,11 @@ public partial class PreferencesWindow : MetroWindow
         if (int.TryParse(MaxConsoleMessagesTextBox.Text, out int maxMessages))
         {
             _settingsService.MaxConsoleMessages = maxMessages;
+        }
+
+        if (int.TryParse(MaxConcurrentTrendRequestsTextBox.Text, out int maxConcurrent))
+        {
+            _settingsService.MaxConcurrentTrendRequests = Math.Max(1, maxConcurrent); // Ensure at least 1
         }
 
         _settingsService.ConfirmOnExit = ConfirmOnExitCheckBox.IsChecked ?? false;

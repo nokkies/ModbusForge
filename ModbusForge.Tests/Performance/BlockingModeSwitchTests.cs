@@ -70,11 +70,15 @@ namespace ModbusForge.Tests.Performance
                 _mockServerService.Object,
                 new Mock<ILogger<CustomEntryCoordinator>>().Object);
 
+            var settingsServiceMock = new Mock<ISettingsService>();
+            settingsServiceMock.Setup(s => s.MaxConcurrentTrendRequests).Returns(8);
+
             _trendCoordinator = new TrendCoordinator(
                 _mockClientService.Object,
                 _mockServerService.Object,
                 _mockTrendLogger.Object,
-                new Mock<ILogger<TrendCoordinator>>().Object);
+                new Mock<ILogger<TrendCoordinator>>().Object,
+                settingsServiceMock.Object);
 
             _configurationCoordinator = new ConfigurationCoordinator(
                 new Mock<ILogger<ConfigurationCoordinator>>().Object);
