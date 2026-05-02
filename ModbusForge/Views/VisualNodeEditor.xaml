@@ -84,16 +84,6 @@
                             Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
                             Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
                     
-                    <!-- Legacy (for compatibility) -->
-                    <Button Content="Input (Legacy)" Tag="Input" Margin="0,8,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#FFF0F0" BorderBrush="#FFC8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="Output (Legacy)" Tag="Output" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#FFF0F0" BorderBrush="#FFC8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    
                     <!-- Logic Gates -->
                     <TextBlock Text="Logic Gates" FontWeight="SemiBold" Margin="0,10,0,5"/>
                     <Button Content="AND Gate" Tag="AND" Margin="0,2,0,2" Padding="8,4"
@@ -210,7 +200,7 @@
                         <Button Content="Clear All" Command="{Binding ClearAllCommand}" Margin="0,0,10,0"/>
                         <Button Content="Auto Layout" Command="{Binding AutoLayoutCommand}" Margin="0,0,10,0"/>
                         <Separator Margin="10,0"/>
-                        <TextBlock Text="💡 Click 🔗 button on Input/Output blocks to configure tags · All connectors are internal connections only · Right-click wires to delete" 
+                        <TextBlock Text="💡 Input/Output blocks have inline area/address fields · All connectors are internal connections only · Right-click wires to delete" 
                                    VerticalAlignment="Center" Foreground="#888" FontSize="11" Margin="0,0,10,0"/>
                         <Separator Margin="10,0"/>
                         <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="0,0,5,0"/>
@@ -226,6 +216,9 @@
                             MouseLeftButtonDown="Canvas_MouseLeftButtonDown"
                             MouseMove="Canvas_MouseMove"
                             MouseLeftButtonUp="Canvas_MouseLeftButtonUp">
+                        <Canvas.LayoutTransform>
+                            <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
+                        </Canvas.LayoutTransform>
                         
                         <!-- Temporary Connection Line (while dragging) -->
                         <Line x:Name="TempConnectionLine" 

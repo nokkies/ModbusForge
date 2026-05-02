@@ -36,7 +36,6 @@ namespace ModbusForge.ViewModels.Coordinators
             int port,
             byte unitId,
             ObservableCollection<CustomEntry> customEntries,
-            ObservableCollection<PlcSimulationElement> plcElements,
             ObservableCollection<VisualNode> visualNodes,
             ObservableCollection<NodeConnection> visualConnections,
             Action<string> setStatusMessage)
@@ -59,7 +58,6 @@ namespace ModbusForge.ViewModels.Coordinators
                         Port = port,
                         UnitId = unitId,
                         CustomEntries = customEntries.ToList(),
-                        PlcElements = plcElements.ToList(),
                         VisualNodes = visualNodes.ToList(),
                         VisualConnections = visualConnections.ToList()
                     };
@@ -127,7 +125,6 @@ namespace ModbusForge.ViewModels.Coordinators
             Action<int> setPort,
             Action<byte> setUnitId,
             ObservableCollection<CustomEntry> customEntries,
-            ObservableCollection<PlcSimulationElement> plcElements,
             ObservableCollection<VisualNode> visualNodes,
             ObservableCollection<NodeConnection> visualConnections,
             Action subscribeCustomEntries)
@@ -152,13 +149,6 @@ namespace ModbusForge.ViewModels.Coordinators
                 foreach (var ce in config.CustomEntries)
                     customEntries.Add(ce);
                 subscribeCustomEntries();
-            }
-
-            if (config.PlcElements != null && config.PlcElements.Any())
-            {
-                plcElements.Clear();
-                foreach (var pe in config.PlcElements)
-                    plcElements.Add(pe);
             }
 
             if (config.VisualNodes != null && config.VisualNodes.Any())

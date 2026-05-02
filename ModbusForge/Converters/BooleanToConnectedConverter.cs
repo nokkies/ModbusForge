@@ -20,7 +20,7 @@ namespace ModbusForge.Converters
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotSupportedException("BooleanToConnectedConverter can only be used for one-way conversion");
+            return Binding.DoNothing;
         }
     }
 }
