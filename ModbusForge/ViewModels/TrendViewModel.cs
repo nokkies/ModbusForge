@@ -164,9 +164,16 @@ namespace ModbusForge.ViewModels
         {
             var key = $"Imported:{System.IO.Path.GetFileNameWithoutExtension(path)}";
             _loggerSvc.Add(key, key);
-            var lines = await File.ReadAllLinesAsync(path);
-            foreach (var line in lines.Skip(1)) // skip header
+
+            bool isHeader = true;
+            await foreach (var line in File.ReadLinesAsync(path))
             {
+                if (isHeader)
+                {
+                    isHeader = false;
+                    continue;
+                }
+
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 var parts = SplitCsv(line);
                 if (parts.Length < 3) continue;
