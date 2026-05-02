@@ -355,6 +355,10 @@ namespace ModbusForge.ViewModels
         {
             var elements = new ObservableCollection<PlcSimulationElement>();
             
+            // Pre-calculate lookups for O(1) retrieval
+            var nodeDict = Nodes.ToDictionary(n => n.Id);
+            var connectionLookup = Connections.ToLookup(c => c.TargetNodeId);
+
             foreach (var visualNode in Nodes)
             {
                 var element = new PlcSimulationElement
@@ -370,8 +374,8 @@ namespace ModbusForge.ViewModels
                     CompareValue = visualNode.CompareValue
                 };
                 
-                // Map connections to input addresses
-                MapConnectionsToInputs(visualNode, element);
+                // Map connections to input addresses using optimized lookups
+                MapConnectionsToInputs(visualNode, element, nodeDict, connectionLookup);
                 
                 elements.Add(element);
             }
@@ -379,15 +383,17 @@ namespace ModbusForge.ViewModels
             return elements;
         }
         
-        private void MapConnectionsToInputs(VisualNode visualNode, PlcSimulationElement element)
+        private void MapConnectionsToInputs(VisualNode visualNode, PlcSimulationElement element,
+            System.Collections.Generic.Dictionary<string, VisualNode> nodeDict,
+            System.Linq.ILookup<string, NodeConnection> connectionLookup)
         {
-            // Find connections that target this node
-            var inputConnections = Connections.Where(c => c.TargetNodeId == visualNode.Id).ToList();
+            // Find connections that target this node using optimized lookup - O(1)
+            var inputConnections = connectionLookup[visualNode.Id];
             
             foreach (var connection in inputConnections)
             {
-                var sourceNode = Nodes.FirstOrDefault(n => n.Id == connection.SourceNodeId);
-                if (sourceNode != null)
+                // Find source node using optimized dictionary - O(1)
+                if (nodeDict.TryGetValue(connection.SourceNodeId, out var sourceNode))
                 {
                     var targetAddress = new PlcAddressReference
                     {
