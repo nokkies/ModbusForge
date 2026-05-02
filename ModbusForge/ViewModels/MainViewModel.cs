@@ -79,7 +79,14 @@ namespace ModbusForge.ViewModels
         private async Task ReadAllCustomNowAsync()
         {
             if (!IsConnected) return;
-            await _customEntryCoordinator.ReadCustomEntriesAsync(CustomEntries, EffectiveUnitId, msg => StatusMessage = msg, IsServerMode);
+            var snapshot = CustomEntries.ToList();
+            var tasks = snapshot.Select(async ce =>
+            {
+                try { await _customEntryCoordinator.ReadCustomNowAsync(ce, EffectiveUnitId, msg => StatusMessage = msg, IsServerMode); }
+                catch (Exception ex) { _logger.LogDebug(ex, "ReadAllCustomNow: failed for {Area} {Address}", ce.Area, ce.Address); }
+            });
+            await Task.WhenAll(tasks);
+            StatusMessage = $"Read {snapshot.Count} custom entries";
         }
 
         public VisualNodeEditorViewModel VisualNodeEditorViewModel => _visualNodeEditorViewModel;
