@@ -147,6 +147,9 @@
                         <Button Content="Clear All" Command="{Binding ClearAllCommand}" Margin="0,0,10,0"/>
                         <Button Content="Auto Layout" Command="{Binding AutoLayoutCommand}" Margin="0,0,10,0"/>
                         <Separator Margin="10,0"/>
+                        <Button x:Name="TagBrowserButton" Content="🏷️ Tags" Click="TagBrowserButton_Click" Margin="0,0,10,0" Padding="8,4"/>
+                        <Button x:Name="WatchWindowButton" Content="👁️ Watch" Click="WatchWindowButton_Click" Margin="0,0,10,0" Padding="8,4"/>
+                        <Separator Margin="10,0"/>
                         <TextBlock Text="💡 Input/Output blocks have inline area/address fields · All connectors are internal connections only · Right-click wires to delete" 
                                    VerticalAlignment="Center" Foreground="#888" FontSize="11" Margin="0,0,10,0"/>
                         <Separator Margin="10,0"/>

@@ -52,7 +52,7 @@ namespace ModbusForge.Models
     }
 
     /// <summary>
-    /// Reference to a Modbus address with optional NOT bubble
+    /// Reference to a Modbus address with optional NOT bubble and symbolic addressing
     /// </summary>
     public partial class PlcAddressReference : ObservableObject
     {
@@ -64,6 +64,30 @@ namespace ModbusForge.Models
 
         [ObservableProperty]
         private bool _not = false;
+
+        /// <summary>
+        /// Symbolic tag name (optional). If set, overrides numeric area/address.
+        /// </summary>
+        [ObservableProperty]
+        private string? _symbolicName;
+
+        /// <summary>
+        /// Display string showing either symbolic name or numeric address
+        /// </summary>
+        public string DisplayAddress
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(SymbolicName))
+                    return SymbolicName;
+                return $"{Area}:{Address}";
+            }
+        }
+
+        /// <summary>
+        /// Returns true if this reference uses symbolic addressing
+        /// </summary>
+        public bool IsSymbolic => !string.IsNullOrEmpty(SymbolicName);
     }
 
     /// <summary>

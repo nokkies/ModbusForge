@@ -119,6 +119,7 @@ namespace ModbusForge
             services.AddSingleton<IScriptRuleService, ScriptRuleService>();
             services.AddSingleton<IVisualSimulationService, VisualSimulationService>();
             services.AddSingleton<IApiServerService, ApiServerService>();
+            services.AddSingleton<TagService>();
             
             // Register Coordinators
             services.AddSingleton<ConnectionCoordinator>(provider => new ConnectionCoordinator(

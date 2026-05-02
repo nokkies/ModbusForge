@@ -1411,5 +1411,37 @@ namespace ModbusForge.Views
                 // Reflection failed, ignore
             }
         }
+
+        private void TagBrowserButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var tagService = App.ServiceProvider.GetRequiredService<TagService>();
+                var browser = new TagBrowserWindow(tagService);
+                browser.Owner = Window.GetWindow(this);
+                browser.Show();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening Tag Browser: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
+        private void WatchWindowButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var tagService = App.ServiceProvider.GetRequiredService<TagService>();
+                var watchWindow = new WatchWindow(tagService);
+                watchWindow.Owner = Window.GetWindow(this);
+                watchWindow.Show();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening Watch Window: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
     }
+    
+    // Helper converter for boolean to dash array
 }

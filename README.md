@@ -1,18 +1,21 @@
-# ModbusForge v4.7.1
+# ModbusForge v4.8.0
 
 A professional Modbus TCP client/server application built with .NET 8.0 and WPF. ModbusForge provides comprehensive tools for testing, monitoring, and automating Modbus communications.
 
 ![ModbusForge](ModbusForge/Resources/ModbusForgeLOGO.png)
 
-## ✨ What's New in v4.7.1
+## What's New in v4.8.0
 
-- **🏗️ POU Navigation Tree** - Program Organization Units for organizing simulation nodes into programs
-- **🔄 Program Management** - Create, rename, delete, and duplicate programs with context persistence
-- **📊 Split Layout** - POU tree and Node palette visible simultaneously (no tab switching)
-- **🏷️ Auto-Generated Names** - Nodes named as `ProgramName_Type_Number` (e.g., `Main_AND_01`)
-- **�️ Live Values Panel** - Real-time value display with register/tag linkage and editable values
-- **✨ Visual Selection** - Selected nodes highlighted with blue border on canvas
-- **📋 Active Nodes List** - Quick access to all nodes with enable/disable controls
+- **Symbolic Addressing** - Assign friendly names (tags) to Modbus addresses (e.g., `Motor1_Speed` instead of `HoldingRegister:1`)
+- **Tag Browser** - Hierarchical organization of tags with groups, import/export functionality
+- **Watch Window** - Real-time monitoring of tag values with alarms and configurable update rates
+- **POU Navigation Tree** - Program Organization Units for organizing simulation nodes into programs
+- **Program Management** - Create, rename, delete, and duplicate programs with context persistence
+- **Split Layout** - POU tree and Node palette visible simultaneously (no tab switching)
+- **Auto-Generated Names** - Nodes named as `ProgramName_Type_Number` (e.g., `Main_AND_01`)
+- **Live Values Panel** - Real-time value display with register/tag linkage and editable values
+- **Visual Selection** - Selected nodes highlighted with blue border on canvas
+- **Active Nodes List** - Quick access to all nodes with enable/disable controls
 
 ## Key Features
 
@@ -201,6 +204,13 @@ This project uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create a si
    The installer will be created in the `installers` directory.
 
 ## Changelog
+
+- 4.8.0 (2026-05-03)
+  - **Symbolic Addressing** - Assign friendly names (tags) to Modbus addresses (e.g., `Motor1_Speed` instead of `HoldingRegister:1`)
+  - **Tag Browser** - Hierarchical organization of tags with groups, import/export functionality
+  - **Watch Window** - Real-time monitoring of tag values with alarms and configurable update rates
+  - **Tag Alarms** - High/low limit alarms with visual indicators in watch window
+  - **Tag Scaling** - Scale and offset for analog value conversion
 
 - 4.7.1 (2026-05-03)
   - **POU Navigation Tree** - Program Organization Units for organizing simulation nodes into programs
