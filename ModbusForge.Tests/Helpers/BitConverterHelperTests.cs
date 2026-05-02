@@ -102,5 +102,17 @@ namespace ModbusForge.Tests.Helpers
             // Assert
             Assert.Empty(result);
         }
+
+        [Theory]
+        [InlineData(0xAA, new[] { false, true, false, true, false, true, false, true })] // 10101010
+        [InlineData(0x55, new[] { true, false, true, false, true, false, true, false })] // 01010101
+        public void ToBooleanArray_SpecificPatterns_ReturnsExpected(byte input, bool[] expected)
+        {
+            // Act
+            bool[] result = BitConverterHelper.ToBooleanArray(new[] { input }, 8);
+
+            // Assert
+            Assert.Equal(expected, result);
+        }
     }
 }

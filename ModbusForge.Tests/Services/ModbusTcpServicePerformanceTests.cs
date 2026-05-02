@@ -54,7 +54,7 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
-        public async Task Dispose_BlocksCallingThread_WhenLockIsHeld()
+        public async Task Dispose_DoesNotBlockCallingThread_WhenLockIsHeld()
         {
             // Arrange
             var mockLogger = new Mock<ILogger<ModbusTcpService>>();
@@ -64,6 +64,7 @@ namespace ModbusForge.Tests.Services
             Assert.NotNull(ioLockField);
             var ioLock = (SemaphoreSlim)ioLockField.GetValue(service)!;
 
+            // Acquire the lock on the current thread
             await ioLock.WaitAsync();
 
             try
@@ -71,21 +72,17 @@ namespace ModbusForge.Tests.Services
                 // Act
                 var sw = Stopwatch.StartNew();
 
-                // Run Dispose in a separate task and check if it blocks
-                var disposeTask = Task.Run(() => service.Dispose());
+                // Call synchronous Dispose directly, it should return immediately (fast-path)
+                service.Dispose();
 
-                await Task.Delay(100);
-                Assert.False(disposeTask.IsCompleted);
-
-                ioLock.Release();
-                await disposeTask;
                 sw.Stop();
 
                 // Assert
-                Assert.True(sw.ElapsedMilliseconds >= 100);
+                Assert.True(sw.ElapsedMilliseconds < 50, $"Dispose should not block, took {sw.ElapsedMilliseconds}ms");
             }
             finally
             {
+                ioLock.Release();
             }
         }
     }
