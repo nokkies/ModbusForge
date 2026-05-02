@@ -47,6 +47,16 @@
                     <CheckBox x:Name="ConfirmOnExitCheckBox" Content="Confirm before exiting application"/>
                 </StackPanel>
             </GroupBox>
+
+            <GroupBox Header="API (Requires Restart)" Margin="0,0,0,10">
+                <StackPanel Margin="10">
+                    <CheckBox x:Name="EnableApiCheckBox" Content="Enable REST API / MCP" Margin="0,0,0,10"/>
+                    <StackPanel Orientation="Horizontal" Margin="20,0,0,0">
+                        <TextBlock Text="API Port:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBox x:Name="ApiPortTextBox" Width="80" Text="5000"/>
+                    </StackPanel>
+                </StackPanel>
+            </GroupBox>
         </StackPanel>
         
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">

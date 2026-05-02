@@ -29,11 +29,7 @@
     <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
 
-  
 
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
 
   <ItemGroup>
     <Content Include="appsettings.json">
@@ -64,9 +60,8 @@
     <PackageReference Include="SkiaSharp.Views.WPF" Version="3.116.1" />
     <!-- MahApps.Metro for modern theming and controls -->
     <PackageReference Include="MahApps.Metro" Version="2.4.10" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
   </ItemGroup>
 
-  
+
 
 </Project>

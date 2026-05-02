@@ -91,7 +91,7 @@ namespace ModbusForge
             services.Configure<LoggingSettings>(Configuration.GetSection("LoggingSettings"));
 
             // Configure logging
-            services.AddLogging(configure => 
+            services.AddLogging(configure =>
             {
                 configure.AddConsole();
                 configure.AddDebug();
@@ -101,7 +101,7 @@ namespace ModbusForge
             // Register services (both Client and Server). ViewModel selects at runtime.
             services.AddSingleton<ModbusTcpService>();
             services.AddSingleton<ModbusServerService>();
-            services.AddSingleton<IModbusService>(provider => 
+            services.AddSingleton<IModbusService>(provider =>
             {
                 // Get the server settings to determine which service to use
                 var settings = provider.GetRequiredService<IOptions<ServerSettings>>().Value;
@@ -119,7 +119,7 @@ namespace ModbusForge
             services.AddSingleton<IScriptRuleService, ScriptRuleService>();
             services.AddSingleton<IVisualSimulationService, VisualSimulationService>();
             services.AddSingleton<IApiServerService, ApiServerService>();
-            
+
             // Register Coordinators
             services.AddSingleton<ConnectionCoordinator>(provider => new ConnectionCoordinator(
                 provider.GetRequiredService<ModbusTcpService>(),
@@ -136,7 +136,7 @@ namespace ModbusForge
                 provider.GetRequiredService<ILogger<TrendCoordinator>>()
             ));
             services.AddSingleton<ConfigurationCoordinator>();
-            
+
             // Register ViewModels
             services.AddSingleton<MainViewModel>();
             services.AddTransient<TrendViewModel>();
@@ -145,7 +145,7 @@ namespace ModbusForge
         }
 
 
-        protected override async void OnExit(ExitEventArgs e)
+        protected override void OnExit(ExitEventArgs e)
         {
             // Stop API Service
             var apiServerService = ServiceProvider.GetService<IApiServerService>();
