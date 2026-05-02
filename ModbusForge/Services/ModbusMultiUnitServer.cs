@@ -155,14 +155,18 @@ namespace ModbusForge.Services
             }
         }
 
-        private static async Task<bool> ReadExactAsync(NetworkStream stream, byte[] buffer, int count, CancellationToken ct)
+        private async Task<bool> ReadExactAsync(NetworkStream stream, byte[] buffer, int count, CancellationToken ct)
         {
             int offset = 0;
             while (offset < count)
             {
                 int read;
                 try { read = await stream.ReadAsync(buffer.AsMemory(offset, count - offset), ct); }
-                catch { return false; }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Error reading from stream");
+                    return false;
+                }
                 if (read == 0) return false;
                 offset += read;
             }
