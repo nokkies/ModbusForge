@@ -1,9 +1,6 @@
 name: Build Installer
 
 on:
-  push:
-    branches: [ "master" ]
-    tags: [ "v*" ]
   workflow_dispatch:
 
 jobs:
