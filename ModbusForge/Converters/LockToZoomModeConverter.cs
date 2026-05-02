@@ -20,7 +20,7 @@ namespace ModbusForge.Converters
 
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         {
-            throw new NotSupportedException();
+            return new object[] { Binding.DoNothing, Binding.DoNothing };
         }
     }
 }
