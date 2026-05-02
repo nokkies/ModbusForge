@@ -26,11 +26,15 @@ namespace ModbusForge.Tests.Coordinators
             _trendLoggerMock = new Mock<ITrendLogger>();
             _loggerMock = new Mock<ILogger<TrendCoordinator>>();
 
+            var settingsServiceMock = new Mock<ISettingsService>();
+            settingsServiceMock.Setup(s => s.MaxConcurrentTrendRequests).Returns(8);
+
             _coordinator = new TrendCoordinator(
                 _clientServiceMock.Object,
                 _serverServiceMock.Object,
                 _trendLoggerMock.Object,
-                _loggerMock.Object);
+                _loggerMock.Object,
+                settingsServiceMock.Object);
         }
 
         [Fact]
