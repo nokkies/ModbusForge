@@ -41,7 +41,7 @@ namespace ModbusForge
         {
             try
             {
-                Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+                ModbusForge.Helpers.UrlHelper.OpenUrl(e.Uri.AbsoluteUri);
             }
             catch (Exception ex)
             {

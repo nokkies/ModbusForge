@@ -57,7 +57,7 @@ namespace ModbusForge
             try
             {
                 var url = "https://www.paypal.com/donate/?hosted_button_id=ELTVNJEYLZE3W";
-                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                ModbusForge.Helpers.UrlHelper.OpenUrl(url);
             }
             catch (Exception ex)
             {
