@@ -31,13 +31,13 @@ namespace ModbusForge.ViewModels
 
             _readNowCommand = new AsyncRelayCommand(ReadAsync, CanRead);
             // Ensure initial enable/disable state reflects current connection
-            try { _readNowCommand.NotifyCanExecuteChanged(); } catch { }
+            try { _readNowCommand.NotifyCanExecuteChanged(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to notify CanExecuteChanged during initialization."); }
             _main.PropertyChanged += (s, e) =>
             {
                 if (string.Equals(e.PropertyName, nameof(MainViewModel.IsConnected), StringComparison.Ordinal) ||
                     string.Equals(e.PropertyName, nameof(MainViewModel.Mode), StringComparison.Ordinal))
                 {
-                    try { _readNowCommand.NotifyCanExecuteChanged(); } catch { }
+                    try { _readNowCommand.NotifyCanExecuteChanged(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to notify CanExecuteChanged on property changed."); }
                 }
             };
         }
@@ -119,12 +119,12 @@ namespace ModbusForge.ViewModels
 
         private bool CanRead()
         {
-            try { return _main.IsConnected && !IsBusy; } catch { return false; }
+            try { return _main.IsConnected && !IsBusy; } catch (Exception ex) { _logger.LogWarning(ex, "Failed to evaluate CanRead."); return false; }
         }
 
         partial void OnIsBusyChanged(bool value)
         {
-            try { _readNowCommand.NotifyCanExecuteChanged(); } catch { }
+            try { _readNowCommand.NotifyCanExecuteChanged(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to notify CanExecuteChanged on IsBusy changed."); }
         }
 
         private async Task ReadAsync()
@@ -345,7 +345,10 @@ namespace ModbusForge.ViewModels
                 var cleansed = bytes.Select(ch => ch >= 32 && ch <= 126 ? ch : (byte)46).ToArray();
                 return Encoding.ASCII.GetString(cleansed);
             }
-            catch { return string.Empty; }
+            catch
+            {
+                return string.Empty;
+            }
         }
 
         private static bool TryParseAddress(string input, out int addr)
