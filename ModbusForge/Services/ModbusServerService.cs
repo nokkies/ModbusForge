@@ -90,10 +90,17 @@ namespace ModbusForge.Services
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error while stopping Modbus multi-unit server");
+                _logger.LogWarning(ex, "Error while stopping ModbusMultiUnitServer during cleanup");
             }
 
-            _multiServer?.Dispose();
+            try
+            {
+                _multiServer?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error while disposing ModbusMultiUnitServer during cleanup");
+            }
             _multiServer = null;
         }
 
@@ -129,7 +136,7 @@ namespace ModbusForge.Services
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to resolve local network IP addresses");
+                _logger.LogWarning(ex, "Failed to retrieve local network IP address");
             }
             return "0.0.0.0";
         }
@@ -275,7 +282,7 @@ namespace ModbusForge.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Error during CleanupResources in Dispose");
+                        _logger.LogWarning(ex, "Error during synchronous dispose");
                     }
                     _isRunning = false;
                 }
