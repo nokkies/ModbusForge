@@ -10,6 +10,7 @@ using System.IO;
 using System.Diagnostics;
 using ModbusForge.Models;
 using ModbusForge.Services;
+using ModbusForge.Helpers;
 using MahApps.Metro.Controls;
 using System.Collections.ObjectModel;
 
@@ -57,7 +58,7 @@ namespace ModbusForge
             try
             {
                 var url = "https://www.paypal.com/donate/?hosted_button_id=ELTVNJEYLZE3W";
-                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                UrlHelper.OpenUrl(url);
             }
             catch (Exception ex)
             {
