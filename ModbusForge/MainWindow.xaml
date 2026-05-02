@@ -10,6 +10,7 @@
         xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="1073" Width="1556"
+        WindowState="Maximized"
         Icon="pack://application:,,,/Resources/ModbusForge.ico"
         BorderThickness="1"
         Background="{StaticResource LightMetallicWhiteBrush}"
@@ -66,14 +67,14 @@
             </Style>
 
             <!-- Modern Button Style -->
-            <Style TargetType="Button" BasedOn="{StaticResource MahApps.Styles.Button}">
+            <Style TargetType="Button">
                 <Setter Property="Padding" Value="12,6"/>
                 <Setter Property="Margin" Value="4,2"/>
                 <Setter Property="FontWeight" Value="SemiBold"/>
             </Style>
 
             <!-- GroupBox Style -->
-            <Style TargetType="GroupBox" BasedOn="{StaticResource MahApps.Styles.GroupBox}">
+            <Style TargetType="GroupBox">
                 <Setter Property="Margin" Value="5"/>
                 <Setter Property="Padding" Value="8"/>
                 <Setter Property="BorderThickness" Value="1"/>
@@ -81,7 +82,7 @@
 
             <!-- StatusBar Style -->
             <Style TargetType="StatusBar">
-                <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Accent4}"/>
+                <Setter Property="Background" Value="#FF2D2D30"/>
                 <Setter Property="Foreground" Value="White"/>
                 <Setter Property="FontWeight" Value="Medium"/>
             </Style>
@@ -98,11 +99,20 @@
 
         <Menu Grid.Row="0">
             <MenuItem Header="_File">
-                <MenuItem Header="_Load All Configuration..." Command="{Binding LoadAllConfigCommand}"/>
-                <MenuItem Header="_Save All Configuration..." Command="{Binding SaveAllConfigCommand}"/>
+                <MenuItem Header="_Open Project..." Command="{Binding LoadProjectCommand}" InputGestureText="Ctrl+O"/>
+                <MenuItem Header="_Save Project..." Command="{Binding SaveProjectCommand}" InputGestureText="Ctrl+S"/>
                 <Separator/>
-                <MenuItem Header="_Load Custom..." Command="{Binding LoadCustomCommand}"/>
-                <MenuItem Header="_Save Custom..." Command="{Binding SaveCustomCommand}"/>
+                <MenuItem Header="_Import Unit IDs..." Command="{Binding ImportUnitIdsCommand}"/>
+                <MenuItem Header="_Export Unit IDs..." Command="{Binding ExportUnitIdsCommand}"/>
+                <Separator/>
+                <MenuItem Header="Export Unit ID..." Command="{Binding ExportUnitIdCommand}"/>
+                <MenuItem Header="Import Unit ID As..." Command="{Binding ImportUnitIdAsCommand}"/>
+                <Separator/>
+                <!-- Legacy commands - hidden but kept for compatibility -->
+                <MenuItem Header="_Load All Configuration..." Command="{Binding LoadAllConfigCommand}" Visibility="Collapsed"/>
+                <MenuItem Header="_Save All Configuration..." Command="{Binding SaveAllConfigCommand}" Visibility="Collapsed"/>
+                <MenuItem Header="_Load Custom..." Command="{Binding LoadCustomCommand}" Visibility="Collapsed"/>
+                <MenuItem Header="_Save Custom..." Command="{Binding SaveCustomCommand}" Visibility="Collapsed"/>
                 <Separator/>
                 <MenuItem Header="_Exit" Click="MenuItem_Exit_Click"/>
             </MenuItem>
@@ -114,11 +124,8 @@
             <MenuItem Header="_Options">
                 <MenuItem Header="_Preferences..." Click="MenuItem_Preferences_Click"/>
                 <MenuItem Header="_Connection Manager..." Click="MenuItem_ConnectionManager_Click"/>
-                <Separator/>
-                <MenuItem Header="_Script Editor..." Click="MenuItem_ScriptEditor_Click"/>
             </MenuItem>
             <MenuItem Header="_Help">
-                <MenuItem Header="_Script Rules Help..." Click="MenuItem_ScriptRulesHelp_Click"/>
                 <Separator/>
                 <MenuItem Header="_Donate..." Click="MenuItem_Donate_Click"/>
                 <MenuItem Header="_About" Click="MenuItem_About_Click"/>
@@ -149,13 +156,15 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="100"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="100"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="Server:" Grid.Column="0" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
+                    <TextBlock Text="{Binding AddressLabel}" Grid.Column="0" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <TextBox Grid.Column="1" Text="{Binding ServerAddress, UpdateSourceTrigger=PropertyChanged}" 
                              IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
-                             Margin="0,0,16,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
+                             Margin="0,0,16,0"/>
 
                     <TextBlock Text="Port:" Grid.Column="2" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <TextBox Grid.Column="3" Text="{Binding Port}" 
@@ -167,16 +176,28 @@
                              IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
                              Margin="0,0,16,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
 
-                    <TextBlock Text="Mode:" Grid.Column="6" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <ComboBox Grid.Column="7" SelectedItem="{Binding Mode}" ItemsSource="{StaticResource ModeOptionsAll}"
+                    <TextBlock Text="Unit ID(s):" Grid.Column="4" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"/>
+                    <TextBox Grid.Column="5" Text="{Binding ServerUnitId}" 
+                             IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
+                             Margin="0,0,16,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"
+                             ToolTip="Comma-separated list (e.g. 1, 2, 5-10)"/>
+
+                    <TextBlock Text="Active ID:" Grid.Column="6" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"/>
+                    <ComboBox Grid.Column="7" ItemsSource="{Binding AvailableUnitIds}" SelectedItem="{Binding SelectedUnitId}" 
+                              IsEnabled="{Binding IsConnected}" 
+                              Margin="0,0,16,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"
+                              ToolTip="Select Unit ID for Custom entries and Simulation"/>
+
+                    <TextBlock Text="Mode:" Grid.Column="8" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox Grid.Column="9" SelectedItem="{Binding Mode}" ItemsSource="{StaticResource ModeOptionsAll}"
                               IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
                               Margin="0,0,16,0"/>
 
-                    <Button Grid.Column="8" Content="{Binding ConnectButtonText}" Command="{Binding ConnectCommand}" 
+                    <Button Grid.Column="10" Content="{Binding ConnectButtonText}" Command="{Binding ConnectCommand}" 
                             IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
                             Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"/>
 
-                    <StackPanel Grid.Column="9" Orientation="Horizontal">
+                    <StackPanel Grid.Column="11" Orientation="Horizontal">
                         <Button Content="Disconnect" Command="{Binding DisconnectCommand}" 
                                 IsEnabled="{Binding IsConnected}"
                                 Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"/>
@@ -205,7 +226,7 @@
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <ComboBox Width="120" SelectedItem="{Binding RegistersGlobalType}" ItemsSource="{StaticResource TypeOptionsAll}"/>
                         <Separator Width="10" Opacity="0"/>
-                        <CheckBox Content="Continuous Read" IsChecked="{Binding HoldingMonitorEnabled}" VerticalAlignment="Center"/>
+                        <mah:ToggleSwitch IsOn="{Binding HoldingMonitorEnabled, Mode=TwoWay}" OnContent="Continuous Read" OffContent="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding HoldingMonitorPeriodMs}"/>
                     </StackPanel>
@@ -235,7 +256,7 @@
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <ComboBox Width="120" SelectedItem="{Binding InputRegistersGlobalType}" ItemsSource="{StaticResource TypeOptionsAll}"/>
                         <Separator Width="10" Opacity="0"/>
-                        <CheckBox Content="Continuous Read" IsChecked="{Binding InputRegistersMonitorEnabled}" VerticalAlignment="Center"/>
+                        <mah:ToggleSwitch IsOn="{Binding InputRegistersMonitorEnabled, Mode=TwoWay}" OnContent="Continuous Read" OffContent="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding InputRegistersMonitorPeriodMs}"/>
                     </StackPanel>
@@ -263,7 +284,7 @@
                         <TextBox Width="80" Text="{Binding CoilCount}" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadCoilsCommand}" Width="80"/>
                         <Separator Width="10" Opacity="0"/>
-                        <CheckBox Content="Continuous Read" IsChecked="{Binding CoilsMonitorEnabled}" VerticalAlignment="Center"/>
+                        <mah:ToggleSwitch IsOn="{Binding CoilsMonitorEnabled, Mode=TwoWay}" OnContent="Continuous Read" OffContent="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding CoilsMonitorPeriodMs}"/>
                     </StackPanel>
@@ -290,7 +311,7 @@
                         <TextBox Width="80" Text="{Binding DiscreteInputCount}" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadDiscreteInputsCommand}" Width="80"/>
                         <Separator Width="10" Opacity="0"/>
-                        <CheckBox Content="Continuous Read" IsChecked="{Binding DiscreteInputsMonitorEnabled}" VerticalAlignment="Center"/>
+                        <mah:ToggleSwitch IsOn="{Binding DiscreteInputsMonitorEnabled, Mode=TwoWay}" OnContent="Continuous Read" OffContent="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding DiscreteInputsMonitorPeriodMs}"/>
                     </StackPanel>
@@ -319,7 +340,7 @@
                         <Button Content="Save" Command="{Binding SaveCustomCommand}" Width="80"/>
                         <Button Content="Load" Command="{Binding LoadCustomCommand}" Width="80" Margin="5,0,0,0"/>
                         <Separator Width="20" Opacity="0"/>
-                        <CheckBox Content="Continuous Read" IsChecked="{Binding GlobalMonitorEnabled}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <mah:ToggleSwitch IsOn="{Binding GlobalMonitorEnabled, Mode=TwoWay}" OnContent="Global Monitor" OffContent="Global Monitor" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <TextBlock VerticalAlignment="Center" Foreground="Gray">
                             <Run Text="Note:" FontWeight="SemiBold"/>
                             <Run Text=" Reads Trend-enabled rows."/>
@@ -356,90 +377,7 @@
                 </Grid>
             </TabItem>
             <TabItem Header="Simulation">
-                <Grid Margin="5">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Toolbar -->
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
-                        <CheckBox Content="Enable Simulation" IsChecked="{Binding SimulationEnabled}" VerticalAlignment="Center"/>
-                        <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding SimulationPeriodMs}"/>
-                        <TextBlock VerticalAlignment="Center" Foreground="Gray" Margin="10,0,0,0">
-                            <Run Text="Note:" FontWeight="SemiBold"/>
-                            <Run Text=" Server mode only."/>
-                        </TextBlock>
-                    </StackPanel>
-
-                    <!-- Content -->
-                    <StackPanel Grid.Row="1" Orientation="Vertical" >
-                        <GroupBox Header="Holding Registers (Waveform)">
-                            <StackPanel Orientation="Vertical" Margin="5">
-                                <StackPanel Orientation="Horizontal">
-                                    <CheckBox Content="Enable" IsChecked="{Binding SimHoldingsEnabled}" VerticalAlignment="Center"/>
-                                    <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                    <TextBox Width="80" Text="{Binding SimHoldingStart}"/>
-                                    <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                    <TextBox Width="80" Text="{Binding SimHoldingCount}"/>
-                                    <TextBlock Text=" Min:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                    <TextBox Width="80" Text="{Binding SimHoldingMin}"/>
-                                    <TextBlock Text=" Max:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                    <TextBox Width="80" Text="{Binding SimHoldingMax}"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                    <TextBlock Text=" Waveform:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <ComboBox Width="100" SelectedItem="{Binding SimHoldingWaveformType}" ItemsSource="{StaticResource WaveformOptionsAll}"/>
-                                    <TextBlock Text=" Amp:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                    <TextBox Width="80" Text="{Binding SimHoldingAmplitude}"/>
-                                    <TextBlock Text=" Freq (Hz):" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                    <TextBox Width="80" Text="{Binding SimHoldingFrequencyHz}"/>
-                                    <TextBlock Text=" Offset:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                    <TextBox Width="80" Text="{Binding SimHoldingOffset}"/>
-                                </StackPanel>
-                                <TextBlock Foreground="Gray" Margin="0,4,0,0">
-                                    <Run Text="Note:" FontWeight="SemiBold"/>
-                                    <Run Text=" Ramp uses Min/Max. Sine/Triangle/Square use Amplitude/Offset (clipped to 0..65535)."/>
-                                </TextBlock>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <GroupBox Header="Coils (Toggle)">
-                            <StackPanel Orientation="Horizontal" Margin="5">
-                                <CheckBox Content="Enable" IsChecked="{Binding SimCoilsEnabled}" VerticalAlignment="Center"/>
-                                <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimCoilStart}"/>
-                                <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimCoilCount}"/>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <GroupBox Header="Input Registers (Ramp)">
-                            <StackPanel Orientation="Horizontal" Margin="5">
-                                <CheckBox Content="Enable" IsChecked="{Binding SimInputsEnabled}" VerticalAlignment="Center"/>
-                                <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimInputStart}"/>
-                                <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimInputCount}"/>
-                                <TextBlock Text=" Min:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimInputMin}"/>
-                                <TextBlock Text=" Max:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimInputMax}"/>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <GroupBox Header="Discrete Inputs (Toggle)">
-                            <StackPanel Orientation="Horizontal" Margin="5">
-                                <CheckBox Content="Enable" IsChecked="{Binding SimDiscreteEnabled}" VerticalAlignment="Center"/>
-                                <TextBlock Text=" Start:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimDiscreteStart}"/>
-                                <TextBlock Text=" Count:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                <TextBox Width="80" Text="{Binding SimDiscreteCount}"/>
-                            </StackPanel>
-                        </GroupBox>
-                    </StackPanel>
-                </Grid>
+                <views:VisualNodeEditor x:Name="VisualEditor" DataContext="{Binding VisualNodeEditorViewModel}"/>
             </TabItem>
             <TabItem Header="Decode">
                 <Grid Margin="5">
@@ -454,6 +392,16 @@
             <TabItem Header="Console">
                 <Grid Margin="5">
                     <ListView ItemsSource="{Binding ConsoleMessages}" />
+                </Grid>
+            </TabItem>
+            <TabItem Header="Debug">
+                <Grid Margin="5">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Live Register Values" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <ListView Grid.Row="1" ItemsSource="{Binding DebugMessages}" />
                 </Grid>
             </TabItem>
         </TabControl>

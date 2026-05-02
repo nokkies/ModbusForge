@@ -64,17 +64,35 @@ namespace ModbusForge.ViewModels.Coordinators
                     typeByAddress[r.Address] = r.Type ?? globalType;
                 }
 
-                holdingRegisters.Clear();
-                for (int i = 0; i < values.Length; i++)
+                // In-place update to minimize UI thread re-layout and CollectionChanged events
+                int currentCount = holdingRegisters.Count;
+                int newCount = values.Length;
+
+                for (int i = 0; i < newCount; i++)
                 {
                     int addr = start + i;
-                    var entry = new RegisterEntry
+                    if (i < currentCount)
                     {
-                        Address = addr,
-                        Value = values[i],
-                        Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType
-                    };
-                    holdingRegisters.Add(entry);
+                        var entry = holdingRegisters[i];
+                        entry.Address = addr;
+                        entry.Value = values[i];
+                        entry.Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType;
+                    }
+                    else
+                    {
+                        holdingRegisters.Add(new RegisterEntry
+                        {
+                            Address = addr,
+                            Value = values[i],
+                            Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType
+                        });
+                    }
+                }
+
+                // Remove excess if the new count is smaller
+                while (holdingRegisters.Count > newCount)
+                {
+                    holdingRegisters.RemoveAt(holdingRegisters.Count - 1);
                 }
 
                 // Compute ValueText based on Type for better display (floats, strings, signed ints)
@@ -157,15 +175,35 @@ namespace ModbusForge.ViewModels.Coordinators
                     return;
                 }
 
-                inputRegisters.Clear();
-                for (int i = 0; i < values.Length; i++)
+                // In-place update to minimize UI thread re-layout and CollectionChanged events
+                int currentCount = inputRegisters.Count;
+                int newCount = values.Length;
+
+                for (int i = 0; i < newCount; i++)
                 {
-                    inputRegisters.Add(new RegisterEntry
+                    int addr = start + i;
+                    if (i < currentCount)
                     {
-                        Address = start + i,
-                        Value = values[i],
-                        Type = globalType
-                    });
+                        var entry = inputRegisters[i];
+                        entry.Address = addr;
+                        entry.Value = values[i];
+                        entry.Type = globalType;
+                    }
+                    else
+                    {
+                        inputRegisters.Add(new RegisterEntry
+                        {
+                            Address = addr,
+                            Value = values[i],
+                            Type = globalType
+                        });
+                    }
+                }
+
+                // Remove excess if the new count is smaller
+                while (inputRegisters.Count > newCount)
+                {
+                    inputRegisters.RemoveAt(inputRegisters.Count - 1);
                 }
 
                 setStatusMessage($"Read {values.Length} input registers");
@@ -235,8 +273,7 @@ namespace ModbusForge.ViewModels.Coordinators
         {
             var service = GetService(isServerMode);
             var registers = DataTypeConverter.ToUInt16(value);
-            await service.WriteSingleRegisterAsync(unitId, address, registers[0]);
-            await service.WriteSingleRegisterAsync(unitId, address + 1, registers[1]);
+            await service.WriteRegistersAsync(unitId, address, registers);
         }
 
         /// <summary>
@@ -246,10 +283,7 @@ namespace ModbusForge.ViewModels.Coordinators
         {
             var service = GetService(isServerMode);
             var registers = DataTypeConverter.ToUInt16(text);
-            for (int i = 0; i < registers.Length; i++)
-            {
-                await service.WriteSingleRegisterAsync(unitId, address + i, registers[i]);
-            }
+            await service.WriteRegistersAsync(unitId, address, registers);
         }
 
         /// <summary>
@@ -281,14 +315,33 @@ namespace ModbusForge.ViewModels.Coordinators
                     return;
                 }
 
-                coils.Clear();
-                for (int i = 0; i < states.Length; i++)
+                // In-place update to minimize UI thread re-layout and CollectionChanged events
+                int currentCount = coils.Count;
+                int newCount = states.Length;
+
+                for (int i = 0; i < newCount; i++)
                 {
-                    coils.Add(new CoilEntry
+                    int addr = start + i;
+                    if (i < currentCount)
                     {
-                        Address = start + i,
-                        State = states[i]
-                    });
+                        var entry = coils[i];
+                        entry.Address = addr;
+                        entry.State = states[i];
+                    }
+                    else
+                    {
+                        coils.Add(new CoilEntry
+                        {
+                            Address = addr,
+                            State = states[i]
+                        });
+                    }
+                }
+
+                // Remove excess if the new count is smaller
+                while (coils.Count > newCount)
+                {
+                    coils.RemoveAt(coils.Count - 1);
                 }
 
                 setStatusMessage($"Read {states.Length} coils");
@@ -333,14 +386,33 @@ namespace ModbusForge.ViewModels.Coordinators
                     return;
                 }
 
-                discreteInputs.Clear();
-                for (int i = 0; i < states.Length; i++)
+                // In-place update to minimize UI thread re-layout and CollectionChanged events
+                int currentCount = discreteInputs.Count;
+                int newCount = states.Length;
+
+                for (int i = 0; i < newCount; i++)
                 {
-                    discreteInputs.Add(new CoilEntry
+                    int addr = start + i;
+                    if (i < currentCount)
                     {
-                        Address = start + i,
-                        State = states[i]
-                    });
+                        var entry = discreteInputs[i];
+                        entry.Address = addr;
+                        entry.State = states[i];
+                    }
+                    else
+                    {
+                        discreteInputs.Add(new CoilEntry
+                        {
+                            Address = addr,
+                            State = states[i]
+                        });
+                    }
+                }
+
+                // Remove excess if the new count is smaller
+                while (discreteInputs.Count > newCount)
+                {
+                    discreteInputs.RemoveAt(discreteInputs.Count - 1);
                 }
 
                 setStatusMessage($"Read {states.Length} discrete inputs");

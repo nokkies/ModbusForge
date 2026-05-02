@@ -36,6 +36,8 @@ namespace ModbusForge.ViewModels.Coordinators
             int port,
             byte unitId,
             ObservableCollection<CustomEntry> customEntries,
+            ObservableCollection<VisualNode> visualNodes,
+            ObservableCollection<NodeConnection> visualConnections,
             Action<string> setStatusMessage)
         {
             try
@@ -55,7 +57,9 @@ namespace ModbusForge.ViewModels.Coordinators
                         ServerAddress = serverAddress,
                         Port = port,
                         UnitId = unitId,
-                        CustomEntries = customEntries.ToList()
+                        CustomEntries = customEntries.ToList(),
+                        VisualNodes = visualNodes.ToList(),
+                        VisualConnections = visualConnections.ToList()
                     };
 
                     var options = new JsonSerializerOptions { WriteIndented = true };
@@ -121,6 +125,8 @@ namespace ModbusForge.ViewModels.Coordinators
             Action<int> setPort,
             Action<byte> setUnitId,
             ObservableCollection<CustomEntry> customEntries,
+            ObservableCollection<VisualNode> visualNodes,
+            ObservableCollection<NodeConnection> visualConnections,
             Action subscribeCustomEntries)
         {
             if (config == null) return;
@@ -143,6 +149,20 @@ namespace ModbusForge.ViewModels.Coordinators
                 foreach (var ce in config.CustomEntries)
                     customEntries.Add(ce);
                 subscribeCustomEntries();
+            }
+
+            if (config.VisualNodes != null && config.VisualNodes.Any())
+            {
+                visualNodes.Clear();
+                foreach (var vn in config.VisualNodes)
+                    visualNodes.Add(vn);
+            }
+
+            if (config.VisualConnections != null && config.VisualConnections.Any())
+            {
+                visualConnections.Clear();
+                foreach (var vc in config.VisualConnections)
+                    visualConnections.Add(vc);
             }
         }
     }

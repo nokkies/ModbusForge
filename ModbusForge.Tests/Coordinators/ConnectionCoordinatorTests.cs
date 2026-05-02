@@ -90,7 +90,7 @@ namespace ModbusForge.Tests.Coordinators
             string? statusMessage = null;
             bool? connectedState = null;
 
-            _mockClientService.Setup(s => s.ConnectAsync(serverAddress, port))
+            _mockClientService.Setup(s => s.ConnectAsync(serverAddress, port, It.IsAny<string>()))
                 .ReturnsAsync(true);
 
             // Act
@@ -102,7 +102,7 @@ namespace ModbusForge.Tests.Coordinators
                 connected => connectedState = connected);
 
             // Assert
-            _mockClientService.Verify(s => s.ConnectAsync(serverAddress, port), Times.Once);
+            _mockClientService.Verify(s => s.ConnectAsync(serverAddress, port, It.IsAny<string>()), Times.Once);
             Assert.NotNull(statusMessage);
             Assert.True(connectedState);
         }
@@ -151,6 +151,176 @@ namespace ModbusForge.Tests.Coordinators
             _mockServerService.Verify(s => s.DisconnectAsync(), Times.Once);
             Assert.NotNull(statusMessage);
             Assert.False(connectedState);
+        }
+
+        [Fact]
+        public async Task RunDiagnosticsAsync_WhenTcpAndModbusOk_ReturnsTrue()
+        {
+            // Arrange
+            string serverAddress = "127.0.0.1";
+            int port = 502;
+            byte unitId = 1;
+            string? statusMessage = null;
+
+            var expectedResult = new ConnectionDiagnosticResult
+            {
+                TcpConnected = true,
+                ModbusResponding = true,
+                TcpLatencyMs = 10,
+                ModbusLatencyMs = 20,
+                LocalEndpoint = "127.0.0.1:12345",
+                RemoteEndpoint = "127.0.0.1:502"
+            };
+
+            _mockClientService.Setup(s => s.RunDiagnosticsAsync(serverAddress, port, unitId))
+                .ReturnsAsync(expectedResult);
+
+            // Act
+            var result = await _coordinator.RunDiagnosticsAsync(serverAddress, port, unitId, msg => statusMessage = msg);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal("TCP: OK, Modbus: OK", statusMessage);
+            _mockClientService.Verify(s => s.RunDiagnosticsAsync(serverAddress, port, unitId), Times.Once);
+            _mockConsoleLogger.Verify(l => l.Log(It.Is<string>(s => s.Contains("OK"))), Times.AtLeastOnce);
+        }
+
+        [Fact]
+        public async Task RunDiagnosticsAsync_WhenTcpFails_ReturnsFalse()
+        {
+            // Arrange
+            string serverAddress = "127.0.0.1";
+            int port = 502;
+            byte unitId = 1;
+            string? statusMessage = null;
+
+            var expectedResult = new ConnectionDiagnosticResult
+            {
+                TcpConnected = false,
+                ModbusResponding = false,
+                TcpError = "Connection refused"
+            };
+
+            _mockClientService.Setup(s => s.RunDiagnosticsAsync(serverAddress, port, unitId))
+                .ReturnsAsync(expectedResult);
+
+            // Act
+            var result = await _coordinator.RunDiagnosticsAsync(serverAddress, port, unitId, msg => statusMessage = msg);
+
+            // Assert
+            Assert.False(result);
+            Assert.Equal("TCP: FAIL, Modbus: FAIL", statusMessage);
+            _mockConsoleLogger.Verify(l => l.Log(It.Is<string>(s => s.Contains("Error: Connection refused"))), Times.Once);
+        }
+
+        [Fact]
+        public async Task RunDiagnosticsAsync_WhenModbusFails_ReturnsFalse()
+        {
+            // Arrange
+            string serverAddress = "127.0.0.1";
+            int port = 502;
+            byte unitId = 1;
+            string? statusMessage = null;
+
+            var expectedResult = new ConnectionDiagnosticResult
+            {
+                TcpConnected = true,
+                ModbusResponding = false,
+                ModbusError = "Timeout",
+                TcpLatencyMs = 10,
+                LocalEndpoint = "127.0.0.1:12345",
+                RemoteEndpoint = "127.0.0.1:502"
+            };
+
+            _mockClientService.Setup(s => s.RunDiagnosticsAsync(serverAddress, port, unitId))
+                .ReturnsAsync(expectedResult);
+
+            // Act
+            var result = await _coordinator.RunDiagnosticsAsync(serverAddress, port, unitId, msg => statusMessage = msg);
+
+            // Assert
+            Assert.False(result);
+            Assert.Equal("TCP: OK, Modbus: FAIL", statusMessage);
+            _mockConsoleLogger.Verify(l => l.Log(It.Is<string>(s => s.Contains("Error: Timeout"))), Times.Once);
+        }
+
+        [Fact]
+        public async Task RunDiagnosticsAsync_WhenServiceThrowsException_ReturnsFalse()
+        {
+            // Arrange
+            string serverAddress = "127.0.0.1";
+            int port = 502;
+            byte unitId = 1;
+            string? statusMessage = null;
+
+            var exception = new Exception("Test exception");
+            _mockClientService.Setup(s => s.RunDiagnosticsAsync(serverAddress, port, unitId))
+                .ThrowsAsync(exception);
+
+            // Act
+            var result = await _coordinator.RunDiagnosticsAsync(serverAddress, port, unitId, msg => statusMessage = msg);
+
+            // Assert
+            Assert.False(result);
+            Assert.Contains("Test exception", statusMessage);
+            _mockConsoleLogger.Verify(l => l.Log(It.Is<string>(s => s.Contains("Diagnostics error: Test exception"))), Times.Once);
+
+            // Note: Verifying ILogger is tricky due to extension methods,
+            // but we know it's injected and used based on other log operations.
+            // We just verify it doesn't crash here.
+        }
+
+        [Fact]
+        public async Task RunDiagnosticsAsync_WhenResultIsNull_HandlesNullReferenceException()
+        {
+            // Arrange
+            string serverAddress = "127.0.0.1";
+            int port = 502;
+            byte unitId = 1;
+            string? statusMessage = null;
+
+            // Simulate the service returning null
+            _mockClientService.Setup(s => s.RunDiagnosticsAsync(serverAddress, port, unitId))
+                .ReturnsAsync((ConnectionDiagnosticResult)null!);
+
+            // Act
+            var result = await _coordinator.RunDiagnosticsAsync(serverAddress, port, unitId, msg => statusMessage = msg);
+
+            // Assert
+            Assert.False(result);
+            // It will hit the catch block when it tries to access result.TcpConnected
+            Assert.Contains("Diagnostics error", statusMessage);
+            _mockConsoleLogger.Verify(l => l.Log(It.Is<string>(s => s.Contains("Diagnostics error"))), Times.AtLeastOnce);
+        }
+
+        [Fact]
+        public async Task RunDiagnosticsAsync_WhenFailsButErrorStringsNull_DoesNotThrow()
+        {
+            // Arrange
+            string serverAddress = "127.0.0.1";
+            int port = 502;
+            byte unitId = 1;
+            string? statusMessage = null;
+
+            var expectedResult = new ConnectionDiagnosticResult
+            {
+                TcpConnected = false,
+                ModbusResponding = false,
+                TcpError = null!,
+                ModbusError = null!
+            };
+
+            _mockClientService.Setup(s => s.RunDiagnosticsAsync(serverAddress, port, unitId))
+                .ReturnsAsync(expectedResult);
+
+            // Act
+            var result = await _coordinator.RunDiagnosticsAsync(serverAddress, port, unitId, msg => statusMessage = msg);
+
+            // Assert
+            Assert.False(result);
+            Assert.Equal("TCP: FAIL, Modbus: FAIL", statusMessage);
+            // Verify we hit the end of the method successfully
+            _mockConsoleLogger.Verify(l => l.Log("=== Diagnostics Complete ==="), Times.Once);
         }
     }
 }

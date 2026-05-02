@@ -32,12 +32,13 @@ namespace ModbusForge.Services
         }
     }
 
-    public interface IModbusService : IDisposable
+    public interface IModbusService : IDisposable, IAsyncDisposable
     {
         bool IsConnected { get; }
+        string BoundEndpoint { get; }
         
         // For client compatibility, but not used in server mode
-        Task<bool> ConnectAsync(string ipAddress, int port);
+        Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1");
         Task DisconnectAsync();
         
         /// <summary>
@@ -49,6 +50,7 @@ namespace ModbusForge.Services
         Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count);
         Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count);
         Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value);
+        Task WriteRegistersAsync(byte unitId, int startAddress, ushort[] values);
 
         // Coil operations
         Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count);

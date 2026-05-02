@@ -10,7 +10,9 @@ using System.IO;
 using System.Diagnostics;
 using ModbusForge.Models;
 using ModbusForge.Services;
+using ModbusForge.Helpers;
 using MahApps.Metro.Controls;
+using System.Collections.ObjectModel;
 
 namespace ModbusForge
 {
@@ -56,7 +58,7 @@ namespace ModbusForge
             try
             {
                 var url = "https://www.paypal.com/donate/?hosted_button_id=ELTVNJEYLZE3W";
-                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                UrlHelper.OpenUrl(url);
             }
             catch (Exception ex)
             {
@@ -90,28 +92,6 @@ namespace ModbusForge
             }
         }
 
-        private void MenuItem_ScriptEditor_Click(object sender, RoutedEventArgs e)
-        {
-            var scriptEditorViewModel = App.ServiceProvider.GetService(typeof(ScriptEditorViewModel)) as ScriptEditorViewModel;
-            if (scriptEditorViewModel != null)
-            {
-                var scriptEditorWindow = new Views.ScriptEditorWindow()
-                {
-                    Owner = this,
-                    DataContext = scriptEditorViewModel
-                };
-                scriptEditorWindow.Show();
-            }
-        }
-
-        private void MenuItem_ScriptRulesHelp_Click(object sender, RoutedEventArgs e)
-        {
-            var scriptEditorViewModel = App.ServiceProvider.GetService(typeof(ScriptEditorViewModel)) as ScriptEditorViewModel;
-            if (scriptEditorViewModel != null)
-            {
-                scriptEditorViewModel.ShowHelpCommand.Execute(null);
-            }
-        }
 
         private void Trend_ExportPng_Click(object sender, RoutedEventArgs e)
         {
