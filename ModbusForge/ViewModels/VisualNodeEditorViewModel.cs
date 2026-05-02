@@ -452,6 +452,70 @@ namespace ModbusForge.ViewModels
             // The actual value updates are handled via the IVisualSimulationService
             if (!ShowLiveValues) return;
         }
+        public ObservableCollection<PlcSimulationElement> ConvertToSimulationElements()
+        {
+            var elements = new ObservableCollection<PlcSimulationElement>();
+            
+            // Pre-calculate lookups for O(1) retrieval
+            var nodeDict = Nodes.ToDictionary(n => n.Id);
+            var connectionLookup = Connections.ToLookup(c => c.TargetNodeId);
+
+            foreach (var visualNode in Nodes)
+            {
+                var element = new PlcSimulationElement
+                {
+                    Id = visualNode.Id,
+                    ElementType = visualNode.ElementType,
+                    Input1 = visualNode.Input1Address,
+                    Input2 = visualNode.Input2Address,
+                    Output = visualNode.OutputAddress,
+                    TimerPresetMs = visualNode.TimerPresetMs,
+                    SetDominant = visualNode.SetDominant,
+                    CounterPreset = visualNode.CounterPreset,
+                    CompareValue = visualNode.CompareValue
+                };
+                
+                // Map connections to input addresses using optimized lookups
+                MapConnectionsToInputs(visualNode, element, nodeDict, connectionLookup);
+                
+                elements.Add(element);
+            }
+            
+            return elements;
+        }
+        
+        private void MapConnectionsToInputs(VisualNode visualNode, PlcSimulationElement element,
+            System.Collections.Generic.Dictionary<string, VisualNode> nodeDict,
+            System.Linq.ILookup<string, NodeConnection> connectionLookup)
+        {
+            // Find connections that target this node using optimized lookup - O(1)
+            var inputConnections = connectionLookup[visualNode.Id];
+            
+            foreach (var connection in inputConnections)
+            {
+                // Find source node using optimized dictionary - O(1)
+                if (nodeDict.TryGetValue(connection.SourceNodeId, out var sourceNode))
+                {
+                    var targetAddress = new PlcAddressReference
+                    {
+                        Area = sourceNode.OutputAddress.Area,
+                        Address = sourceNode.OutputAddress.Address,
+                        Not = sourceNode.OutputAddress.Not
+                    };
+                    
+                    if (connection.TargetConnector == "Input1")
+                    {
+                        element.Input1 = targetAddress;
+                    }
+                    else if (connection.TargetConnector == "Input2")
+                    {
+                        element.Input2 = targetAddress;
+                    }
+                }
+            }
+=======
+>>>>>>> origin/master
+        }
         
         partial void OnShowLiveValuesChanged(bool value)
         {
