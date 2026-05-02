@@ -7,6 +7,35 @@ namespace ModbusForge.Tests.Helpers
     public class DataTypeConverterTests
     {
         [Theory]
+        [InlineData(0x3F80, 0x0000, 1.0f)]
+        [InlineData(0xBF80, 0x0000, -1.0f)]
+        [InlineData(0x0000, 0x0000, 0.0f)]
+        [InlineData(0x42F6, 0xE979, 123.456f)] // ~123.456
+        public void ToSingle_ExplicitRegisters_ReturnsExpectedFloat(ushort high, ushort low, float expected)
+        {
+            // Act
+            float result = DataTypeConverter.ToSingle(high, low);
+
+            // Assert
+            // Use precision 3 for 123.456f test as floats are imprecise
+            Assert.Equal(expected, result, 3);
+        }
+
+        [Theory]
+        [InlineData(1.0f, new ushort[] { 0x3F80, 0x0000 })]
+        [InlineData(-1.0f, new ushort[] { 0xBF80, 0x0000 })]
+        [InlineData(0.0f, new ushort[] { 0x0000, 0x0000 })]
+        [InlineData(123.456f, new ushort[] { 0x42F6, 0xE979 })]
+        public void ToUInt16_ExplicitFloat_ReturnsExpectedRegisters(float input, ushort[] expected)
+        {
+            // Act
+            ushort[] result = DataTypeConverter.ToUInt16(input);
+
+            // Assert
+            Assert.Equal(expected, result);
+        }
+
+        [Theory]
         [InlineData(1.0f)]
         [InlineData(0.0f)]
         [InlineData(-1.0f)]
