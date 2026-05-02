@@ -47,6 +47,56 @@ namespace ModbusForge.ViewModels
             // Start with empty canvas - no sample nodes
         }
         
+        private void InitializeSampleNodes()
+        {
+            // Create a simple AND gate example
+            var input1 = new VisualNode
+            {
+                Name = "Input 1",
+                ElementType = PlcElementType.Input,
+                X = 50,
+                Y = 100,
+                Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 }
+            };
+            
+            var input2 = new VisualNode
+            {
+                Name = "Input 2",
+                ElementType = PlcElementType.Input,
+                X = 50,
+                Y = 200,
+                Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 2 }
+            };
+            
+            var andGate = new VisualNode
+            {
+                Name = "AND Gate",
+                ElementType = PlcElementType.AND,
+                X = 250,
+                Y = 150,
+                OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 }
+            };
+            
+            var output = new VisualNode
+            {
+                Name = "Output",
+                ElementType = PlcElementType.Output,
+                X = 450,
+                Y = 150,
+                OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 }
+            };
+            
+            Nodes.Add(input1);
+            Nodes.Add(input2);
+            Nodes.Add(andGate);
+            Nodes.Add(output);
+            
+            // Create connections
+            CreateConnection(input1.Id, andGate.Id, "Input1");
+            CreateConnection(input2.Id, andGate.Id, "Input2");
+            CreateConnection(andGate.Id, output.Id, "Input1");
+        }
+        
         [RelayCommand]
         private void AddNode(string nodeType)
         {

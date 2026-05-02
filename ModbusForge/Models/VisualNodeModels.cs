@@ -254,7 +254,7 @@ namespace ModbusForge.Models
         private PlcArea _area = PlcArea.Coil;
         
         [ObservableProperty]
-        private int _address = 0;
+        private int _address = 1;
         
         [ObservableProperty]
         private bool _not = false;

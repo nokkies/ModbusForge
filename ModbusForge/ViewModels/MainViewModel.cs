@@ -1694,6 +1694,53 @@ namespace ModbusForge.ViewModels
             }
         }
 
+        internal void MigrateOldNodeAddresses(VisualNode node)
+        {
+            // Fix InputInt nodes with missing OutputAddress
+            if (node.ElementType == PlcElementType.InputInt && node.OutputAddress == null)
+            {
+                node.OutputAddress = new PlcAddressReference 
+                { 
+                    Area = PlcArea.HoldingRegister, 
+                    Address = node.Input1Address?.Address ?? 1 
+                };
+            }
+            
+            // Fix InputBool nodes with missing OutputAddress
+            if (node.ElementType == PlcElementType.InputBool && node.OutputAddress == null)
+            {
+                node.OutputAddress = new PlcAddressReference 
+                { 
+                    Area = PlcArea.Coil, 
+                    Address = node.Input1Address?.Address ?? 1 
+                };
+            }
+            
+            // Fix any nodes with address 0 (invalid in UI's 1-based convention)
+            MigrateAddress(node.OutputAddress);
+            MigrateAddress(node.Input1Address);
+            MigrateAddress(node.Input2Address);
+
+            // Also fix any associated connector configurations
+            if (_visualNodeEditorViewModel?.ConnectorConfigs != null)
+            {
+                foreach (var config in _visualNodeEditorViewModel.ConnectorConfigs.Where(c => c.NodeId == node.Id))
+                {
+                    if (config.Address == 0)
+                    {
+                        config.Address = 1;
+                    }
+                }
+            }
+        }
+
+        internal void MigrateAddress(PlcAddressReference? address)
+        {
+            if (address != null && address.Address == 0)
+            {
+                address.Address = 1;
+            }
+        }
         private async Task ImportUnitIdAsAsync()
         {
             try
