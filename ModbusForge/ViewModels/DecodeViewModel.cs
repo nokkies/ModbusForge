@@ -31,13 +31,28 @@ namespace ModbusForge.ViewModels
 
             _readNowCommand = new AsyncRelayCommand(ReadAsync, CanRead);
             // Ensure initial enable/disable state reflects current connection
-            try { _readNowCommand.NotifyCanExecuteChanged(); } catch { }
+            try
+            {
+                _readNowCommand.NotifyCanExecuteChanged();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to notify CanExecuteChanged during initialization");
+            }
+
             _main.PropertyChanged += (s, e) =>
             {
                 if (string.Equals(e.PropertyName, nameof(MainViewModel.IsConnected), StringComparison.Ordinal) ||
                     string.Equals(e.PropertyName, nameof(MainViewModel.Mode), StringComparison.Ordinal))
                 {
-                    try { _readNowCommand.NotifyCanExecuteChanged(); } catch { }
+                    try
+                    {
+                        _readNowCommand.NotifyCanExecuteChanged();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to notify CanExecuteChanged during property change");
+                    }
                 }
             };
         }
@@ -119,12 +134,27 @@ namespace ModbusForge.ViewModels
 
         private bool CanRead()
         {
-            try { return _main.IsConnected && !IsBusy; } catch { return false; }
+            try
+            {
+                return _main.IsConnected && !IsBusy;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error evaluating CanRead");
+                return false;
+            }
         }
 
         partial void OnIsBusyChanged(bool value)
         {
-            try { _readNowCommand.NotifyCanExecuteChanged(); } catch { }
+            try
+            {
+                _readNowCommand.NotifyCanExecuteChanged();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to notify CanExecuteChanged when IsBusy changed");
+            }
         }
 
         private async Task ReadAsync()
@@ -340,12 +370,11 @@ namespace ModbusForge.ViewModels
 
         private static string BytesToAscii(params byte[] bytes)
         {
-            try
-            {
-                var cleansed = bytes.Select(ch => ch >= 32 && ch <= 126 ? ch : (byte)46).ToArray();
-                return Encoding.ASCII.GetString(cleansed);
-            }
-            catch { return string.Empty; }
+            if (bytes == null || bytes.Length == 0)
+                return string.Empty;
+
+            var cleansed = bytes.Select(ch => ch >= 32 && ch <= 126 ? ch : (byte)46).ToArray();
+            return Encoding.ASCII.GetString(cleansed);
         }
 
         private static bool TryParseAddress(string input, out int addr)
