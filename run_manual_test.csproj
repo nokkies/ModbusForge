@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <Reference Include="NModbus4">
+      <HintPath>/home/jules/.nuget/packages/nmodbus4/2.0.5516.31020/lib/net40/NModbus4.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="run_manual_test.cs" />
+    <Compile Include="ModbusForge/Services/ModbusServerService.cs" Link="Services/ModbusServerService.cs" />
+    <Compile Include="ModbusForge/Services/IModbusService.cs" Link="Services/IModbusService.cs" />
+    <Compile Include="ModbusForge/Services/ModbusMultiUnitServer.cs" Link="Services/ModbusMultiUnitServer.cs" />
+    <Compile Include="ModbusForge/Helpers/BitConverterHelper.cs" Link="Helpers/BitConverterHelper.cs" />
+  </ItemGroup>
+</Project>
