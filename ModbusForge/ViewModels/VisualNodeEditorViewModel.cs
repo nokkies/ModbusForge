@@ -56,7 +56,7 @@ namespace ModbusForge.ViewModels
                 ElementType = PlcElementType.Input,
                 X = 50,
                 Y = 100,
-                Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 0 }
+                Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 }
             };
             
             var input2 = new VisualNode
@@ -65,7 +65,7 @@ namespace ModbusForge.ViewModels
                 ElementType = PlcElementType.Input,
                 X = 50,
                 Y = 200,
-                Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 }
+                Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 2 }
             };
             
             var andGate = new VisualNode

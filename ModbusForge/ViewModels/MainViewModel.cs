@@ -1679,7 +1679,7 @@ namespace ModbusForge.ViewModels
             }
         }
 
-        private void MigrateOldNodeAddresses(VisualNode node)
+        internal void MigrateOldNodeAddresses(VisualNode node)
         {
             // Fix InputInt nodes with missing OutputAddress
             if (node.ElementType == PlcElementType.InputInt && node.OutputAddress == null)
@@ -1701,20 +1701,29 @@ namespace ModbusForge.ViewModels
                 };
             }
             
-            // Fix any nodes with Coil:0 addresses (invalid)
-            if (node.OutputAddress?.Area == PlcArea.Coil && node.OutputAddress.Address == 0)
+            // Fix any nodes with address 0 (invalid in UI's 1-based convention)
+            MigrateAddress(node.OutputAddress);
+            MigrateAddress(node.Input1Address);
+            MigrateAddress(node.Input2Address);
+
+            // Also fix any associated connector configurations
+            if (_visualNodeEditorViewModel?.ConnectorConfigs != null)
             {
-                node.OutputAddress.Address = 1;
+                foreach (var config in _visualNodeEditorViewModel.ConnectorConfigs.Where(c => c.NodeId == node.Id))
+                {
+                    if (config.Address == 0)
+                    {
+                        config.Address = 1;
+                    }
+                }
             }
-            
-            if (node.Input1Address?.Area == PlcArea.Coil && node.Input1Address.Address == 0)
+        }
+
+        internal void MigrateAddress(PlcAddressReference? address)
+        {
+            if (address != null && address.Address == 0)
             {
-                node.Input1Address.Address = 1;
-            }
-            
-            if (node.Input2Address?.Area == PlcArea.Coil && node.Input2Address.Address == 0)
-            {
-                node.Input2Address.Address = 1;
+                address.Address = 1;
             }
         }
 
