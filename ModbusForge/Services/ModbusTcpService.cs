@@ -319,18 +319,39 @@ namespace ModbusForge.Services
             {
                 if (disposing)
                 {
-                    // For synchronous dispose, we have to wait synchronously.
-                    // Callers are encouraged to use DisposeAsync to avoid blocking.
-                    _ioLock.Wait();
-                    try
+                    // Try to acquire the lock immediately without blocking to allow fast-path dispose.
+                    bool lockAcquired = _ioLock.Wait(0);
+
+                    // Force clean up underlying resources immediately to abort pending I/O operations
+                    try { _client?.Dispose(); } catch { }
+                    try { _tcpClient?.Close(); } catch { }
+
+                    if (lockAcquired)
                     {
-                        _client?.Dispose();
-                        _tcpClient?.Close();
+                        // Fast path: lock was available, safe to dispose now
+                        try
+                        {
+                            _ioLock.Release();
+                            _ioLock.Dispose();
+                        }
+                        catch { }
                     }
-                    finally
+                    else
                     {
-                        _ioLock.Release();
-                        _ioLock.Dispose();
+                        // Lock is held by an active I/O operation.
+                        // We must not block the calling thread, but we also can't dispose the lock yet,
+                        // otherwise the active operation will throw ObjectDisposedException when it releases.
+                        // We schedule a background task to await and clean up the lock safely.
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await _ioLock.WaitAsync().ConfigureAwait(false);
+                                _ioLock.Release();
+                                _ioLock.Dispose();
+                            }
+                            catch { }
+                        });
                     }
                 }
                 _disposed = true;
