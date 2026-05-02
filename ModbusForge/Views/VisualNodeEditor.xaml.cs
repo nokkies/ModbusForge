@@ -917,7 +917,7 @@ namespace ModbusForge.Views
             };
             
             testDialog.ShowDialog();
-            if (testDialog.DialogResult == true)
+            if (testDialog.DialogResult == true && addrRef != null)
             {
                 // Update with test dialog results
                 addrRef.Area = testDialog.SelectedArea;
@@ -1234,9 +1234,9 @@ namespace ModbusForge.Views
             return FindEllipseByTag(nodeBorder, connectorType);
         }
         
-        private Ellipse FindEllipseByTag(DependencyObject parent, string connectorType)
+        private Ellipse? FindEllipseByTag(DependencyObject parent, string connectorType)
         {
-            int count = VisualTreeHelper.GetChildrenCount(parent);
+            var count = VisualTreeHelper.GetChildrenCount(parent);
             for (int i = 0; i < count; i++)
             {
                 var child = VisualTreeHelper.GetChild(parent, i);

@@ -61,6 +61,12 @@ public class SettingsService : ISettingsService
         set { _settings.ApiPort = value; OnSettingsChanged(); }
     }
 
+    public int MaxConcurrentTrendRequests
+    {
+        get => _settings.MaxConcurrentTrendRequests;
+        set { _settings.MaxConcurrentTrendRequests = value; OnSettingsChanged(); }
+    }
+
     public event EventHandler? SettingsChanged;
 
     public SettingsService()
@@ -123,5 +129,6 @@ public class SettingsService : ISettingsService
         public int MaxConsoleMessages { get; set; } = 1000;
         public bool EnableApi { get; set; } = false;
         public int ApiPort { get; set; } = 5000;
+        public int MaxConcurrentTrendRequests { get; set; } = 8;
     }
 }

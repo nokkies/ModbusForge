@@ -133,7 +133,8 @@ namespace ModbusForge
                 provider.GetRequiredService<ModbusTcpService>(),
                 provider.GetRequiredService<ModbusServerService>(),
                 provider.GetRequiredService<ITrendLogger>(),
-                provider.GetRequiredService<ILogger<TrendCoordinator>>()
+                provider.GetRequiredService<ILogger<TrendCoordinator>>(),
+                provider.GetRequiredService<ISettingsService>()
             ));
             services.AddSingleton<ConfigurationCoordinator>();
             

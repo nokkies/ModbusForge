@@ -84,7 +84,15 @@ namespace ModbusForge.Services
 
         private void CleanupResources()
         {
-            try { _multiServer?.Stop(); } catch { }
+            try
+            {
+                _multiServer?.Stop();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error while stopping Modbus multi-unit server");
+            }
+
             _multiServer?.Dispose();
             _multiServer = null;
         }
@@ -107,7 +115,7 @@ namespace ModbusForge.Services
             }
         }
 
-        private static string GetLocalNetworkIp()
+        private string GetLocalNetworkIp()
         {
             try
             {
@@ -119,7 +127,10 @@ namespace ModbusForge.Services
                 if (ips.Count > 0)
                     return string.Join(", ", ips);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to resolve local network IP addresses");
+            }
             return "0.0.0.0";
         }
 
@@ -169,6 +180,22 @@ namespace ModbusForge.Services
                 if (ds == null || registerAddress < 1 || registerAddress >= ds.HoldingRegisters.Count)
                     throw new ArgumentOutOfRangeException(nameof(registerAddress));
                 ds.HoldingRegisters[(ushort)registerAddress] = value;
+            });
+        }
+
+        public async Task WriteRegistersAsync(byte unitId, int startAddress, ushort[] values)
+        {
+            if (!_isRunning) throw new InvalidOperationException("Modbus server is not running");
+            await Task.Run(() =>
+            {
+                var ds = GetDataStore(unitId);
+                if (ds == null || startAddress < 1 || startAddress + values.Length - 1 >= ds.HoldingRegisters.Count)
+                    throw new ArgumentOutOfRangeException(nameof(startAddress));
+
+                for (int i = 0; i < values.Length; i++)
+                {
+                    ds.HoldingRegisters[(ushort)(startAddress + i)] = values[i];
+                }
             });
         }
 
@@ -242,7 +269,14 @@ namespace ModbusForge.Services
             {
                 if (disposing)
                 {
-                    try { CleanupResources(); } catch { }
+                    try
+                    {
+                        CleanupResources();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error during CleanupResources in Dispose");
+                    }
                     _isRunning = false;
                 }
                 _disposed = true;

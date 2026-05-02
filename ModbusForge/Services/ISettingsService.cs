@@ -15,10 +15,13 @@ public interface ISettingsService
     // Logging settings
     bool EnableConsoleLogging { get; set; }
     int MaxConsoleMessages { get; set; }
-    
+
     // API settings
     bool EnableApi { get; set; }
     int ApiPort { get; set; }
+
+    // Trend settings
+    int MaxConcurrentTrendRequests { get; set; }
 
     // Save/Load
     void Save();
