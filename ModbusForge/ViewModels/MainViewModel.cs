@@ -36,6 +36,8 @@ namespace ModbusForge.ViewModels
 {
     public partial class MainViewModel : ViewModelBase, IDisposable
     {
+        private const long MaxProjectFileSize = 5 * 1024 * 1024; // 5MB limit for project files
+
         // Partial method declarations for delegated properties (required by CommunityToolkit.Mvvm)
         partial void OnRegistersGlobalTypeChanged(string value);
         partial void OnInputRegistersGlobalTypeChanged(string value);
@@ -1436,14 +1438,25 @@ namespace ModbusForge.ViewModels
 
                 if (openFileDialog.ShowDialog() == true)
                 {
-                    var json = await File.ReadAllTextAsync(openFileDialog.FileName);
+                    var fileInfo = new FileInfo(openFileDialog.FileName);
+                    if (fileInfo.Length > MaxProjectFileSize)
+                    {
+                        MessageBox.Show($"The selected project file is too large (max {MaxProjectFileSize / 1024 / 1024}MB).", "File Too Large", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
                     var options = new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true,
                         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                     };
 
-                    var projectConfig = JsonSerializer.Deserialize<ProjectConfiguration>(json, options);
+                    ProjectConfiguration? projectConfig;
+                    using (var stream = File.OpenRead(openFileDialog.FileName))
+                    {
+                        projectConfig = await JsonSerializer.DeserializeAsync<ProjectConfiguration>(stream, options);
+                    }
+
                     if (projectConfig != null)
                     {
                         // Apply global settings
@@ -1522,14 +1535,25 @@ namespace ModbusForge.ViewModels
 
                 if (openFileDialog.ShowDialog() == true)
                 {
-                    var json = await File.ReadAllTextAsync(openFileDialog.FileName);
+                    var fileInfo = new FileInfo(openFileDialog.FileName);
+                    if (fileInfo.Length > MaxProjectFileSize)
+                    {
+                        MessageBox.Show($"The selected file is too large (max {MaxProjectFileSize / 1024 / 1024}MB).", "File Too Large", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
                     var options = new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true,
                         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                     };
 
-                    var projectConfig = JsonSerializer.Deserialize<ProjectConfiguration>(json, options);
+                    ProjectConfiguration? projectConfig;
+                    using (var stream = File.OpenRead(openFileDialog.FileName))
+                    {
+                        projectConfig = await JsonSerializer.DeserializeAsync<ProjectConfiguration>(stream, options);
+                    }
+
                     if (projectConfig?.UnitConfigurations != null)
                     {
                         var importedCount = 0;
@@ -1736,14 +1760,25 @@ namespace ModbusForge.ViewModels
 
                 if (openFileDialog.ShowDialog() == true)
                 {
-                    var json = await File.ReadAllTextAsync(openFileDialog.FileName);
+                    var fileInfo = new FileInfo(openFileDialog.FileName);
+                    if (fileInfo.Length > MaxProjectFileSize)
+                    {
+                        MessageBox.Show($"The selected file is too large (max {MaxProjectFileSize / 1024 / 1024}MB).", "File Too Large", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
                     var options = new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true,
                         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                     };
 
-                    var projectConfig = JsonSerializer.Deserialize<ProjectConfiguration>(json, options);
+                    ProjectConfiguration? projectConfig;
+                    using (var stream = File.OpenRead(openFileDialog.FileName))
+                    {
+                        projectConfig = await JsonSerializer.DeserializeAsync<ProjectConfiguration>(stream, options);
+                    }
+
                     if (projectConfig?.UnitConfigurations != null && projectConfig.UnitConfigurations.Count > 0)
                     {
                         // Get the first Unit ID from the imported file

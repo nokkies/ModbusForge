@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.7" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="NModbus" Version="3.0.81" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\ModbusForge\**\*.cs" Exclude="..\ModbusForge\obj\**;..\ModbusForge\bin\**;..\ModbusForge\App.xaml.cs;..\ModbusForge\MainWindow.xaml.cs;..\ModbusForge\**\*.xaml.cs" />
+    <Compile Include="..\ModbusForge.Tests\**\*.cs" Exclude="..\ModbusForge.Tests\obj\**;..\ModbusForge.Tests\bin\**" />
+  </ItemGroup>
+</Project>
