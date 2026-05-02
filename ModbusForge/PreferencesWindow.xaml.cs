@@ -24,6 +24,8 @@ public partial class PreferencesWindow : MetroWindow
         MaxConsoleMessagesTextBox.Text = _settingsService.MaxConsoleMessages.ToString();
         MaxConcurrentTrendRequestsTextBox.Text = _settingsService.MaxConcurrentTrendRequests.ToString();
         ConfirmOnExitCheckBox.IsChecked = _settingsService.ConfirmOnExit;
+        EnableApiCheckBox.IsChecked = _settingsService.EnableApi;
+        ApiPortTextBox.Text = _settingsService.ApiPort.ToString();
     }
 
     private void SaveButton_Click(object sender, System.Windows.RoutedEventArgs e)
@@ -49,6 +51,12 @@ public partial class PreferencesWindow : MetroWindow
         }
 
         _settingsService.ConfirmOnExit = ConfirmOnExitCheckBox.IsChecked ?? false;
+
+        _settingsService.EnableApi = EnableApiCheckBox.IsChecked ?? false;
+        if (int.TryParse(ApiPortTextBox.Text, out int apiPort))
+        {
+            _settingsService.ApiPort = apiPort;
+        }
 
         _settingsService.Save();
         DialogResult = true;
