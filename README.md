@@ -1,16 +1,18 @@
-# ModbusForge v4.5.14
+# ModbusForge v4.7.1
 
 A professional Modbus TCP client/server application built with .NET 8.0 and WPF. ModbusForge provides comprehensive tools for testing, monitoring, and automating Modbus communications.
 
 ![ModbusForge](ModbusForge/Resources/ModbusForgeLOGO.png)
 
-## ✨ What's New in v4.5.14
+## ✨ What's New in v4.7.1
 
-- **� Maximized Startup** - Application now starts maximized for better usability
-- **� Input Validation** - Address TextBoxes now validate numeric input with visual feedback
-- **♻️ Code Quality** - Refactored 350-line method, fixed memory leaks, standardized logging
-- **🛠️ Bug Fixes** - Fixed empty catch blocks, extracted magic numbers to constants
-- **🖱️ Right-Click Delete** - Delete nodes via right-click context menu
+- **🏗️ POU Navigation Tree** - Program Organization Units for organizing simulation nodes into programs
+- **🔄 Program Management** - Create, rename, delete, and duplicate programs with context persistence
+- **📊 Split Layout** - POU tree and Node palette visible simultaneously (no tab switching)
+- **🏷️ Auto-Generated Names** - Nodes named as `ProgramName_Type_Number` (e.g., `Main_AND_01`)
+- **�️ Live Values Panel** - Real-time value display with register/tag linkage and editable values
+- **✨ Visual Selection** - Selected nodes highlighted with blue border on canvas
+- **📋 Active Nodes List** - Quick access to all nodes with enable/disable controls
 
 ## Key Features
 
@@ -199,6 +201,16 @@ This project uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create a si
    The installer will be created in the `installers` directory.
 
 ## Changelog
+
+- 4.7.1 (2026-05-03)
+  - **POU Navigation Tree** - Program Organization Units for organizing simulation nodes into programs
+  - **Program Management** - Create, rename, delete, and duplicate programs with context persistence
+  - **Split Layout** - POU tree and Node palette visible simultaneously (no tab switching)
+  - **Auto-Generated Names** - Nodes named as `ProgramName_Type_Number` (e.g., `Main_AND_01`)
+  - **Live Values Panel** - Real-time value display with register/tag linkage and editable values
+  - **Visual Selection** - Selected nodes highlighted with blue border on canvas
+  - **Active Nodes List** - Quick access to all nodes with enable/disable controls
+  - **Simulation Controls** - Master toggle, waveform presets, live value monitoring
 
 - 4.5.14 (2025-03-27)
   - **Maximized Startup** - Application now starts maximized for better usability

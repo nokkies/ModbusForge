@@ -57,6 +57,28 @@ namespace ModbusForge.Views
             _liveUpdateTimer.Tick += LiveUpdateTimer_Tick;
         }
         
+        private void TreeViewItem_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is TreeViewItem item && item.DataContext is ProgramModel program)
+            {
+                if (DataContext is VisualNodeEditorViewModel vm)
+                {
+                    vm.SelectProgramCommand.Execute(program);
+                }
+            }
+        }
+        
+        private void TreeViewItem_Selected(object sender, RoutedEventArgs e)
+        {
+            if (sender is TreeViewItem item && item.DataContext is ProgramModel program)
+            {
+                if (DataContext is VisualNodeEditorViewModel vm)
+                {
+                    vm.SelectedProgram = program;
+                }
+            }
+        }
+        
         private void VisualNodeEditor_MouseUp(object sender, MouseButtonEventArgs e)
         {
             // Global mouse up handler - catch any missed mouse releases
@@ -373,6 +395,13 @@ namespace ModbusForge.Views
                 Height = node.Height,
                 DataContext = node
             };
+            
+            // Highlight selected node
+            if (_viewModel?.SelectedNode == node)
+            {
+                border.BorderBrush = new SolidColorBrush(Color.FromRgb(0, 122, 204));
+                border.BorderThickness = new Thickness(3);
+            }
             
             border.MouseLeftButtonDown += Node_MouseLeftButtonDown;
             border.MouseRightButtonDown += Node_MouseRightButtonDown;

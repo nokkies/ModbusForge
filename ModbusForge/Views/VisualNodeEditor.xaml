@@ -6,6 +6,8 @@
              xmlns:local="clr-namespace:ModbusForge.Views"
              xmlns:models="clr-namespace:ModbusForge.Models"
              xmlns:converters="clr-namespace:ModbusForge.Converters"
+             xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              mc:Ignorable="d" 
              d:DesignHeight="600" d:DesignWidth="800">
     
@@ -14,6 +16,14 @@
         <converters:PlcElementTypeToColorConverter x:Key="PlcElementTypeToColorConverter"/>
         <converters:ConnectorTagConverter x:Key="ConnectorTagConverter"/>
         <converters:BoolToDashArrayConverter x:Key="BoolToDashArrayConverter"/>
+        
+        <!-- Waveform Options -->
+        <x:Array x:Key="WaveformOptionsAll" Type="{x:Type sys:String}">
+            <sys:String>Ramp</sys:String>
+            <sys:String>Sine</sys:String>
+            <sys:String>Triangle</sys:String>
+            <sys:String>Square</sys:String>
+        </x:Array>
         
         <!-- Node Style -->
         <Style x:Key="NodeStyle" TargetType="Border">
@@ -57,127 +67,64 @@
             <ColumnDefinition Width="200"/>
             <ColumnDefinition Width="5"/>
             <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="200"/>
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="250"/>
         </Grid.ColumnDefinitions>
         
-        <!-- Node Palette -->
+        <!-- Left Panel: POU Tree -->
         <Border Grid.Column="0" Background="#F5F5F5" BorderBrush="#DDD" BorderThickness="1">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="10" Orientation="Vertical">
-                    <TextBlock Text="Node Palette" FontWeight="Bold" Margin="0,0,0,10"/>
+                    <TextBlock Text="Programs (POUs)" FontWeight="Bold" Margin="0,0,0,10" FontSize="14"/>
                     
-                    <!-- I/O -->
-                    <TextBlock Text="I/O" FontWeight="SemiBold" Margin="0,10,0,5"/>
-                    <Button Content="Input BOOL" Tag="InputBool" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="Input INT" Tag="InputInt" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="Output BOOL" Tag="OutputBool" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="Output INT" Tag="OutputInt" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                    <!-- Create New Program -->
+                    <Border Background="#E3F2FD" BorderBrush="#2196F3" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="Create New Program" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0" Text="{Binding NewProgramName}" Margin="0,0,5,0" Padding="5"/>
+                                <Button Grid.Column="1" Content="Create" Command="{Binding CreateProgramCommand}" Padding="8,4"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
                     
-                    <!-- Logic Gates -->
-                    <TextBlock Text="Logic Gates" FontWeight="SemiBold" Margin="0,10,0,5"/>
-                    <Button Content="AND Gate" Tag="AND" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="OR Gate" Tag="OR" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="NOT Gate" Tag="NOT" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="RS Latch" Tag="RS" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                    <!-- Programs Tree -->
+                    <TreeView ItemsSource="{Binding ProgramTree.Programs}">
+                        <TreeView.ItemTemplate>
+                            <HierarchicalDataTemplate ItemsSource="{Binding Programs}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                    <TextBlock Text=" (" Foreground="#888" Margin="5,0,0,0"/>
+                                    <TextBlock Text="{Binding Nodes.Count}" Foreground="#888"/>
+                                    <TextBlock Text=" nodes)" Foreground="#888"/>
+                                </StackPanel>
+                            </HierarchicalDataTemplate>
+                        </TreeView.ItemTemplate>
+                        <TreeView.ItemContainerStyle>
+                            <Style TargetType="TreeViewItem">
+                                <EventSetter Event="MouseDoubleClick" Handler="TreeViewItem_MouseDoubleClick"/>
+                                <EventSetter Event="Selected" Handler="TreeViewItem_Selected"/>
+                            </Style>
+                        </TreeView.ItemContainerStyle>
+                    </TreeView>
                     
-                    <!-- Timers -->
-                    <TextBlock Text="Timers" FontWeight="SemiBold" Margin="0,10,0,5"/>
-                    <Button Content="TON Timer" Tag="TON" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="TOF Timer" Tag="TOF" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="TP Timer" Tag="TP" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    
-                    <!-- Counters -->
-                    <TextBlock Text="Counters" FontWeight="SemiBold" Margin="0,10,0,5"/>
-                    <Button Content="CTU Counter" Tag="CTU" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="CTD Counter" Tag="CTD" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="CTC Counter" Tag="CTC" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    
-                    <!-- Comparators -->
-                    <TextBlock Text="Comparators" FontWeight="SemiBold" Margin="0,10,0,5"/>
-                    <Button Content="Equal (==)" Tag="COMPARE_EQ" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="Not Equal (!=)" Tag="COMPARE_NE" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="Greater Than (&gt;)" Tag="COMPARE_GT" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="Less Than (&lt;)" Tag="COMPARE_LT" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="Greater Equal (&gt;=)" Tag="COMPARE_GE" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="Less Equal (&lt;=)" Tag="COMPARE_LE" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    
-                    <!-- Math Operations -->
-                    <TextBlock Text="Math Operations" FontWeight="SemiBold" Margin="0,10,0,5"/>
-                    <Button Content="Add (+)" Tag="MATH_ADD" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="Subtract (-)" Tag="MATH_SUB" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="Multiply (*)" Tag="MATH_MUL" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
-                    <Button Content="Divide (/)" Tag="MATH_DIV" Margin="0,2,0,2" Padding="8,4"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
-                            Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                    <!-- Program Actions -->
+                    <Border Background="#FFF3E0" BorderBrush="#FF9800" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Program Actions" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                            <Button Content="Duplicate Selected Program" Command="{Binding DuplicateProgramCommand}" 
+                                    CommandParameter="{Binding SelectedProgram}" Margin="0,2,0,2" Padding="8,4"/>
+                            <Button Content="Delete Selected Program" Command="{Binding DeleteProgramCommand}" 
+                                    CommandParameter="{Binding SelectedProgram}" Margin="0,2,0,2" Padding="8,4"
+                                    Foreground="#D32F2F"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
         </Border>
@@ -227,6 +174,261 @@
                     </Canvas>
                 </ScrollViewer>
             </Grid>
+        </Border>
+        
+        <!-- Splitter -->
+        <GridSplitter Grid.Column="3" HorizontalAlignment="Stretch" Background="#DDD"/>
+        
+        <!-- Right Panel: Node Palette -->
+        <Border Grid.Column="4" Background="#F5F5F5" BorderBrush="#DDD" BorderThickness="1">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="10" Orientation="Vertical">
+                    <TextBlock Text="Node Palette" FontWeight="Bold" Margin="0,0,0,10" FontSize="14"/>
+                    
+                    <!-- I/O Section -->
+                    <Expander Header="I/O" IsExpanded="True" Margin="0,5">
+                        <StackPanel Margin="0,5,0,0">
+                            <Button Content="Input BOOL" Tag="InputBool" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="Input INT" Tag="InputInt" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="Output BOOL" Tag="OutputBool" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="Output INT" Tag="OutputInt" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                        </StackPanel>
+                    </Expander>
+                    
+                    <!-- Logic Gates Section -->
+                    <Expander Header="Logic Gates" IsExpanded="True" Margin="0,5">
+                        <StackPanel Margin="0,5,0,0">
+                            <Button Content="AND Gate" Tag="AND" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="OR Gate" Tag="OR" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="NOT Gate" Tag="NOT" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="RS Latch" Tag="RS" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                        </StackPanel>
+                    </Expander>
+                    
+                    <!-- Timers Section -->
+                    <Expander Header="Timers" IsExpanded="True" Margin="0,5">
+                        <StackPanel Margin="0,5,0,0">
+                            <Button Content="TON Timer" Tag="TON" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="TOF Timer" Tag="TOF" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="TP Timer" Tag="TP" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                        </StackPanel>
+                    </Expander>
+                    
+                    <!-- Counters Section -->
+                    <Expander Header="Counters" IsExpanded="True" Margin="0,5">
+                        <StackPanel Margin="0,5,0,0">
+                            <Button Content="CTU Counter" Tag="CTU" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="CTD Counter" Tag="CTD" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="CTC Counter" Tag="CTC" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                        </StackPanel>
+                    </Expander>
+                    
+                    <!-- Comparators Section -->
+                    <Expander Header="Comparators" IsExpanded="True" Margin="0,5">
+                        <StackPanel Margin="0,5,0,0">
+                            <Button Content="Equal (==)" Tag="COMPARE_EQ" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="Not Equal (!=)" Tag="COMPARE_NE" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="Greater Than (&gt;)" Tag="COMPARE_GT" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="Less Than (&lt;)" Tag="COMPARE_LT" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="Greater Equal (&gt;=)" Tag="COMPARE_GE" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="Less Equal (&lt;=)" Tag="COMPARE_LE" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                        </StackPanel>
+                    </Expander>
+                    
+                    <!-- Math Operations Section -->
+                    <Expander Header="Math Operations" IsExpanded="True" Margin="0,5">
+                        <StackPanel Margin="0,5,0,0">
+                            <Button Content="Add (+)" Tag="MATH_ADD" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="Subtract (-)" Tag="MATH_SUB" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="Multiply (*)" Tag="MATH_MUL" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                            <Button Content="Divide (/)" Tag="MATH_DIV" Margin="0,2,0,2" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="#F0F0F0" BorderBrush="#C8C8C8" BorderThickness="1"
+                                    Command="{Binding AddNodeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}"/>
+                        </StackPanel>
+                    </Expander>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+        
+        <!-- Splitter -->
+        <GridSplitter Grid.Column="5" HorizontalAlignment="Stretch" Background="#DDD"/>
+        
+        <!-- Simulation Controls Panel -->
+        <Border Grid.Column="6" Background="#F5F5F5" BorderBrush="#DDD" BorderThickness="1">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="10" Orientation="Vertical">
+                    <TextBlock Text="Simulation Controls" FontWeight="Bold" Margin="0,0,0,10" FontSize="14"/>
+                    
+                    <!-- Master Simulation Toggle -->
+                    <Border Background="#E8F5E9" BorderBrush="#4CAF50" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="Master Simulation" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                            <mah:ToggleSwitch IsOn="{Binding ShowLiveValues}" OnContent="Enabled" OffContent="Disabled"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- Waveform Presets -->
+                    <Expander Header="Waveform Presets" IsExpanded="True" Margin="0,5">
+                        <StackPanel Margin="0,5,0,0">
+                            <ComboBox ItemsSource="{StaticResource WaveformOptionsAll}" SelectedItem="{Binding SelectedWaveform}" 
+                                      Margin="0,0,0,5" HorizontalAlignment="Stretch"/>
+                            <TextBlock Text="Period (ms):" Margin="0,5,0,2"/>
+                            <TextBox Text="{Binding WaveformPeriodMs}" Margin="0,0,0,5"/>
+                            <TextBlock Text="Amplitude:" Margin="0,5,0,2"/>
+                            <TextBox Text="{Binding WaveformAmplitude}" Margin="0,0,0,5"/>
+                            <TextBlock Text="Offset:" Margin="0,5,0,2"/>
+                            <TextBox Text="{Binding WaveformOffset}" Margin="0,0,0,5"/>
+                            <Button Content="Apply to Selected Nodes" Command="{Binding ApplyWaveformCommand}" 
+                                    Margin="0,5,0,0" Padding="8,4"/>
+                        </StackPanel>
+                    </Expander>
+                    
+                    <!-- Node List with Quick Controls -->
+                    <Expander Header="Active Nodes" IsExpanded="True" Margin="0,5">
+                        <StackPanel Margin="0,5,0,0">
+                            <ListBox ItemsSource="{Binding Nodes}" SelectedItem="{Binding SelectedNode}"
+                                     HorizontalAlignment="Stretch" MaxHeight="200">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Name}" FontSize="11" Margin="0,0,5,0"/>
+                                            <TextBlock Text="(" FontSize="11" Foreground="#666"/>
+                                            <TextBlock Text="{Binding AddressDisplay}" FontSize="10" Foreground="#666" Margin="0,0,2,0"/>
+                                            <TextBlock Text=")" FontSize="11" Foreground="#666"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                <Button Content="Enable" Command="{Binding EnableNodeCommand}" 
+                                        Margin="0,0,5,0" Padding="8,4" Width="80"/>
+                                <Button Content="Disable" Command="{Binding DisableNodeCommand}" 
+                                        Padding="8,4" Width="80"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
+                    
+                    <!-- Real-time Value Preview -->
+                    <Expander Header="Live Values" IsExpanded="True" Margin="0,5">
+                        <StackPanel Margin="0,5,0,0">
+                            <ItemsControl ItemsSource="{Binding Nodes}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="White" BorderBrush="#DDD" BorderThickness="1" 
+                                                CornerRadius="3" Padding="8" Margin="0,0,0,5">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                
+                                                <!-- Node name and address -->
+                                                <TextBlock Grid.Column="0" Grid.Row="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="11" Foreground="#333"/>
+                                                <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding AddressDisplay}" 
+                                                           Foreground="#666" FontSize="10" Margin="5,0,0,0"/>
+                                                
+                                                <!-- Value label and editable value -->
+                                                <StackPanel Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1" Orientation="Horizontal" Margin="0,3,0,0">
+                                                    <TextBlock Text="Value:" FontWeight="SemiBold" FontSize="10" Foreground="#666" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                                    <TextBox Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                             FontWeight="Bold" Foreground="#007ACC" FontSize="11" 
+                                                             Padding="3" MinWidth="60"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Expander>
+                    
+                    <!-- Quick Actions -->
+                    <Expander Header="Quick Actions" IsExpanded="True" Margin="0,5">
+                        <StackPanel Margin="0,5,0,0">
+                            <Button Content="Reset All Values" Command="{Binding ResetValuesCommand}" 
+                                    Margin="0,0,0,5" Padding="8,4" HorizontalAlignment="Stretch"/>
+                            <Button Content="Randomize Values" Command="{Binding RandomizeValuesCommand}" 
+                                    Margin="0,0,0,5" Padding="8,4" HorizontalAlignment="Stretch"/>
+                            <Button Content="Export Configuration" Command="{Binding ExportConfigCommand}" 
+                                    Margin="0,0,0,5" Padding="8,4" HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                    </Expander>
+                </StackPanel>
+            </ScrollViewer>
         </Border>
     </Grid>
 </UserControl>

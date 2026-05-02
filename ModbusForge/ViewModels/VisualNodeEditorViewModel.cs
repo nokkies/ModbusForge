@@ -42,9 +42,33 @@ namespace ModbusForge.ViewModels
         [ObservableProperty]
         private string? _pendingConnectionStart;
         
+        [ObservableProperty]
+        private string? _selectedWaveform = "Ramp";
+        
+        [ObservableProperty]
+        private int _waveformPeriodMs = 1000;
+        
+        [ObservableProperty]
+        private double _waveformAmplitude = 100;
+        
+        [ObservableProperty]
+        private double _waveformOffset = 0;
+        
+        [ObservableProperty]
+        private ProgramFolder _programTree = new ProgramFolder { Name = "Programs" };
+        
+        [ObservableProperty]
+        private ProgramModel? _selectedProgram;
+        
+        [ObservableProperty]
+        private string _newProgramName = "New Program";
+        
         public VisualNodeEditorViewModel()
         {
-            // Start with empty canvas - no sample nodes
+            // Initialize with a default program
+            var defaultProgram = new ProgramModel { Name = "Main", ExecutionOrder = 0 };
+            ProgramTree.Programs.Add(defaultProgram);
+            SelectedProgram = defaultProgram;
         }
         
         private void InitializeSampleNodes()
@@ -102,55 +126,49 @@ namespace ModbusForge.ViewModels
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"DEBUG: AddNode called with nodeType: {nodeType}");
-                
                 if (!Enum.TryParse<PlcElementType>(nodeType, out var elementType))
                 {
-                    System.Diagnostics.Debug.WriteLine($"DEBUG: Failed to parse nodeType: {nodeType}");
                     return;
                 }
                 
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Successfully parsed elementType: {elementType}");
+                // Generate a unique name for the node
+                var programName = SelectedProgram?.Name ?? "Program";
+                var nodeTypeName = elementType.ToString();
+                var nodeNumber = GetNextNodeNumber(elementType);
+                var nodeName = $"{programName}_{nodeTypeName}_{nodeNumber:D2}";
                 
                 var newNode = new VisualNode
                 {
                     Id = Guid.NewGuid().ToString(),
                     ElementType = elementType,
+                    Name = nodeName,
                     X = 100 + Nodes.Count * 30,
                     Y = 100 + Nodes.Count * 30,
                     Width = 240,
                     Height = 140
                 };
                 
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Created new node with ID: {newNode.Id}");
-                
                 // Set default parameters based on type
                 switch (elementType)
                 {
                     case PlcElementType.Input:
-                        newNode.Name = "Input";
                         newNode.Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
                         break;
                     case PlcElementType.Output:
-                        newNode.Name = "Output";
                         newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
                         break;
                     case PlcElementType.InputBool:
-                        newNode.Name = "Input BOOL";
                         newNode.Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = GetNextAvailableAddress(PlcArea.Coil) };
                         newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = newNode.Input1Address.Address };
                         break;
                     case PlcElementType.InputInt:
-                        newNode.Name = "Input INT";
                         newNode.Input1Address = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = GetNextAvailableAddress(PlcArea.HoldingRegister) };
                         newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = newNode.Input1Address.Address };
                         break;
                     case PlcElementType.OutputBool:
-                        newNode.Name = "Output BOOL";
                         newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = GetNextAvailableAddress(PlcArea.Coil) };
                         break;
                     case PlcElementType.OutputInt:
-                        newNode.Name = "Output INT";
                         newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = GetNextAvailableAddress(PlcArea.HoldingRegister) };
                         break;
                     case PlcElementType.TON:
@@ -164,19 +182,9 @@ namespace ModbusForge.ViewModels
                         newNode.CounterPreset = 10;
                         break;
                     case PlcElementType.MATH_ADD:
-                        newNode.Name = "ADD";
-                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = GetNextAvailableAddress(PlcArea.HoldingRegister) };
-                        break;
                     case PlcElementType.MATH_SUB:
-                        newNode.Name = "SUB";
-                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = GetNextAvailableAddress(PlcArea.HoldingRegister) };
-                        break;
                     case PlcElementType.MATH_MUL:
-                        newNode.Name = "MUL";
-                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = GetNextAvailableAddress(PlcArea.HoldingRegister) };
-                        break;
                     case PlcElementType.MATH_DIV:
-                        newNode.Name = "DIV";
                         newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = GetNextAvailableAddress(PlcArea.HoldingRegister) };
                         break;
                 }
@@ -184,6 +192,13 @@ namespace ModbusForge.ViewModels
                 System.Diagnostics.Debug.WriteLine($"DEBUG: About to add node to Nodes collection. Current count: {Nodes.Count}");
                 Nodes.Add(newNode);
                 System.Diagnostics.Debug.WriteLine($"DEBUG: Node added successfully. New count: {Nodes.Count}");
+                
+                // Also add to the selected program's nodes
+                if (SelectedProgram != null)
+                {
+                    SelectedProgram.Nodes.Add(newNode);
+                }
+                
                 SelectedNode = newNode;
                 System.Diagnostics.Debug.WriteLine($"DEBUG: SelectedNode set to: {newNode.Id}");
             }
@@ -217,6 +232,20 @@ namespace ModbusForge.ViewModels
             }
             
             return nextAddress;
+        }
+        
+        private int GetNextNodeNumber(PlcElementType elementType)
+        {
+            // Count existing nodes of this type in the current program
+            int count = 0;
+            foreach (var node in Nodes)
+            {
+                if (node.ElementType == elementType)
+                {
+                    count++;
+                }
+            }
+            return count + 1;
         }
         
         [RelayCommand]
@@ -278,6 +307,202 @@ namespace ModbusForge.ViewModels
             
             // Update all connections
             UpdateAllConnections();
+        }
+        
+        [RelayCommand]
+        private void ApplyWaveform()
+        {
+            if (SelectedNode == null) return;
+            
+            SelectedNode.Waveform = SelectedWaveform;
+            SelectedNode.PeriodMs = WaveformPeriodMs;
+            SelectedNode.Amplitude = WaveformAmplitude;
+            SelectedNode.Offset = WaveformOffset;
+        }
+        
+        [RelayCommand]
+        private void EnableNode()
+        {
+            if (SelectedNode != null)
+            {
+                SelectedNode.IsEnabled = true;
+            }
+        }
+        
+        [RelayCommand]
+        private void DisableNode()
+        {
+            if (SelectedNode != null)
+            {
+                SelectedNode.IsEnabled = false;
+            }
+        }
+        
+        [RelayCommand]
+        private void ResetValues()
+        {
+            foreach (var node in Nodes)
+            {
+                node.CurrentValueDouble = 0;
+            }
+        }
+        
+        [RelayCommand]
+        private void RandomizeValues()
+        {
+            var random = new Random();
+            foreach (var node in Nodes)
+            {
+                node.CurrentValueDouble = random.NextDouble() * 100;
+            }
+        }
+        
+        [RelayCommand]
+        private async Task ExportConfig()
+        {
+            // Placeholder for export functionality
+            await Task.CompletedTask;
+        }
+        
+        [RelayCommand]
+        private void CreateProgram()
+        {
+            var newProgram = new ProgramModel 
+            { 
+                Name = NewProgramName,
+                ExecutionOrder = ProgramTree.Programs.Count
+            };
+            ProgramTree.Programs.Add(newProgram);
+            SelectedProgram = newProgram;
+            NewProgramName = "New Program";
+        }
+        
+        [RelayCommand]
+        private void SwitchTab(string tabName)
+        {
+            // No longer needed - both panels are always visible
+        }
+        
+        [RelayCommand]
+        private void DeleteProgram(ProgramModel? program)
+        {
+            if (program == null) return;
+            if (ProgramTree.Programs.Count <= 1) return; // Keep at least one program
+            
+            ProgramTree.Programs.Remove(program);
+            if (SelectedProgram == program)
+            {
+                SelectedProgram = ProgramTree.Programs.FirstOrDefault();
+            }
+        }
+        
+        [RelayCommand]
+        private void DuplicateProgram(ProgramModel? program)
+        {
+            if (program == null) return;
+            
+            var duplicate = new ProgramModel
+            {
+                Name = $"{program.Name}_Copy",
+                Description = program.Description,
+                IsEnabled = program.IsEnabled,
+                ExecutionOrder = ProgramTree.Programs.Count
+            };
+            
+            // Copy nodes
+            foreach (var node in program.Nodes)
+            {
+                var nodeCopy = new VisualNode
+                {
+                    Name = node.Name,
+                    ElementType = node.ElementType,
+                    X = node.X + 50,
+                    Y = node.Y + 50,
+                    Width = node.Width,
+                    Height = node.Height,
+                    Input1Address = node.Input1Address,
+                    Input2Address = node.Input2Address,
+                    OutputAddress = node.OutputAddress,
+                    TimerPresetMs = node.TimerPresetMs,
+                    SetDominant = node.SetDominant,
+                    CounterPreset = node.CounterPreset,
+                    CompareValue = node.CompareValue,
+                    Waveform = node.Waveform,
+                    PeriodMs = node.PeriodMs,
+                    Amplitude = node.Amplitude,
+                    Offset = node.Offset
+                };
+                duplicate.Nodes.Add(nodeCopy);
+            }
+            
+            ProgramTree.Programs.Add(duplicate);
+        }
+        
+        [RelayCommand]
+        private void SelectProgram(ProgramModel? program)
+        {
+            if (program == null) return;
+            
+            // Save current program's nodes/connections
+            if (SelectedProgram != null)
+            {
+                SelectedProgram.Nodes.Clear();
+                foreach (var node in Nodes)
+                {
+                    SelectedProgram.Nodes.Add(node);
+                }
+                SelectedProgram.Connections.Clear();
+                foreach (var conn in Connections)
+                {
+                    SelectedProgram.Connections.Add(conn);
+                }
+                SelectedProgram.ConnectorConfigs.Clear();
+                foreach (var config in ConnectorConfigs)
+                {
+                    SelectedProgram.ConnectorConfigs.Add(config);
+                }
+            }
+            
+            // Load selected program's nodes/connections
+            SelectedProgram = program;
+            Nodes.Clear();
+            foreach (var node in program.Nodes)
+            {
+                Nodes.Add(node);
+            }
+            Connections.Clear();
+            foreach (var conn in program.Connections)
+            {
+                Connections.Add(conn);
+            }
+            ConnectorConfigs.Clear();
+            foreach (var config in program.ConnectorConfigs)
+            {
+                ConnectorConfigs.Add(config);
+            }
+        }
+        
+        partial void OnSelectedProgramChanged(ProgramModel? value)
+        {
+            if (value != null)
+            {
+                // Load the program's content
+                Nodes.Clear();
+                foreach (var node in value.Nodes)
+                {
+                    Nodes.Add(node);
+                }
+                Connections.Clear();
+                foreach (var conn in value.Connections)
+                {
+                    Connections.Add(conn);
+                }
+                ConnectorConfigs.Clear();
+                foreach (var config in value.ConnectorConfigs)
+                {
+                    ConnectorConfigs.Add(config);
+                }
+            }
         }
         
         public void SelectNode(VisualNode? node)

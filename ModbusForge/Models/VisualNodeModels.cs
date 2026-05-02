@@ -39,7 +39,25 @@ namespace ModbusForge.Models
         private bool _currentValue = false;
         
         [ObservableProperty]
+        private double _currentValueDouble = 0;
+        
+        [ObservableProperty]
         private bool _showLiveValues = false;
+        
+        [ObservableProperty]
+        private bool _isEnabled = true;
+        
+        [ObservableProperty]
+        private string? _waveform = "Ramp";
+        
+        [ObservableProperty]
+        private int _periodMs = 1000;
+        
+        [ObservableProperty]
+        private double _amplitude = 100;
+        
+        [ObservableProperty]
+        private double _offset = 0;
         
         [ObservableProperty]
         private PlcAddressReference _input1Address = new PlcAddressReference();
