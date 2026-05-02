@@ -235,8 +235,7 @@ namespace ModbusForge.ViewModels.Coordinators
         {
             var service = GetService(isServerMode);
             var registers = DataTypeConverter.ToUInt16(value);
-            await service.WriteSingleRegisterAsync(unitId, address, registers[0]);
-            await service.WriteSingleRegisterAsync(unitId, address + 1, registers[1]);
+            await service.WriteRegistersAsync(unitId, address, registers);
         }
 
         /// <summary>
@@ -246,10 +245,7 @@ namespace ModbusForge.ViewModels.Coordinators
         {
             var service = GetService(isServerMode);
             var registers = DataTypeConverter.ToUInt16(text);
-            for (int i = 0; i < registers.Length; i++)
-            {
-                await service.WriteSingleRegisterAsync(unitId, address + i, registers[i]);
-            }
+            await service.WriteRegistersAsync(unitId, address, registers);
         }
 
         /// <summary>
