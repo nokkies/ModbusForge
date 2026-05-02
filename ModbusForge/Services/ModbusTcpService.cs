@@ -166,6 +166,16 @@ namespace ModbusForge.Services
                 (client, protocolAddress) => client.WriteSingleRegister(unitId, protocolAddress, value));
         }
 
+        public async Task WriteRegistersAsync(byte unitId, int startAddress, ushort[] values)
+        {
+            await ExecuteWriteAsync(
+                unitId,
+                startAddress,
+                $"Writing {values.Length} registers starting at {startAddress}",
+                "Error writing multiple registers",
+                (client, protocolAddress) => client.WriteMultipleRegisters(unitId, protocolAddress, values));
+        }
+
         public async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
         {
             return await ExecuteReadAsync(
