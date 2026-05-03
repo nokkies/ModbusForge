@@ -1,15 +1,14 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace ModbusForge.Services;
 
 public class SettingsService : ISettingsService
 {
-    private static readonly string SettingsFilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "ModbusForge",
-        "settings.json");
+    private readonly string _settingsFilePath;
+    private readonly ILogger<SettingsService>? _logger;
 
     private SettingsData _settings = new();
 
@@ -51,27 +50,36 @@ public class SettingsService : ISettingsService
 
     public event EventHandler? SettingsChanged;
 
-    public SettingsService()
+    public SettingsService(ILogger<SettingsService>? logger = null)
+        : this(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ModbusForge", "settings.json"), logger)
     {
+    }
+
+    internal SettingsService(string settingsFilePath, ILogger<SettingsService>? logger = null)
+    {
+        _settingsFilePath = settingsFilePath;
+        _logger = logger;
         Load();
     }
 
-    public void Save()
+    public bool Save()
     {
         try
         {
-            var directory = Path.GetDirectoryName(SettingsFilePath);
+            var directory = Path.GetDirectoryName(_settingsFilePath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
             }
 
             var json = JsonSerializer.Serialize(_settings, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(SettingsFilePath, json);
+            File.WriteAllText(_settingsFilePath, json);
+            return true;
         }
-        catch
+        catch (Exception ex)
         {
-            // Silently fail if we can't save settings
+            _logger?.LogError(ex, "Failed to save settings to {FilePath}", _settingsFilePath);
+            return false;
         }
     }
 
@@ -79,9 +87,9 @@ public class SettingsService : ISettingsService
     {
         try
         {
-            if (File.Exists(SettingsFilePath))
+            if (File.Exists(_settingsFilePath))
             {
-                var json = File.ReadAllText(SettingsFilePath);
+                var json = File.ReadAllText(_settingsFilePath);
                 var loaded = JsonSerializer.Deserialize<SettingsData>(json);
                 if (loaded != null)
                 {
@@ -89,8 +97,9 @@ public class SettingsService : ISettingsService
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
+            _logger?.LogError(ex, "Failed to load settings from {FilePath}", _settingsFilePath);
             // Use defaults if we can't load
             _settings = new SettingsData();
         }

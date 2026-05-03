@@ -17,7 +17,7 @@ public interface ISettingsService
     int MaxConsoleMessages { get; set; }
     
     // Save/Load
-    void Save();
+    bool Save();
     void Load();
     
     // Event for settings changed

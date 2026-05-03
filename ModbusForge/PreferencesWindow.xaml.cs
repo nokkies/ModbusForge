@@ -43,9 +43,19 @@ public partial class PreferencesWindow : MetroWindow
 
         _settingsService.ConfirmOnExit = ConfirmOnExitCheckBox.IsChecked ?? false;
 
-        _settingsService.Save();
-        DialogResult = true;
-        Close();
+        if (_settingsService.Save())
+        {
+            DialogResult = true;
+            Close();
+        }
+        else
+        {
+            System.Windows.MessageBox.Show(
+                "Failed to save settings. Please check your permissions or disk space.",
+                "Error",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Error);
+        }
     }
 
     private void CancelButton_Click(object sender, System.Windows.RoutedEventArgs e)
