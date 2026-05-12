@@ -197,7 +197,14 @@ namespace ModbusForge.ViewModels
         private async Task<ushort[]> ReadCoilsAsRegistersAsync(IModbusService svc, byte unit, int count)
         {
             var coils = await svc.ReadCoilsAsync(unit, Address, (ushort)count);
-            return coils?.Select(b => (ushort)(b ? 1 : 0)).ToArray() ?? Array.Empty<ushort>();
+            if (coils == null) return Array.Empty<ushort>();
+
+            var result = new ushort[coils.Length];
+            for (int i = 0; i < coils.Length; i++)
+            {
+                result[i] = (ushort)(coils[i] ? 1 : 0);
+            }
+            return result;
         }
 
         /// <summary>
@@ -206,7 +213,14 @@ namespace ModbusForge.ViewModels
         private async Task<ushort[]> ReadDiscreteInputsAsRegistersAsync(IModbusService svc, byte unit, int count)
         {
             var inputs = await svc.ReadDiscreteInputsAsync(unit, Address, (ushort)count);
-            return inputs?.Select(b => (ushort)(b ? 1 : 0)).ToArray() ?? Array.Empty<ushort>();
+            if (inputs == null) return Array.Empty<ushort>();
+
+            var result = new ushort[inputs.Length];
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                result[i] = (ushort)(inputs[i] ? 1 : 0);
+            }
+            return result;
         }
 
         /// <summary>
