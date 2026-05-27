@@ -1218,7 +1218,10 @@ namespace ModbusForge.ViewModels
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error subscribing to custom entries");
+            }
         }
 
         private void CustomEntries_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
