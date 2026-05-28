@@ -60,9 +60,8 @@ namespace ModbusForge.Tests.Performance
             var connectionCoordinator = new ConnectionCoordinator(_mockClientService.Object, _mockServerService.Object, _mockConsoleLogger.Object, new Mock<ILogger<ConnectionCoordinator>>().Object);
             var registerCoordinator = new RegisterCoordinator(_mockClientService.Object, _mockServerService.Object, _mockConsoleLogger.Object, new Mock<ILogger<RegisterCoordinator>>().Object);
             var customEntryCoordinator = new CustomEntryCoordinator(registerCoordinator, _mockCustomEntryService.Object, _mockClientService.Object, _mockServerService.Object, new Mock<ILogger<CustomEntryCoordinator>>().Object);
-            var trendCoordinator = new TrendCoordinator(_mockClientService.Object, _mockServerService.Object, _mockTrendLogger.Object, new Mock<ILogger<TrendCoordinator>>().Object);
+            var trendCoordinator = new TrendCoordinator(_mockClientService.Object, _mockServerService.Object, _mockTrendLogger.Object, new Mock<ILogger<TrendCoordinator>>().Object, new Mock<ISettingsService>().Object);
             var configurationCoordinator = new ConfigurationCoordinator(new Mock<ILogger<ConfigurationCoordinator>>().Object);
-            var simulationCoordinator = new SimulationCoordinator(new Mock<ISimulationService>().Object);
 
             var viewModel = new MainViewModel(
                 _mockClientService.Object,
@@ -76,8 +75,7 @@ namespace ModbusForge.Tests.Performance
                 registerCoordinator,
                 customEntryCoordinator,
                 trendCoordinator,
-                configurationCoordinator,
-                simulationCoordinator);
+                configurationCoordinator);
 
             // Add many custom entries
             for (int i = 1; i <= entryCount; i++)
@@ -118,9 +116,8 @@ namespace ModbusForge.Tests.Performance
             var connectionCoordinator = new ConnectionCoordinator(_mockClientService.Object, _mockServerService.Object, _mockConsoleLogger.Object, new Mock<ILogger<ConnectionCoordinator>>().Object);
             var registerCoordinator = new RegisterCoordinator(_mockClientService.Object, _mockServerService.Object, _mockConsoleLogger.Object, new Mock<ILogger<RegisterCoordinator>>().Object);
             var customEntryCoordinator = new CustomEntryCoordinator(registerCoordinator, _mockCustomEntryService.Object, _mockClientService.Object, _mockServerService.Object, new Mock<ILogger<CustomEntryCoordinator>>().Object);
-            var trendCoordinator = new TrendCoordinator(_mockClientService.Object, _mockServerService.Object, _mockTrendLogger.Object, new Mock<ILogger<TrendCoordinator>>().Object);
+            var trendCoordinator = new TrendCoordinator(_mockClientService.Object, _mockServerService.Object, _mockTrendLogger.Object, new Mock<ILogger<TrendCoordinator>>().Object, new Mock<ISettingsService>().Object);
             var configurationCoordinator = new ConfigurationCoordinator(new Mock<ILogger<ConfigurationCoordinator>>().Object);
-            var simulationCoordinator = new SimulationCoordinator(new Mock<ISimulationService>().Object);
 
             var viewModel = new MainViewModel(
                 _mockClientService.Object,
@@ -134,8 +131,7 @@ namespace ModbusForge.Tests.Performance
                 registerCoordinator,
                 customEntryCoordinator,
                 trendCoordinator,
-                configurationCoordinator,
-                simulationCoordinator);
+                configurationCoordinator);
 
             // Add contiguous custom entries (Address 1 to 10)
             for (int i = 1; i <= entryCount; i++)

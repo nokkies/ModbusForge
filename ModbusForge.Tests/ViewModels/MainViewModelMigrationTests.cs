@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using ModbusForge.Configuration;
 using ModbusForge.Models;
 using ModbusForge.Services;
 using ModbusForge.ViewModels;
@@ -24,10 +25,10 @@ namespace ModbusForge.Tests.ViewModels
             var mockCustomEntryService = new Mock<ICustomEntryService>();
             var mockConsoleLogger = new Mock<IConsoleLoggerService>();
 
-            var connectionCoordinator = new ConnectionCoordinator(mockTcpService.Object, mockServerService.Object, new Mock<ILogger<ConnectionCoordinator>>().Object);
-            var registerCoordinator = new RegisterCoordinator(mockTcpService.Object, mockServerService.Object, new Mock<ILogger<RegisterCoordinator>>().Object);
-            var customEntryCoordinator = new CustomEntryCoordinator(mockCustomEntryService.Object, registerCoordinator, new Mock<ILogger<CustomEntryCoordinator>>().Object);
-            var trendCoordinator = new TrendCoordinator(mockTcpService.Object, mockServerService.Object, new Mock<ILogger<TrendCoordinator>>().Object);
+            var connectionCoordinator = new ConnectionCoordinator(mockTcpService.Object, mockServerService.Object, mockConsoleLogger.Object, new Mock<ILogger<ConnectionCoordinator>>().Object);
+            var registerCoordinator = new RegisterCoordinator(mockTcpService.Object, mockServerService.Object, mockConsoleLogger.Object, new Mock<ILogger<RegisterCoordinator>>().Object);
+            var customEntryCoordinator = new CustomEntryCoordinator(registerCoordinator, mockCustomEntryService.Object, mockTcpService.Object, mockServerService.Object, new Mock<ILogger<CustomEntryCoordinator>>().Object);
+            var trendCoordinator = new TrendCoordinator(mockTcpService.Object, mockServerService.Object, mockTrendLogger.Object, new Mock<ILogger<TrendCoordinator>>().Object, new Mock<ISettingsService>().Object);
             var configurationCoordinator = new ConfigurationCoordinator(new Mock<ILogger<ConfigurationCoordinator>>().Object);
 
             return new MainViewModel(
@@ -125,9 +126,9 @@ namespace ModbusForge.Tests.ViewModels
             var config2 = new ConnectorConfiguration { NodeId = nodeId, Address = 5 };
             var config3 = new ConnectorConfiguration { NodeId = "other-node", Address = 0 };
 
-            vm.VisualNodeEditor.ConnectorConfigs.Add(config1);
-            vm.VisualNodeEditor.ConnectorConfigs.Add(config2);
-            vm.VisualNodeEditor.ConnectorConfigs.Add(config3);
+            vm.VisualNodeEditorViewModel.ConnectorConfigs.Add(config1);
+            vm.VisualNodeEditorViewModel.ConnectorConfigs.Add(config2);
+            vm.VisualNodeEditorViewModel.ConnectorConfigs.Add(config3);
 
             // Act
             vm.MigrateOldNodeAddresses(node);
