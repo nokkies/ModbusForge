@@ -1286,11 +1286,24 @@ namespace ModbusForge.Views
             return null!;
         }
         
+        public static double SnapToGrid(double value, int gridSize)
+        {
+            if (gridSize <= 0) return value;
+            return System.Math.Floor(value / gridSize + 0.5) * gridSize;
+        }
+
         private void Canvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             if (_isDraggingNode && _draggedNode != null && _viewModel != null)
             {
                 var newPos = new Point(_draggedNode.X, _draggedNode.Y);
+
+                if (_viewModel.SnapToGrid)
+                {
+                    newPos.X = SnapToGrid(newPos.X, _viewModel.GridSize);
+                    newPos.Y = SnapToGrid(newPos.Y, _viewModel.GridSize);
+                }
+
                 if (_originalNodePosition.X != newPos.X || _originalNodePosition.Y != newPos.Y)
                 {
                     // Node was actually moved, so register an undo command
