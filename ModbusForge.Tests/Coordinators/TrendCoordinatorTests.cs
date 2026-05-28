@@ -146,5 +146,110 @@ namespace ModbusForge.Tests.Coordinators
              // Assert
              _clientServiceMock.Verify(x => x.ReadHoldingRegistersAsync(1, 10, 3), Times.Once);
         }
+
+        [Theory]
+        [InlineData("HoldingRegister", "holdingregister", "HOLDINGREGISTER")]
+        public async Task ProcessTrendSamplingAsync_ShouldGroupSameAreaWithDifferentCasing(string area1, string area2, string area3)
+        {
+            // Arrange
+            var entries = new List<CustomEntry>
+            {
+                new CustomEntry { Address = 1, Type = "uint", Area = area1, Trend = true },
+                new CustomEntry { Address = 2, Type = "uint", Area = area2, Trend = true },
+                new CustomEntry { Address = 3, Type = "uint", Area = area3, Trend = true }
+            };
+
+            _clientServiceMock
+                .Setup(x => x.ReadHoldingRegistersAsync(1, 1, 3))
+                .ReturnsAsync(new ushort[] { 1, 2, 3 });
+
+            // Act
+            await _coordinator.ProcessTrendSamplingAsync(
+                entries,
+                unitId: 1,
+                isServerMode: false,
+                setGlobalMonitorEnabled: _ => { });
+
+            // Assert
+            _clientServiceMock.Verify(x => x.ReadHoldingRegistersAsync(1, 1, 3), Times.Once);
+            _clientServiceMock.Verify(x => x.ReadHoldingRegistersAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<int>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task ProcessTrendSamplingAsync_ShouldGroupNullAreaWithHoldingRegister()
+        {
+            // Arrange
+            var entries = new List<CustomEntry>
+            {
+                new CustomEntry { Address = 1, Type = "uint", Area = null, Trend = true },
+                new CustomEntry { Address = 2, Type = "uint", Area = "HoldingRegister", Trend = true }
+            };
+
+            _clientServiceMock
+                .Setup(x => x.ReadHoldingRegistersAsync(1, 1, 2))
+                .ReturnsAsync(new ushort[] { 1, 2 });
+
+            // Act
+            await _coordinator.ProcessTrendSamplingAsync(
+                entries,
+                unitId: 1,
+                isServerMode: false,
+                setGlobalMonitorEnabled: _ => { });
+
+            // Assert
+            _clientServiceMock.Verify(x => x.ReadHoldingRegistersAsync(1, 1, 2), Times.Once);
+            _clientServiceMock.Verify(x => x.ReadHoldingRegistersAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<int>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task ProcessTrendSamplingAsync_ShouldGroupDistinctAreasSeparately()
+        {
+            // Arrange
+            var entries = new List<CustomEntry>
+            {
+                new CustomEntry { Address = 1, Type = "uint", Area = "HoldingRegister", Trend = true },
+                new CustomEntry { Address = 1, Type = "uint", Area = "InputRegister", Trend = true },
+                new CustomEntry { Address = 1, Type = "uint", Area = "Coil", Trend = true },
+                new CustomEntry { Address = 1, Type = "uint", Area = "DiscreteInput", Trend = true }
+            };
+
+            _clientServiceMock.Setup(x => x.ReadHoldingRegistersAsync(1, 1, 1)).ReturnsAsync(new ushort[] { 1 });
+            _clientServiceMock.Setup(x => x.ReadInputRegistersAsync(1, 1, 1)).ReturnsAsync(new ushort[] { 1 });
+            _clientServiceMock.Setup(x => x.ReadCoilsAsync(1, 1, 1)).ReturnsAsync(new bool[] { true });
+            _clientServiceMock.Setup(x => x.ReadDiscreteInputsAsync(1, 1, 1)).ReturnsAsync(new bool[] { true });
+
+            // Act
+            await _coordinator.ProcessTrendSamplingAsync(
+                entries,
+                unitId: 1,
+                isServerMode: false,
+                setGlobalMonitorEnabled: _ => { });
+
+            // Assert
+            _clientServiceMock.Verify(x => x.ReadHoldingRegistersAsync(1, 1, 1), Times.Once);
+            _clientServiceMock.Verify(x => x.ReadInputRegistersAsync(1, 1, 1), Times.Once);
+            _clientServiceMock.Verify(x => x.ReadCoilsAsync(1, 1, 1), Times.Once);
+            _clientServiceMock.Verify(x => x.ReadDiscreteInputsAsync(1, 1, 1), Times.Once);
+        }
+
+        [Fact]
+        public async Task ProcessTrendSamplingAsync_EmptySnapshot_IssuesZeroReads()
+        {
+            // Arrange
+            var entries = new List<CustomEntry>();
+
+            // Act
+            await _coordinator.ProcessTrendSamplingAsync(
+                entries,
+                unitId: 1,
+                isServerMode: false,
+                setGlobalMonitorEnabled: _ => { });
+
+            // Assert
+            _clientServiceMock.Verify(x => x.ReadHoldingRegistersAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+            _clientServiceMock.Verify(x => x.ReadInputRegistersAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+            _clientServiceMock.Verify(x => x.ReadCoilsAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+            _clientServiceMock.Verify(x => x.ReadDiscreteInputsAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+        }
     }
 }
