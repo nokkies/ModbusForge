@@ -24,7 +24,7 @@ public interface ISettingsService
     int MaxConcurrentTrendRequests { get; set; }
 
     // Save/Load
-    void Save();
+    bool Save();
     void Load();
     
     // Event for settings changed
