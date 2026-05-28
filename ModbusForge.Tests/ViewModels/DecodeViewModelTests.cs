@@ -20,7 +20,7 @@ namespace ModbusForge.Tests.ViewModels
 
         private DecodeViewModel CreateViewModel()
         {
-            _mockTcpService = new Mock<ModbusTcpService>(new Mock<ILogger<ModbusTcpService>>().Object, new Mock<ConnectionManager>(new Mock<ILogger<ConnectionManager>>().Object).Object);
+            _mockTcpService = new Mock<ModbusTcpService>(new Mock<ILogger<ModbusTcpService>>().Object);
             _mockServerService = new Mock<ModbusServerService>(new Mock<ILogger<ModbusServerService>>().Object);
             _mockLogger = new Mock<ILogger<DecodeViewModel>>();
 
