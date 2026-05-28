@@ -107,7 +107,7 @@ namespace ModbusForge.ViewModels
             _configurationCoordinator = configurationCoordinator ?? throw new ArgumentNullException(nameof(configurationCoordinator));
             // Initialize visual node editor
             _visualNodeEditorViewModel = new VisualNodeEditorViewModel();
-            _visualSimulationService = App.ServiceProvider.GetRequiredService<IVisualSimulationService>();
+            _visualSimulationService = App.ServiceProvider?.GetService<IVisualSimulationService>()!;
             // VisualSimulationService will be started/stopped by ShowLiveValues toggle
             
             var settings = options?.Value ?? new ServerSettings();
