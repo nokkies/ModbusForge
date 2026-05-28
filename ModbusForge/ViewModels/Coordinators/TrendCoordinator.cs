@@ -60,7 +60,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 int[] successCount = new int[1];
                 int[] errorCount = new int[1];
 
-                var groups = snapshot.GroupBy(ce => ce.Area ?? "HoldingRegister", StringComparer.OrdinalIgnoreCase);
+                var groups = snapshot.GroupBy(ce => (ce.Area ?? "HoldingRegister").ToLowerInvariant());
 
                 // Create a semaphore based on settings, default to 8 if invalid
                 int maxConcurrent = _settingsService.MaxConcurrentTrendRequests > 0 ? _settingsService.MaxConcurrentTrendRequests : 8;
