@@ -12,6 +12,9 @@
              d:DesignHeight="600" d:DesignWidth="800">
     
     <UserControl.Resources>
+        <!-- Node Accent Brush -->
+        <SolidColorBrush x:Key="NodeAccentBrush" Color="#3B82F6"/>
+
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <converters:PlcElementTypeToColorConverter x:Key="PlcElementTypeToColorConverter"/>
         <converters:ConnectorTagConverter x:Key="ConnectorTagConverter"/>
@@ -37,6 +40,30 @@
                     <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.3"/>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderThickness" Value="2"/>
+                    <Setter Property="BorderBrush" Value="#666"/>
+                    <Setter Property="Effect" Value="{x:Null}"/>
+                </Trigger>
+                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                    <Setter Property="BorderThickness" Value="2"/>
+                    <Setter Property="Effect">
+                        <Setter.Value>
+                            <DropShadowEffect Color="#3B82F6" BlurRadius="2" ShadowDepth="0" Opacity="0.8"/>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=DataContext.SelectedNode}" Value="{Binding}">
+                    <Setter Property="BorderThickness" Value="3"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource NodeAccentBrush}"/>
+                    <Setter Property="Effect">
+                        <Setter.Value>
+                            <DropShadowEffect Color="#3B82F6" BlurRadius="4" ShadowDepth="0" Opacity="0.8"/>
+                        </Setter.Value>
+                    </Setter>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
         
         <!-- Connector Style -->
@@ -47,20 +74,35 @@
             <Setter Property="Stroke" Value="#2E7D32"/>
             <Setter Property="StrokeThickness" Value="2"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="StrokeThickness" Value="3"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
         
         <!-- Input Connector Style -->
         <Style x:Key="InputConnectorStyle" TargetType="Ellipse" BasedOn="{StaticResource ConnectorStyle}">
             <Setter Property="Fill" Value="#2196F3"/>
             <Setter Property="Stroke" Value="#1565C0"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Fill" Value="#64B5F6"/> <!-- Lighter blue -->
+                </Trigger>
+            </Style.Triggers>
         </Style>
         
         <!-- Output Connector Style -->
         <Style x:Key="OutputConnectorStyle" TargetType="Ellipse" BasedOn="{StaticResource ConnectorStyle}">
             <Setter Property="Fill" Value="#FF9800"/>
             <Setter Property="Stroke" Value="#E65100"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Fill" Value="#FFB74D"/> <!-- Lighter orange -->
+                </Trigger>
+            </Style.Triggers>
         </Style>
-    </UserControl.Resources>
+        </UserControl.Resources>
     
     <Grid>
         <Grid.ColumnDefinitions>

@@ -37,6 +37,8 @@ namespace ModbusForge.Views
         private VisualNode? _draggedNode = null;
         private Point _dragStartPoint;
         private Point _originalNodePosition;
+        private Ellipse? _hoveredConnector = null;
+        private Brush? _hoveredConnectorOriginalBrush = null;
         private DispatcherTimer? _liveUpdateTimer;
         
         // Track event handlers for cleanup to prevent memory leaks
@@ -1189,20 +1191,57 @@ namespace ModbusForge.Views
             {
                 // Update temporary connection line using actual connector positions
                 var parts = _viewModel.PendingConnectionStart.Split(',');
-                var nodeId = parts[0];
-                var connectorType = parts[1];
+                var startNodeId = parts[0];
+                var startConnectorType = parts[1];
                 
-                var node = _viewModel.Nodes.FirstOrDefault(n => n.Id == nodeId);
+                var node = _viewModel.Nodes.FirstOrDefault(n => n.Id == startNodeId);
                 if (node != null)
                 {
                     // Use the new method to get actual connector position
-                    var startPoint = GetActualConnectorPosition(nodeId, connectorType);
+                    var startPoint = GetActualConnectorPosition(startNodeId, startConnectorType);
                     
                     TempConnectionLine.X1 = startPoint.X;
                     TempConnectionLine.Y1 = startPoint.Y;
                     TempConnectionLine.X2 = currentPoint.X;
                     TempConnectionLine.Y2 = currentPoint.Y;
                     TempConnectionLine.Visibility = Visibility.Visible;
+
+                    // Visual feedback for drop target
+                    var hitResult = VisualTreeHelper.HitTest(canvas, currentPoint);
+                    if (hitResult?.VisualHit is Ellipse ellipse && ellipse.Tag is string tag)
+                    {
+                        if (_hoveredConnector != ellipse)
+                        {
+                            // Reset previous hovered
+                            if (_hoveredConnector != null)
+                            {
+                                _hoveredConnector.ClearValue(Shape.FillProperty);
+                            }
+
+                            _hoveredConnector = ellipse;
+                            _hoveredConnectorOriginalBrush = ellipse.Fill;
+
+                            var targetParts = tag.Split(',');
+                            if (targetParts.Length >= 2)
+                            {
+                                var targetNodeId = targetParts[0];
+                                var targetConnectorType = targetParts[1];
+
+                                bool isValid = IsValidConnection(startNodeId, startConnectorType, targetNodeId, targetConnectorType);
+                                _hoveredConnector.Fill = isValid ? Brushes.LimeGreen : Brushes.Red;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Not hovering over an ellipse, reset if we were previously
+                        if (_hoveredConnector != null)
+                        {
+                            _hoveredConnector.ClearValue(Shape.FillProperty);
+                            _hoveredConnector = null;
+                            _hoveredConnectorOriginalBrush = null;
+                        }
+                    }
                 }
             }
         }
@@ -1353,7 +1392,7 @@ namespace ModbusForge.Views
                     var startParts = _viewModel.PendingConnectionStart.Split(',');
                     var startNodeId = startParts[0];
                     
-                if (startNodeId != nodeId) // Don't connect to self
+                if (IsValidConnection(startNodeId, startParts[1], nodeId, connectorType))
                 {
                     _viewModel.CreateConnection(startNodeId, nodeId, connectorType);
                 }
@@ -1363,6 +1402,13 @@ namespace ModbusForge.Views
                     TempConnectionLine.Visibility = Visibility.Collapsed;
                     _isConnecting = false;
                     
+                    // Reset hover visual feedback
+                    if (_hoveredConnector != null)
+                    {
+                        _hoveredConnector.ClearValue(Shape.FillProperty);
+                        _hoveredConnector = null;
+                        _hoveredConnectorOriginalBrush = null;
+                    }
                 }
                 e.Handled = true;
             }
@@ -1414,6 +1460,30 @@ namespace ModbusForge.Views
             return CalculateConnectorPosition(nodeId, connectorType);
         }
         
+        private bool IsValidConnection(string sourceNodeId, string sourceConnector, string targetNodeId, string targetConnector)
+        {
+            if (_viewModel == null) return false;
+
+            // 1. Direction: source must be Output, target must be an Input
+            if (sourceConnector != "Output" || !targetConnector.StartsWith("Input"))
+                return false;
+
+            // 2. Different nodes (no self-connection)
+            if (sourceNodeId == targetNodeId)
+                return false;
+
+            // 3. Duplicate check
+            var duplicateExists = _viewModel.Connections.Any(c =>
+                c.SourceNodeId == sourceNodeId &&
+                c.TargetNodeId == targetNodeId &&
+                c.TargetConnector == targetConnector);
+
+            if (duplicateExists)
+                return false;
+
+            return true;
+        }
+
         private Ellipse? FindConnectorInNode(Border nodeBorder, string connectorType)
         {
             // Recursively search the visual tree for an Ellipse tagged with the connector type
