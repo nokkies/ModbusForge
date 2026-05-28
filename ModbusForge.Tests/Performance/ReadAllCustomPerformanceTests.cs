@@ -48,12 +48,21 @@ namespace ModbusForge.Tests.Performance
             const int entryCount = 10;
             const int delayMs = 50;
 
-            // Mock holding register reads with a delay
+            // Mock holding register reads with a delay, forcing sequential execution
+            var semaphore = new System.Threading.SemaphoreSlim(1, 1);
             _mockClientService.Setup(s => s.ReadHoldingRegistersAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<int>()))
                 .Returns(async () =>
                 {
-                    await Task.Delay(delayMs);
-                    return new ushort[] { 123 };
+                    await semaphore.WaitAsync();
+                    try
+                    {
+                        await Task.Delay(delayMs);
+                        return new ushort[] { 123 };
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
                 });
             _mockClientService.SetupGet(s => s.IsConnected).Returns(true);
 
@@ -77,10 +86,10 @@ namespace ModbusForge.Tests.Performance
                 trendCoordinator,
                 configurationCoordinator);
 
-            // Add many custom entries
+            // Add many custom entries with gaps to avoid batching
             for (int i = 1; i <= entryCount; i++)
             {
-                viewModel.CustomEntries.Add(new CustomEntry { Address = i, Area = "HoldingRegister", Type = "uint" });
+                viewModel.CustomEntries.Add(new CustomEntry { Address = i * 20, Area = "HoldingRegister", Type = "uint" });
             }
 
             // Act
