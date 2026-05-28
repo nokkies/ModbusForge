@@ -75,7 +75,8 @@ namespace ModbusForge.Tests.Services
             // Act - Create client and connect to actual bound address
             var clientService = new ModbusTcpService(new Mock<ILogger<ModbusTcpService>>().Object);
             var boundEndpoint = _serverService.BoundEndpoint;
-            var actualIp = boundEndpoint.Split(':')[0]; // Get first IP from bound endpoint
+            var ipPart = boundEndpoint.Split(':')[0]; // Get IP list part
+            var actualIp = ipPart.Split(',')[0].Trim(); // Get first IP
             
             var clientConnected = await clientService.ConnectAsync(actualIp, _testPort, "1");
 
@@ -100,7 +101,8 @@ namespace ModbusForge.Tests.Services
             Assert.True(serverConnected, "Server should start successfully");
 
             var boundEndpoint = _serverService.BoundEndpoint;
-            var actualIp = boundEndpoint.Split(':')[0]; // Get first IP from bound endpoint
+            var ipPart = boundEndpoint.Split(':')[0];
+            var actualIp = ipPart.Split(',')[0].Trim();
             var clients = new ModbusTcpService[clientCount];
 
             // Act - Connect multiple clients
@@ -196,8 +198,12 @@ namespace ModbusForge.Tests.Services
             Assert.True(connected, "Server should connect successfully on localhost");
             Assert.True(_serverService.IsConnected, "Server should report as connected");
             
+            // Client should be able to connect to localhost
+            using var clientService = new ModbusTcpService(new Mock<ILogger<ModbusTcpService>>().Object);
+            var clientConnected = await clientService.ConnectAsync("127.0.0.1", _testPort, "1");
+            Assert.True(clientConnected, "Client should be able to connect to server via localhost");
+            
             var boundEndpoint = _serverService.BoundEndpoint;
-            Assert.Contains("127.0.0.1", boundEndpoint);
             Assert.Contains(_testPort.ToString(), boundEndpoint);
         }
 
