@@ -95,7 +95,38 @@ namespace ModbusForge.Views
         
         private void VisualNodeEditor_KeyDown(object sender, KeyEventArgs e)
         {
+            if (_viewModel == null) return;
+
+            // Check for modifier keys
+            bool isCtrl = (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+            bool isShift = (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift;
+
             // Handle keyboard shortcuts
+            if (isCtrl && e.Key == Key.Z)
+            {
+                if (isShift)
+                {
+                    _viewModel.UndoRedo.Redo();
+                }
+                else
+                {
+                    _viewModel.UndoRedo.Undo();
+                }
+                RefreshCanvas();
+                RefreshConnections();
+                e.Handled = true;
+                return;
+            }
+
+            if (isCtrl && e.Key == Key.Y)
+            {
+                _viewModel.UndoRedo.Redo();
+                RefreshCanvas();
+                RefreshConnections();
+                e.Handled = true;
+                return;
+            }
+
             switch (e.Key)
             {
                 case Key.Delete:
@@ -359,7 +390,11 @@ namespace ModbusForge.Views
                 {
                     var menu = new ContextMenu();
                     var del  = new MenuItem { Header = "Delete Connection" };
-                    del.Click += (_, __) => _viewModel.Connections.Remove(capturedConn);
+                    del.Click += (_, __) => {
+                        var command = new ModbusForge.Services.EditorCommands.DeleteConnectionCommand(_viewModel, capturedConn);
+                        command.Execute();
+                        _viewModel.UndoRedo.Push(command);
+                    };
                     menu.Items.Add(del);
                     ((Line)s).ContextMenu = menu;
                     menu.IsOpen = true;
@@ -881,7 +916,19 @@ namespace ModbusForge.Views
                 case PlcElementType.TP:
                     footerPanel.Children.Add(new TextBlock { Text = "ms:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
                     var timerBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.TimerPresetMs.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
-                    timerBox.LostFocus += (s, ev) => { if (int.TryParse(timerBox.Text, out int v) && v >= 0) node.TimerPresetMs = v; };
+                    int oldTimerPresetMs = node.TimerPresetMs;
+                    timerBox.GotFocus += (s, ev) => oldTimerPresetMs = node.TimerPresetMs;
+                    timerBox.LostFocus += (s, ev) => {
+                        if (int.TryParse(timerBox.Text, out int v) && v >= 0)
+                        {
+                            if (v != oldTimerPresetMs)
+                            {
+                                var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.TimerPresetMs), oldTimerPresetMs, v);
+                                command.Execute();
+                                _viewModel?.UndoRedo.Push(command);
+                            }
+                        }
+                    };
                     footerPanel.Children.Add(timerBox);
                     break;
                     
@@ -890,7 +937,19 @@ namespace ModbusForge.Views
                 case PlcElementType.CTC:
                     footerPanel.Children.Add(new TextBlock { Text = "Pre:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
                     var counterBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.CounterPreset.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
-                    counterBox.LostFocus += (s, ev) => { if (int.TryParse(counterBox.Text, out int v)) node.CounterPreset = v; };
+                    int oldCounterPreset = node.CounterPreset;
+                    counterBox.GotFocus += (s, ev) => oldCounterPreset = node.CounterPreset;
+                    counterBox.LostFocus += (s, ev) => {
+                        if (int.TryParse(counterBox.Text, out int v))
+                        {
+                            if (v != oldCounterPreset)
+                            {
+                                var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.CounterPreset), oldCounterPreset, v);
+                                command.Execute();
+                                _viewModel?.UndoRedo.Push(command);
+                            }
+                        }
+                    };
                     footerPanel.Children.Add(counterBox);
                     break;
                     
@@ -902,7 +961,19 @@ namespace ModbusForge.Views
                 case PlcElementType.COMPARE_LE:
                     footerPanel.Children.Add(new TextBlock { Text = "Val:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
                     var cmpBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.CompareValue.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
-                    cmpBox.LostFocus += (s, ev) => { if (int.TryParse(cmpBox.Text, out int v)) node.CompareValue = v; };
+                    int oldCompareValue = node.CompareValue;
+                    cmpBox.GotFocus += (s, ev) => oldCompareValue = node.CompareValue;
+                    cmpBox.LostFocus += (s, ev) => {
+                        if (int.TryParse(cmpBox.Text, out int v))
+                        {
+                            if (v != oldCompareValue)
+                            {
+                                var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.CompareValue), oldCompareValue, v);
+                                command.Execute();
+                                _viewModel?.UndoRedo.Push(command);
+                            }
+                        }
+                    };
                     footerPanel.Children.Add(cmpBox);
                     break;
                     
@@ -912,15 +983,35 @@ namespace ModbusForge.Views
                 case PlcElementType.MATH_DIV:
                     footerPanel.Children.Add(new TextBlock { Text = "Const:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
                     var mathBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.CompareValue.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
-                    mathBox.LostFocus += (s, ev) => { if (int.TryParse(mathBox.Text, out int v)) node.CompareValue = v; };
+                    int oldMathCompareValue = node.CompareValue;
+                    mathBox.GotFocus += (s, ev) => oldMathCompareValue = node.CompareValue;
+                    mathBox.LostFocus += (s, ev) => {
+                        if (int.TryParse(mathBox.Text, out int v))
+                        {
+                            if (v != oldMathCompareValue)
+                            {
+                                var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.CompareValue), oldMathCompareValue, v);
+                                command.Execute();
+                                _viewModel?.UndoRedo.Push(command);
+                            }
+                        }
+                    };
                     footerPanel.Children.Add(mathBox);
                     break;
                     
                 case PlcElementType.RS:
                     footerPanel.Children.Add(new TextBlock { Text = "Set Dom:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
                     var setDomCheck = new System.Windows.Controls.CheckBox { IsChecked = node.SetDominant, VerticalAlignment = VerticalAlignment.Center };
-                    setDomCheck.Checked += (s, ev) => node.SetDominant = true;
-                    setDomCheck.Unchecked += (s, ev) => node.SetDominant = false;
+                    setDomCheck.Checked += (s, ev) => {
+                        var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.SetDominant), false, true);
+                        command.Execute();
+                        _viewModel?.UndoRedo.Push(command);
+                    };
+                    setDomCheck.Unchecked += (s, ev) => {
+                        var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.SetDominant), true, false);
+                        command.Execute();
+                        _viewModel?.UndoRedo.Push(command);
+                    };
                     footerPanel.Children.Add(setDomCheck);
                     break;
             }
@@ -1130,6 +1221,23 @@ namespace ModbusForge.Views
         
         private void Canvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
+            if (_isDraggingNode && _draggedNode != null && _viewModel != null)
+            {
+                var newPos = new Point(_draggedNode.X, _draggedNode.Y);
+                if (_originalNodePosition.X != newPos.X || _originalNodePosition.Y != newPos.Y)
+                {
+                    // Node was actually moved, so register an undo command
+                    // But first set it back to the original position so the command can capture the change
+                    _draggedNode.X = _originalNodePosition.X;
+                    _draggedNode.Y = _originalNodePosition.Y;
+
+                    var command = new ModbusForge.Services.EditorCommands.MoveNodeCommand(_draggedNode, _originalNodePosition, newPos);
+                    command.Execute();
+                    _viewModel.UndoRedo.Push(command);
+                    RefreshConnections();
+                }
+            }
+
             // Reset dragging state only - connections persist until user completes or cancels them
             _isDraggingNode = false;
             _draggedNode = null;
@@ -1184,7 +1292,9 @@ namespace ModbusForge.Views
             };
             deleteItem.Click += (s, ev) =>
             {
-                _viewModel.DeleteNodeCommand.Execute(node);
+                var command = new ModbusForge.Services.EditorCommands.DeleteNodeCommand(_viewModel, node, _viewModel.SelectedProgram);
+                command.Execute();
+                _viewModel.UndoRedo.Push(command);
                 AddDebugMessage($"Deleted node {node.Id} via context menu");
             };
             contextMenu.Items.Add(deleteItem);
