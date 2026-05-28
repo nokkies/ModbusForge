@@ -610,9 +610,9 @@ namespace ModbusForge.Services
             return address.Not ? (value == 0 ? 1 : 0) : value;
         }
 
-        private void WriteModbusValue(PlcAddressReference output, ushort value, DataStore dataStore)
+        private void WriteModbusValue(PlcAddressReference? output, ushort value, DataStore dataStore)
         {
-            if (output?.Address < 0) return;
+            if (output == null || output.Address < 0) return;
 
             var finalValue = output.Not ? (value == 0 ? (ushort)1 : (ushort)0) : value;
 

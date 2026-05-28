@@ -40,7 +40,8 @@ namespace ModbusForge.ViewModels
         partial void OnRegistersGlobalTypeChanged(string value);
         partial void OnInputRegistersGlobalTypeChanged(string value);
 
-        private IModbusService _modbusService;
+        // Initialized in InitializeServiceState called from constructor
+        private IModbusService _modbusService = null!;
         private readonly ModbusTcpService _clientService;
         private readonly ModbusServerService _serverService;
         private readonly IConsoleLoggerService _consoleLoggerService;
@@ -385,9 +386,12 @@ namespace ModbusForge.ViewModels
 
         private IRelayCommand? _disconnectCommand;
         private readonly ILogger<MainViewModel> _logger;
-        private DispatcherTimer _customTimer;
-        private DispatcherTimer _monitorTimer;
-        private DispatcherTimer _trendTimer;
+        // Timers initialized in InitializeTimersAndServices called from constructor
+        private DispatcherTimer _customTimer = null!;
+        // Timers initialized in InitializeTimersAndServices called from constructor
+        private DispatcherTimer _monitorTimer = null!;
+        // Timers initialized in InitializeTimersAndServices called from constructor
+        private DispatcherTimer _trendTimer = null!;
         private readonly ITrendLogger _trendLogger;
         private readonly ICustomEntryService _customEntryService;
         private bool _isMonitoring;
