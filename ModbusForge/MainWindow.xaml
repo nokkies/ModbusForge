@@ -193,9 +193,10 @@
                               IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
                               Margin="0,0,16,0"/>
 
-                    <Button Grid.Column="10" Content="{Binding ConnectButtonText}" Command="{Binding ConnectCommand}" 
-                            IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
-                            Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"/>
+                    <Button Grid.Column="10" Content="{Binding ConnectButtonText}" Command="{Binding ConnectCommand}"
+                            IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
+                            Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"
+                            AutomationProperties.AutomationId="ConnectButton"/>
 
                     <StackPanel Grid.Column="11" Orientation="Horizontal">
                         <Button Content="Disconnect" Command="{Binding DisconnectCommand}" 
@@ -376,7 +377,7 @@
                     </DataGrid>
                 </Grid>
             </TabItem>
-            <TabItem Header="Simulation">
+            <TabItem Header="Simulation" AutomationProperties.AutomationId="SimulationTab">
                 <views:VisualNodeEditor x:Name="VisualEditor" DataContext="{Binding VisualNodeEditorViewModel}"/>
             </TabItem>
             <TabItem Header="Decode">

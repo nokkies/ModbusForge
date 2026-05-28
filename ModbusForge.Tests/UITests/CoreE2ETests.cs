@@ -12,28 +12,19 @@ public class CoreE2ETests : E2ETestBase
     {
         ReportResult(
             "AppLaunchAndConnectTest",
-            "Verifies that the application can launch and the connect button is clickable.",
+            "Launches the app and clicks the Connect button (looked up by AutomationId=\"ConnectButton\").",
             () =>
             {
                 if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || MainWindow == null)
                 {
-                    Assert.True(true, "Skipped actual UI interaction on non-Windows/Headless system.");
+                    Assert.True(true, "Skipped UI interaction: non-Windows or app could not launch in this environment.");
                     return;
                 }
 
-                // FlaUI Interaction: Find Connect Button
                 var cf = new ConditionFactory(new FlaUI.UIA3.UIA3PropertyLibrary());
                 var connectButton = MainWindow.FindFirstDescendant(cf.ByAutomationId("ConnectButton"))?.AsButton();
 
-                // The XAML does not currently expose an AutomationId="ConnectButton".
-                // Treat a missing element as "skip" so this test does not fail the suite;
-                // the test will start asserting once the XAML adds the AutomationId.
-                if (connectButton == null)
-                {
-                    Assert.True(true, "ConnectButton AutomationId not found in current XAML - skipping click.");
-                    return;
-                }
-
+                Assert.NotNull(connectButton);
                 connectButton.Invoke();
             });
     }
@@ -43,35 +34,24 @@ public class CoreE2ETests : E2ETestBase
     {
         ReportResult(
             "AddNodeAndReadRegistersTest",
-            "Verifies navigating to the logic tab and clicking Add Node.",
+            "Switches to the Simulation tab and clicks the \"Input BOOL\" palette button to add a node.",
             () =>
             {
                 if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || MainWindow == null)
                 {
-                    Assert.True(true, "Skipped actual UI interaction on non-Windows/Headless system.");
+                    Assert.True(true, "Skipped UI interaction: non-Windows or app could not launch in this environment.");
                     return;
                 }
 
                 var cf = new ConditionFactory(new FlaUI.UIA3.UIA3PropertyLibrary());
 
-                // Switch to Logic Tab by Automation ID or Name
-                var logicTab = MainWindow.FindFirstDescendant(cf.ByName("Logic"))?.AsTabItem();
-                if (logicTab != null)
-                {
-                    logicTab.Select();
-                }
+                var simulationTab = MainWindow.FindFirstDescendant(cf.ByAutomationId("SimulationTab"))?.AsTabItem();
+                Assert.NotNull(simulationTab);
+                simulationTab.Select();
 
-                // Find Add Node button by standard name
-                var addNodeBtn = MainWindow.FindFirstDescendant(cf.ByName("Add Node"))?.AsButton()
-                                 ?? MainWindow.FindFirstDescendant(cf.ByAutomationId("AddNodeButton"))?.AsButton();
-
-                if (addNodeBtn != null)
-                {
-                    addNodeBtn.Invoke();
-                }
-
-                // E2E UI flow finished for the core logic
-                Assert.True(true);
+                var inputBoolBtn = MainWindow.FindFirstDescendant(cf.ByName("Input BOOL"))?.AsButton();
+                Assert.NotNull(inputBoolBtn);
+                inputBoolBtn.Invoke();
             });
     }
 }
