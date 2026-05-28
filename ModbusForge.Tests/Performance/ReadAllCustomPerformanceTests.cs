@@ -51,13 +51,13 @@ namespace ModbusForge.Tests.Performance
             // Mock holding register reads with a delay, forcing sequential execution
             var semaphore = new System.Threading.SemaphoreSlim(1, 1);
             _mockClientService.Setup(s => s.ReadHoldingRegistersAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<int>()))
-                .Returns(async () =>
+                .Returns(async (byte uid, int addr, int count) =>
                 {
                     await semaphore.WaitAsync();
                     try
                     {
                         await Task.Delay(delayMs);
-                        return new ushort[] { 123 };
+                        return new ushort[count];
                     }
                     finally
                     {
@@ -101,8 +101,8 @@ namespace ModbusForge.Tests.Performance
 
             // Assert
             Console.WriteLine($"Sequential read of {entryCount} entries took {sw.ElapsedMilliseconds}ms");
-            // Expected time: ~10 * 50ms = 500ms
-            Assert.True(sw.ElapsedMilliseconds >= entryCount * delayMs, $"Expected at least {entryCount * delayMs}ms but took {sw.ElapsedMilliseconds}ms");
+            // Verify that ReadHoldingRegistersAsync was called exactly 10 times for the gaps
+            _mockClientService.Verify(s => s.ReadHoldingRegistersAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<int>()), Times.Exactly(entryCount));
         }
 
         [Fact]
@@ -156,12 +156,9 @@ namespace ModbusForge.Tests.Performance
 
             // Assert
             Console.WriteLine($"Optimized read of {entryCount} entries took {sw.ElapsedMilliseconds}ms");
-            // Expected time: ~1 * 50ms = 50ms (instead of 500ms)
-            // We allow some overhead, so check if it's significantly faster than sequential
-            Assert.True(sw.ElapsedMilliseconds < (entryCount * delayMs) / 2, $"Expected significant speedup. Sequential would take {entryCount * delayMs}ms, but took {sw.ElapsedMilliseconds}ms");
 
-            // Verify that ReadHoldingRegistersAsync was called fewer times (should be 1 for 10 contiguous registers)
-            _mockClientService.Verify(s => s.ReadHoldingRegistersAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<int>()), Times.AtMost(2));
+            // Verify that ReadHoldingRegistersAsync was called exactly 1 time for 10 contiguous registers
+            _mockClientService.Verify(s => s.ReadHoldingRegistersAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<int>()), Times.Exactly(1));
         }
     }
 }
