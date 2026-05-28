@@ -10,6 +10,29 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ModbusForge.ViewModels
 {
+    public partial class PaletteNode : ObservableObject
+    {
+        [ObservableProperty]
+        private string _name = string.Empty;
+
+        [ObservableProperty]
+        private string _tag = string.Empty;
+
+        [ObservableProperty]
+        private bool _isVisible = true;
+    }
+
+    public partial class PaletteCategory : ObservableObject
+    {
+        [ObservableProperty]
+        private string _name = string.Empty;
+
+        [ObservableProperty]
+        private bool _isVisible = true;
+
+        public ObservableCollection<PaletteNode> Nodes { get; set; } = new ObservableCollection<PaletteNode>();
+    }
+
     public partial class VisualNodeEditorViewModel : ViewModelBase
     {
         [ObservableProperty]
@@ -63,12 +86,130 @@ namespace ModbusForge.ViewModels
         [ObservableProperty]
         private string _newProgramName = "New Program";
         
+        [ObservableProperty]
+        private string _searchText = "";
+
+        public ObservableCollection<PaletteCategory> PaletteCategories { get; } = new ObservableCollection<PaletteCategory>();
+
         public VisualNodeEditorViewModel()
         {
             // Initialize with a default program
             var defaultProgram = new ProgramModel { Name = "Main", ExecutionOrder = 0 };
             ProgramTree.Programs.Add(defaultProgram);
             SelectedProgram = defaultProgram;
+
+            InitializePalette();
+        }
+
+        private void InitializePalette()
+        {
+            PaletteCategories.Add(new PaletteCategory
+            {
+                Name = "I/O",
+                Nodes = new ObservableCollection<PaletteNode>
+                {
+                    new PaletteNode { Name = "Input BOOL", Tag = "InputBool" },
+                    new PaletteNode { Name = "Input INT", Tag = "InputInt" },
+                    new PaletteNode { Name = "Output BOOL", Tag = "OutputBool" },
+                    new PaletteNode { Name = "Output INT", Tag = "OutputInt" }
+                }
+            });
+
+            PaletteCategories.Add(new PaletteCategory
+            {
+                Name = "Logic Gates",
+                Nodes = new ObservableCollection<PaletteNode>
+                {
+                    new PaletteNode { Name = "AND Gate", Tag = "AND" },
+                    new PaletteNode { Name = "OR Gate", Tag = "OR" },
+                    new PaletteNode { Name = "NOT Gate", Tag = "NOT" },
+                    new PaletteNode { Name = "RS Latch", Tag = "RS" }
+                }
+            });
+
+            PaletteCategories.Add(new PaletteCategory
+            {
+                Name = "Timers",
+                Nodes = new ObservableCollection<PaletteNode>
+                {
+                    new PaletteNode { Name = "TON Timer", Tag = "TON" },
+                    new PaletteNode { Name = "TOF Timer", Tag = "TOF" },
+                    new PaletteNode { Name = "TP Timer", Tag = "TP" }
+                }
+            });
+
+            PaletteCategories.Add(new PaletteCategory
+            {
+                Name = "Counters",
+                Nodes = new ObservableCollection<PaletteNode>
+                {
+                    new PaletteNode { Name = "CTU Counter", Tag = "CTU" },
+                    new PaletteNode { Name = "CTD Counter", Tag = "CTD" },
+                    new PaletteNode { Name = "CTC Counter", Tag = "CTC" }
+                }
+            });
+
+            PaletteCategories.Add(new PaletteCategory
+            {
+                Name = "Comparators",
+                Nodes = new ObservableCollection<PaletteNode>
+                {
+                    new PaletteNode { Name = "Equal (==)", Tag = "COMPARE_EQ" },
+                    new PaletteNode { Name = "Not Equal (!=)", Tag = "COMPARE_NE" },
+                    new PaletteNode { Name = "Greater Than (>)", Tag = "COMPARE_GT" },
+                    new PaletteNode { Name = "Less Than (<)", Tag = "COMPARE_LT" },
+                    new PaletteNode { Name = "Greater Equal (>=)", Tag = "COMPARE_GE" },
+                    new PaletteNode { Name = "Less Equal (<=)", Tag = "COMPARE_LE" }
+                }
+            });
+
+            PaletteCategories.Add(new PaletteCategory
+            {
+                Name = "Math Operations",
+                Nodes = new ObservableCollection<PaletteNode>
+                {
+                    new PaletteNode { Name = "Add (+)", Tag = "MATH_ADD" },
+                    new PaletteNode { Name = "Subtract (-)", Tag = "MATH_SUB" },
+                    new PaletteNode { Name = "Multiply (*)", Tag = "MATH_MUL" },
+                    new PaletteNode { Name = "Divide (/)", Tag = "MATH_DIV" }
+                }
+            });
+        }
+
+        [RelayCommand]
+        private void ClearSearch()
+        {
+            SearchText = "";
+            System.Windows.Input.Keyboard.ClearFocus();
+        }
+
+        partial void OnSearchTextChanged(string value)
+        {
+            bool isEmpty = string.IsNullOrWhiteSpace(value);
+
+            foreach (var category in PaletteCategories)
+            {
+                bool anyVisible = false;
+
+                foreach (var node in category.Nodes)
+                {
+                    if (isEmpty)
+                    {
+                        node.IsVisible = true;
+                        anyVisible = true;
+                    }
+                    else
+                    {
+                        bool matches = node.Name.Contains(value!, StringComparison.OrdinalIgnoreCase) ||
+                                       node.Tag.Contains(value!, StringComparison.OrdinalIgnoreCase) ||
+                                       category.Name.Contains(value!, StringComparison.OrdinalIgnoreCase);
+                        node.IsVisible = matches;
+                        if (matches) anyVisible = true;
+                    }
+                }
+
+                category.IsVisible = anyVisible;
+            }
         }
         
         private void InitializeSampleNodes()
