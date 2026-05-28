@@ -42,6 +42,9 @@ namespace ModbusForge.Views
         // Track event handlers for cleanup to prevent memory leaks
         private readonly Dictionary<string, List<(object Target, PropertyChangedEventHandler Handler)>> _nodeEventHandlers = new();
         
+        // Track connection lines to avoid recreating them
+        private readonly Dictionary<string, Line> _connectionLines = new();
+
         public VisualNodeEditor()
         {
             InitializeComponent();
@@ -328,6 +331,8 @@ namespace ModbusForge.Views
             }
             foreach (var element in elementsToRemove)
                 NodeCanvas.Children.Remove(element);
+
+            _connectionLines.Clear();
             
             // Draw connections using actual visual-tree positions where available
             foreach (var connection in _viewModel.Connections)
@@ -361,9 +366,48 @@ namespace ModbusForge.Views
                     e.Handled = true;
                 };
                 NodeCanvas.Children.Add(line);
+                _connectionLines[connection.Id] = line;
             }
         }
         
+        internal static IEnumerable<NodeConnection> GetConnectionsForNode(IEnumerable<NodeConnection> connections, string nodeId)
+        {
+            return connections.Where(c => c.SourceNodeId == nodeId || c.TargetNodeId == nodeId);
+        }
+
+        private void RefreshConnectionsForNode(string nodeId)
+        {
+            if (_viewModel == null || NodeCanvas == null) return;
+
+            var connections = GetConnectionsForNode(_viewModel.Connections, nodeId);
+
+            foreach (var connection in connections)
+            {
+                var startPoint = GetActualConnectorPosition(connection.SourceNodeId, "Output");
+                var endPoint   = GetActualConnectorPosition(connection.TargetNodeId, connection.TargetConnector);
+
+                // Update model so ViewModel stays consistent
+                if (startPoint.X != 0 || startPoint.Y != 0)
+                {
+                    connection.StartX = startPoint.X;
+                    connection.StartY = startPoint.Y;
+                }
+                if (endPoint.X != 0 || endPoint.Y != 0)
+                {
+                    connection.EndX = endPoint.X;
+                    connection.EndY = endPoint.Y;
+                }
+
+                if (_connectionLines.TryGetValue(connection.Id, out var line))
+                {
+                    line.X1 = connection.StartX;
+                    line.Y1 = connection.StartY;
+                    line.X2 = connection.EndX;
+                    line.Y2 = connection.EndY;
+                }
+            }
+        }
+
         private Line CreateConnectionLine(NodeConnection connection)
         {
             var line = new Line
@@ -1046,8 +1090,8 @@ namespace ModbusForge.Views
                     // Update connections
                     _viewModel.UpdateNodeConnections(_draggedNode.Id);
                     
-                    // Refresh connection lines to match new positions
-                    RefreshConnections();
+                    // Refresh connection lines to match new positions only for the dragged node
+                    RefreshConnectionsForNode(_draggedNode.Id);
                 }
             }
             else if (_isConnecting && !string.IsNullOrEmpty(_viewModel.PendingConnectionStart))
