@@ -25,7 +25,7 @@ namespace ModbusForge.Services
             _logger.LogInformation("Modbus TCP client created");
         }
 
-        public async Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
+        public virtual async Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
         {
             return await ExecuteReadAsync(
                 unitId,
@@ -35,7 +35,7 @@ namespace ModbusForge.Services
                 (client, protocolAddress) => client.ReadInputRegisters(unitId, protocolAddress, (ushort)count));
         }
 
-        public async Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
+        public virtual async Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
         {
             return await ExecuteReadAsync(
                 unitId,
@@ -86,7 +86,7 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1")
+        public virtual async Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1")
         {
             await _ioLock.WaitAsync().ConfigureAwait(false);
             try
@@ -146,7 +146,7 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count)
+        public virtual async Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count)
         {
             return await ExecuteReadAsync(
                 unitId,
@@ -156,17 +156,17 @@ namespace ModbusForge.Services
                 (client, protocolAddress) => client.ReadHoldingRegisters(unitId, protocolAddress, (ushort)count));
         }
 
-        public async Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
+        public virtual async Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
         {
             await ExecuteWriteAsync(
                 unitId,
                 registerAddress,
-                $"Writing register at {registerAddress} = {value}",
+                $"Writing register at {registerAddress}",
                 "Error writing single register",
                 (client, protocolAddress) => client.WriteSingleRegister(unitId, protocolAddress, value));
         }
 
-        public async Task WriteRegistersAsync(byte unitId, int startAddress, ushort[] values)
+        public virtual async Task WriteRegistersAsync(byte unitId, int startAddress, ushort[] values)
         {
             await ExecuteWriteAsync(
                 unitId,
@@ -176,7 +176,7 @@ namespace ModbusForge.Services
                 (client, protocolAddress) => client.WriteMultipleRegisters(unitId, protocolAddress, values));
         }
 
-        public async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
+        public virtual async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
         {
             return await ExecuteReadAsync(
                 unitId,
@@ -186,12 +186,12 @@ namespace ModbusForge.Services
                 (client, protocolAddress) => client.ReadCoils(unitId, protocolAddress, (ushort)count));
         }
 
-        public async Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)
+        public virtual async Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)
         {
             await ExecuteWriteAsync(
                 unitId,
                 coilAddress,
-                $"Writing coil at {coilAddress} = {value}",
+                $"Writing coil at {coilAddress}",
                 "Error writing single coil",
                 (client, protocolAddress) => client.WriteSingleCoil(unitId, protocolAddress, value));
         }
@@ -373,7 +373,7 @@ namespace ModbusForge.Services
             Dispose(false);
         }
 
-        public async Task<ConnectionDiagnosticResult> RunDiagnosticsAsync(string ipAddress, int port, byte unitId)
+        public virtual async Task<ConnectionDiagnosticResult> RunDiagnosticsAsync(string ipAddress, int port, byte unitId)
         {
             var result = new ConnectionDiagnosticResult();
             var sw = System.Diagnostics.Stopwatch.StartNew();

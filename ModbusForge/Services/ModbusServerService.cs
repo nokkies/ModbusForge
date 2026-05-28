@@ -28,15 +28,15 @@ namespace ModbusForge.Services
             _logger.LogInformation("Modbus TCP server created");
         }
 
-        public Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count) =>
+        public virtual Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count) =>
             ReadFromDataStoreAsync(unitId, startAddress, count, ds => ds.InputRegisters, "input registers");
 
-        public Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count) =>
+        public virtual Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count) =>
             ReadFromDataStoreAsync(unitId, startAddress, count, ds => ds.InputDiscretes, "discrete inputs");
 
         public virtual bool IsConnected => _isRunning;
 
-        public async Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1")
+        public virtual async Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1")
         {
             return await Task.Run(() =>
             {
@@ -175,10 +175,10 @@ namespace ModbusForge.Services
             });
         }
 
-        public Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count) =>
+        public virtual Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count) =>
             ReadFromDataStoreAsync(unitId, startAddress, count, ds => ds.HoldingRegisters, "holding registers");
 
-        public async Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
+        public virtual async Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
         {
             if (!_isRunning) throw new InvalidOperationException("Modbus server is not running");
             await Task.Run(() =>
@@ -190,7 +190,7 @@ namespace ModbusForge.Services
             });
         }
 
-        public async Task WriteRegistersAsync(byte unitId, int startAddress, ushort[] values)
+        public virtual async Task WriteRegistersAsync(byte unitId, int startAddress, ushort[] values)
         {
             if (!_isRunning) throw new InvalidOperationException("Modbus server is not running");
             await Task.Run(() =>
@@ -206,7 +206,7 @@ namespace ModbusForge.Services
             });
         }
 
-        public Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count) =>
+        public virtual Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count) =>
             ReadFromDataStoreAsync(unitId, startAddress, count, ds => ds.CoilDiscretes, "coils");
 
         private async Task<T[]?> ReadFromDataStoreAsync<T>(
@@ -229,7 +229,7 @@ namespace ModbusForge.Services
             });
         }
 
-        public Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)
+        public virtual Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)
         {
             if (!_isRunning) throw new InvalidOperationException("Modbus server is not running");
             return Task.Run(() =>
@@ -290,7 +290,7 @@ namespace ModbusForge.Services
             }
         }
 
-        public Task<ConnectionDiagnosticResult> RunDiagnosticsAsync(string ipAddress, int port, byte unitId)
+        public virtual Task<ConnectionDiagnosticResult> RunDiagnosticsAsync(string ipAddress, int port, byte unitId)
         {
             var result = new ConnectionDiagnosticResult();
             if (_isRunning && _multiServer != null)
