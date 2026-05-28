@@ -163,7 +163,10 @@ namespace ModbusForge.Views
         {
             if (_isConnecting)
             {
-                _viewModel.PendingConnectionStart = null;
+                if (_viewModel != null)
+                {
+                    _viewModel.PendingConnectionStart = null;
+                }
                 TempConnectionLine.Visibility = Visibility.Collapsed;
                 _isConnecting = false;
                 
@@ -200,7 +203,7 @@ namespace ModbusForge.Views
             return position;
         }
         
-        private T FindParent<T>(DependencyObject child) where T : DependencyObject
+        private T? FindParent<T>(DependencyObject child) where T : DependencyObject
         {
             DependencyObject parentObject = VisualTreeHelper.GetParent(child);
             
@@ -270,7 +273,7 @@ namespace ModbusForge.Views
             }
         }
         
-        private void Connections_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        private void Connections_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
             RefreshConnections();
         }
@@ -1257,7 +1260,7 @@ namespace ModbusForge.Views
             return CalculateConnectorPosition(nodeId, connectorType);
         }
         
-        private Ellipse FindConnectorInNode(Border nodeBorder, string connectorType)
+        private Ellipse? FindConnectorInNode(Border nodeBorder, string connectorType)
         {
             // Recursively search the visual tree for an Ellipse tagged with the connector type
             return FindEllipseByTag(nodeBorder, connectorType);
