@@ -126,6 +126,7 @@
                 <MenuItem Header="_Connection Manager..." Click="MenuItem_ConnectionManager_Click"/>
             </MenuItem>
             <MenuItem Header="_Help">
+                <MenuItem Header="_Keyboard Shortcuts..." Click="MenuItem_KeyboardShortcuts_Click"/>
                 <Separator/>
                 <MenuItem Header="_Donate..." Click="MenuItem_Donate_Click"/>
                 <MenuItem Header="_About" Click="MenuItem_About_Click"/>

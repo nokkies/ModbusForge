@@ -54,15 +54,7 @@
                         </Setter.Value>
                     </Setter>
                 </Trigger>
-                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=DataContext.SelectedNode}" Value="{Binding}">
-                    <Setter Property="BorderThickness" Value="3"/>
-                    <Setter Property="BorderBrush" Value="{StaticResource NodeAccentBrush}"/>
-                    <Setter Property="Effect">
-                        <Setter.Value>
-                            <DropShadowEffect Color="#3B82F6" BlurRadius="4" ShadowDepth="0" Opacity="0.8"/>
-                        </Setter.Value>
-                    </Setter>
-                </DataTrigger>
+                <!-- Selected-node visual is applied programmatically in VisualNodeEditor.xaml.cs CreateNodeElement -->
             </Style.Triggers>
         </Style>
         

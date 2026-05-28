@@ -53,6 +53,15 @@ namespace ModbusForge
             about.ShowDialog();
         }
 
+        private void MenuItem_KeyboardShortcuts_Click(object sender, RoutedEventArgs e)
+        {
+            var shortcuts = new KeyboardShortcutsWindow
+            {
+                Owner = this
+            };
+            shortcuts.ShowDialog();
+        }
+
         private void MenuItem_Donate_Click(object sender, RoutedEventArgs e)
         {
             try

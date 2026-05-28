@@ -287,6 +287,34 @@ namespace ModbusForge.Views
                     _liveUpdateTimer?.Stop();
                 }
             }
+            else if (e.PropertyName == nameof(VisualNodeEditorViewModel.SelectedNode))
+            {
+                RefreshNodeSelectionVisuals();
+            }
+        }
+
+        private void RefreshNodeSelectionVisuals()
+        {
+            if (_viewModel == null || NodeCanvas == null) return;
+
+            var selected = _viewModel.SelectedNode;
+            foreach (var child in NodeCanvas.Children)
+            {
+                if (child is Border border && border.DataContext is VisualNode node)
+                {
+                    if (node == selected)
+                    {
+                        border.BorderBrush = new SolidColorBrush(Color.FromRgb(0x3B, 0x82, 0xF6));
+                        border.BorderThickness = new Thickness(3);
+                    }
+                    else
+                    {
+                        // Restore style defaults so the hover/focus triggers still work
+                        border.ClearValue(Border.BorderBrushProperty);
+                        border.ClearValue(Border.BorderThicknessProperty);
+                    }
+                }
+            }
         }
         
         private void LiveUpdateTimer_Tick(object? sender, EventArgs e)

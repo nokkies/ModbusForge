@@ -1,0 +1,84 @@
+<Window x:Class="ModbusForge.KeyboardShortcutsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        mc:Ignorable="d"
+        Title="Keyboard Shortcuts" Width="560" Height="500"
+        WindowStartupLocation="CenterOwner"
+        Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png">
+    <Border Padding="16" Background="White">
+        <DockPanel>
+            <Button DockPanel.Dock="Bottom" Content="Close" Width="80"
+                    HorizontalAlignment="Right" Margin="0,12,0,0"
+                    IsDefault="True" IsCancel="True" Click="Close_Click"/>
+
+            <TextBlock DockPanel.Dock="Top" Text="Keyboard Shortcuts"
+                       FontSize="20" FontWeight="Bold" Margin="0,0,0,12"/>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="Visual Node Editor (Simulation tab)"
+                               FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                    <Grid Margin="8,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl + Z" FontFamily="Consolas" Margin="0,2"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Undo last editor action (add / delete / move / connect / parameter edit). Stack capped at 100." TextWrapping="Wrap" Margin="0,2"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl + Y" FontFamily="Consolas" Margin="0,2"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="Redo the most recent undo." TextWrapping="Wrap" Margin="0,2"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl + Shift + Z" FontFamily="Consolas" Margin="0,2"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="Redo (alternate)." TextWrapping="Wrap" Margin="0,2"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Delete" FontFamily="Consolas" Margin="0,2"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="Delete the most recently added node." TextWrapping="Wrap" Margin="0,2"/>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Esc" FontFamily="Consolas" Margin="0,2"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" Text="Cancel an in-progress connection drag. Inside the palette search box, clears the search." TextWrapping="Wrap" Margin="0,2"/>
+
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Right-click wire" FontFamily="Consolas" Margin="0,2"/>
+                        <TextBlock Grid.Row="5" Grid.Column="1" Text="Delete a connection." TextWrapping="Wrap" Margin="0,2"/>
+                    </Grid>
+
+                    <TextBlock Text="Visual Affordances"
+                               FontSize="14" FontWeight="SemiBold" Margin="0,8,0,8"/>
+                    <StackPanel Margin="8,0,0,16">
+                        <TextBlock TextWrapping="Wrap" Margin="0,2">
+                            <Run Text="Hover a node:"/> the border lightens and the drop shadow fades.
+                        </TextBlock>
+                        <TextBlock TextWrapping="Wrap" Margin="0,2">
+                            <Run Text="Click a node:"/> the selected node gets a thick blue border (#3B82F6).
+                        </TextBlock>
+                        <TextBlock TextWrapping="Wrap" Margin="0,2">
+                            <Run Text="Hover a connector dot:"/> the dot stroke thickens and fills with a lighter color.
+                        </TextBlock>
+                        <TextBlock TextWrapping="Wrap" Margin="0,2">
+                            <Run Text="Drag a wire from an output:"/> while dragging, the target input dot turns green if the connection would be valid, red if not.
+                        </TextBlock>
+                    </StackPanel>
+
+                    <TextBlock Text="Palette"
+                               FontSize="14" FontWeight="SemiBold" Margin="0,8,0,8"/>
+                    <StackPanel Margin="8,0,0,16">
+                        <TextBlock TextWrapping="Wrap" Margin="0,2">
+                            Type in the <Run FontStyle="Italic">Search nodes...</Run> box at the top of the palette to filter visible nodes by name, tag, or category.
+                        </TextBlock>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
+</Window>

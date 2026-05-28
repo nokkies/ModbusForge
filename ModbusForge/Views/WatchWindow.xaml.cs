@@ -18,12 +18,14 @@ namespace ModbusForge.Views
 
         public WatchWindow(TagService tagService)
         {
-            InitializeComponent();
+            // Assign fields BEFORE InitializeComponent so the XAML's initial SelectedIndex="2"
+            // does not fire UpdateRate_Changed -> UpdateTimerInterval on null _updateTimer / _tagService.
             _tagService = tagService;
-
-            // Setup timer
             _updateTimer = new DispatcherTimer();
             _updateTimer.Tick += UpdateTimer_Tick;
+
+            InitializeComponent();
+
             UpdateTimerInterval();
 
             // Bind to watch entries
@@ -53,6 +55,8 @@ namespace ModbusForge.Views
 
         private void UpdateTimerInterval()
         {
+            if (_updateTimer == null || _tagService == null || UpdateRateCombo == null) return;
+
             var selectedInterval = UpdateRateCombo.SelectedIndex switch
             {
                 0 => 100,
