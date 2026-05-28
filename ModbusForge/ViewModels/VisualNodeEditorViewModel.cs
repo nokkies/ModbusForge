@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ModbusForge.Models;
 using ModbusForge.Services;
+using ModbusForge.Services.EditorCommands;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ModbusForge.ViewModels
@@ -90,6 +91,8 @@ namespace ModbusForge.ViewModels
         private string _searchText = "";
 
         public ObservableCollection<PaletteCategory> PaletteCategories { get; } = new ObservableCollection<PaletteCategory>();
+
+        public UndoRedoService UndoRedo { get; } = new UndoRedoService();
 
         public VisualNodeEditorViewModel()
         {
@@ -331,16 +334,11 @@ namespace ModbusForge.ViewModels
                 }
                 
                 System.Diagnostics.Debug.WriteLine($"DEBUG: About to add node to Nodes collection. Current count: {Nodes.Count}");
-                Nodes.Add(newNode);
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Node added successfully. New count: {Nodes.Count}");
                 
-                // Also add to the selected program's nodes
-                if (SelectedProgram != null)
-                {
-                    SelectedProgram.Nodes.Add(newNode);
-                }
+                var command = new AddNodeCommand(this, newNode, SelectedProgram);
+                command.Execute();
+                UndoRedo.Push(command);
                 
-                SelectedNode = newNode;
                 System.Diagnostics.Debug.WriteLine($"DEBUG: SelectedNode set to: {newNode.Id}");
             }
             catch (Exception ex)
@@ -394,29 +392,9 @@ namespace ModbusForge.ViewModels
         {
             if (node != null)
             {
-                // Remove connections to/from this node
-                var connectionsToRemove = Connections.Where(c => 
-                    c.SourceNodeId == node.Id || c.TargetNodeId == node.Id).ToList();
-                
-                foreach (var connection in connectionsToRemove)
-                {
-                    Connections.Remove(connection);
-                }
-                
-                // Remove connector configurations
-                var configsToRemove = ConnectorConfigs.Where(c => c.NodeId == node.Id).ToList();
-                foreach (var config in configsToRemove)
-                {
-                    ConnectorConfigs.Remove(config);
-                }
-                
-                // Remove the node
-                Nodes.Remove(node);
-                
-                if (SelectedNode == node)
-                {
-                    SelectedNode = null;
-                }
+                var command = new DeleteNodeCommand(this, node, SelectedProgram);
+                command.Execute();
+                UndoRedo.Push(command);
             }
         }
         
@@ -742,8 +720,9 @@ namespace ModbusForge.ViewModels
             {
                 var connection = new NodeConnection(sourceNodeId, targetNodeId, targetConnector);
                 
-                UpdateConnectionPoints(connection, sourceNode, targetNode);
-                Connections.Add(connection);
+                var command = new AddConnectionCommand(this, connection);
+                command.Execute();
+                UndoRedo.Push(command);
                 
                 System.Diagnostics.Debug.WriteLine($"Connection added to collection. Total: {Connections.Count}");
                 System.Diagnostics.Debug.WriteLine($"Connection points: Start({connection.StartX}, {connection.StartY}) -> End({connection.EndX}, {connection.EndY})");
