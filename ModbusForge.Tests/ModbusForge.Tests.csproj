@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ModbusForge\ModbusForge.csproj" />
+    <ProjectReference Include="..\UI.TestFramework\UI.TestFramework.csproj" />
   </ItemGroup>
 
 </Project>
