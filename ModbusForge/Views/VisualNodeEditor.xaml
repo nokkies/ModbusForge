@@ -205,7 +205,7 @@
                         </Canvas.LayoutTransform>
                         
                         <!-- Temporary Connection Line (while dragging) -->
-                        <Line x:Name="TempConnectionLine" 
+                        <Path x:Name="TempConnectionLine"
                               Stroke="#999" StrokeThickness="2" StrokeDashArray="5,5"
                               Visibility="Collapsed"/>
                     </Canvas>
