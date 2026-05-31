@@ -181,14 +181,14 @@
                         <Button Content="Clear All" Command="{Binding ClearAllCommand}" Margin="0,0,10,0"/>
                         <Button Content="Auto Layout" Command="{Binding AutoLayoutCommand}" Margin="0,0,10,0"/>
                         <Separator Margin="10,0"/>
-                        <Button x:Name="TagBrowserButton" Content="🏷️ Tags" Click="TagBrowserButton_Click" Margin="0,0,10,0" Padding="8,4"/>
+                        <Button x:Name="TagBrowserButton" Content="🏷️ Tags" Click="TagBrowserButton_Click" Margin="0,0,10,0" Padding="8,4" AutomationProperties.AutomationId="TagBrowserButton"/>
                         <Button x:Name="WatchWindowButton" Content="👁️ Watch" Click="WatchWindowButton_Click" Margin="0,0,10,0" Padding="8,4"/>
                         <Separator Margin="10,0"/>
                         <TextBlock Text="💡 Input/Output blocks have inline area/address fields · All connectors are internal connections only · Right-click wires to delete" 
                                    VerticalAlignment="Center" Foreground="#888" FontSize="11" Margin="0,0,10,0"/>
                         <Separator Margin="10,0"/>
                         <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                        <Slider Width="100" Minimum="0.5" Maximum="2" Value="{Binding ZoomLevel}" VerticalAlignment="Center"/>
+                        <Slider Width="100" Minimum="0.5" Maximum="2" Value="{Binding ZoomLevel}" VerticalAlignment="Center" AutomationProperties.AutomationId="ZoomSlider"/>
                         <TextBlock Text="{Binding ZoomLevel, StringFormat={}{0:P0}}" VerticalAlignment="Center" Margin="5,0,0,0"/>
                     </StackPanel>
                 </Border>
@@ -225,7 +225,8 @@
                     <Grid Margin="0,0,0,10">
                         <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                  mah:TextBoxHelper.Watermark="Search nodes..."
-                                 mah:TextBoxHelper.ClearTextButton="True">
+                                 mah:TextBoxHelper.ClearTextButton="True"
+                                 AutomationProperties.AutomationId="PaletteSearchBox">
                             <TextBox.InputBindings>
                                 <KeyBinding Key="Esc" Command="{Binding ClearSearchCommand}" />
                             </TextBox.InputBindings>

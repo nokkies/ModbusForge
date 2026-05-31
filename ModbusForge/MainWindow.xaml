@@ -192,7 +192,8 @@
                     <TextBlock Text="Mode:" Grid.Column="8" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <ComboBox Grid.Column="9" SelectedItem="{Binding Mode}" ItemsSource="{StaticResource ModeOptionsAll}"
                               IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
-                              Margin="0,0,16,0"/>
+                              Margin="0,0,16,0"
+                              AutomationProperties.AutomationId="ModeComboBox"/>
 
                     <Button Grid.Column="10" Content="{Binding ConnectButtonText}" Command="{Binding ConnectCommand}"
                             IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
@@ -202,7 +203,8 @@
                     <StackPanel Grid.Column="11" Orientation="Horizontal">
                         <Button Content="Disconnect" Command="{Binding DisconnectCommand}" 
                                 IsEnabled="{Binding IsConnected}"
-                                Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"/>
+                                Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"
+                                AutomationProperties.AutomationId="DisconnectButton"/>
                         <Button Content="Diagnostics" Command="{Binding RunDiagnosticsCommand}" 
                                 ToolTip="Test TCP and Modbus connectivity"
                                 Style="{StaticResource MetallicButtonStyle}"/>
