@@ -90,12 +90,26 @@ namespace ModbusForge.ViewModels
         [ObservableProperty]
         private string _searchText = "";
 
+        [ObservableProperty]
+        private bool _snapToGrid = true;
+
+        [ObservableProperty]
+        private int _gridSize = 20;
+
         public ObservableCollection<PaletteCategory> PaletteCategories { get; } = new ObservableCollection<PaletteCategory>();
 
         public UndoRedoService UndoRedo { get; } = new UndoRedoService();
 
+        public IRelayCommand AlignLeftCommand { get; }
+        public IRelayCommand AlignTopCommand { get; }
+        public IRelayCommand DistributeHorizontallyCommand { get; }
+
         public VisualNodeEditorViewModel()
         {
+            AlignLeftCommand = new RelayCommand(AlignLeft);
+            AlignTopCommand = new RelayCommand(AlignTop);
+            DistributeHorizontallyCommand = new RelayCommand(DistributeHorizontally);
+
             // Initialize with a default program
             var defaultProgram = new ProgramModel { Name = "Main", ExecutionOrder = 0 };
             ProgramTree.Programs.Add(defaultProgram);
@@ -601,6 +615,36 @@ namespace ModbusForge.ViewModels
             }
         }
         
+        private List<VisualNode> GetSelection()
+        {
+            if (SelectedNode != null)
+            {
+                return new List<VisualNode> { SelectedNode };
+            }
+            return new List<VisualNode>();
+        }
+
+        private void AlignLeft()
+        {
+            var selection = GetSelection();
+            if (selection.Count < 2) return;
+            // No-op for now, needs multi-select
+        }
+
+        private void AlignTop()
+        {
+            var selection = GetSelection();
+            if (selection.Count < 2) return;
+            // No-op for now, needs multi-select
+        }
+
+        private void DistributeHorizontally()
+        {
+            var selection = GetSelection();
+            if (selection.Count < 3) return; // Distribute needs at least 3
+            // No-op for now, needs multi-select
+        }
+
         partial void OnSelectedProgramChanged(ProgramModel? value)
         {
             if (value != null)

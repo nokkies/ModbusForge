@@ -1306,11 +1306,24 @@ namespace ModbusForge.Views
             return null!;
         }
         
+        public static double SnapToGrid(double value, int gridSize)
+        {
+            if (gridSize <= 0) return value;
+            return System.Math.Floor(value / gridSize + 0.5) * gridSize;
+        }
+
         private void Canvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             if (_isDraggingNode && _draggedNode != null && _viewModel != null)
             {
                 var newPos = new Point(_draggedNode.X, _draggedNode.Y);
+
+                if (_viewModel.SnapToGrid)
+                {
+                    newPos.X = SnapToGrid(newPos.X, _viewModel.GridSize);
+                    newPos.Y = SnapToGrid(newPos.Y, _viewModel.GridSize);
+                }
+
                 if (_originalNodePosition.X != newPos.X || _originalNodePosition.Y != newPos.Y)
                 {
                     // Node was actually moved, so register an undo command
@@ -1321,8 +1334,23 @@ namespace ModbusForge.Views
                     var command = new ModbusForge.Services.EditorCommands.MoveNodeCommand(_draggedNode, _originalNodePosition, newPos);
                     command.Execute();
                     _viewModel.UndoRedo.Push(command);
-                    RefreshConnections();
                 }
+                else
+                {
+                    // Snapped back to original position, reset model coordinates
+                    _draggedNode.X = _originalNodePosition.X;
+                    _draggedNode.Y = _originalNodePosition.Y;
+                }
+
+                // Ensure visual border matches final model coordinates
+                var nodeBorder = FindNodeBorder(_draggedNode.Id);
+                if (nodeBorder != null)
+                {
+                    Canvas.SetLeft(nodeBorder, _draggedNode.X);
+                    Canvas.SetTop(nodeBorder, _draggedNode.Y);
+                }
+
+                RefreshConnections();
             }
 
             // Reset dragging state only - connections persist until user completes or cancels them
