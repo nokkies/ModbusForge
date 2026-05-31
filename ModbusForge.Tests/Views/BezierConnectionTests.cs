@@ -1,5 +1,6 @@
 
 
+using System.Windows;
 using ModbusForge.Views;
 using Xunit;
 
