@@ -5,6 +5,7 @@ using FlaUI.Core.AutomationElements;
 
 namespace ModbusForge.Tests.UITests;
 
+[Collection("Sequential UI Tests")]
 public class CoreE2ETests : E2ETestBase
 {
     [Fact]

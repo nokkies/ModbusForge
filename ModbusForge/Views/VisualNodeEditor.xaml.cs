@@ -45,7 +45,7 @@ namespace ModbusForge.Views
         private readonly Dictionary<string, List<(object Target, PropertyChangedEventHandler Handler)>> _nodeEventHandlers = new();
         
         // Track connection lines to avoid recreating them
-        private readonly Dictionary<string, Line> _connectionLines = new();
+        private readonly Dictionary<string, Path> _connectionPaths = new();
 
         public VisualNodeEditor()
         {
@@ -387,13 +387,13 @@ namespace ModbusForge.Views
             var elementsToRemove = new List<UIElement>();
             foreach (UIElement child in NodeCanvas.Children)
             {
-                if (child is Line line && line != TempConnectionLine)
-                    elementsToRemove.Add(line);
+                if (child is Path path && path != TempConnectionLine)
+                    elementsToRemove.Add(path);
             }
             foreach (var element in elementsToRemove)
                 NodeCanvas.Children.Remove(element);
 
-            _connectionLines.Clear();
+            _connectionPaths.Clear();
             
             // Draw connections using actual visual-tree positions where available
             foreach (var connection in _viewModel.Connections)
@@ -413,10 +413,10 @@ namespace ModbusForge.Views
                     connection.EndY = endPoint.Y;
                 }
 
-                var line = CreateConnectionLine(connection);
+                var path = CreateConnectionLine(connection);
                 // Right-click on a wire → delete it
                 var capturedConn = connection;
-                line.MouseRightButtonDown += (s, e) =>
+                path.MouseRightButtonDown += (s, e) =>
                 {
                     var menu = new ContextMenu();
                     var del  = new MenuItem { Header = "Delete Connection" };
@@ -426,18 +426,24 @@ namespace ModbusForge.Views
                         _viewModel.UndoRedo.Push(command);
                     };
                     menu.Items.Add(del);
-                    ((Line)s).ContextMenu = menu;
+                    ((Path)s).ContextMenu = menu;
                     menu.IsOpen = true;
                     e.Handled = true;
                 };
-                NodeCanvas.Children.Add(line);
-                _connectionLines[connection.Id] = line;
+                NodeCanvas.Children.Add(path);
+                _connectionPaths[connection.Id] = path;
             }
         }
         
         internal static IEnumerable<NodeConnection> GetConnectionsForNode(IEnumerable<NodeConnection> connections, string nodeId)
         {
             return connections.Where(c => c.SourceNodeId == nodeId || c.TargetNodeId == nodeId);
+        }
+
+        public static (Point C1, Point C2) ComputeBezierControlPoints(Point start, Point end)
+        {
+            double dx = Math.Max(40, Math.Abs(end.X - start.X) * 0.5);
+            return (new Point(start.X + dx, start.Y), new Point(end.X - dx, end.Y));
         }
 
         private void RefreshConnectionsForNode(string nodeId)
@@ -463,24 +469,36 @@ namespace ModbusForge.Views
                     connection.EndY = endPoint.Y;
                 }
 
-                if (_connectionLines.TryGetValue(connection.Id, out var line))
+                if (_connectionPaths.TryGetValue(connection.Id, out var path))
                 {
-                    line.X1 = connection.StartX;
-                    line.Y1 = connection.StartY;
-                    line.X2 = connection.EndX;
-                    line.Y2 = connection.EndY;
+                    if (path.Data is PathGeometry pathGeometry &&
+                        pathGeometry.Figures.Count > 0 &&
+                        pathGeometry.Figures[0].Segments.Count > 0 &&
+                        pathGeometry.Figures[0].Segments[0] is BezierSegment bezierSegment)
+                    {
+                        var controls = ComputeBezierControlPoints(startPoint, endPoint);
+                        pathGeometry.Figures[0].StartPoint = startPoint;
+                        bezierSegment.Point1 = controls.C1;
+                        bezierSegment.Point2 = controls.C2;
+                        bezierSegment.Point3 = endPoint;
+                    }
                 }
             }
         }
 
-        private Line CreateConnectionLine(NodeConnection connection)
+        private Path CreateConnectionLine(NodeConnection connection)
         {
-            var line = new Line
+            var startPoint = new Point(connection.StartX, connection.StartY);
+            var endPoint = new Point(connection.EndX, connection.EndY);
+            var controls = ComputeBezierControlPoints(startPoint, endPoint);
+
+            var bezierSegment = new BezierSegment(controls.C1, controls.C2, endPoint, true);
+            var pathFigure = new PathFigure(startPoint, new[] { bezierSegment }, false);
+            var pathGeometry = new PathGeometry(new[] { pathFigure });
+
+            var path = new Path
             {
-                X1 = connection.StartX,
-                Y1 = connection.StartY,
-                X2 = connection.EndX,
-                Y2 = connection.EndY,
+                Data = pathGeometry,
                 Stroke = new SolidColorBrush(Color.FromRgb(102, 102, 102)),
                 StrokeThickness = 2
             };
@@ -488,14 +506,14 @@ namespace ModbusForge.Views
             // Set dash array based on connection state
             if (connection.IsConnected)
             {
-                line.StrokeDashArray = new DoubleCollection { 1, 0 };
+                path.StrokeDashArray = new DoubleCollection { 1, 0 };
             }
             else
             {
-                line.StrokeDashArray = new DoubleCollection { 5, 5 };
+                path.StrokeDashArray = new DoubleCollection { 5, 5 };
             }
             
-            return line;
+            return path;
         }
         
         private Border CreateNodeElement(VisualNode node)
@@ -1228,10 +1246,12 @@ namespace ModbusForge.Views
                     // Use the new method to get actual connector position
                     var startPoint = GetActualConnectorPosition(startNodeId, startConnectorType);
                     
-                    TempConnectionLine.X1 = startPoint.X;
-                    TempConnectionLine.Y1 = startPoint.Y;
-                    TempConnectionLine.X2 = currentPoint.X;
-                    TempConnectionLine.Y2 = currentPoint.Y;
+                    var controls = ComputeBezierControlPoints(startPoint, currentPoint);
+                    var bezierSegment = new BezierSegment(controls.C1, controls.C2, currentPoint, true);
+                    var pathFigure = new PathFigure(startPoint, new[] { bezierSegment }, false);
+                    var pathGeometry = new PathGeometry(new[] { pathFigure });
+
+                    TempConnectionLine.Data = pathGeometry;
                     TempConnectionLine.Visibility = Visibility.Visible;
 
                     // Visual feedback for drop target
