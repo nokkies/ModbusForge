@@ -1527,12 +1527,34 @@ namespace ModbusForge.Views
 
             if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
-                // Zoom in/out
+                // Zoom in/out anchored at cursor
                 if (_viewModel == null) { e.Handled = true; return; }
 
+                double oldZoom = _viewModel.ZoomLevel;
                 double delta = e.Delta > 0 ? 0.1 : -0.1;
-                double newZoom = Math.Clamp(_viewModel.ZoomLevel + delta, 0.25, 4.0);
-                _viewModel.ZoomLevel = Math.Round(newZoom, 2);
+                double newZoom = Math.Clamp(oldZoom + delta, 0.25, 4.0);
+                newZoom = Math.Round(newZoom, 2);
+
+                if (Math.Abs(newZoom - oldZoom) > 0.001)
+                {
+                    // Get mouse position relative to Canvas and Viewport
+                    Point mousePosOnCanvas = e.GetPosition(NodeCanvas);
+                    Point mousePosOnViewport = e.GetPosition(sv);
+
+                    _viewModel.ZoomLevel = newZoom;
+
+                    // Force the layout to update so scrollable bounds match new size
+                    NodeCanvas.UpdateLayout();
+                    sv.UpdateLayout();
+
+                    // Calculate new offsets to keep cursor in same place relative to viewport
+                    double newHOffset = mousePosOnCanvas.X * newZoom - mousePosOnViewport.X;
+                    double newVOffset = mousePosOnCanvas.Y * newZoom - mousePosOnViewport.Y;
+
+                    sv.ScrollToHorizontalOffset(newHOffset);
+                    sv.ScrollToVerticalOffset(newVOffset);
+                }
+
                 e.Handled = true;
             }
             else if ((Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)

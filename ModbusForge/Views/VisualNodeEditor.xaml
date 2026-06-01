@@ -220,6 +220,7 @@
                               PreviewMouseWheel="CanvasScrollViewer_PreviewMouseWheel">
                     <Canvas x:Name="NodeCanvas" 
                             Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}"
+                            Background="Transparent"
                             MouseLeftButtonDown="Canvas_MouseLeftButtonDown"
                             MouseMove="Canvas_MouseMove"
                             MouseLeftButtonUp="Canvas_MouseLeftButtonUp"

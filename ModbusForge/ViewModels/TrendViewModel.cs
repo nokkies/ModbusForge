@@ -79,6 +79,12 @@ namespace ModbusForge.ViewModels
             _loggerSvc.Removed += OnRemoved;
             _loggerSvc.Sampled += OnSampled;
 
+            // Pre-populate with existing keys
+            foreach (var kvp in _loggerSvc.ActiveKeys)
+            {
+                OnAdded(kvp.Key, kvp.Value);
+            }
+
             // initialize commands and play window
             _playWindowPoints = Math.Max(1, (int)Math.Round(60_000.0 / Math.Max(1, _loggerSvc.SampleRateMs)));
             DeleteSelectedCommand = new RelayCommand(DeleteSelected, CanDeleteSelected);

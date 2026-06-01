@@ -92,5 +92,16 @@ namespace ModbusForge.Services
             if (!_isRunning) return; // ignore when not running
             Sampled?.Invoke(key, value, timestampUtc);
         }
+
+        public IReadOnlyDictionary<string, string> ActiveKeys
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    return new Dictionary<string, string>(_keys);
+                }
+            }
+        }
     }
 }

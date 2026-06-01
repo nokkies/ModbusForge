@@ -24,5 +24,7 @@ namespace ModbusForge.Services
         event Action<string, string>? Added;          // key, displayName
         event Action<string>? Removed;                // key
         event Action<string, double, DateTime>? Sampled; // key, value, timestampUtc
+
+        System.Collections.Generic.IReadOnlyDictionary<string, string> ActiveKeys { get; }
     }
 }
