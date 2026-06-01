@@ -32,6 +32,10 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl + Z" FontFamily="Consolas" Margin="0,2"/>
@@ -51,6 +55,18 @@
 
                         <TextBlock Grid.Row="5" Grid.Column="0" Text="Right-click wire" FontFamily="Consolas" Margin="0,2"/>
                         <TextBlock Grid.Row="5" Grid.Column="1" Text="Delete a connection." TextWrapping="Wrap" Margin="0,2"/>
+
+                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Scroll Wheel" FontFamily="Consolas" Margin="0,2"/>
+                        <TextBlock Grid.Row="6" Grid.Column="1" Text="Scroll canvas vertically." TextWrapping="Wrap" Margin="0,2"/>
+
+                        <TextBlock Grid.Row="7" Grid.Column="0" Text="Shift + Scroll" FontFamily="Consolas" Margin="0,2"/>
+                        <TextBlock Grid.Row="7" Grid.Column="1" Text="Scroll canvas horizontally." TextWrapping="Wrap" Margin="0,2"/>
+
+                        <TextBlock Grid.Row="8" Grid.Column="0" Text="Ctrl + Scroll" FontFamily="Consolas" Margin="0,2"/>
+                        <TextBlock Grid.Row="8" Grid.Column="1" Text="Zoom in / out of canvas." TextWrapping="Wrap" Margin="0,2"/>
+
+                        <TextBlock Grid.Row="9" Grid.Column="0" Text="Middle Drag / Left Hold" FontFamily="Consolas" Margin="0,2"/>
+                        <TextBlock Grid.Row="9" Grid.Column="1" Text="Pan canvas in any direction (Left hold on empty background)." TextWrapping="Wrap" Margin="0,2"/>
                     </Grid>
 
                     <TextBlock Text="Visual Affordances"

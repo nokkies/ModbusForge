@@ -135,6 +135,26 @@ namespace ModbusForge.Views
         public void ShowPalette() { PanePalette.Show(); }
         public void ShowControls() { PaneControls.Show(); }
         public void ShowPrograms() { PanePrograms.Show(); }
+
+        private void LayoutAnchorable_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            e.Cancel = true;
+            if (sender is AvalonDock.Layout.LayoutAnchorable anchorable)
+            {
+                anchorable.Hide();
+            }
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            var shortcuts = new KeyboardShortcutsWindow();
+            var mainWindow = Window.GetWindow(this);
+            if (mainWindow != null)
+            {
+                shortcuts.Owner = mainWindow;
+            }
+            shortcuts.ShowDialog();
+        }
         
         private void TreeViewItem_Selected(object sender, RoutedEventArgs e)
         {
@@ -1282,8 +1302,17 @@ namespace ModbusForge.Views
                 return;
             }
             
-            // Start rubber band selection or clear selection
-            _viewModel.ClearSelection();
+            // Start panning instead of immediate clear selection
+            if (CanvasScrollViewer != null)
+            {
+                _isPanning = true;
+                _panStartPoint = e.GetPosition(CanvasScrollViewer);
+                _panStartH = CanvasScrollViewer.HorizontalOffset;
+                _panStartV = CanvasScrollViewer.VerticalOffset;
+                NodeCanvas.CaptureMouse();
+                NodeCanvas.Cursor = Cursors.SizeAll;
+                e.Handled = true;
+            }
         }
         
         private void Canvas_MouseMove(object sender, MouseEventArgs e)
@@ -1416,6 +1445,26 @@ namespace ModbusForge.Views
 
         private void Canvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
+            if (_isPanning)
+            {
+                _isPanning = false;
+                NodeCanvas.ReleaseMouseCapture();
+                NodeCanvas.Cursor = Cursors.Arrow;
+                
+                // Clear selection if it was a quick click rather than a drag
+                if (CanvasScrollViewer != null)
+                {
+                    var pos = e.GetPosition(CanvasScrollViewer);
+                    double dist = Math.Sqrt(Math.Pow(pos.X - _panStartPoint.X, 2) + Math.Pow(pos.Y - _panStartPoint.Y, 2));
+                    if (dist < 3 && _viewModel != null)
+                    {
+                        _viewModel.ClearSelection();
+                    }
+                }
+                e.Handled = true;
+                return;
+            }
+
             if (_isDraggingNode && _draggedNode != null && _viewModel != null)
             {
                 var newPos = new Point(_draggedNode.X, _draggedNode.Y);
