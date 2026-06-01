@@ -211,12 +211,18 @@
                 </Border>
                 
                 <!-- Canvas -->
-                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <ScrollViewer x:Name="CanvasScrollViewer"
+                              Grid.Row="1"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto"
+                              PreviewMouseWheel="CanvasScrollViewer_PreviewMouseWheel">
                     <Canvas x:Name="NodeCanvas" 
                             Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}"
                             MouseLeftButtonDown="Canvas_MouseLeftButtonDown"
                             MouseMove="Canvas_MouseMove"
-                            MouseLeftButtonUp="Canvas_MouseLeftButtonUp">
+                            MouseLeftButtonUp="Canvas_MouseLeftButtonUp"
+                            PreviewMouseDown="Canvas_PreviewMouseDown"
+                            PreviewMouseUp="Canvas_PreviewMouseUp">
                         <Canvas.LayoutTransform>
                             <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
                         </Canvas.LayoutTransform>

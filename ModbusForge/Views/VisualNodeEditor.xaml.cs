@@ -1293,6 +1293,18 @@ namespace ModbusForge.Views
             var canvas = sender as Canvas;
             if (canvas == null) return;
             
+            // Middle-mouse pan
+            if (_isPanning && CanvasScrollViewer != null)
+            {
+                var pos = e.GetPosition(CanvasScrollViewer);
+                double dx = _panStartPoint.X - pos.X;
+                double dy = _panStartPoint.Y - pos.Y;
+                CanvasScrollViewer.ScrollToHorizontalOffset(_panStartH + dx);
+                CanvasScrollViewer.ScrollToVerticalOffset(_panStartV + dy);
+                e.Handled = true;
+                return;
+            }
+
             var currentPoint = e.GetPosition(canvas);
             
             if (_isDraggingNode && _draggedNode != null)
@@ -1448,6 +1460,66 @@ namespace ModbusForge.Views
             _draggedNode = null;
         }
         
+        // ── Canvas Navigation ────────────────────────────────────────────────
+
+        private bool _isPanning = false;
+        private Point _panStartPoint;
+        private double _panStartH, _panStartV;
+
+        /// <summary>
+        /// Ctrl+Scroll → zoom in/out anchored at cursor.
+        /// Shift+Scroll → horizontal scroll.
+        /// Plain scroll → vertical scroll (default).
+        /// </summary>
+        private void CanvasScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            var sv = CanvasScrollViewer;
+            if (sv == null) return;
+
+            if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                // Zoom in/out
+                if (_viewModel == null) { e.Handled = true; return; }
+
+                double delta = e.Delta > 0 ? 0.1 : -0.1;
+                double newZoom = Math.Clamp(_viewModel.ZoomLevel + delta, 0.25, 4.0);
+                _viewModel.ZoomLevel = Math.Round(newZoom, 2);
+                e.Handled = true;
+            }
+            else if ((Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
+            {
+                // Horizontal scroll
+                sv.ScrollToHorizontalOffset(sv.HorizontalOffset - e.Delta);
+                e.Handled = true;
+            }
+            // else: let the ScrollViewer handle vertical scroll normally
+        }
+
+        private void Canvas_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Middle) return;
+            if (CanvasScrollViewer == null) return;
+            _isPanning = true;
+            _panStartPoint = e.GetPosition(CanvasScrollViewer);
+            _panStartH = CanvasScrollViewer.HorizontalOffset;
+            _panStartV = CanvasScrollViewer.VerticalOffset;
+            NodeCanvas.CaptureMouse();
+            NodeCanvas.Cursor = Cursors.SizeAll;
+            e.Handled = true;
+        }
+
+        private void Canvas_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Middle) return;
+            if (!_isPanning) return;
+            _isPanning = false;
+            NodeCanvas.ReleaseMouseCapture();
+            NodeCanvas.Cursor = Cursors.Arrow;
+            e.Handled = true;
+        }
+
+        // ────────────────────────────────────────────────────────────────────
+
         private void Node_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (_viewModel == null) return;
