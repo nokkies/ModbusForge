@@ -202,7 +202,6 @@ namespace ModbusForge.Services
             if (dataStore == null) return;
 
             var now = DateTime.UtcNow;
-            _lastUpdate = now;
 
             EnsureTopoOrder();
             if (_topoOrder == null || _topoOrder.Count == 0) return;
@@ -252,6 +251,8 @@ namespace ModbusForge.Services
                     _logger.LogDebug(ex, "Failed to write output for node {NodeId}", node.Id);
                 }
             }
+
+            _lastUpdate = now;
         }
 
         private static bool IsOutputNode(PlcElementType type) =>
@@ -342,6 +343,10 @@ namespace ModbusForge.Services
                 case PlcElementType.MATH_MUL:
                 case PlcElementType.MATH_DIV:
                     return NodeResult.FromInt(EvaluateMathInt(node, dataStore));
+
+                // ── Signal Generator ──
+                case PlcElementType.SignalGenerator:
+                    return NodeResult.FromInt(EvaluateSignalGenerator(node));
 
                 default:
                     return NodeResult.FromBool(false);
@@ -635,6 +640,48 @@ namespace ModbusForge.Services
                         dataStore.InputDiscretes[output.Address] = finalValue != 0;
                     break;
             }
+        }
+
+        private int EvaluateSignalGenerator(VisualNode node)
+        {
+            var now = DateTime.UtcNow;
+            var elapsedMs = (int)(now - _lastUpdate).TotalMilliseconds;
+            if (elapsedMs < 0) elapsedMs = 0;
+            
+            node.TimerAccumulatorMs += elapsedMs;
+            
+            int period = node.PeriodMs > 0 ? node.PeriodMs : 1000;
+            double amplitude = node.Amplitude;
+            double offset = node.Offset;
+            
+            if (node.TimerAccumulatorMs >= period)
+            {
+                node.TimerAccumulatorMs %= period;
+            }
+            
+            double progress = (double)node.TimerAccumulatorMs / period;
+            double value = 0;
+            
+            string waveform = node.Waveform ?? "Ramp";
+            switch (waveform)
+            {
+                case "Sine":
+                    value = amplitude * Math.Sin(2 * Math.PI * progress) + offset;
+                    break;
+                case "Triangle":
+                    value = amplitude * (1.0 - 4.0 * Math.Abs(progress - 0.5)) + offset;
+                    break;
+                case "Square":
+                    value = (progress < 0.5 ? amplitude : 0) + offset;
+                    break;
+                case "Ramp":
+                default:
+                    value = amplitude * progress + offset;
+                    break;
+            }
+            
+            node.IntValue = (int)Math.Round(value);
+            return node.IntValue;
         }
 
         // ───────────────────────── MISC ─────────────────────────

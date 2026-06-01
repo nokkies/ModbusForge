@@ -1,8 +1,15 @@
-# ModbusForge v5.0.0
+# ModbusForge v5.1.3
 
 A professional Modbus TCP client/server application built with .NET 8.0 and WPF. ModbusForge provides comprehensive tools for testing, monitoring, and automating Modbus communications.
 
 ![ModbusForge](ModbusForge/Resources/ModbusForgeLOGO.png)
+
+## What's New in v5.1.3
+
+- **Palette Position Move**: Moved the `Sources` category (including the `Signal Generator`) immediately below `I/O` in the node palette, resolving the issue where it was cut off/barely visible at the bottom of the panel.
+- **Trend View Restoration**: Reverted the `TrendViewModel` to a transient lifetime to resolve rendering issues when closing and reopening the pane, while implementing proper event disposal to prevent memory leaks.
+- **Signal Generator & Timers Fixes**: Added standard waveforms (Ramp, Sine, Triangle, Square) to the Signal Generator block, resolved simulation timer tick delta calculations (which were preventing time accumulators from incrementing), and expanded block sizes to prevent text cutting off.
+- **Improved Canvas Navigation**: Disabled left-click canvas panning to allow standard marquee multi-select, retaining middle-mouse click/drag for canvas navigation.
 
 ## What's New in v5.0.0
 

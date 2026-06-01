@@ -126,6 +126,7 @@ namespace ModbusForge.Models
                     PlcElementType.MATH_SUB => "SUB",
                     PlcElementType.MATH_MUL => "MUL",
                     PlcElementType.MATH_DIV => "DIV",
+                    PlcElementType.SignalGenerator => $"SignalGen ({Waveform}, {PeriodMs}ms)",
                     _ => "Unknown"
                 };
             }
@@ -165,7 +166,8 @@ namespace ModbusForge.Models
                        ElementType == PlcElementType.MATH_ADD ||
                        ElementType == PlcElementType.MATH_SUB ||
                        ElementType == PlcElementType.MATH_MUL ||
-                       ElementType == PlcElementType.MATH_DIV;
+                       ElementType == PlcElementType.MATH_DIV ||
+                       ElementType == PlcElementType.SignalGenerator;
             }
         }
         
@@ -203,6 +205,7 @@ namespace ModbusForge.Models
                     PlcElementType.COMPARE_EQ or PlcElementType.COMPARE_NE or PlcElementType.COMPARE_GT or 
                     PlcElementType.COMPARE_LT or PlcElementType.COMPARE_GE or PlcElementType.COMPARE_LE => $"Value: {CompareValue}",
                     PlcElementType.MATH_ADD or PlcElementType.MATH_SUB or PlcElementType.MATH_MUL or PlcElementType.MATH_DIV => $"Const: {CompareValue}",
+                    PlcElementType.SignalGenerator => $"{Waveform}: H={Amplitude}, T={PeriodMs}ms",
                     _ => ""
                 };
             }

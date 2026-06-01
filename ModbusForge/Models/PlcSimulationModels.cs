@@ -37,7 +37,8 @@ namespace ModbusForge.Models
         MATH_ADD,     // Addition
         MATH_SUB,     // Subtraction
         MATH_MUL,     // Multiplication
-        MATH_DIV      // Division
+        MATH_DIV,      // Division
+        SignalGenerator // Signal Generator
     }
 
     /// <summary>

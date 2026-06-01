@@ -17,7 +17,7 @@ using System.Windows;
 
 namespace ModbusForge.ViewModels
 {
-    public partial class TrendViewModel : ObservableObject
+    public partial class TrendViewModel : ObservableObject, IDisposable
     {
         private readonly ITrendLogger _loggerSvc;
         private readonly IFileDialogService _fileDialogService;
@@ -80,9 +80,12 @@ namespace ModbusForge.ViewModels
             _loggerSvc.Sampled += OnSampled;
 
             // Pre-populate with existing keys
-            foreach (var kvp in _loggerSvc.ActiveKeys)
+            if (_loggerSvc.ActiveKeys != null)
             {
-                OnAdded(kvp.Key, kvp.Value);
+                foreach (var kvp in _loggerSvc.ActiveKeys)
+                {
+                    OnAdded(kvp.Key, kvp.Value);
+                }
             }
 
             // initialize commands and play window
@@ -408,6 +411,13 @@ namespace ModbusForge.ViewModels
                     break;
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            _loggerSvc.Added -= OnAdded;
+            _loggerSvc.Removed -= OnRemoved;
+            _loggerSvc.Sampled -= OnSampled;
         }
     }
 }

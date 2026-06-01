@@ -34,6 +34,7 @@ namespace ModbusForge.Converters
                     PlcElementType.COMPARE_GE or PlcElementType.COMPARE_LE => new SolidColorBrush(Color.FromRgb(156, 39, 176)), // Deep Purple
                     PlcElementType.MATH_ADD or PlcElementType.MATH_SUB => new SolidColorBrush(Color.FromRgb(63, 81, 181)), // Indigo
                     PlcElementType.MATH_MUL or PlcElementType.MATH_DIV => new SolidColorBrush(Color.FromRgb(121, 85, 72)), // Brown
+                    PlcElementType.SignalGenerator => new SolidColorBrush(Color.FromRgb(141, 110, 189)), // Violet/Purple
                     _ => new SolidColorBrush(Color.FromRgb(158, 158, 158)) // Grey
                 };
             }
@@ -124,7 +125,7 @@ namespace ModbusForge.Converters
                 return elementType switch
                 {
                     PlcElementType.Input => "📥",
-                    PlcElementType.Output => "�",
+                    PlcElementType.Output => "📤",
                     PlcElementType.NOT => "❌",
                     PlcElementType.AND => "∧",
                     PlcElementType.OR => "∨",
@@ -145,6 +146,7 @@ namespace ModbusForge.Converters
                     PlcElementType.MATH_SUB => "-",
                     PlcElementType.MATH_MUL => "×",
                     PlcElementType.MATH_DIV => "÷",
+                    PlcElementType.SignalGenerator => "📈",
                     _ => "?"
                 };
             }

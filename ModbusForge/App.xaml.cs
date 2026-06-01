@@ -142,7 +142,7 @@ namespace ModbusForge
             
             // Register ViewModels
             services.AddSingleton<MainViewModel>();
-            services.AddSingleton<TrendViewModel>();
+            services.AddTransient<TrendViewModel>();
             services.AddTransient<DecodeViewModel>();
             services.AddTransient<ScriptEditorViewModel>();
         }

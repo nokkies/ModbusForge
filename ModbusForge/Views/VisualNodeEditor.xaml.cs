@@ -37,9 +37,13 @@ namespace ModbusForge.Views
         private VisualNode? _draggedNode = null;
         private Point _dragStartPoint;
         private Point _originalNodePosition;
+        private readonly Dictionary<string, Point> _draggedNodesOriginalPositions = new();
         private Ellipse? _hoveredConnector = null;
         private Brush? _hoveredConnectorOriginalBrush = null;
         private DispatcherTimer? _liveUpdateTimer;
+        private bool _isSelectingRange = false;
+        private Point _selectionStartPoint;
+        private Rectangle? _selectionRectangle = null;
         
         // Track event handlers for cleanup to prevent memory leaks
         private readonly Dictionary<string, List<(object Target, PropertyChangedEventHandler Handler)>> _nodeEventHandlers = new();
@@ -610,11 +614,7 @@ namespace ModbusForge.Views
             };
             
             // Highlight selected node
-            if (_viewModel?.SelectedNode == node)
-            {
-                border.BorderBrush = new SolidColorBrush(Color.FromRgb(0, 122, 204));
-                border.BorderThickness = new Thickness(3);
-            }
+            UpdateNodeSelectionHighlight(node, border);
             
             border.MouseLeftButtonDown += Node_MouseLeftButtonDown;
             border.MouseRightButtonDown += Node_MouseRightButtonDown;
@@ -649,7 +649,7 @@ namespace ModbusForge.Views
             var capturedHeader = header;
             var capturedLiveText = liveText;
             var originalColor = GetElementColor(node.ElementType);
-            SetupNodeEventHandlers(node, capturedHeader, capturedLiveText, capturedHeaderText, capturedAddressText, originalColor);
+            SetupNodeEventHandlers(node, border, capturedHeader, capturedLiveText, capturedHeaderText, capturedAddressText, originalColor);
             
             // Footer row (if needed)
             var footer = CreateNodeFooter(node);
@@ -861,13 +861,16 @@ namespace ModbusForge.Views
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(-8, 0, 0, 0) // pull dot to edge
             };
-            var input1 = CreateConnector(node.Id, "Input1", true);
-            inputStack.Children.Add(input1);
-            if (node.HasSecondInput)
+            if (node.ElementType != PlcElementType.SignalGenerator)
             {
-                var input2 = CreateConnector(node.Id, "Input2", true);
-                input2.Margin = new Thickness(0, 6, 0, 0);
-                inputStack.Children.Add(input2);
+                var input1 = CreateConnector(node.Id, "Input1", true);
+                inputStack.Children.Add(input1);
+                if (node.HasSecondInput)
+                {
+                    var input2 = CreateConnector(node.Id, "Input2", true);
+                    input2.Margin = new Thickness(0, 6, 0, 0);
+                    inputStack.Children.Add(input2);
+                }
             }
             Grid.SetColumn(inputStack, 0);
             contentGrid.Children.Add(inputStack);
@@ -925,13 +928,26 @@ namespace ModbusForge.Views
             return (contentGrid, contentStack, liveText);
         }
 
-        private void SetupNodeEventHandlers(VisualNode node, Border header, TextBlock liveText, 
+        private void SetupNodeEventHandlers(VisualNode node, Border border, Border header, TextBlock liveText, 
             TextBlock headerText, TextBlock addressText, Color originalColor)
         {
             _nodeEventHandlers[node.Id] = new List<(object, PropertyChangedEventHandler)>();
             
             PropertyChangedEventHandler nodePropertyHandler = (s, e) =>
             {
+                if (e.PropertyName == nameof(VisualNode.X) ||
+                    e.PropertyName == nameof(VisualNode.Y))
+                {
+                    Canvas.SetLeft(border, node.X);
+                    Canvas.SetTop(border, node.Y);
+                    RefreshConnectionsForNode(node.Id);
+                }
+
+                if (e.PropertyName == nameof(VisualNode.IsSelected))
+                {
+                    UpdateNodeSelectionHighlight(node, border);
+                }
+
                 if (e.PropertyName == nameof(VisualNode.CurrentValue) ||
                     e.PropertyName == nameof(VisualNode.ShowLiveValues))
                 {
@@ -958,6 +974,20 @@ namespace ModbusForge.Views
             
             node.OutputAddress.PropertyChanged += addressHandler;
             _nodeEventHandlers[node.Id].Add((node.OutputAddress, addressHandler));
+        }
+
+        private void UpdateNodeSelectionHighlight(VisualNode node, Border border)
+        {
+            if (node.IsSelected)
+            {
+                border.BorderBrush = new SolidColorBrush(Color.FromRgb(0, 122, 204));
+                border.BorderThickness = new Thickness(3);
+            }
+            else
+            {
+                border.ClearValue(Border.BorderBrushProperty);
+                border.ClearValue(Border.BorderThicknessProperty);
+            }
         }
 
         private void UpdateLiveValueDisplay(VisualNode node, TextBlock liveText, Border header, Color originalColor)
@@ -996,6 +1026,11 @@ namespace ModbusForge.Views
                 case PlcElementType.OutputInt:
                     var outputValue = GetOutputRegisterValue(node);
                     liveText.Text = $"● VAL:{outputValue}";
+                    liveText.Foreground = Brushes.Cyan;
+                    break;
+
+                case PlcElementType.SignalGenerator:
+                    liveText.Text = $"● VAL:{node.IntValue}";
                     liveText.Foreground = Brushes.Cyan;
                     break;
                     
@@ -1172,6 +1207,42 @@ namespace ModbusForge.Views
                     };
                     footerPanel.Children.Add(setDomCheck);
                     break;
+
+                case PlcElementType.SignalGenerator:
+                    footerPanel.Children.Add(new TextBlock { Text = "H:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
+                    var sigHeightBox = new TextBox { Width = 35, Height = 18, FontSize = 10, Text = node.CompareValue.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                    int oldSigHeight = node.CompareValue;
+                    sigHeightBox.GotFocus += (s, ev) => oldSigHeight = node.CompareValue;
+                    sigHeightBox.LostFocus += (s, ev) => {
+                        if (int.TryParse(sigHeightBox.Text, out int v))
+                        {
+                            if (v != oldSigHeight)
+                            {
+                                var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.CompareValue), oldSigHeight, v);
+                                command.Execute();
+                                _viewModel?.UndoRedo.Push(command);
+                            }
+                        }
+                    };
+                    footerPanel.Children.Add(sigHeightBox);
+
+                    footerPanel.Children.Add(new TextBlock { Text = " T:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5,0,2,0) });
+                    var sigTimeBox = new TextBox { Width = 45, Height = 18, FontSize = 10, Text = node.TimerPresetMs.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                    int oldSigTime = node.TimerPresetMs;
+                    sigTimeBox.GotFocus += (s, ev) => oldSigTime = node.TimerPresetMs;
+                    sigTimeBox.LostFocus += (s, ev) => {
+                        if (int.TryParse(sigTimeBox.Text, out int v) && v >= 0)
+                        {
+                            if (v != oldSigTime)
+                            {
+                                var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.TimerPresetMs), oldSigTime, v);
+                                command.Execute();
+                                _viewModel?.UndoRedo.Push(command);
+                            }
+                        }
+                    };
+                    footerPanel.Children.Add(sigTimeBox);
+                    break;
             }
         }
         
@@ -1302,17 +1373,36 @@ namespace ModbusForge.Views
                 return;
             }
             
-            // Start panning instead of immediate clear selection
-            if (CanvasScrollViewer != null)
+            // Start marquee selection
+            _isSelectingRange = true;
+            _selectionStartPoint = clickPoint;
+            
+            if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0)
             {
-                _isPanning = true;
-                _panStartPoint = e.GetPosition(CanvasScrollViewer);
-                _panStartH = CanvasScrollViewer.HorizontalOffset;
-                _panStartV = CanvasScrollViewer.VerticalOffset;
-                NodeCanvas.CaptureMouse();
-                NodeCanvas.Cursor = Cursors.SizeAll;
-                e.Handled = true;
+                _viewModel.ClearSelection();
             }
+
+            // Create temporary visual rectangle for selection box
+            if (_selectionRectangle == null)
+            {
+                _selectionRectangle = new Rectangle
+                {
+                    Stroke = new SolidColorBrush(Color.FromRgb(0, 122, 204)),
+                    StrokeThickness = 1,
+                    Fill = new SolidColorBrush(Color.FromArgb(30, 0, 122, 204)),
+                    Visibility = Visibility.Collapsed
+                };
+                NodeCanvas.Children.Add(_selectionRectangle);
+            }
+            
+            Canvas.SetLeft(_selectionRectangle, clickPoint.X);
+            Canvas.SetTop(_selectionRectangle, clickPoint.Y);
+            _selectionRectangle.Width = 0;
+            _selectionRectangle.Height = 0;
+            _selectionRectangle.Visibility = Visibility.Visible;
+            
+            NodeCanvas.CaptureMouse();
+            e.Handled = true;
         }
         
         private void Canvas_MouseMove(object sender, MouseEventArgs e)
@@ -1336,32 +1426,69 @@ namespace ModbusForge.Views
 
             var currentPoint = e.GetPosition(canvas);
             
+            if (_isSelectingRange && _selectionRectangle != null)
+            {
+                var x = Math.Min(_selectionStartPoint.X, currentPoint.X);
+                var y = Math.Min(_selectionStartPoint.Y, currentPoint.Y);
+                var width = Math.Abs(_selectionStartPoint.X - currentPoint.X);
+                var height = Math.Abs(_selectionStartPoint.Y - currentPoint.Y);
+
+                Canvas.SetLeft(_selectionRectangle, x);
+                Canvas.SetTop(_selectionRectangle, y);
+                _selectionRectangle.Width = width;
+                _selectionRectangle.Height = height;
+
+                // Select nodes inside boundary
+                var selectionRect = new Rect(x, y, width, height);
+                foreach (var node in _viewModel.Nodes)
+                {
+                    var nodeBorder = FindNodeBorder(node.Id);
+                    if (nodeBorder != null)
+                    {
+                        var nodeRect = new Rect(node.X, node.Y, node.Width, nodeBorder.ActualHeight > 0 ? nodeBorder.ActualHeight : 80);
+                        bool intersects = selectionRect.IntersectsWith(nodeRect);
+                        
+                        if (intersects)
+                        {
+                            node.IsSelected = true;
+                        }
+                        else if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0)
+                        {
+                            node.IsSelected = false;
+                        }
+                    }
+                }
+                e.Handled = true;
+                return;
+            }
+            
             if (_isDraggingNode && _draggedNode != null)
             {
-                // Find the border element for the dragged node
-                var nodeBorder = FindNodeBorder(_draggedNode.Id);
-                if (nodeBorder != null)
+                // Move all selected nodes by the delta
+                var deltaX = currentPoint.X - _dragStartPoint.X;
+                var deltaY = currentPoint.Y - _dragStartPoint.Y;
+                
+                foreach (var kvp in _draggedNodesOriginalPositions)
                 {
-                    // Move the node based on the difference from the original click point
-                    var deltaX = currentPoint.X - _dragStartPoint.X;
-                    var deltaY = currentPoint.Y - _dragStartPoint.Y;
+                    var nodeId = kvp.Key;
+                    var originalPos = kvp.Value;
+                    var node = _viewModel.Nodes.FirstOrDefault(n => n.Id == nodeId);
+                    var nodeBorder = FindNodeBorder(nodeId);
                     
-                    // Update node position based on original position plus delta
-                    var newX = _originalNodePosition.X + deltaX;
-                    var newY = _originalNodePosition.Y + deltaY;
-                    
-                    Canvas.SetLeft(nodeBorder, newX);
-                    Canvas.SetTop(nodeBorder, newY);
-                    
-                    // Update the node model
-                    _draggedNode.X = newX;
-                    _draggedNode.Y = newY;
-                    
-                    // Update connections
-                    _viewModel.UpdateNodeConnections(_draggedNode.Id);
-                    
-                    // Refresh connection lines to match new positions only for the dragged node
-                    RefreshConnectionsForNode(_draggedNode.Id);
+                    if (node != null && nodeBorder != null)
+                    {
+                        var newX = originalPos.X + deltaX;
+                        var newY = originalPos.Y + deltaY;
+                        
+                        Canvas.SetLeft(nodeBorder, newX);
+                        Canvas.SetTop(nodeBorder, newY);
+                        
+                        node.X = newX;
+                        node.Y = newY;
+                        
+                        _viewModel.UpdateNodeConnections(nodeId);
+                        RefreshConnectionsForNode(nodeId);
+                    }
                 }
             }
             else if (_isConnecting && !string.IsNullOrEmpty(_viewModel.PendingConnectionStart))
@@ -1445,6 +1572,18 @@ namespace ModbusForge.Views
 
         private void Canvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
+            if (_isSelectingRange)
+            {
+                _isSelectingRange = false;
+                if (_selectionRectangle != null)
+                {
+                    _selectionRectangle.Visibility = Visibility.Collapsed;
+                }
+                NodeCanvas.ReleaseMouseCapture();
+                e.Handled = true;
+                return;
+            }
+
             if (_isPanning)
             {
                 _isPanning = false;
@@ -1465,42 +1604,72 @@ namespace ModbusForge.Views
                 return;
             }
 
-            if (_isDraggingNode && _draggedNode != null && _viewModel != null)
+            if (_isDraggingNode && _viewModel != null)
             {
-                var newPos = new Point(_draggedNode.X, _draggedNode.Y);
+                var commands = new List<ModbusForge.Services.EditorCommands.IEditorCommand>();
+                bool movedAny = false;
 
-                if (_viewModel.SnapToGrid)
+                foreach (var kvp in _draggedNodesOriginalPositions)
                 {
-                    newPos.X = SnapToGrid(newPos.X, _viewModel.GridSize);
-                    newPos.Y = SnapToGrid(newPos.Y, _viewModel.GridSize);
+                    var nodeId = kvp.Key;
+                    var originalPos = kvp.Value;
+                    var node = _viewModel.Nodes.FirstOrDefault(n => n.Id == nodeId);
+                    if (node == null) continue;
+
+                    var finalPos = new Point(node.X, node.Y);
+                    if (_viewModel.SnapToGrid)
+                    {
+                        finalPos.X = SnapToGrid(finalPos.X, _viewModel.GridSize);
+                        finalPos.Y = SnapToGrid(finalPos.Y, _viewModel.GridSize);
+                    }
+
+                    if (originalPos.X != finalPos.X || originalPos.Y != finalPos.Y)
+                    {
+                        // Reset to original position temporarily so the command captures it
+                        node.X = originalPos.X;
+                        node.Y = originalPos.Y;
+
+                        var command = new ModbusForge.Services.EditorCommands.MoveNodeCommand(node, originalPos, finalPos);
+                        commands.Add(command);
+                        movedAny = true;
+                    }
+                    else
+                    {
+                        // Reset to original position
+                        node.X = originalPos.X;
+                        node.Y = originalPos.Y;
+                    }
                 }
 
-                if (_originalNodePosition.X != newPos.X || _originalNodePosition.Y != newPos.Y)
+                if (movedAny && commands.Count > 0)
                 {
-                    // Node was actually moved, so register an undo command
-                    // But first set it back to the original position so the command can capture the change
-                    _draggedNode.X = _originalNodePosition.X;
-                    _draggedNode.Y = _originalNodePosition.Y;
-
-                    var command = new ModbusForge.Services.EditorCommands.MoveNodeCommand(_draggedNode, _originalNodePosition, newPos);
-                    command.Execute();
-                    _viewModel.UndoRedo.Push(command);
+                    var composite = new ModbusForge.Services.EditorCommands.CompositeCommand(commands);
+                    composite.Execute();
+                    _viewModel.UndoRedo.Push(composite);
                 }
                 else
                 {
-                    // Snapped back to original position, reset model coordinates
-                    _draggedNode.X = _originalNodePosition.X;
-                    _draggedNode.Y = _originalNodePosition.Y;
+                    // If we didn't move any node, but we clicked a node that was already selected,
+                    // let's make it the only selected node now.
+                    if (_draggedNode != null && _draggedNode.IsSelected && 
+                        (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0)
+                    {
+                        _viewModel.SelectNode(_draggedNode);
+                    }
                 }
 
-                // Ensure visual border matches final model coordinates
-                var nodeBorder = FindNodeBorder(_draggedNode.Id);
-                if (nodeBorder != null)
+                // Force layout update and connection refresh
+                foreach (var kvp in _draggedNodesOriginalPositions)
                 {
-                    Canvas.SetLeft(nodeBorder, _draggedNode.X);
-                    Canvas.SetTop(nodeBorder, _draggedNode.Y);
+                    var nodeId = kvp.Key;
+                    var nodeBorder = FindNodeBorder(nodeId);
+                    var node = _viewModel.Nodes.FirstOrDefault(n => n.Id == nodeId);
+                    if (node != null && nodeBorder != null)
+                    {
+                        Canvas.SetLeft(nodeBorder, node.X);
+                        Canvas.SetTop(nodeBorder, node.Y);
+                    }
                 }
-
                 RefreshConnections();
             }
 
@@ -1609,12 +1778,32 @@ namespace ModbusForge.Views
             _dragStartPoint = clickPoint;
             _isDraggingNode = true;
             
-            // Store the original node position
-            _originalNodePosition = new Point(Canvas.GetLeft(border), Canvas.GetTop(border));
+            // Handle selection with Ctrl/Shift for multi-select
+            if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control ||
+                (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
+            {
+                _viewModel.ToggleSelectNode(node);
+            }
+            else
+            {
+                if (!node.IsSelected)
+                {
+                    _viewModel.SelectNode(node);
+                }
+            }
+
+            // Capture original positions of all selected nodes for group dragging
+            _draggedNodesOriginalPositions.Clear();
+            foreach (var n in _viewModel.Nodes.Where(n => n.IsSelected))
+            {
+                var nBorder = FindNodeBorder(n.Id);
+                if (nBorder != null)
+                {
+                    _draggedNodesOriginalPositions[n.Id] = new Point(Canvas.GetLeft(nBorder), Canvas.GetTop(nBorder));
+                }
+            }
             
-            // Select the node
-            _viewModel.SelectNode(node);
-            
+            _originalNodePosition = new Point(node.X, node.Y);
             border.CaptureMouse();
             e.Handled = true;
         }
@@ -1647,6 +1836,36 @@ namespace ModbusForge.Views
             };
             contextMenu.Items.Add(deleteItem);
             
+            if (node.ElementType == PlcElementType.SignalGenerator)
+            {
+                var configItem = new MenuItem
+                {
+                    Header = "Configure Waveform...",
+                    Icon = new TextBlock { Text = "⚙️", FontSize = 12 }
+                };
+                configItem.Click += (s, ev) =>
+                {
+                    var dlg = new SignalGeneratorConfigWindow(node)
+                    {
+                        Owner = Window.GetWindow(this)
+                    };
+                    if (dlg.ShowDialog() == true)
+                    {
+                        var commandList = new System.Collections.Generic.List<ModbusForge.Services.EditorCommands.IEditorCommand>
+                        {
+                            new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.Waveform), node.Waveform, dlg.SelectedWaveform),
+                            new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.PeriodMs), node.PeriodMs, dlg.SelectedPeriod),
+                            new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.Amplitude), node.Amplitude, dlg.SelectedAmplitude),
+                            new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.Offset), node.Offset, dlg.SelectedOffset)
+                        };
+                        var composite = new ModbusForge.Services.EditorCommands.CompositeCommand(commandList);
+                        composite.Execute();
+                        _viewModel.UndoRedo.Push(composite);
+                    }
+                };
+                contextMenu.Items.Insert(0, configItem);
+            }
+
             // Show the context menu
             contextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
             contextMenu.PlacementTarget = border;

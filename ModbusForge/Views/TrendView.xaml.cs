@@ -16,10 +16,29 @@ namespace ModbusForge.Views
         public TrendView()
         {
             InitializeComponent();
-            // Avoid resolving services during design-time to keep the XAML designer happy
             if (!DesignerProperties.GetIsInDesignMode(this))
             {
                 DataContext = App.ServiceProvider.GetRequiredService<TrendViewModel>();
+            }
+
+            Loaded += TrendView_Loaded;
+            Unloaded += TrendView_Unloaded;
+        }
+
+        private void TrendView_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (DataContext == null && !DesignerProperties.GetIsInDesignMode(this))
+            {
+                DataContext = App.ServiceProvider.GetRequiredService<TrendViewModel>();
+            }
+        }
+
+        private void TrendView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is IDisposable disposable)
+            {
+                disposable.Dispose();
+                DataContext = null;
             }
         }
 

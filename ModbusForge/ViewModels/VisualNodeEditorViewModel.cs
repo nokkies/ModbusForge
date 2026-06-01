@@ -134,6 +134,15 @@ namespace ModbusForge.ViewModels
 
             PaletteCategories.Add(new PaletteCategory
             {
+                Name = "Sources",
+                Nodes = new ObservableCollection<PaletteNode>
+                {
+                    new PaletteNode { Name = "Signal Generator", Tag = "SignalGenerator" }
+                }
+            });
+
+            PaletteCategories.Add(new PaletteCategory
+            {
                 Name = "Logic Gates",
                 Nodes = new ObservableCollection<PaletteNode>
                 {
@@ -335,6 +344,12 @@ namespace ModbusForge.ViewModels
                     case PlcElementType.TOF:
                     case PlcElementType.TP:
                         newNode.TimerPresetMs = 1000;
+                        newNode.Width = 190; // wider to avoid text truncation
+                        break;
+                    case PlcElementType.SignalGenerator:
+                        newNode.CompareValue = 100; // default height
+                        newNode.TimerPresetMs = 1000; // default sample time
+                        newNode.Width = 190;
                         break;
                     case PlcElementType.CTU:
                     case PlcElementType.CTD:
@@ -626,32 +641,46 @@ namespace ModbusForge.ViewModels
         
         private List<VisualNode> GetSelection()
         {
-            if (SelectedNode != null)
-            {
-                return new List<VisualNode> { SelectedNode };
-            }
-            return new List<VisualNode>();
+            return Nodes.Where(n => n.IsSelected).ToList();
         }
 
         private void AlignLeft()
         {
             var selection = GetSelection();
             if (selection.Count < 2) return;
-            // No-op for now, needs multi-select
+            double minX = selection.Min(n => n.X);
+            foreach (var node in selection)
+            {
+                node.X = minX;
+            }
+            UpdateAllConnections();
         }
 
         private void AlignTop()
         {
             var selection = GetSelection();
             if (selection.Count < 2) return;
-            // No-op for now, needs multi-select
+            double minY = selection.Min(n => n.Y);
+            foreach (var node in selection)
+            {
+                node.Y = minY;
+            }
+            UpdateAllConnections();
         }
 
         private void DistributeHorizontally()
         {
             var selection = GetSelection();
-            if (selection.Count < 3) return; // Distribute needs at least 3
-            // No-op for now, needs multi-select
+            if (selection.Count < 3) return;
+            var sorted = selection.OrderBy(n => n.X).ToList();
+            double startX = sorted.First().X;
+            double endX = sorted.Last().X;
+            double step = (endX - startX) / (sorted.Count - 1);
+            for (int i = 0; i < sorted.Count; i++)
+            {
+                sorted[i].X = startX + i * step;
+            }
+            UpdateAllConnections();
         }
 
         partial void OnSelectedProgramChanged(ProgramModel? value)
@@ -684,6 +713,19 @@ namespace ModbusForge.ViewModels
             if (node != null)
             {
                 node.IsSelected = true;
+                SelectedNode = node;
+            }
+        }
+
+        public void ToggleSelectNode(VisualNode node)
+        {
+            node.IsSelected = !node.IsSelected;
+            if (!node.IsSelected && SelectedNode == node)
+            {
+                SelectedNode = Nodes.FirstOrDefault(n => n.IsSelected);
+            }
+            else if (node.IsSelected)
+            {
                 SelectedNode = node;
             }
         }
