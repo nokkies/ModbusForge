@@ -252,7 +252,7 @@ namespace ModbusForge
         {
             if (sender is Wpf.Ui.Controls.NavigationView navView && navView.SelectedItem is Wpf.Ui.Controls.NavigationViewItem selectedItem)
             {
-                if (selectedItem.Tag is string tagString && int.TryParse(tagString, out int index))
+                if (selectedItem.Tag != null && int.TryParse(selectedItem.Tag.ToString(), out int index))
                 {
                     MainTabControl.SelectedIndex = index;
                 }

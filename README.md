@@ -1,21 +1,16 @@
-# ModbusForge v4.8.0
+# ModbusForge v5.0.0
 
 A professional Modbus TCP client/server application built with .NET 8.0 and WPF. ModbusForge provides comprehensive tools for testing, monitoring, and automating Modbus communications.
 
 ![ModbusForge](ModbusForge/Resources/ModbusForgeLOGO.png)
 
-## What's New in v4.8.0
+## What's New in v5.0.0
 
-- **Symbolic Addressing** - Assign friendly names (tags) to Modbus addresses (e.g., `Motor1_Speed` instead of `HoldingRegister:1`)
-- **Tag Browser** - Hierarchical organization of tags with groups, import/export functionality
-- **Watch Window** - Real-time monitoring of tag values with alarms and configurable update rates
-- **POU Navigation Tree** - Program Organization Units for organizing simulation nodes into programs
-- **Program Management** - Create, rename, delete, and duplicate programs with context persistence
-- **Split Layout** - POU tree and Node palette visible simultaneously (no tab switching)
-- **Auto-Generated Names** - Nodes named as `ProgramName_Type_Number` (e.g., `Main_AND_01`)
-- **Live Values Panel** - Real-time value display with register/tag linkage and editable values
-- **Visual Selection** - Selected nodes highlighted with blue border on canvas
-- **Active Nodes List** - Quick access to all nodes with enable/disable controls
+- **Windows 11 Fluent UI Overhaul** - Seamless modern dark/light mode interface with a collapsible Left Navigation Sidebar.
+- **Real-Time DataGrid Filtering** - Dynamic, instantaneous search filter textbox for Holding Registers, Input Registers, Coils, and Discrete Inputs.
+- **Fast Interactive Writes** - Double-click holding registers or coils to open the new Quick Write modal dialog.
+- **Add to Custom Watch & Trend** - Context menu and double-click actions to quickly add Modbus registers/coils to Custom Watch or Trends.
+- **Copy to Clipboard** - Easily copy addresses, values, or states using context menus.
 
 ## Key Features
 
@@ -204,6 +199,12 @@ This project uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create a si
    The installer will be created in the `installers` directory.
 
 ## Changelog
+
+- 5.0.0 (2026-06-01)
+  - **Fluent UI Shell** - Replaced top-level TabControl with left navigation sidebar and FluentWindow.
+  - **Quick Write Dialog** - Custom modal dialog for Modbus writes on double-click/context menu.
+  - **DataGrid Filter** - Real-time filtering using CollectionView.
+  - **Quick Actions** - Context menu options to copy parameters and instantly watch or trend registers.
 
 - 4.8.0 (2026-05-03)
   - **Symbolic Addressing** - Assign friendly names (tags) to Modbus addresses (e.g., `Motor1_Speed` instead of `HoldingRegister:1`)
