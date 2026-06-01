@@ -55,4 +55,6 @@ public class CoreE2ETests : E2ETestBase
                 inputBoolBtn.Invoke();
             });
     }
+
+    }
 }

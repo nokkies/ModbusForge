@@ -248,13 +248,25 @@ namespace ModbusForge
             }
         }
 
-        private void RootNavigation_SelectionChanged(object sender, RoutedEventArgs e)
+        private void NavItem_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (sender is Wpf.Ui.Controls.NavigationView navView && navView.SelectedItem is Wpf.Ui.Controls.NavigationViewItem selectedItem)
+            if (sender is Wpf.Ui.Controls.NavigationViewItem item && item.Tag != null)
             {
-                if (selectedItem.Tag != null && int.TryParse(selectedItem.Tag.ToString(), out int index))
+                if (int.TryParse(item.Tag.ToString(), out int index))
                 {
-                    MainTabControl.SelectedIndex = index;
+                    if (MainTabControl.SelectedIndex != index)
+                    {
+                        MainTabControl.SelectedIndex = index;
+                    }
+                    
+                    foreach (var menuItemObj in RootNavigation.MenuItems)
+                    {
+                        if (menuItemObj is Wpf.Ui.Controls.NavigationViewItem navItem)
+                        {
+                            navItem.SetValue(Wpf.Ui.Controls.NavigationViewItem.IsActiveProperty, navItem == item);
+                        }
+                    }
+                    e.Handled = true;
                 }
             }
         }
