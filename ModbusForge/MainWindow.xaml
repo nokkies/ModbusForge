@@ -1,4 +1,4 @@
-<mah:MetroWindow x:Class="ModbusForge.MainWindow"
+<ui:FluentWindow x:Class="ModbusForge.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -7,19 +7,16 @@
         xmlns:viewmodels="clr-namespace:ModbusForge.ViewModels"
         xmlns:views="clr-namespace:ModbusForge.Views"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
-        xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="1073" Width="1556"
         WindowState="Maximized"
         Icon="pack://application:,,,/Resources/ModbusForge.ico"
         BorderThickness="1"
-        Background="{StaticResource LightMetallicWhiteBrush}"
-        GlowBrush="{StaticResource LightMetallicAccentBrush}"
-        WindowTitleBrush="{StaticResource LightMetallicChromeBrush}"
-        NonActiveWindowTitleBrush="{StaticResource LightMetallicSteelBrush}"
-        TitleForeground="{StaticResource LightMetallicTextBrush}">
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica">
 
-    <mah:MetroWindow.Resources>
+    <ui:FluentWindow.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Resources/Converters.xaml"/>
@@ -87,17 +84,19 @@
                 <Setter Property="FontWeight" Value="Medium"/>
             </Style>
         </ResourceDictionary>
-    </mah:MetroWindow.Resources>
+    </ui:FluentWindow.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/> <!-- TitleBar -->
+            <RowDefinition Height="Auto"/> <!-- Menu -->
+            <RowDefinition Height="*"/>    <!-- Main Body -->
+            <RowDefinition Height="Auto"/> <!-- StatusBar -->
         </Grid.RowDefinitions>
 
-        <Menu Grid.Row="0">
+        <ui:TitleBar Title="{Binding Title}" Grid.Row="0" />
+
+        <Menu Grid.Row="1">
             <MenuItem Header="_File">
                 <MenuItem Header="_Open Project..." Command="{Binding LoadProjectCommand}" InputGestureText="Ctrl+O"/>
                 <MenuItem Header="_Save Project..." Command="{Binding SaveProjectCommand}" InputGestureText="Ctrl+S"/>
@@ -133,87 +132,132 @@
             </MenuItem>
         </Menu>
 
-        <Border Grid.Row="1" Style="{StaticResource ModernCardStyle}" Margin="16,8,16,8">
-            <Grid>
+        <!-- Main Body: Sidebar on Left, Connection Bar & TabControl on Right -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/> <!-- Navigation sidebar -->
+                <ColumnDefinition Width="*"/>    <!-- Main Right Content -->
+            </Grid.ColumnDefinitions>
+
+            <ui:NavigationView x:Name="RootNavigation" Grid.Column="0" 
+                               PaneDisplayMode="Left" 
+                               IsBackButtonVisible="Collapsed" 
+                               IsPaneToggleVisible="True"
+                               SelectionChanged="RootNavigation_SelectionChanged">
+                <ui:NavigationView.MenuItems>
+                    <ui:NavigationViewItem Content="Registers" Icon="{ui:SymbolIcon Symbol=Database24}" Tag="0"/>
+                    <ui:NavigationViewItem Content="Input Registers" Icon="{ui:SymbolIcon Symbol=DatabaseSearch24}" Tag="1"/>
+                    <ui:NavigationViewItem Content="Coils" Icon="{ui:SymbolIcon Symbol=ToggleLeft24}" Tag="2"/>
+                    <ui:NavigationViewItem Content="Discrete Inputs" Icon="{ui:SymbolIcon Symbol=ToggleRight24}" Tag="3"/>
+                    <ui:NavigationViewItem Content="Custom Watch" Icon="{ui:SymbolIcon Symbol=Star24}" Tag="4"/>
+                    <ui:NavigationViewItem Content="Simulation" Icon="{ui:SymbolIcon Symbol=VirtualNetwork24}" Tag="5"/>
+                    <ui:NavigationViewItem Content="Decode" Icon="{ui:SymbolIcon Symbol=Code24}" Tag="6"/>
+                    <ui:NavigationViewItem Content="Trend" Icon="{ui:SymbolIcon Symbol=DataTrending24}" Tag="7"/>
+                    <ui:NavigationViewItem Content="Console" Icon="{ui:SymbolIcon Symbol=WindowConsole20}" Tag="8"/>
+                    <ui:NavigationViewItem Content="Debug" Icon="{ui:SymbolIcon Symbol=Bug24}" Tag="9"/>
+                </ui:NavigationView.MenuItems>
+            </ui:NavigationView>
+
+            <!-- Right Content Area containing the Connection Bar and TabControl -->
+            <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/> <!-- Connection Bar -->
+                    <RowDefinition Height="*"/>    <!-- Content Area -->
                 </Grid.RowDefinitions>
-                
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
-                    <TextBlock Text="{Binding ConnectionHeader}" Style="{StaticResource ModernTitleStyle}"/>
-                    <Ellipse Style="{StaticResource StatusIndicatorStyle}" Margin="12,0,0,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource ModernBodyStyle}" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                </StackPanel>
-                
-                <Grid Grid.Row="1">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="120"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="80"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="80"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="{Binding AddressLabel}" Grid.Column="0" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <TextBox Grid.Column="1" Text="{Binding ServerAddress, UpdateSourceTrigger=PropertyChanged}" 
-                             IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
-                             Margin="0,0,16,0"/>
+                <Border Grid.Row="0" Style="{StaticResource ModernCardStyle}" Margin="16,8,16,8">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+                            <TextBlock Text="{Binding ConnectionHeader}" Style="{StaticResource ModernTitleStyle}"/>
+                            <Ellipse Style="{StaticResource StatusIndicatorStyle}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource ModernBodyStyle}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="Port:" Grid.Column="2" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <TextBox Grid.Column="3" Text="{Binding Port}" 
-                             IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
-                             Margin="0,0,16,0"/>
+                            <TextBlock Text="{Binding AddressLabel}" Grid.Column="0" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox Grid.Column="1" Text="{Binding ServerAddress, UpdateSourceTrigger=PropertyChanged}" 
+                                     IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
+                                     Margin="0,0,16,0"/>
 
-                    <TextBlock Text="Unit ID:" Grid.Column="4" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
-                    <TextBox Grid.Column="5" Text="{Binding UnitId}" 
-                             IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
-                             Margin="0,0,16,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
+                            <TextBlock Text="Port:" Grid.Column="2" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox Grid.Column="3" Text="{Binding Port}" 
+                                     IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
+                                     Margin="0,0,16,0"/>
 
-                    <TextBlock Text="Unit ID(s):" Grid.Column="4" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"/>
-                    <TextBox Grid.Column="5" Text="{Binding ServerUnitId}" 
-                             IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
-                             Margin="0,0,16,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"
-                             ToolTip="Comma-separated list (e.g. 1, 2, 5-10)"/>
+                            <TextBlock Text="Unit ID:" Grid.Column="4" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
+                            <TextBox Grid.Column="5" Text="{Binding UnitId}" 
+                                     IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
+                                     Margin="0,0,16,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
 
-                    <TextBlock Text="Active ID:" Grid.Column="6" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"/>
-                    <ComboBox Grid.Column="7" ItemsSource="{Binding AvailableUnitIds}" SelectedItem="{Binding SelectedUnitId}" 
-                              IsEnabled="{Binding IsConnected}" 
-                              Margin="0,0,16,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"
-                              ToolTip="Select Unit ID for Custom entries and Simulation"/>
+                            <TextBlock Text="Unit ID(s):" Grid.Column="4" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"/>
+                            <TextBox Grid.Column="5" Text="{Binding ServerUnitId}" 
+                                     IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
+                                     Margin="0,0,16,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"
+                                     ToolTip="Comma-separated list (e.g. 1, 2, 5-10)"/>
 
-                    <TextBlock Text="Mode:" Grid.Column="8" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <ComboBox Grid.Column="9" SelectedItem="{Binding Mode}" ItemsSource="{StaticResource ModeOptionsAll}"
-                              IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
-                              Margin="0,0,16,0"
-                              AutomationProperties.AutomationId="ModeComboBox"/>
+                            <TextBlock Text="Active ID:" Grid.Column="6" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"/>
+                            <ComboBox Grid.Column="7" ItemsSource="{Binding AvailableUnitIds}" SelectedItem="{Binding SelectedUnitId}" 
+                                      IsEnabled="{Binding IsConnected}" 
+                                      Margin="0,0,16,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"
+                                      ToolTip="Select Unit ID for Custom entries and Simulation"/>
 
-                    <Button Grid.Column="10" Content="{Binding ConnectButtonText}" Command="{Binding ConnectCommand}"
-                            IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
-                            Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"
-                            AutomationProperties.AutomationId="ConnectButton"/>
+                            <TextBlock Text="Mode:" Grid.Column="8" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox Grid.Column="9" SelectedItem="{Binding Mode}" ItemsSource="{StaticResource ModeOptionsAll}"
+                                      IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
+                                      Margin="0,0,16,0"
+                                      AutomationProperties.AutomationId="ModeComboBox"/>
 
-                    <StackPanel Grid.Column="11" Orientation="Horizontal">
-                        <Button Content="Disconnect" Command="{Binding DisconnectCommand}" 
-                                IsEnabled="{Binding IsConnected}"
-                                Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"
-                                AutomationProperties.AutomationId="DisconnectButton"/>
-                        <Button Content="Diagnostics" Command="{Binding RunDiagnosticsCommand}" 
-                                ToolTip="Test TCP and Modbus connectivity"
-                                Style="{StaticResource MetallicButtonStyle}"/>
-                    </StackPanel>
-                </Grid>
-            </Grid>
-        </Border>
+                            <Button Grid.Column="10" Content="{Binding ConnectButtonText}" Command="{Binding ConnectCommand}"
+                                    IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
+                                    Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"
+                                    AutomationProperties.AutomationId="ConnectButton"/>
 
-        <TabControl Grid.Row="2" Margin="5">
+                            <StackPanel Grid.Column="11" Orientation="Horizontal">
+                                <Button Content="Disconnect" Command="{Binding DisconnectCommand}" 
+                                        IsEnabled="{Binding IsConnected}"
+                                        Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"
+                                        AutomationProperties.AutomationId="DisconnectButton"/>
+                                <Button Content="Diagnostics" Command="{Binding RunDiagnosticsCommand}" 
+                                        ToolTip="Test TCP and Modbus connectivity"
+                                        Style="{StaticResource MetallicButtonStyle}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <TabControl x:Name="MainTabControl" Grid.Row="1" Margin="5">
+                    <TabControl.Template>
+                        <ControlTemplate TargetType="TabControl">
+                            <Grid KeyboardNavigation.TabNavigation="Local">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="0"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TabPanel x:Name="HeaderPanel" Grid.Row="0" IsItemsHost="True" KeyboardNavigation.TabIndex="1"/>
+                                <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" Grid.Row="1"/>
+                            </Grid>
+                        </ControlTemplate>
+                    </TabControl.Template>
             <TabItem Header="Registers">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
@@ -230,12 +274,25 @@
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <ComboBox Width="120" SelectedItem="{Binding RegistersGlobalType}" ItemsSource="{StaticResource TypeOptionsAll}"/>
                         <Separator Width="10" Opacity="0"/>
-                        <mah:ToggleSwitch IsOn="{Binding HoldingMonitorEnabled, Mode=TwoWay}" OnContent="Continuous Read" OffContent="Continuous Read" VerticalAlignment="Center"/>
+                        <ui:ToggleSwitch IsChecked="{Binding HoldingMonitorEnabled, Mode=TwoWay}" Content="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding HoldingMonitorPeriodMs}"/>
+                        <Separator Width="20" Opacity="0"/>
+                        <TextBlock Text="Filter:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <ui:TextBox Width="150" Text="{Binding HoldingSearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Address, value, type..."/>
                     </StackPanel>
 
-                    <DataGrid x:Name="HoldingRegistersGrid" Grid.Row="1" ItemsSource="{Binding HoldingRegisters}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="HoldingRegistersGrid_CellEditEnding">
+                    <DataGrid x:Name="HoldingRegistersGrid" Grid.Row="1" ItemsSource="{Binding HoldingRegistersView}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="HoldingRegistersGrid_CellEditEnding" MouseDoubleClick="HoldingRegistersGrid_MouseDoubleClick">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Quick Write..." Click="HoldingRegisters_Write_Click"/>
+                                <MenuItem Header="Add to Custom Watch" Click="HoldingRegisters_AddToCustom_Click"/>
+                                <MenuItem Header="Add to Trend View" Click="HoldingRegisters_AddToTrend_Click"/>
+                                <Separator/>
+                                <MenuItem Header="Copy Address" Click="HoldingRegisters_CopyAddress_Click"/>
+                                <MenuItem Header="Copy Value" Click="HoldingRegisters_CopyValue_Click"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="*"/>
@@ -260,12 +317,24 @@
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <ComboBox Width="120" SelectedItem="{Binding InputRegistersGlobalType}" ItemsSource="{StaticResource TypeOptionsAll}"/>
                         <Separator Width="10" Opacity="0"/>
-                        <mah:ToggleSwitch IsOn="{Binding InputRegistersMonitorEnabled, Mode=TwoWay}" OnContent="Continuous Read" OffContent="Continuous Read" VerticalAlignment="Center"/>
+                        <ui:ToggleSwitch IsChecked="{Binding InputRegistersMonitorEnabled, Mode=TwoWay}" Content="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding InputRegistersMonitorPeriodMs}"/>
+                        <Separator Width="20" Opacity="0"/>
+                        <TextBlock Text="Filter:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <ui:TextBox Width="150" Text="{Binding InputSearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Address, value, type..."/>
                     </StackPanel>
 
-                    <DataGrid Grid.Row="1" ItemsSource="{Binding InputRegisters}" AutoGenerateColumns="False" IsReadOnly="True">
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding InputRegistersView}" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="InputRegistersGrid_MouseDoubleClick">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Add to Custom Watch" Click="InputRegisters_AddToCustom_Click"/>
+                                <MenuItem Header="Add to Trend View" Click="InputRegisters_AddToTrend_Click"/>
+                                <Separator/>
+                                <MenuItem Header="Copy Address" Click="InputRegisters_CopyAddress_Click"/>
+                                <MenuItem Header="Copy Value" Click="InputRegisters_CopyValue_Click"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
                             <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"/>
@@ -288,12 +357,24 @@
                         <TextBox Width="80" Text="{Binding CoilCount}" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadCoilsCommand}" Width="80"/>
                         <Separator Width="10" Opacity="0"/>
-                        <mah:ToggleSwitch IsOn="{Binding CoilsMonitorEnabled, Mode=TwoWay}" OnContent="Continuous Read" OffContent="Continuous Read" VerticalAlignment="Center"/>
+                        <ui:ToggleSwitch IsChecked="{Binding CoilsMonitorEnabled, Mode=TwoWay}" Content="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding CoilsMonitorPeriodMs}"/>
+                        <Separator Width="20" Opacity="0"/>
+                        <TextBlock Text="Filter:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <ui:TextBox Width="150" Text="{Binding CoilsSearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Address, state..."/>
                     </StackPanel>
 
-                    <DataGrid x:Name="CoilsGrid" Grid.Row="1" ItemsSource="{Binding Coils}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="CoilsGrid_CellEditEnding" CurrentCellChanged="CoilsGrid_CurrentCellChanged">
+                    <DataGrid x:Name="CoilsGrid" Grid.Row="1" ItemsSource="{Binding CoilsView}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="CoilsGrid_CellEditEnding" CurrentCellChanged="CoilsGrid_CurrentCellChanged" MouseDoubleClick="CoilsGrid_MouseDoubleClick">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Quick Write..." Click="Coils_Write_Click"/>
+                                <MenuItem Header="Add to Custom Watch" Click="Coils_AddToCustom_Click"/>
+                                <Separator/>
+                                <MenuItem Header="Copy Address" Click="Coils_CopyAddress_Click"/>
+                                <MenuItem Header="Copy State" Click="Coils_CopyState_Click"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
                             <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="*"/>
@@ -315,12 +396,23 @@
                         <TextBox Width="80" Text="{Binding DiscreteInputCount}" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadDiscreteInputsCommand}" Width="80"/>
                         <Separator Width="10" Opacity="0"/>
-                        <mah:ToggleSwitch IsOn="{Binding DiscreteInputsMonitorEnabled, Mode=TwoWay}" OnContent="Continuous Read" OffContent="Continuous Read" VerticalAlignment="Center"/>
+                        <ui:ToggleSwitch IsChecked="{Binding DiscreteInputsMonitorEnabled, Mode=TwoWay}" Content="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBox Width="80" Text="{Binding DiscreteInputsMonitorPeriodMs}"/>
+                        <Separator Width="20" Opacity="0"/>
+                        <TextBlock Text="Filter:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <ui:TextBox Width="150" Text="{Binding DiscreteSearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Address, state..."/>
                     </StackPanel>
 
-                    <DataGrid Grid.Row="1" ItemsSource="{Binding DiscreteInputs}" AutoGenerateColumns="False" IsReadOnly="True">
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding DiscreteInputsView}" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="DiscreteInputsGrid_MouseDoubleClick">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Add to Custom Watch" Click="DiscreteInputs_AddToCustom_Click"/>
+                                <Separator/>
+                                <MenuItem Header="Copy Address" Click="DiscreteInputs_CopyAddress_Click"/>
+                                <MenuItem Header="Copy State" Click="DiscreteInputs_CopyState_Click"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
                             <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="*"/>
@@ -344,7 +436,7 @@
                         <Button Content="Save" Command="{Binding SaveCustomCommand}" Width="80"/>
                         <Button Content="Load" Command="{Binding LoadCustomCommand}" Width="80" Margin="5,0,0,0"/>
                         <Separator Width="20" Opacity="0"/>
-                        <mah:ToggleSwitch IsOn="{Binding GlobalMonitorEnabled, Mode=TwoWay}" OnContent="Global Monitor" OffContent="Global Monitor" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <ui:ToggleSwitch IsChecked="{Binding GlobalMonitorEnabled, Mode=TwoWay}" Content="Global Monitor" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <TextBlock VerticalAlignment="Center" Foreground="Gray">
                             <Run Text="Note:" FontWeight="SemiBold"/>
                             <Run Text=" Reads Trend-enabled rows."/>
@@ -409,6 +501,8 @@
                 </Grid>
             </TabItem>
         </TabControl>
+            </Grid>
+        </Grid>
 
         <StatusBar Grid.Row="3">
             <StatusBarItem>
@@ -428,4 +522,4 @@
             </StatusBarItem>
         </StatusBar>
     </Grid>
-</mah:MetroWindow>
+</ui:FluentWindow>

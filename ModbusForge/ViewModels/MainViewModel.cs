@@ -115,6 +115,58 @@ namespace ModbusForge.ViewModels
             InitializeWindowTitle();
             InitializeTimersAndServices();
 
+            // Initialize collection views for filtering
+            HoldingRegistersView = CollectionViewSource.GetDefaultView(HoldingRegisters);
+            InputRegistersView = CollectionViewSource.GetDefaultView(InputRegisters);
+            CoilsView = CollectionViewSource.GetDefaultView(Coils);
+            DiscreteInputsView = CollectionViewSource.GetDefaultView(DiscreteInputs);
+
+            HoldingRegistersView.Filter = item =>
+            {
+                if (string.IsNullOrWhiteSpace(HoldingSearchText)) return true;
+                if (item is RegisterEntry reg)
+                {
+                    return reg.Address.ToString().Contains(HoldingSearchText, StringComparison.OrdinalIgnoreCase)
+                        || (reg.ValueText != null && reg.ValueText.Contains(HoldingSearchText, StringComparison.OrdinalIgnoreCase))
+                        || (reg.Type != null && reg.Type.Contains(HoldingSearchText, StringComparison.OrdinalIgnoreCase));
+                }
+                return true;
+            };
+
+            InputRegistersView.Filter = item =>
+            {
+                if (string.IsNullOrWhiteSpace(InputSearchText)) return true;
+                if (item is RegisterEntry reg)
+                {
+                    return reg.Address.ToString().Contains(InputSearchText, StringComparison.OrdinalIgnoreCase)
+                        || reg.Value.ToString().Contains(InputSearchText, StringComparison.OrdinalIgnoreCase)
+                        || (reg.Type != null && reg.Type.Contains(InputSearchText, StringComparison.OrdinalIgnoreCase));
+                }
+                return true;
+            };
+
+            CoilsView.Filter = item =>
+            {
+                if (string.IsNullOrWhiteSpace(CoilsSearchText)) return true;
+                if (item is CoilEntry coil)
+                {
+                    return coil.Address.ToString().Contains(CoilsSearchText, StringComparison.OrdinalIgnoreCase)
+                        || coil.State.ToString().Contains(CoilsSearchText, StringComparison.OrdinalIgnoreCase);
+                }
+                return true;
+            };
+
+            DiscreteInputsView.Filter = item =>
+            {
+                if (string.IsNullOrWhiteSpace(DiscreteSearchText)) return true;
+                if (item is CoilEntry coil)
+                {
+                    return coil.Address.ToString().Contains(DiscreteSearchText, StringComparison.OrdinalIgnoreCase)
+                        || coil.State.ToString().Contains(DiscreteSearchText, StringComparison.OrdinalIgnoreCase);
+                }
+                return true;
+            };
+
             _logger.LogInformation("MainViewModel initialized");
         }
 
@@ -427,6 +479,29 @@ namespace ModbusForge.ViewModels
         public ObservableCollection<RegisterEntry> InputRegisters { get; } = new();
         public ObservableCollection<CoilEntry> DiscreteInputs { get; } = new();
 
+        // Filtered collection views for grids
+        public ICollectionView HoldingRegistersView { get; }
+        public ICollectionView InputRegistersView { get; }
+        public ICollectionView CoilsView { get; }
+        public ICollectionView DiscreteInputsView { get; }
+
+        [ObservableProperty]
+        private string _holdingSearchText = "";
+
+        [ObservableProperty]
+        private string _inputSearchText = "";
+
+        [ObservableProperty]
+        private string _coilsSearchText = "";
+
+        [ObservableProperty]
+        private string _discreteSearchText = "";
+
+        partial void OnHoldingSearchTextChanged(string value) => HoldingRegistersView.Refresh();
+        partial void OnInputSearchTextChanged(string value) => InputRegistersView.Refresh();
+        partial void OnCoilsSearchTextChanged(string value) => CoilsView.Refresh();
+        partial void OnDiscreteSearchTextChanged(string value) => DiscreteInputsView.Refresh();
+
         public IAsyncRelayCommand<DataGridCellEditEndingEventArgs> UpdateHoldingRegisterCommand { get; private set; } = null!;
         public ICommand ConnectCommand { get; private set; } = null!;
 
@@ -465,7 +540,14 @@ namespace ModbusForge.ViewModels
         public bool GlobalMonitorEnabled 
         { 
             get => CurrentConfig.MonitoringSettings.GlobalMonitorEnabled; 
-            set => SetGlobalMonitorEnabled(value); 
+            set 
+            {
+                if (CurrentConfig.MonitoringSettings.GlobalMonitorEnabled != value)
+                {
+                    SetGlobalMonitorEnabled(value);
+                    OnPropertyChanged(nameof(GlobalMonitorEnabled));
+                }
+            }
         }
         public bool HoldingMonitorEnabled 
         { 

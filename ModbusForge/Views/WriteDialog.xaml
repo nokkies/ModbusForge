@@ -1,0 +1,43 @@
+<ui:FluentWindow x:Class="ModbusForge.Views.WriteDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="Write Register Value" Height="220" Width="380"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- TitleBar -->
+            <RowDefinition Height="Auto"/> <!-- Details -->
+            <RowDefinition Height="Auto"/> <!-- Input -->
+            <RowDefinition Height="Auto"/> <!-- Buttons -->
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Title="Quick Write" Grid.Row="0" CloseWindowByDoubleClickOnIcon="False" Height="32"/>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,16">
+            <TextBlock Text="Address:" FontWeight="SemiBold" Margin="0,0,4,0"/>
+            <TextBlock x:Name="AddressText" Text="0" Margin="0,0,24,0"/>
+            
+            <TextBlock Text="Type:" FontWeight="SemiBold" Margin="0,0,4,0"/>
+            <TextBlock x:Name="TypeText" Text="uint"/>
+        </StackPanel>
+
+        <Grid Grid.Row="2" Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="New Value:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,12,0"/>
+            <ui:TextBox x:Name="ValueTextBox" Grid.Column="1" PlaceholderText="Enter new value..."/>
+        </Grid>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <ui:Button Content="Write" Appearance="Primary" Width="85" Margin="0,0,8,0" Click="Write_Click" IsDefault="True"/>
+            <ui:Button Content="Cancel" Appearance="Secondary" Width="85" Click="Cancel_Click" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

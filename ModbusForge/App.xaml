@@ -3,10 +3,14 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:ModbusForge"
              xmlns:converters="clr-namespace:ModbusForge.Converters"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              Startup="Application_Startup">
     <Application.Resources>
       <ResourceDictionary>
         <ResourceDictionary.MergedDictionaries>
+          <!-- Wpf.Ui Theme and Controls -->
+          <ui:ThemesDictionary Theme="Light" />
+          <ui:ControlsDictionary />
           <!-- MahApps.Metro base styles -->
           <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml"/>
           <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml"/>

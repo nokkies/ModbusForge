@@ -19,7 +19,7 @@ namespace ModbusForge
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : MetroWindow
+    public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     {
         private readonly MainViewModel _viewModel;
         private bool _isCommittingCustom;
@@ -245,6 +245,347 @@ namespace ModbusForge
                 {
                     _isCommittingCustom = false;
                 }
+            }
+        }
+
+        private void RootNavigation_SelectionChanged(object sender, RoutedEventArgs e)
+        {
+            if (sender is Wpf.Ui.Controls.NavigationView navView && navView.SelectedItem is Wpf.Ui.Controls.NavigationViewItem selectedItem)
+            {
+                if (selectedItem.Tag is string tagString && int.TryParse(tagString, out int index))
+                {
+                    MainTabControl.SelectedIndex = index;
+                }
+            }
+        }
+
+        private T? GetSelectedGridItem<T>(object sender) where T : class
+        {
+            if (sender is MenuItem menuItem)
+            {
+                if (menuItem.CommandParameter is T param) return param;
+                if (menuItem.Parent is ContextMenu menu && menu.PlacementTarget is DataGrid grid)
+                {
+                    return grid.SelectedItem as T;
+                }
+            }
+            return null;
+        }
+
+        private void OpenWriteDialog(object entry)
+        {
+            var dialog = new ModbusForge.Views.WriteDialog(_viewModel, entry)
+            {
+                Owner = this
+            };
+            dialog.ShowDialog();
+        }
+
+        private void AddRegisterToCustom(RegisterEntry entry, string area)
+        {
+            foreach (var existing in _viewModel.CustomEntries)
+            {
+                if (existing.Address == entry.Address && existing.Area == area)
+                {
+                    _viewModel.StatusMessage = $"Address {entry.Address} already in watch list.";
+                    return;
+                }
+            }
+
+            var newEntry = new CustomEntry
+            {
+                Name = $"{area[0]}R {entry.Address}",
+                Address = entry.Address,
+                Area = area,
+                Type = entry.Type ?? "uint",
+                Value = string.IsNullOrEmpty(entry.ValueText) ? entry.Value.ToString() : entry.ValueText,
+                Continuous = false,
+                PeriodMs = 1000,
+                Monitor = false,
+                ReadPeriodMs = 1000,
+                Trend = false
+            };
+
+            _viewModel.CustomEntries.Add(newEntry);
+            _viewModel.StatusMessage = $"Added {area} {entry.Address} to watch list.";
+        }
+
+        private void AddCoilToCustom(CoilEntry entry, string area)
+        {
+            foreach (var existing in _viewModel.CustomEntries)
+            {
+                if (existing.Address == entry.Address && existing.Area == area)
+                {
+                    _viewModel.StatusMessage = $"Address {entry.Address} already in watch list.";
+                    return;
+                }
+            }
+
+            var newEntry = new CustomEntry
+            {
+                Name = $"{area} {entry.Address}",
+                Address = entry.Address,
+                Area = area,
+                Type = "uint",
+                Value = entry.State ? "1" : "0",
+                Continuous = false,
+                PeriodMs = 1000,
+                Monitor = false,
+                ReadPeriodMs = 1000,
+                Trend = false
+            };
+
+            _viewModel.CustomEntries.Add(newEntry);
+            _viewModel.StatusMessage = $"Added {area} {entry.Address} to watch list.";
+        }
+
+        private void AddRegisterToTrend(RegisterEntry entry, string area)
+        {
+            CustomEntry? trendEntry = null;
+            foreach (var existing in _viewModel.CustomEntries)
+            {
+                if (existing.Address == entry.Address && existing.Area == area)
+                {
+                    trendEntry = existing;
+                    break;
+                }
+            }
+
+            if (trendEntry == null)
+            {
+                trendEntry = new CustomEntry
+                {
+                    Name = $"{area[0]}R {entry.Address}",
+                    Address = entry.Address,
+                    Area = area,
+                    Type = entry.Type ?? "uint",
+                    Value = string.IsNullOrEmpty(entry.ValueText) ? entry.Value.ToString() : entry.ValueText,
+                    Continuous = false,
+                    PeriodMs = 1000,
+                    Monitor = false,
+                    ReadPeriodMs = 1000,
+                    Trend = true
+                };
+                _viewModel.CustomEntries.Add(trendEntry);
+            }
+            else
+            {
+                trendEntry.Trend = true;
+            }
+
+            _viewModel.GlobalMonitorEnabled = true;
+            _viewModel.StatusMessage = $"Added {area} {entry.Address} to trend logger.";
+        }
+
+        // Holding Registers Grid Handlers
+        private void HoldingRegistersGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is DataGrid grid && grid.SelectedItem is RegisterEntry entry)
+            {
+                var dep = (DependencyObject)e.OriginalSource;
+                while (dep != null && !(dep is DataGridRow))
+                {
+                    dep = System.Windows.Media.VisualTreeHelper.GetParent(dep);
+                }
+                if (dep is DataGridRow)
+                {
+                    OpenWriteDialog(entry);
+                }
+            }
+        }
+
+        private void HoldingRegisters_Write_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<RegisterEntry>(sender);
+            if (entry != null)
+            {
+                OpenWriteDialog(entry);
+            }
+        }
+
+        private void HoldingRegisters_AddToCustom_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<RegisterEntry>(sender);
+            if (entry != null)
+            {
+                AddRegisterToCustom(entry, "HoldingRegister");
+            }
+        }
+
+        private void HoldingRegisters_AddToTrend_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<RegisterEntry>(sender);
+            if (entry != null)
+            {
+                AddRegisterToTrend(entry, "HoldingRegister");
+            }
+        }
+
+        private void HoldingRegisters_CopyAddress_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<RegisterEntry>(sender);
+            if (entry != null)
+            {
+                Clipboard.SetText(entry.Address.ToString());
+            }
+        }
+
+        private void HoldingRegisters_CopyValue_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<RegisterEntry>(sender);
+            if (entry != null)
+            {
+                Clipboard.SetText(string.IsNullOrEmpty(entry.ValueText) ? entry.Value.ToString() : entry.ValueText);
+            }
+        }
+
+        // Input Registers Grid Handlers
+        private void InputRegistersGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is DataGrid grid && grid.SelectedItem is RegisterEntry entry)
+            {
+                var dep = (DependencyObject)e.OriginalSource;
+                while (dep != null && !(dep is DataGridRow))
+                {
+                    dep = System.Windows.Media.VisualTreeHelper.GetParent(dep);
+                }
+                if (dep is DataGridRow)
+                {
+                    AddRegisterToCustom(entry, "InputRegister");
+                }
+            }
+        }
+
+        private void InputRegisters_AddToCustom_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<RegisterEntry>(sender);
+            if (entry != null)
+            {
+                AddRegisterToCustom(entry, "InputRegister");
+            }
+        }
+
+        private void InputRegisters_AddToTrend_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<RegisterEntry>(sender);
+            if (entry != null)
+            {
+                AddRegisterToTrend(entry, "InputRegister");
+            }
+        }
+
+        private void InputRegisters_CopyAddress_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<RegisterEntry>(sender);
+            if (entry != null)
+            {
+                Clipboard.SetText(entry.Address.ToString());
+            }
+        }
+
+        private void InputRegisters_CopyValue_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<RegisterEntry>(sender);
+            if (entry != null)
+            {
+                Clipboard.SetText(string.IsNullOrEmpty(entry.ValueText) ? entry.Value.ToString() : entry.ValueText);
+            }
+        }
+
+        // Coils Grid Handlers
+        private void CoilsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is DataGrid grid && grid.SelectedItem is CoilEntry entry)
+            {
+                var dep = (DependencyObject)e.OriginalSource;
+                while (dep != null && !(dep is DataGridRow))
+                {
+                    dep = System.Windows.Media.VisualTreeHelper.GetParent(dep);
+                }
+                if (dep is DataGridRow)
+                {
+                    OpenWriteDialog(entry);
+                }
+            }
+        }
+
+        private void Coils_Write_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<CoilEntry>(sender);
+            if (entry != null)
+            {
+                OpenWriteDialog(entry);
+            }
+        }
+
+        private void Coils_AddToCustom_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<CoilEntry>(sender);
+            if (entry != null)
+            {
+                AddCoilToCustom(entry, "Coil");
+            }
+        }
+
+        private void Coils_CopyAddress_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<CoilEntry>(sender);
+            if (entry != null)
+            {
+                Clipboard.SetText(entry.Address.ToString());
+            }
+        }
+
+        private void Coils_CopyState_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<CoilEntry>(sender);
+            if (entry != null)
+            {
+                Clipboard.SetText(entry.State.ToString());
+            }
+        }
+
+        // Discrete Inputs Grid Handlers
+        private void DiscreteInputsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is DataGrid grid && grid.SelectedItem is CoilEntry entry)
+            {
+                var dep = (DependencyObject)e.OriginalSource;
+                while (dep != null && !(dep is DataGridRow))
+                {
+                    dep = System.Windows.Media.VisualTreeHelper.GetParent(dep);
+                }
+                if (dep is DataGridRow)
+                {
+                    AddCoilToCustom(entry, "DiscreteInput");
+                }
+            }
+        }
+
+        private void DiscreteInputs_AddToCustom_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<CoilEntry>(sender);
+            if (entry != null)
+            {
+                AddCoilToCustom(entry, "DiscreteInput");
+            }
+        }
+
+        private void DiscreteInputs_CopyAddress_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<CoilEntry>(sender);
+            if (entry != null)
+            {
+                Clipboard.SetText(entry.Address.ToString());
+            }
+        }
+
+        private void DiscreteInputs_CopyState_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = GetSelectedGridItem<CoilEntry>(sender);
+            if (entry != null)
+            {
+                Clipboard.SetText(entry.State.ToString());
             }
         }
     }
