@@ -302,8 +302,8 @@ namespace ModbusForge.ViewModels
                     Name = nodeName,
                     X = 100 + Nodes.Count * 30,
                     Y = 100 + Nodes.Count * 30,
-                    Width = 240,
-                    Height = 140
+                    Width = 160,
+                    Height = 80
                 };
                 
                 // Set default parameters based on type
@@ -311,9 +311,11 @@ namespace ModbusForge.ViewModels
                 {
                     case PlcElementType.Input:
                         newNode.Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        newNode.Width = 200; // wider for inline address editor
                         break;
                     case PlcElementType.Output:
                         newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        newNode.Width = 200;
                         break;
                     case PlcElementType.InputBool:
                         newNode.Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = GetNextAvailableAddress(PlcArea.Coil) };
@@ -529,6 +531,13 @@ namespace ModbusForge.ViewModels
             }
         }
         
+        [RelayCommand]
+        private void RenameProgram((ProgramModel? Program, string NewName) args)
+        {
+            if (args.Program == null || string.IsNullOrWhiteSpace(args.NewName)) return;
+            args.Program.Name = args.NewName.Trim();
+        }
+
         [RelayCommand]
         private void DuplicateProgram(ProgramModel? program)
         {

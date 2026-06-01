@@ -64,14 +64,77 @@ namespace ModbusForge.Views
         
         private void TreeViewItem_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (sender is TreeViewItem item && item.DataContext is ProgramModel program)
+            if (sender is TreeViewItem item && item.DataContext is ProgramModel)
             {
-                if (DataContext is VisualNodeEditorViewModel vm)
+                // Find the RenameBox and ViewPanel in the item template
+                var grid = FindVisualChild<Grid>(item);
+                if (grid != null)
                 {
-                    vm.SelectProgramCommand.Execute(program);
+                    var viewPanel = grid.FindName("ViewPanel") as StackPanel;
+                    var renameBox = grid.FindName("RenameBox") as TextBox;
+                    if (viewPanel != null && renameBox != null)
+                    {
+                        viewPanel.Visibility = Visibility.Collapsed;
+                        renameBox.Visibility = Visibility.Visible;
+                        renameBox.Focus();
+                        renameBox.SelectAll();
+                        e.Handled = true;
+                    }
                 }
             }
         }
+
+        private void RenameBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            CommitRename(sender as TextBox);
+        }
+
+        private void RenameBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter) { CommitRename(sender as TextBox); e.Handled = true; }
+            else if (e.Key == Key.Escape) { CancelRename(sender as TextBox); e.Handled = true; }
+        }
+
+        private void CommitRename(TextBox? box)
+        {
+            if (box == null) return;
+            var grid = box.Parent as Grid;
+            if (grid == null) return;
+            var viewPanel = grid.FindName("ViewPanel") as StackPanel;
+            if (viewPanel != null) viewPanel.Visibility = Visibility.Visible;
+            box.Visibility = Visibility.Collapsed;
+            // Name is already bound two-way so it's updated
+        }
+
+        private void CancelRename(TextBox? box)
+        {
+            if (box == null) return;
+            var grid = box.Parent as Grid;
+            if (grid == null) return;
+            if (grid.FindName("ViewPanel") is StackPanel vp) vp.Visibility = Visibility.Visible;
+            box.Visibility = Visibility.Collapsed;
+        }
+
+        private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T t) return t;
+                var result = FindVisualChild<T>(child);
+                if (result != null) return result;
+            }
+            return null;
+        }
+
+        public void SaveState()
+        {
+            // Save state via ViewModel if available
+        }
+
+        public void ShowPalette() { PanePalette.Show(); }
+        public void ShowControls() { PaneControls.Show(); }
+        public void ShowPrograms() { PanePrograms.Show(); }
         
         private void TreeViewItem_Selected(object sender, RoutedEventArgs e)
         {
@@ -522,7 +585,7 @@ namespace ModbusForge.Views
             {
                 Style = (Style)FindResource("NodeStyle"),
                 Width = node.Width,
-                Height = node.Height,
+                // Let height auto-size based on content instead of fixed
                 DataContext = node
             };
             
@@ -582,38 +645,61 @@ namespace ModbusForge.Views
 
         private (Border header, TextBlock headerText, TextBlock addressText) CreateNodeHeader(VisualNode node)
         {
-            var headerStack = new StackPanel();
-            var headerText = new TextBlock 
-            { 
-                Text = node.DisplayName, 
-                FontWeight = FontWeights.Bold, 
-                Foreground = Brushes.White,
-                FontSize = 14,
-                HorizontalAlignment = HorizontalAlignment.Center
-            };
-            var addressText = new TextBlock 
-            { 
-                Text = node.AddressDisplay, 
-                FontWeight = FontWeights.Normal, 
-                Foreground = Brushes.White,
-                FontSize = 11,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(0, 2, 0, 0)
-            };
-            headerStack.Children.Add(headerText);
-            if (!string.IsNullOrEmpty(node.AddressDisplay))
+            var color = GetElementColor(node.ElementType);
+
+            // Slim left accent bar + inline title — modern node-editor style
+            var headerGrid = new Grid { Height = 26 };
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4) });   // accent bar
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // text
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });      // address badge
+
+            // Accent bar
+            var accentBar = new Border
             {
-                headerStack.Children.Add(addressText);
-            }
-            
+                Background = new SolidColorBrush(color),
+                CornerRadius = new CornerRadius(6, 0, 0, 0)
+            };
+            Grid.SetColumn(accentBar, 0);
+            headerGrid.Children.Add(accentBar);
+
+            // Title text
+            var headerText = new TextBlock
+            {
+                Text = node.DisplayName,
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Color.FromRgb(30, 30, 30)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 4, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                ToolTip = node.DisplayName
+            };
+            Grid.SetColumn(headerText, 1);
+            headerGrid.Children.Add(headerText);
+
+            // Address badge (small pill)
+            var addressText = new TextBlock
+            {
+                Text = node.AddressDisplay,
+                FontSize = 9,
+                Foreground = new SolidColorBrush(Color.FromRgb(120, 120, 120)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0),
+                Visibility = string.IsNullOrEmpty(node.AddressDisplay) ? Visibility.Collapsed : Visibility.Visible
+            };
+            Grid.SetColumn(addressText, 2);
+            headerGrid.Children.Add(addressText);
+
+            // Wrap in a border with bottom divider line
             var header = new Border
             {
-                Background = new SolidColorBrush(GetElementColor(node.ElementType)),
+                Background = new SolidColorBrush(Color.FromRgb(245, 245, 248)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)),
+                BorderThickness = new Thickness(0, 0, 0, 1),
                 CornerRadius = new CornerRadius(6, 6, 0, 0),
-                Padding = new Thickness(8, 6, 8, 6),
-                Child = headerStack
+                Child = headerGrid
             };
-            
+
             return (header, headerText, addressText);
         }
 
@@ -639,7 +725,7 @@ namespace ModbusForge.Views
             // Area ComboBox
             var areaCombo = new System.Windows.Controls.ComboBox
             {
-                Width = 200,
+                Width = 130,
                 Height = 26,
                 FontSize = 11,
                 ItemsSource = Enum.GetValues(typeof(PlcArea)),
@@ -659,7 +745,7 @@ namespace ModbusForge.Views
             // Address TextBox with validation
             var addrBox = new TextBox
             {
-                Width = 200,
+                Width = 130,
                 Height = 28,
                 FontSize = 11,
                 Text = addrRef.Address >= 0 ? addrRef.Address.ToString() : "",
@@ -743,75 +829,79 @@ namespace ModbusForge.Views
 
         private (Grid contentGrid, StackPanel contentStack, TextBlock liveText) CreateNodeContent(VisualNode node)
         {
-            var contentGrid = new Grid();
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            
-            // Input connectors
-            var inputStack = new StackPanel 
-            { 
-                Orientation = Orientation.Vertical, 
-                VerticalAlignment = VerticalAlignment.Center 
+            var contentGrid = new Grid { MinHeight = 32 };
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) }); // input connectors
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // center
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) }); // output connector
+
+            // Input connectors — vertically centered, small dots on left edge
+            var inputStack = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(-8, 0, 0, 0) // pull dot to edge
             };
-            
             var input1 = CreateConnector(node.Id, "Input1", true);
             inputStack.Children.Add(input1);
-            
             if (node.HasSecondInput)
             {
                 var input2 = CreateConnector(node.Id, "Input2", true);
+                input2.Margin = new Thickness(0, 6, 0, 0);
                 inputStack.Children.Add(input2);
             }
-            
             Grid.SetColumn(inputStack, 0);
             contentGrid.Children.Add(inputStack);
-            
-            // Center content
-            var contentStack = new StackPanel 
-            { 
-                Margin = new Thickness(4, 0, 4, 0),
-                VerticalAlignment = VerticalAlignment.Center
+
+            // Center content — compact
+            var contentStack = new StackPanel
+            {
+                Margin = new Thickness(4, 4, 4, 4),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
             };
-            
-            // Name label for non-I/O nodes
+
             if (!IsIoNode(node.ElementType))
             {
-                contentStack.Children.Add(new TextBlock 
-                { 
-                    Text = node.Name, 
-                    FontWeight = FontWeights.SemiBold,
+                contentStack.Children.Add(new TextBlock
+                {
+                    Text = node.Name,
+                    FontSize = 10,
+                    FontWeight = FontWeights.Medium,
+                    Foreground = new SolidColorBrush(Color.FromRgb(50, 50, 50)),
                     HorizontalAlignment = HorizontalAlignment.Center,
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     ToolTip = node.Name
                 });
             }
-            
-            // Live value indicator
+
+            // Live value indicator — compact badge
             var liveText = new TextBlock
             {
                 Text = "",
-                FontSize = 10,
+                FontSize = 9,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(Color.FromRgb(0, 122, 204)),
                 HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 2, 0, 0),
                 Visibility = Visibility.Collapsed
             };
             contentStack.Children.Add(liveText);
-            
+
             Grid.SetColumn(contentStack, 1);
             contentGrid.Children.Add(contentStack);
-            
-            // Output connector
-            var outputStack = new StackPanel 
-            { 
-                Orientation = Orientation.Vertical, 
-                VerticalAlignment = VerticalAlignment.Center 
+
+            // Output connector — right edge
+            var outputStack = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, -8, 0) // pull dot to edge
             };
             var output = CreateConnector(node.Id, "Output", false);
             outputStack.Children.Add(output);
-            
             Grid.SetColumn(outputStack, 2);
             contentGrid.Children.Add(outputStack);
-            
+
             return (contentGrid, contentStack, liveText);
         }
 

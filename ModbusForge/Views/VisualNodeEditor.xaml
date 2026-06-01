@@ -8,6 +8,7 @@
              xmlns:converters="clr-namespace:ModbusForge.Converters"
              xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
              xmlns:sys="clr-namespace:System;assembly=mscorlib"
+             xmlns:avalonDock="https://github.com/Dirkster99/AvalonDock"
              mc:Ignorable="d" 
              d:DesignHeight="600" d:DesignWidth="800">
     
@@ -30,41 +31,43 @@
         
         <!-- Node Style -->
         <Style x:Key="NodeStyle" TargetType="Border">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#333"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Background" Value="#FAFAFA"/>
+            <Setter Property="BorderBrush" Value="#D0D0D8"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="0"/>
             <Setter Property="Effect">
                 <Setter.Value>
-                    <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.3"/>
+                    <DropShadowEffect BlurRadius="6" ShadowDepth="1" Opacity="0.18" Color="#000"/>
                 </Setter.Value>
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="BorderThickness" Value="2"/>
-                    <Setter Property="BorderBrush" Value="#666"/>
-                    <Setter Property="Effect" Value="{x:Null}"/>
-                </Trigger>
-                <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                    <Setter Property="BorderThickness" Value="2"/>
+                    <Setter Property="BorderBrush" Value="#A0A0B8"/>
                     <Setter Property="Effect">
                         <Setter.Value>
-                            <DropShadowEffect Color="#3B82F6" BlurRadius="2" ShadowDepth="0" Opacity="0.8"/>
+                            <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.25" Color="#000"/>
                         </Setter.Value>
                     </Setter>
                 </Trigger>
-                <!-- Selected-node visual is applied programmatically in VisualNodeEditor.xaml.cs CreateNodeElement -->
+                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                    <Setter Property="BorderBrush" Value="#3B82F6"/>
+                    <Setter Property="Effect">
+                        <Setter.Value>
+                            <DropShadowEffect Color="#3B82F6" BlurRadius="6" ShadowDepth="0" Opacity="0.6"/>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
             </Style.Triggers>
         </Style>
         
         <!-- Connector Style -->
         <Style x:Key="ConnectorStyle" TargetType="Ellipse">
-            <Setter Property="Width" Value="12"/>
-            <Setter Property="Height" Value="12"/>
-            <Setter Property="Fill" Value="#4CAF50"/>
-            <Setter Property="Stroke" Value="#2E7D32"/>
-            <Setter Property="StrokeThickness" Value="2"/>
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Height" Value="10"/>
+            <Setter Property="Fill" Value="#5BA85F"/>
+            <Setter Property="Stroke" Value="#3A7A3E"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
@@ -96,19 +99,14 @@
         </Style>
         </UserControl.Resources>
     
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="200"/>
-            <ColumnDefinition Width="5"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="5"/>
-            <ColumnDefinition Width="200"/>
-            <ColumnDefinition Width="5"/>
-            <ColumnDefinition Width="250"/>
-        </Grid.ColumnDefinitions>
-        
-        <!-- Left Panel: POU Tree -->
-        <Border Grid.Column="0" Background="#F5F5F5" BorderBrush="#DDD" BorderThickness="1">
+    <avalonDock:DockingManager x:Name="SimDockingManager">
+        <avalonDock:LayoutRoot>
+            <avalonDock:LayoutPanel Orientation="Horizontal">
+                
+                <!-- Left Panel: POU Tree -->
+                <avalonDock:LayoutAnchorablePane DockWidth="200">
+                    <avalonDock:LayoutAnchorable x:Name="PanePrograms" Title="Programs" CanClose="True">
+        <Border Background="#F5F5F5" BorderBrush="#DDD" BorderThickness="1">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="10" Orientation="Vertical">
                     <TextBlock Text="Programs (POUs)" FontWeight="Bold" Margin="0,0,0,10" FontSize="14"/>
@@ -129,15 +127,31 @@
                     </Border>
                     
                     <!-- Programs Tree -->
-                    <TreeView ItemsSource="{Binding ProgramTree.Programs}">
+                    <TreeView x:Name="ProgramsTree" ItemsSource="{Binding ProgramTree.Programs}">
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Programs}">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
-                                    <TextBlock Text=" (" Foreground="#888" Margin="5,0,0,0"/>
-                                    <TextBlock Text="{Binding Nodes.Count}" Foreground="#888"/>
-                                    <TextBlock Text=" nodes)" Foreground="#888"/>
-                                </StackPanel>
+                                <Grid>
+                                    <!-- View mode: TextBlock -->
+                                    <StackPanel x:Name="ViewPanel" Orientation="Horizontal"
+                                                Visibility="Visible">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text=" (" Foreground="#888" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Nodes.Count}" Foreground="#888" VerticalAlignment="Center"/>
+                                        <TextBlock Text=" nodes)" Foreground="#888" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <!-- Edit mode: TextBox (shown by code-behind) -->
+                                    <TextBox x:Name="RenameBox"
+                                             Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                             Visibility="Collapsed"
+                                             MinWidth="100"
+                                             FontWeight="SemiBold"
+                                             BorderThickness="1"
+                                             Padding="2,1"
+                                             Tag="{Binding}"
+                                             LostFocus="RenameBox_LostFocus"
+                                             KeyDown="RenameBox_KeyDown"/>
+                                </Grid>
                             </HierarchicalDataTemplate>
                         </TreeView.ItemTemplate>
                         <TreeView.ItemContainerStyle>
@@ -162,12 +176,13 @@
                 </StackPanel>
             </ScrollViewer>
         </Border>
-        
-        <!-- Splitter -->
-        <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="#DDD"/>
-        
-        <!-- Canvas Area -->
-        <Border Grid.Column="2" Background="White" BorderBrush="#DDD" BorderThickness="1">
+                    </avalonDock:LayoutAnchorable>
+                </avalonDock:LayoutAnchorablePane>
+                
+                <!-- Canvas Area -->
+                <avalonDock:LayoutDocumentPane>
+                    <avalonDock:LayoutDocument Title="Canvas" CanClose="True" CanFloat="False">
+        <Border Background="White" BorderBrush="#DDD" BorderThickness="1">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -188,9 +203,6 @@
                         <Separator Margin="10,0"/>
                         <Button x:Name="TagBrowserButton" Content="🏷️ Tags" Click="TagBrowserButton_Click" Margin="0,0,10,0" Padding="8,4" AutomationProperties.AutomationId="TagBrowserButton"/>
                         <Button x:Name="WatchWindowButton" Content="👁️ Watch" Click="WatchWindowButton_Click" Margin="0,0,10,0" Padding="8,4"/>
-                        <Separator Margin="10,0"/>
-                        <TextBlock Text="💡 Input/Output blocks have inline area/address fields · All connectors are internal connections only · Right-click wires to delete" 
-                                   VerticalAlignment="Center" Foreground="#888" FontSize="11" Margin="0,0,10,0"/>
                         <Separator Margin="10,0"/>
                         <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <Slider Width="100" Minimum="0.5" Maximum="2" Value="{Binding ZoomLevel}" VerticalAlignment="Center" AutomationProperties.AutomationId="ZoomSlider"/>
@@ -217,12 +229,13 @@
                 </ScrollViewer>
             </Grid>
         </Border>
-        
-        <!-- Splitter -->
-        <GridSplitter Grid.Column="3" HorizontalAlignment="Stretch" Background="#DDD"/>
-        
-        <!-- Right Panel: Node Palette -->
-        <Border Grid.Column="4" Background="#F5F5F5" BorderBrush="#DDD" BorderThickness="1">
+                    </avalonDock:LayoutDocument>
+                </avalonDock:LayoutDocumentPane>
+                
+                <!-- Right Panel: Node Palette -->
+                <avalonDock:LayoutAnchorablePane DockWidth="200">
+                    <avalonDock:LayoutAnchorable x:Name="PanePalette" Title="Node Palette" CanClose="True">
+        <Border Background="#F5F5F5" BorderBrush="#DDD" BorderThickness="1">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="10" Orientation="Vertical">
                     <TextBlock Text="Node Palette" FontWeight="Bold" Margin="0,0,0,10" FontSize="14"/>
@@ -270,12 +283,13 @@
                 </StackPanel>
             </ScrollViewer>
         </Border>
-        
-        <!-- Splitter -->
-        <GridSplitter Grid.Column="5" HorizontalAlignment="Stretch" Background="#DDD"/>
-        
-        <!-- Simulation Controls Panel -->
-        <Border Grid.Column="6" Background="#F5F5F5" BorderBrush="#DDD" BorderThickness="1">
+                    </avalonDock:LayoutAnchorable>
+                </avalonDock:LayoutAnchorablePane>
+                
+                <!-- Simulation Controls Panel -->
+                <avalonDock:LayoutAnchorablePane DockWidth="250">
+                    <avalonDock:LayoutAnchorable x:Name="PaneControls" Title="Controls" CanClose="True">
+        <Border Background="#F5F5F5" BorderBrush="#DDD" BorderThickness="1">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="10" Orientation="Vertical">
                     <TextBlock Text="Simulation Controls" FontWeight="Bold" Margin="0,0,0,10" FontSize="14"/>
@@ -381,5 +395,9 @@
                 </StackPanel>
             </ScrollViewer>
         </Border>
-    </Grid>
+                    </avalonDock:LayoutAnchorable>
+                </avalonDock:LayoutAnchorablePane>
+            </avalonDock:LayoutPanel>
+        </avalonDock:LayoutRoot>
+    </avalonDock:DockingManager>
 </UserControl>

@@ -7,6 +7,7 @@
         xmlns:viewmodels="clr-namespace:ModbusForge.ViewModels"
         xmlns:views="clr-namespace:ModbusForge.Views"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        xmlns:avalonDock="https://github.com/Dirkster99/AvalonDock"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="1073" Width="1556"
@@ -124,6 +125,11 @@
                 <MenuItem Header="_Preferences..." Click="MenuItem_Preferences_Click"/>
                 <MenuItem Header="_Connection Manager..." Click="MenuItem_ConnectionManager_Click"/>
             </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="_Simulation Palette" Click="MenuItem_ShowSimPalette_Click"/>
+                <MenuItem Header="Simulation _Controls" Click="MenuItem_ShowSimControls_Click"/>
+                <MenuItem Header="Simulation _Programs" Click="MenuItem_ShowSimPrograms_Click"/>
+            </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_Keyboard Shortcuts..." Click="MenuItem_KeyboardShortcuts_Click"/>
                 <Separator/>
@@ -142,7 +148,8 @@
             <ui:NavigationView x:Name="RootNavigation" Grid.Column="0" 
                                PaneDisplayMode="Left" 
                                IsBackButtonVisible="Collapsed" 
-                               IsPaneToggleVisible="True">
+                               IsPaneToggleVisible="True"
+                               OpenPaneLength="175">
                 <ui:NavigationView.MenuItems>
                     <ui:NavigationViewItem Content="Registers" Icon="{ui:SymbolIcon Symbol=Database24}" Tag="0" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
                     <ui:NavigationViewItem Content="Input Registers" Icon="{ui:SymbolIcon Symbol=DatabaseSearch24}" Tag="1" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
@@ -157,107 +164,98 @@
                 </ui:NavigationView.MenuItems>
             </ui:NavigationView>
 
-            <!-- Right Content Area containing the Connection Bar and TabControl -->
+            <!-- Right Content Area containing the Connection Bar and DockingManager -->
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/> <!-- Connection Bar -->
                     <RowDefinition Height="*"/>    <!-- Content Area -->
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0" Style="{StaticResource ModernCardStyle}" Margin="16,8,16,8">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
-                            <TextBlock Text="{Binding ConnectionHeader}" Style="{StaticResource ModernTitleStyle}"/>
-                            <Ellipse Style="{StaticResource StatusIndicatorStyle}" Margin="12,0,0,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource ModernBodyStyle}" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                        </StackPanel>
-                        
-                        <Grid Grid.Row="1">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="80"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="80"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="100"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="100"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+            <Border Grid.Row="0" Style="{StaticResource ModernCardStyle}" Margin="16,8,16,8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock Text="{Binding ConnectionHeader}" Style="{StaticResource ModernTitleStyle}"/>
+                        <Ellipse Style="{StaticResource StatusIndicatorStyle}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource ModernBodyStyle}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                            <TextBlock Text="{Binding AddressLabel}" Grid.Column="0" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBox Grid.Column="1" Text="{Binding ServerAddress, UpdateSourceTrigger=PropertyChanged}" 
-                                     IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
-                                     Margin="0,0,16,0"/>
+                        <TextBlock Text="{Binding AddressLabel}" Grid.Column="0" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox Grid.Column="1" Text="{Binding ServerAddress, UpdateSourceTrigger=PropertyChanged}" 
+                                 IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
+                                 Margin="0,0,16,0"/>
 
-                            <TextBlock Text="Port:" Grid.Column="2" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBox Grid.Column="3" Text="{Binding Port}" 
-                                     IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
-                                     Margin="0,0,16,0"/>
+                        <TextBlock Text="Port:" Grid.Column="2" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox Grid.Column="3" Text="{Binding Port}" 
+                                 IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
+                                 Margin="0,0,16,0"/>
 
-                            <TextBlock Text="Unit ID:" Grid.Column="4" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
-                            <TextBox Grid.Column="5" Text="{Binding UnitId}" 
-                                     IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
-                                     Margin="0,0,16,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
+                        <TextBlock Text="Unit ID:" Grid.Column="4" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
+                        <TextBox Grid.Column="5" Text="{Binding UnitId}" 
+                                 IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
+                                 Margin="0,0,16,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
 
-                            <TextBlock Text="Unit ID(s):" Grid.Column="4" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"/>
-                            <TextBox Grid.Column="5" Text="{Binding ServerUnitId}" 
-                                     IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
-                                     Margin="0,0,16,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"
-                                     ToolTip="Comma-separated list (e.g. 1, 2, 5-10)"/>
+                        <TextBlock Text="Unit ID(s):" Grid.Column="4" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"/>
+                        <TextBox Grid.Column="5" Text="{Binding ServerUnitId}" 
+                                 IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
+                                 Margin="0,0,16,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"
+                                 ToolTip="Comma-separated list (e.g. 1, 2, 5-10)"/>
 
-                            <TextBlock Text="Active ID:" Grid.Column="6" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"/>
-                            <ComboBox Grid.Column="7" ItemsSource="{Binding AvailableUnitIds}" SelectedItem="{Binding SelectedUnitId}" 
-                                      IsEnabled="{Binding IsConnected}" 
-                                      Margin="0,0,16,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"
-                                      ToolTip="Select Unit ID for Custom entries and Simulation"/>
+                        <TextBlock Text="Active ID:" Grid.Column="6" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"/>
+                        <ComboBox Grid.Column="7" ItemsSource="{Binding AvailableUnitIds}" SelectedItem="{Binding SelectedUnitId}" 
+                                  IsEnabled="{Binding IsConnected}" 
+                                  Margin="0,0,16,0" Visibility="{Binding IsServerMode, Converter={StaticResource BoolToVis}}"
+                                  ToolTip="Select Unit ID for Custom entries and Simulation"/>
 
-                            <TextBlock Text="Mode:" Grid.Column="8" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <ComboBox Grid.Column="9" SelectedItem="{Binding Mode}" ItemsSource="{StaticResource ModeOptionsAll}"
-                                      IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
-                                      Margin="0,0,16,0"
-                                      AutomationProperties.AutomationId="ModeComboBox"/>
+                        <TextBlock Text="Mode:" Grid.Column="8" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox Grid.Column="9" SelectedItem="{Binding Mode}" ItemsSource="{StaticResource ModeOptionsAll}"
+                                  IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
+                                  Margin="0,0,16,0"
+                                  AutomationProperties.AutomationId="ModeComboBox"/>
 
-                            <Button Grid.Column="10" Content="{Binding ConnectButtonText}" Command="{Binding ConnectCommand}"
-                                    IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
+                        <Button Grid.Column="10" Content="{Binding ConnectButtonText}" Command="{Binding ConnectCommand}"
+                                IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}"
+                                Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"
+                                AutomationProperties.AutomationId="ConnectButton"/>
+
+                        <StackPanel Grid.Column="11" Orientation="Horizontal">
+                            <Button Content="Disconnect" Command="{Binding DisconnectCommand}" 
+                                    IsEnabled="{Binding IsConnected}"
                                     Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"
-                                    AutomationProperties.AutomationId="ConnectButton"/>
-
-                            <StackPanel Grid.Column="11" Orientation="Horizontal">
-                                <Button Content="Disconnect" Command="{Binding DisconnectCommand}" 
-                                        IsEnabled="{Binding IsConnected}"
-                                        Style="{StaticResource MetallicButtonStyle}" Margin="0,0,8,0"
-                                        AutomationProperties.AutomationId="DisconnectButton"/>
-                                <Button Content="Diagnostics" Command="{Binding RunDiagnosticsCommand}" 
-                                        ToolTip="Test TCP and Modbus connectivity"
-                                        Style="{StaticResource MetallicButtonStyle}"/>
-                            </StackPanel>
-                        </Grid>
+                                    AutomationProperties.AutomationId="DisconnectButton"/>
+                            <Button Content="Diagnostics" Command="{Binding RunDiagnosticsCommand}" 
+                                    ToolTip="Test TCP and Modbus connectivity"
+                                    Style="{StaticResource MetallicButtonStyle}"/>
+                        </StackPanel>
                     </Grid>
-                </Border>
+                </Grid>
+            </Border>
 
-                <TabControl x:Name="MainTabControl" Grid.Row="1" Margin="5">
-                    <TabControl.Template>
-                        <ControlTemplate TargetType="TabControl">
-                            <Grid KeyboardNavigation.TabNavigation="Local">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="0"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-                                <TabPanel x:Name="HeaderPanel" Grid.Row="0" IsItemsHost="True" KeyboardNavigation.TabIndex="1"/>
-                                <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" Grid.Row="1"/>
-                            </Grid>
-                        </ControlTemplate>
-                    </TabControl.Template>
-            <TabItem Header="Registers">
+            <avalonDock:DockingManager x:Name="MainDockingManager" Grid.Row="1" Margin="5">
+                <avalonDock:LayoutRoot>
+                    <avalonDock:LayoutPanel Orientation="Horizontal">
+                        <avalonDock:LayoutDocumentPane x:Name="MainDocumentPane">
+                            <avalonDock:LayoutDocument x:Name="DocRegisters" Title="Registers" ContentId="Registers">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -299,8 +297,8 @@
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
-            </TabItem>
-            <TabItem Header="Input Registers">
+                            </avalonDock:LayoutDocument>
+                            <avalonDock:LayoutDocument x:Name="DocInputRegisters" Title="Input Registers" ContentId="InputRegisters">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -341,8 +339,8 @@
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
-            </TabItem>
-            <TabItem Header="Coils">
+                            </avalonDock:LayoutDocument>
+                            <avalonDock:LayoutDocument x:Name="DocCoils" Title="Coils" ContentId="Coils">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -380,8 +378,8 @@
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
-            </TabItem>
-            <TabItem Header="Discrete Inputs">
+                            </avalonDock:LayoutDocument>
+                            <avalonDock:LayoutDocument x:Name="DocDiscreteInputs" Title="Discrete Inputs" ContentId="DiscreteInputs">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -418,8 +416,8 @@
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
-            </TabItem>
-            <TabItem Header="Custom">
+                            </avalonDock:LayoutDocument>
+                            <avalonDock:LayoutDocument x:Name="DocCustomWatch" Title="Custom Watch" ContentId="CustomWatch">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -470,26 +468,26 @@
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
-            </TabItem>
-            <TabItem Header="Simulation" AutomationProperties.AutomationId="SimulationTab">
+                            </avalonDock:LayoutDocument>
+                            <avalonDock:LayoutDocument x:Name="DocSimulation" Title="Simulation" ContentId="Simulation">
                 <views:VisualNodeEditor x:Name="VisualEditor" DataContext="{Binding VisualNodeEditorViewModel}"/>
-            </TabItem>
-            <TabItem Header="Decode">
+                            </avalonDock:LayoutDocument>
+                            <avalonDock:LayoutDocument x:Name="DocDecode" Title="Decode" ContentId="Decode">
                 <Grid Margin="5">
                     <views:DecodeView />
                 </Grid>
-            </TabItem>
-            <TabItem Header="Trend">
+                            </avalonDock:LayoutDocument>
+                            <avalonDock:LayoutDocument x:Name="DocTrend" Title="Trend" ContentId="Trend">
                 <Grid Margin="5">
                     <views:TrendView x:Name="TrendViewControl" />
                 </Grid>
-            </TabItem>
-            <TabItem Header="Console">
+                            </avalonDock:LayoutDocument>
+                            <avalonDock:LayoutDocument x:Name="DocConsole" Title="Console" ContentId="Console">
                 <Grid Margin="5">
                     <ListView ItemsSource="{Binding ConsoleMessages}" />
                 </Grid>
-            </TabItem>
-            <TabItem Header="Debug">
+                            </avalonDock:LayoutDocument>
+                            <avalonDock:LayoutDocument x:Name="DocDebug" Title="Debug" ContentId="Debug">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -498,8 +496,11 @@
                     <TextBlock Grid.Row="0" Text="Live Register Values" FontWeight="Bold" Margin="0,0,0,5"/>
                     <ListView Grid.Row="1" ItemsSource="{Binding DebugMessages}" />
                 </Grid>
-            </TabItem>
-        </TabControl>
+                            </avalonDock:LayoutDocument>
+                        </avalonDock:LayoutDocumentPane>
+                    </avalonDock:LayoutPanel>
+                </avalonDock:LayoutRoot>
+            </avalonDock:DockingManager>
             </Grid>
         </Grid>
 

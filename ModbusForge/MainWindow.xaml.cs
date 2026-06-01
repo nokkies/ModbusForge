@@ -13,6 +13,7 @@ using ModbusForge.Services;
 using ModbusForge.Helpers;
 using MahApps.Metro.Controls;
 using System.Collections.ObjectModel;
+using AvalonDock.Layout;
 
 namespace ModbusForge
 {
@@ -254,9 +255,29 @@ namespace ModbusForge
             {
                 if (int.TryParse(item.Tag.ToString(), out int index))
                 {
-                    if (MainTabControl.SelectedIndex != index)
+                    LayoutDocument targetDoc = null;
+                    switch (index)
                     {
-                        MainTabControl.SelectedIndex = index;
+                        case 0: targetDoc = DocRegisters; break;
+                        case 1: targetDoc = DocInputRegisters; break;
+                        case 2: targetDoc = DocCoils; break;
+                        case 3: targetDoc = DocDiscreteInputs; break;
+                        case 4: targetDoc = DocCustomWatch; break;
+                        case 5: targetDoc = DocSimulation; break;
+                        case 6: targetDoc = DocDecode; break;
+                        case 7: targetDoc = DocTrend; break;
+                        case 8: targetDoc = DocConsole; break;
+                        case 9: targetDoc = DocDebug; break;
+                    }
+
+                    if (targetDoc != null)
+                    {
+                        if (targetDoc.Parent == null)
+                        {
+                            MainDocumentPane.Children.Insert(Math.Min(index, MainDocumentPane.Children.Count), targetDoc);
+                        }
+                        targetDoc.IsActive = true;
+                        targetDoc.IsSelected = true;
                     }
                     
                     foreach (var menuItemObj in RootNavigation.MenuItems)
@@ -269,6 +290,21 @@ namespace ModbusForge
                     e.Handled = true;
                 }
             }
+        }
+
+        private void MenuItem_ShowSimPalette_Click(object sender, RoutedEventArgs e)
+        {
+            VisualEditor?.ShowPalette();
+        }
+
+        private void MenuItem_ShowSimControls_Click(object sender, RoutedEventArgs e)
+        {
+            VisualEditor?.ShowControls();
+        }
+
+        private void MenuItem_ShowSimPrograms_Click(object sender, RoutedEventArgs e)
+        {
+            VisualEditor?.ShowPrograms();
         }
 
         private T? GetSelectedGridItem<T>(object sender) where T : class
@@ -599,6 +635,16 @@ namespace ModbusForge
             {
                 Clipboard.SetText(entry.State.ToString());
             }
+        }
+
+        private void RootNavigation_PaneOpened(object sender, RoutedEventArgs e)
+        {
+            // Navigation pane is now a standalone element; no resize needed.
+        }
+
+        private void RootNavigation_PaneClosed(object sender, RoutedEventArgs e)
+        {
+            // Navigation pane is now a standalone element; no resize needed.
         }
     }
 }
