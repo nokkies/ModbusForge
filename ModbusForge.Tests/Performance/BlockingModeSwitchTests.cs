@@ -51,11 +51,28 @@ namespace ModbusForge.Tests.Performance
             _mockServerService = new Mock<ModbusServerService>(serverLogger.Object);
 
             // Construct Coordinators with mocks
+            var mockRetry = new Mock<IRetryPolicyService>();
+            mockRetry.Setup(r => r.ExecuteWithRetryAsync(It.IsAny<Func<Task<bool>>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>()))
+                .Returns(async (Func<Task<bool>> op, string name, int max, int init, int maxD) => await op());
+            var mockValidation = new Mock<IValidationService>();
+            mockValidation.Setup(v => v.ValidateIpAddress(It.IsAny<string>())).Returns(ValidationResult.Success);
+            mockValidation.Setup(v => v.ValidatePort(It.IsAny<int>())).Returns(ValidationResult.Success);
+            var mockError = new Mock<IErrorHandlingService>();
+            mockError.Setup(e => e.HandleError(It.IsAny<Exception>(), It.IsAny<string>()))
+                .Returns(new ErrorHandlingResult { UserMessage = "Error", RecoverySuggestion = "Suggestion" });
+            var mockCircuit = new Mock<ICircuitBreakerService>();
+            mockCircuit.Setup(c => c.ExecuteAsync(It.IsAny<string>(), It.IsAny<Func<Task<bool>>>(), It.IsAny<CircuitBreakerConfig>()))
+                .Returns(async (string name, Func<Task<bool>> op, CircuitBreakerConfig cfg) => await op());
+
             _connectionCoordinator = new ConnectionCoordinator(
                 _mockClientService.Object,
                 _mockServerService.Object,
                 _mockConsoleLogger.Object,
-                new Mock<ILogger<ConnectionCoordinator>>().Object);
+                new Mock<ILogger<ConnectionCoordinator>>().Object,
+                mockRetry.Object,
+                mockValidation.Object,
+                mockError.Object,
+                mockCircuit.Object);
 
             _registerCoordinator = new RegisterCoordinator(
                 _mockClientService.Object,

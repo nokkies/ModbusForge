@@ -812,7 +812,7 @@ namespace ModbusForge.ViewModels
                 msg => StatusMessage = msg, async () => await ReadCoilsAsync(), IsServerMode);
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
@@ -839,7 +839,7 @@ namespace ModbusForge.ViewModels
             await _registerCoordinator.WriteCoilAtAsync(EffectiveUnitId, address, state, IsServerMode);
         }
 
-        protected virtual void Dispose(bool disposing)
+        protected override void Dispose(bool disposing)
         {
             if (!_disposed)
             {
@@ -864,6 +864,9 @@ namespace ModbusForge.ViewModels
                             }
                         }
                         catch (Exception ex) { _logger.LogDebug(ex, "Error detaching event handlers during disposal"); }
+                        
+                        // Dispose VisualNodeEditorViewModel
+                        _visualNodeEditorViewModel?.Dispose();
                     }
                     catch (Exception ex) { _logger.LogDebug(ex, "Error during timer cleanup in Dispose"); }
                     try

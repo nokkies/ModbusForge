@@ -12,6 +12,10 @@ namespace ModbusForge.Tests.Coordinators
         private readonly Mock<IModbusService> _mockServerService;
         private readonly Mock<IConsoleLoggerService> _mockConsoleLogger;
         private readonly Mock<ILogger<ConnectionCoordinator>> _mockLogger;
+        private readonly Mock<IRetryPolicyService> _mockRetryPolicyService;
+        private readonly Mock<IValidationService> _mockValidationService;
+        private readonly Mock<IErrorHandlingService> _mockErrorHandlingService;
+        private readonly Mock<ICircuitBreakerService> _mockCircuitBreakerService;
         private readonly ConnectionCoordinator _coordinator;
 
         public ConnectionCoordinatorTests()
@@ -20,12 +24,36 @@ namespace ModbusForge.Tests.Coordinators
             _mockServerService = new Mock<IModbusService>();
             _mockConsoleLogger = new Mock<IConsoleLoggerService>();
             _mockLogger = new Mock<ILogger<ConnectionCoordinator>>();
-            
+
+            _mockRetryPolicyService = new Mock<IRetryPolicyService>();
+            _mockRetryPolicyService.Setup(r => r.ExecuteWithRetryAsync(It.IsAny<System.Func<System.Threading.Tasks.Task<bool>>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>()))
+                .Returns(async (System.Func<System.Threading.Tasks.Task<bool>> op, string name, int max, int init, int maxD) => await op());
+            _mockRetryPolicyService.Setup(r => r.ExecuteWithRetryAsync(It.IsAny<System.Func<System.Threading.Tasks.Task>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>()))
+                .Returns(async (System.Func<System.Threading.Tasks.Task> op, string name, int max, int init, int maxD) => await op());
+
+            _mockValidationService = new Mock<IValidationService>();
+            _mockValidationService.Setup(v => v.ValidateIpAddress(It.IsAny<string>())).Returns(ValidationResult.Success);
+            _mockValidationService.Setup(v => v.ValidatePort(It.IsAny<int>())).Returns(ValidationResult.Success);
+
+            _mockErrorHandlingService = new Mock<IErrorHandlingService>();
+            _mockErrorHandlingService.Setup(e => e.HandleError(It.IsAny<System.Exception>(), It.IsAny<string>()))
+                .Returns(new ErrorHandlingResult { UserMessage = "Error", RecoverySuggestion = "Suggestion" });
+
+            _mockCircuitBreakerService = new Mock<ICircuitBreakerService>();
+            _mockCircuitBreakerService.Setup(c => c.ExecuteAsync(It.IsAny<string>(), It.IsAny<System.Func<System.Threading.Tasks.Task<bool>>>(), It.IsAny<CircuitBreakerConfig>()))
+                .Returns(async (string name, System.Func<System.Threading.Tasks.Task<bool>> op, CircuitBreakerConfig cfg) => await op());
+            _mockCircuitBreakerService.Setup(c => c.ExecuteAsync(It.IsAny<string>(), It.IsAny<System.Func<System.Threading.Tasks.Task>>(), It.IsAny<CircuitBreakerConfig>()))
+                .Returns(async (string name, System.Func<System.Threading.Tasks.Task> op, CircuitBreakerConfig cfg) => await op());
+
             _coordinator = new ConnectionCoordinator(
                 _mockClientService.Object,
                 _mockServerService.Object,
                 _mockConsoleLogger.Object,
-                _mockLogger.Object);
+                _mockLogger.Object,
+                _mockRetryPolicyService.Object,
+                _mockValidationService.Object,
+                _mockErrorHandlingService.Object,
+                _mockCircuitBreakerService.Object);
         }
 
         [Fact]

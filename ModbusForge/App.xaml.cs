@@ -35,6 +35,34 @@ namespace ModbusForge
             this.DispatcherUnhandledException += App_DispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 
+            // Validate configuration on startup
+            var configValidator = ServiceProvider.GetRequiredService<IConfigurationValidator>();
+            var serverSettings = ServiceProvider.GetRequiredService<IOptions<ServerSettings>>().Value;
+            var loggingSettings = ServiceProvider.GetRequiredService<IOptions<LoggingSettings>>().Value;
+            
+            var validationResult = configValidator.ValidateConfiguration(serverSettings, loggingSettings);
+            if (!validationResult.IsValid)
+            {
+                MessageBox.Show(
+                    $"Configuration validation failed:\n{validationResult.ErrorMessage}\n\nApplication will exit.",
+                    "Configuration Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                Shutdown();
+                return;
+            }
+
+            // Log any configuration warnings
+            var warnings = configValidator.GetValidationWarnings();
+            if (warnings.Count > 0)
+            {
+                var logger = ServiceProvider.GetRequiredService<ILogger<App>>();
+                foreach (var warning in warnings)
+                {
+                    logger.LogWarning("Configuration warning: {Warning}", warning);
+                }
+            }
+
             // Start API Service if enabled
             var settingsService = ServiceProvider.GetRequiredService<ISettingsService>();
             var apiServerService = ServiceProvider.GetRequiredService<IApiServerService>();
@@ -121,13 +149,22 @@ namespace ModbusForge
             services.AddSingleton<IVisualSimulationService, VisualSimulationService>();
             services.AddSingleton<IApiServerService, ApiServerService>();
             services.AddSingleton<TagService>();
+            services.AddSingleton<IRetryPolicyService, RetryPolicyService>();
+            services.AddSingleton<IValidationService, ValidationService>();
+            services.AddSingleton<IConfigurationValidator, ConfigurationValidator>();
+            services.AddSingleton<IErrorHandlingService, ErrorHandlingService>();
+            services.AddSingleton<ICircuitBreakerService, CircuitBreakerService>();
             
             // Register Coordinators
             services.AddSingleton<ConnectionCoordinator>(provider => new ConnectionCoordinator(
                 provider.GetRequiredService<ModbusTcpService>(),
                 provider.GetRequiredService<ModbusServerService>(),
                 provider.GetRequiredService<IConsoleLoggerService>(),
-                provider.GetRequiredService<ILogger<ConnectionCoordinator>>()
+                provider.GetRequiredService<ILogger<ConnectionCoordinator>>(),
+                provider.GetRequiredService<IRetryPolicyService>(),
+                provider.GetRequiredService<IValidationService>(),
+                provider.GetRequiredService<IErrorHandlingService>(),
+                provider.GetRequiredService<ICircuitBreakerService>()
             ));
             services.AddSingleton<RegisterCoordinator>();
             services.AddSingleton<CustomEntryCoordinator>();

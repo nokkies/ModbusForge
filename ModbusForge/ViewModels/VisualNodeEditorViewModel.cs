@@ -973,5 +973,32 @@ namespace ModbusForge.ViewModels
                 }
             }
         }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    // Stop visual simulation service if running
+                    var visualSimulationService = App.ServiceProvider?.GetService<IVisualSimulationService>();
+                    if (visualSimulationService != null)
+                    {
+                        visualSimulationService.Stop();
+                    }
+
+                    // Clear collections to prevent memory leaks
+                    Nodes.Clear();
+                    Connections.Clear();
+                    ConnectorConfigs.Clear();
+                    PaletteCategories.Clear();
+                    ProgramTree.Programs.Clear();
+                }
+                _disposed = true;
+            }
+            base.Dispose(disposing);
+        }
+
+        private bool _disposed = false;
     }
 }

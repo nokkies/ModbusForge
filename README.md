@@ -1,8 +1,15 @@
-# ModbusForge v5.1.3
+# ModbusForge v5.2.0
 
 A professional Modbus TCP client/server application built with .NET 8.0 and WPF. ModbusForge provides comprehensive tools for testing, monitoring, and automating Modbus communications.
 
 ![ModbusForge](ModbusForge/Resources/ModbusForgeLOGO.png)
+
+## What's New in v5.2.0
+
+- **Centralized Resilience & Error Handling**: Integrated a central retry policy with exponential backoff and jitter, a circuit breaker pattern to prevent cascading connection failures, and an error handling translation service offering detailed recovery suggestions.
+- **Startup Configuration Validation**: Added startup configuration schema validation to prevent execution with malformed or missing `appsettings.json`.
+- **Validation Service**: Implemented strong input validation for IP addresses, ports, unit IDs, registers, and connection strings.
+- **Improved Memory Lifecycle**: Cleaned up ViewModel event handler subscriptions and added visual simulation service and collection cleanups on dispose to prevent potential memory leaks.
 
 ## What's New in v5.1.3
 

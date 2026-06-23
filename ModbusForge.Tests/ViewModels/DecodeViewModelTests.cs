@@ -31,7 +31,20 @@ namespace ModbusForge.Tests.ViewModels
             var mockCustomEntryService = new Mock<ICustomEntryService>();
             var mockConsoleLogger = new Mock<IConsoleLoggerService>();
 
-            var connectionCoordinator = new ConnectionCoordinator(_mockTcpService.Object, _mockServerService.Object, mockConsoleLogger.Object, new Mock<ILogger<ConnectionCoordinator>>().Object);
+            var mockRetry = new Mock<IRetryPolicyService>();
+            mockRetry.Setup(r => r.ExecuteWithRetryAsync(It.IsAny<Func<Task<bool>>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>()))
+                .Returns(async (Func<Task<bool>> op, string name, int max, int init, int maxD) => await op());
+            var mockValidation = new Mock<IValidationService>();
+            mockValidation.Setup(v => v.ValidateIpAddress(It.IsAny<string>())).Returns(ValidationResult.Success);
+            mockValidation.Setup(v => v.ValidatePort(It.IsAny<int>())).Returns(ValidationResult.Success);
+            var mockError = new Mock<IErrorHandlingService>();
+            mockError.Setup(e => e.HandleError(It.IsAny<Exception>(), It.IsAny<string>()))
+                .Returns(new ErrorHandlingResult { UserMessage = "Error", RecoverySuggestion = "Suggestion" });
+            var mockCircuit = new Mock<ICircuitBreakerService>();
+            mockCircuit.Setup(c => c.ExecuteAsync(It.IsAny<string>(), It.IsAny<Func<Task<bool>>>(), It.IsAny<CircuitBreakerConfig>()))
+                .Returns(async (string name, Func<Task<bool>> op, CircuitBreakerConfig cfg) => await op());
+
+            var connectionCoordinator = new ConnectionCoordinator(_mockTcpService.Object, _mockServerService.Object, mockConsoleLogger.Object, new Mock<ILogger<ConnectionCoordinator>>().Object, mockRetry.Object, mockValidation.Object, mockError.Object, mockCircuit.Object);
             var registerCoordinator = new RegisterCoordinator(_mockTcpService.Object, _mockServerService.Object, mockConsoleLogger.Object, new Mock<ILogger<RegisterCoordinator>>().Object);
             var customEntryCoordinator = new CustomEntryCoordinator(registerCoordinator, mockCustomEntryService.Object, _mockTcpService.Object, _mockServerService.Object, new Mock<ILogger<CustomEntryCoordinator>>().Object);
             var trendCoordinator = new TrendCoordinator(_mockTcpService.Object, _mockServerService.Object, mockTrendLogger.Object, new Mock<ILogger<TrendCoordinator>>().Object, new Mock<ISettingsService>().Object);

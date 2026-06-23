@@ -15,17 +15,29 @@ namespace ModbusForge.ViewModels.Coordinators
         private readonly IModbusService _serverService;
         private readonly IConsoleLoggerService _consoleLoggerService;
         private readonly ILogger<ConnectionCoordinator> _logger;
+        private readonly IRetryPolicyService _retryPolicyService;
+        private readonly IValidationService _validationService;
+        private readonly IErrorHandlingService _errorHandlingService;
+        private readonly ICircuitBreakerService _circuitBreakerService;
 
         public ConnectionCoordinator(
             IModbusService clientService,
             IModbusService serverService,
             IConsoleLoggerService consoleLoggerService,
-            ILogger<ConnectionCoordinator> logger)
+            ILogger<ConnectionCoordinator> logger,
+            IRetryPolicyService retryPolicyService,
+            IValidationService validationService,
+            IErrorHandlingService errorHandlingService,
+            ICircuitBreakerService circuitBreakerService)
         {
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
             _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
             _consoleLoggerService = consoleLoggerService ?? throw new ArgumentNullException(nameof(consoleLoggerService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _retryPolicyService = retryPolicyService ?? throw new ArgumentNullException(nameof(retryPolicyService));
+            _validationService = validationService ?? throw new ArgumentNullException(nameof(validationService));
+            _errorHandlingService = errorHandlingService ?? throw new ArgumentNullException(nameof(errorHandlingService));
+            _circuitBreakerService = circuitBreakerService ?? throw new ArgumentNullException(nameof(circuitBreakerService));
         }
 
         /// <summary>
@@ -51,11 +63,64 @@ namespace ModbusForge.ViewModels.Coordinators
         {
             try
             {
+                // Validate connection parameters
+                var ipValidation = _validationService.ValidateIpAddress(serverAddress);
+                if (!ipValidation.IsValid)
+                {
+                    setStatusMessage($"Invalid IP address: {ipValidation.ErrorMessage}");
+                    _consoleLoggerService.Log($"Invalid IP address: {ipValidation.ErrorMessage}");
+                    MessageBox.Show(ipValidation.ErrorMessage, "Validation Error", 
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return false;
+                }
+
+                var portValidation = _validationService.ValidatePort(port);
+                if (!portValidation.IsValid)
+                {
+                    setStatusMessage($"Invalid port: {portValidation.ErrorMessage}");
+                    _consoleLoggerService.Log($"Invalid port: {portValidation.ErrorMessage}");
+                    MessageBox.Show(portValidation.ErrorMessage, "Validation Error", 
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return false;
+                }
+
                 var service = GetService(isServerMode);
                 setStatusMessage(isServerMode ? "Starting server..." : "Connecting...");
                 _consoleLoggerService.Log(isServerMode ? "Starting server..." : "Connecting...");
                 
-                var success = await service.ConnectAsync(serverAddress, port, unitIds);
+                // Use circuit breaker and retry policy for client connections (not server starts)
+                bool success;
+                try
+                {
+                    success = isServerMode 
+                        ? await service.ConnectAsync(serverAddress, port, unitIds)
+                        : await _circuitBreakerService.ExecuteAsync(
+                            $"ModbusClient_{serverAddress}:{port}",
+                            async () => await _retryPolicyService.ExecuteWithRetryAsync(
+                                async () => await service.ConnectAsync(serverAddress, port, unitIds),
+                                $"Connect to {serverAddress}:{port}",
+                                maxRetries: 3,
+                                initialDelayMs: 1000,
+                                maxDelayMs: 5000),
+                            new CircuitBreakerConfig 
+                            { 
+                                FailureThreshold = 3, 
+                                OpenTimeout = TimeSpan.FromSeconds(30),
+                                SuccessThreshold = 2
+                            });
+                }
+                catch (CircuitBreakerOpenException cbEx)
+                {
+                    setConnected(false);
+                    setStatusMessage("Connection blocked by circuit breaker");
+                    _logger.LogWarning(cbEx, "Connection blocked by circuit breaker for {Address}:{Port}", serverAddress, port);
+                    _consoleLoggerService.Log($"Connection blocked by circuit breaker: {cbEx.Message}");
+                    
+                    var circuitMsg = $"Connection temporarily blocked due to repeated failures.\n\n{cbEx.Message}\n\nThe circuit breaker will automatically reset after the timeout period.";
+                    MessageBox.Show(circuitMsg, "Circuit Breaker Active",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    return false;
+                }
 
                 if (success)
                 {
@@ -85,12 +150,28 @@ namespace ModbusForge.ViewModels.Coordinators
                     _logger.LogWarning(isServerMode ? "Failed to start Modbus server" : "Failed to connect to Modbus server");
                     _consoleLoggerService.Log(isServerMode ? "Server failed to start" : "Connection failed");
                     
-                    var msg = isServerMode
+                    // Use error handling service for better error messages
+                    var errorMsg = isServerMode
                         ? $"Failed to start server on port {port}. The port may be in use. Try another port (e.g., 1502) or stop the process using it."
                         : "Failed to connect to Modbus server.";
-                    _consoleLoggerService.Log(msg);
-                    MessageBox.Show(msg, isServerMode ? "Server Error" : "Connection Error",
-                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    
+                    try
+                    {
+                        // Create a synthetic exception for error handling
+                        var exception = new Exception(errorMsg);
+                        var errorResult = _errorHandlingService.HandleError(exception, isServerMode ? "ServerStart" : "ClientConnect");
+                        
+                        // Show user-friendly message with recovery suggestions
+                        var userMessage = $"{errorResult.UserMessage}\n\nRecovery Suggestions:\n{errorResult.RecoverySuggestion}";
+                        MessageBox.Show(userMessage, isServerMode ? "Server Error" : "Connection Error",
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                    catch
+                    {
+                        // Fallback to basic error message if error handling fails
+                        MessageBox.Show(errorMsg, isServerMode ? "Server Error" : "Connection Error",
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
 
                     // If in Server mode, offer to retry automatically on alternative port 1502
                     if (isServerMode)
