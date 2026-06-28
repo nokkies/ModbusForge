@@ -250,6 +250,10 @@ namespace ModbusForge.ViewModels
             LoadCustomCommand = new RelayCommand(async () => await LoadCustomAsync());
             SaveAllConfigCommand = new RelayCommand(async () => await SaveAllConfigAsync());
             LoadAllConfigCommand = new RelayCommand(async () => await LoadAllConfigAsync());
+            
+            // Keyboard shortcut commands
+            TrendCommand = new RelayCommand(ShowTrendView);
+            RefreshCommand = new RelayCommand(async () => await RefreshAsync());
         }
 
         /// <summary>
@@ -470,6 +474,8 @@ namespace ModbusForge.ViewModels
         public IRelayCommand LoadCustomCommand { get; private set; } = null!;
         public IRelayCommand SaveAllConfigCommand { get; private set; } = null!;
         public IRelayCommand LoadAllConfigCommand { get; private set; } = null!;
+        public IRelayCommand TrendCommand { get; private set; } = null!;
+        public IRelayCommand RefreshCommand { get; private set; } = null!;
 
         public ObservableCollection<string> ConsoleMessages { get; } = new();
 
@@ -1342,6 +1348,16 @@ namespace ModbusForge.ViewModels
                 if (ce.Trend)
                 {
                     _trendLogger.Add(key, GetTrendDisplayName(ce));
+                    
+                    // Automatically enable continuous read when trend is added
+                    if (ce.Area == "HoldingRegister" && !HoldingMonitorEnabled)
+                    {
+                        HoldingMonitorEnabled = true;
+                    }
+                    else if (ce.Area == "InputRegister" && !InputRegistersMonitorEnabled)
+                    {
+                        InputRegistersMonitorEnabled = true;
+                    }
                 }
                 else
                 {
@@ -1842,6 +1858,39 @@ namespace ModbusForge.ViewModels
                         config.Address = 1;
                     }
                 }
+            }
+        }
+
+        private void ShowTrendView()
+        {
+            // Request navigation to trend view - MainWindow will handle this via property binding
+            RequestedViewIndex = 7; // Trend view index
+        }
+
+        [ObservableProperty]
+        private int _requestedViewIndex = -1;
+
+        private async Task RefreshAsync()
+        {
+            if (!IsConnected)
+            {
+                StatusMessage = "Not connected - cannot refresh";
+                return;
+            }
+
+            try
+            {
+                await ReadRegistersAsync();
+                await ReadInputRegistersAsync();
+                await ReadCoilsAsync();
+                await ReadDiscreteInputsAsync();
+                await ReadAllCustomNowAsync();
+                StatusMessage = "All data refreshed";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during refresh");
+                StatusMessage = $"Refresh failed: {ex.Message}";
             }
         }
 

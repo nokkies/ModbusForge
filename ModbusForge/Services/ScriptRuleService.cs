@@ -233,8 +233,25 @@ namespace ModbusForge.Services
                 double triggerNum = Convert.ToDouble(triggerValue, CultureInfo.InvariantCulture);
                 return comparison(currentNum, triggerNum);
             }
-            catch
+            catch (FormatException ex)
             {
+                _logger.LogWarning(ex, "Format error converting values to numeric comparison. Current: '{CurrentValue}', Trigger: '{TriggerValue}'", currentValue, triggerValue);
+                return false;
+            }
+            catch (InvalidCastException ex)
+            {
+                _logger.LogWarning(ex, "Invalid cast during numeric comparison. Current type: '{CurrentType}', Trigger type: '{TriggerType}'", 
+                    currentValue?.GetType().Name, triggerValue?.GetType().Name);
+                return false;
+            }
+            catch (OverflowException ex)
+            {
+                _logger.LogWarning(ex, "Overflow error during numeric conversion. Current: '{CurrentValue}', Trigger: '{TriggerValue}'", currentValue, triggerValue);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error during numeric value comparison. Current: '{CurrentValue}', Trigger: '{TriggerValue}'", currentValue, triggerValue);
                 return false;
             }
         }

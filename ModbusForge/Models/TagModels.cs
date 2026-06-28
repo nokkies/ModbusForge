@@ -97,8 +97,28 @@ namespace ModbusForge.Models
                     var raw = Convert.ToDouble(CurrentValue);
                     return (raw * Scale) + Offset;
                 }
-                catch
+                catch (FormatException ex)
                 {
+                    // Log format conversion errors - current value cannot be converted to double
+                    System.Diagnostics.Debug.WriteLine($"Tag '{Name}': Format error converting '{CurrentValue}' to double for scaling. {ex.Message}");
+                    return null;
+                }
+                catch (InvalidCastException ex)
+                {
+                    // Log type conversion errors - current value type is incompatible
+                    System.Diagnostics.Debug.WriteLine($"Tag '{Name}': Invalid cast converting '{CurrentValue?.GetType().Name}' to double for scaling. {ex.Message}");
+                    return null;
+                }
+                catch (OverflowException ex)
+                {
+                    // Log overflow errors - value is too large/small for double
+                    System.Diagnostics.Debug.WriteLine($"Tag '{Name}': Overflow error converting '{CurrentValue}' to double for scaling. {ex.Message}");
+                    return null;
+                }
+                catch (Exception ex)
+                {
+                    // Log any unexpected errors during scaling
+                    System.Diagnostics.Debug.WriteLine($"Tag '{Name}': Unexpected error during scaling calculation. {ex.Message}");
                     return null;
                 }
             }

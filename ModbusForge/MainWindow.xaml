@@ -17,6 +17,13 @@
         ExtendsContentIntoTitleBar="True"
         WindowBackdropType="Mica">
 
+    <Window.InputBindings>
+        <KeyBinding Key="R" Modifiers="Control" Command="{Binding ReadRegistersCommand}"/>
+        <KeyBinding Key="T" Modifiers="Control" Command="{Binding TrendCommand}"/>
+        <KeyBinding Key="S" Modifiers="Control" Command="{Binding SaveProjectCommand}"/>
+        <KeyBinding Key="F5" Command="{Binding RefreshCommand}"/>
+    </Window.InputBindings>
+
     <ui:FluentWindow.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>

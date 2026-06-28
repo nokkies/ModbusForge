@@ -1,12 +1,39 @@
 # ModbusForge Feature Roadmap
 
 ## Current Version
-**v4.6.0** - Released with REST API for AI integration, code health improvements
+**v5.2.0** - Released with centralized validation, resilience, and error handling
 
 ---
 
-## v4.7.0 - Simulation GUI Improvements
-**Focus:** Improve user experience and usability of simulation features
+## v5.3.0 - UX Quick Wins
+**Focus:** Immediate user experience improvements with high impact, low effort
+
+### Tasks
+- [ ] Automatically enable 'continuous read' when trend line is added
+- [ ] Replace generic catch blocks with proper logging and user feedback in conversion operations
+- [ ] Add global keyboard shortcuts (Ctrl+R read, Ctrl+W write, Ctrl+T trends, Ctrl+S save, F5 refresh)
+- [ ] Improve error messages with recovery suggestions
+
+**Estimated Effort:** 1-2 weeks
+
+---
+
+## v5.4.0 - Performance & Reliability
+**Focus:** Application performance, memory management, and robustness
+
+### Tasks
+- [ ] Implement data grid virtualization for large address ranges
+- [ ] Add connection pooling for multi-device support
+- [ ] Refactor MainViewModel (1,846 lines) into smaller, focused ViewModels
+- [ ] Add structured logging with correlation IDs
+- [ ] Implement comprehensive input sanitization
+
+**Estimated Effort:** 3-4 weeks
+
+---
+
+## v5.5.0 - Enhanced Simulation
+**Focus:** Improve simulation GUI and controls (from original roadmap)
 
 ### Tasks
 - [ ] Redesign simulation tab layout with split panels and collapsible sections
@@ -19,111 +46,73 @@
 
 ---
 
-## v4.8.0 - Alarm/Event System
-**Focus:** Critical production monitoring and alerting capabilities
+## v5.6.0 - Data Management
+**Focus:** Enhanced import/export and data handling capabilities
 
 ### Tasks
-- [ ] Design alarm conditions (high/low thresholds, rate of change, deadband)
-- [ ] Create IAlarmService interface and AlarmService implementation
-- [ ] Add alarm configuration UI with hysteresis and severity levels
-- [ ] Implement email notification service (SMTP)
-- [ ] Add alarm history logging and viewer with acknowledgment
-
-**Estimated Effort:** 3-4 weeks
-
----
-
-## v4.9.0 - Device Template Library
-**Focus:** Reduce setup time with pre-built device configurations
-
-### Tasks
-- [ ] Define JSON template schema (register maps, data types, units, descriptions)
-- [ ] Create template parser and validator
-- [ ] Build initial library: Siemens VFDs, Allen-Bradley PLCs, common sensors
-- [ ] Add template import/export to custom entries
-- [ ] Create template browser UI with search/filter by manufacturer
-
-**Estimated Effort:** 3-4 weeks
-
----
-
-## v5.0.0 - Calculation Engine
-**Focus:** Enable derived tags without scripting (Major Feature)
-
-### Tasks
-- [ ] Define expression syntax (Excel-like: `=A1+B1`, `=AVG(Tag1,Tag2)`)
-- [ ] Create derived tag model and CalculationService
-- [ ] Implement operators: +, -, *, /, AVG, MIN, MAX, IF, ROUND
-- [ ] Add derived tag UI editor with syntax validation
-- [ ] Integrate with custom entries for real-time evaluation
-
-**Estimated Effort:** 4-5 weeks
-
----
-
-## v5.1.0 - MQTT Support
-**Focus:** Enable cloud integration and IIoT connectivity
-
-### Tasks
-- [ ] Add MQTTnet library for MQTT client
-- [ ] Create IMqttService interface and MqttService
-- [ ] Add MQTT settings (broker URL, port, username, password, QoS)
-- [ ] Implement tag-to-topic mapping configuration
-- [ ] Add bidirectional publish/subscribe with connection status UI
-
-**Estimated Effort:** 3-4 weeks
-
----
-
-## v5.2.0 - Data Historian
-**Focus:** Long-term data storage and analysis
-
-### Tasks
-- [ ] Add SQLite database for long-term time-series storage
-- [ ] Create historian service with time-range queries and aggregation
-- [ ] Add historian configuration UI (retention period, compression level)
-- [ ] Integrate with existing trend system for seamless export
+- [ ] Bulk export of all data (registers, coils, custom entries, trends)
+- [ ] Import validation with conflict resolution
+- [ ] Excel export format for business users
+- [ ] Configuration versioning and migration logic
+- [ ] Enhanced save/load dialogs with recent files
 
 **Estimated Effort:** 2-3 weeks
 
 ---
 
-## v5.3.0 - Web Dashboard
-**Focus:** Remote monitoring and management via browser
+## v5.7.0 - Testing & Monitoring
+**Focus:** Test coverage expansion and built-in performance monitoring
 
 ### Tasks
-- [ ] Create React/Vue frontend served by existing REST API
-- [ ] Add real-time dashboard with live tag values (WebSocket updates)
-- [ ] Implement trend charts using Chart.js or ECharts
-- [ ] Add device configuration web UI for remote management
-
-**Estimated Effort:** 4-5 weeks
-
----
-
-## v5.4.0 - HMI Widget Library
-**Focus:** Visual dashboard widgets for operator interfaces
-
-### Tasks
-- [ ] Create gauge controls (circular, linear, digital)
-- [ ] Add meter and progress bar controls with styling options
-- [ ] Create widget binding system for tags (drag-and-drop assignment)
-- [ ] Add widget editor with canvas for dashboard layout
-
-**Estimated Effort:** 4-5 weeks
-
----
-
-## v5.5.0 - Protocol Analysis
-**Focus:** Advanced troubleshooting and diagnostics
-
-### Tasks
-- [ ] Add Modbus packet capture and logging (request/response pairs)
-- [ ] Create packet decoder with function code and register details
-- [ ] Add traffic statistics (throughput, error rate, timing analysis)
-- [ ] Create protocol analyzer UI with filter/search and export
+- [ ] Expand unit test coverage for API server endpoints
+- [ ] Add error handling scenario tests
+- [ ] Implement concurrent operations testing
+- [ ] Add built-in performance metrics (latency tracking, memory monitoring, operation timing)
+- [ ] Performance dashboard with real-time metrics
 
 **Estimated Effort:** 3-4 weeks
+
+---
+
+## v5.8.0 - Code Quality & Architecture
+**Focus:** Technical debt reduction and architecture improvements
+
+### Tasks
+- [ ] Dependency injection cleanup and circular dependency resolution
+- [ ] Plugin architecture foundation for extensibility
+- [ ] API documentation with OpenAPI/Swagger
+- [ ] Code signing investigation for installer
+- [ ] Security audit and hardening
+
+**Estimated Effort:** 3-4 weeks
+
+---
+
+## v5.9.0 - Documentation & User Experience
+**Focus:** Comprehensive documentation and user guidance
+
+### Tasks
+- [ ] Create comprehensive user guide with screenshots and tutorials
+- [ ] Add in-application help system with context-sensitive documentation
+- [ ] Video tutorials for common workflows
+- [ ] Troubleshooting guide with common issues and solutions
+- [ ] Improved onboarding experience for new users
+
+**Estimated Effort:** 2-3 weeks
+
+---
+
+## v6.0.0 - Major Feature Integration
+**Focus:** Integration of major features from original roadmap (Breaking Changes)
+
+### Tasks
+- [ ] Alarm/Event System (from v4.8.0)
+- [ ] Device Template Library (from v4.9.0)
+- [ ] Calculation Engine (from v5.0.0)
+- [ ] MQTT Support (from v5.1.0)
+- [ ] Data Historian (from v5.2.0)
+
+**Estimated Effort:** 8-10 weeks
 
 ---
 
@@ -133,16 +122,20 @@
 - Bug fixes
 - Minor improvements
 - Performance optimizations
+- Critical security patches
 
 ### Minor Versions (x.X.0)
-- New features that don't break existing functionality
-- UI improvements
+- Focused feature sets (single theme per version)
+- UI/UX improvements
 - Service additions
+- Code quality enhancements
+- Performance optimizations
 
 ### Major Versions (X.0.0)
 - Significant architectural changes
 - Breaking changes to existing APIs
-- Major new feature categories (e.g., Calculation Engine)
+- Integration of multiple major feature categories
+- Foundation shifts (e.g., plugin architecture)
 
 ---
 
@@ -150,21 +143,22 @@
 
 | Version | Target Quarter | Status |
 |---------|---------------|--------|
-| v4.7.0 | Q2 2026 | Planned |
-| v4.8.0 | Q2 2026 | Planned |
-| v4.9.0 | Q3 2026 | Planned |
-| v5.0.0 | Q3 2026 | Planned |
-| v5.1.0 | Q4 2026 | Planned |
-| v5.2.0 | Q4 2026 | Planned |
-| v5.3.0 | Q1 2027 | Planned |
-| v5.4.0 | Q1 2027 | Planned |
-| v5.5.0 | Q2 2027 | Planned |
+| v5.3.0 | Q3 2026 | Planned |
+| v5.4.0 | Q3 2026 | Planned |
+| v5.5.0 | Q4 2026 | Planned |
+| v5.6.0 | Q4 2026 | Planned |
+| v5.7.0 | Q1 2027 | Planned |
+| v5.8.0 | Q1 2027 | Planned |
+| v5.9.0 | Q2 2027 | Planned |
+| v6.0.0 | Q2 2027 | Planned |
 
 ---
 
 ## Notes
 
+- Each minor version focuses on a specific theme (UX, Performance, Simulation, etc.)
 - Versions may be adjusted based on user feedback and priorities
-- Some features may be split across multiple versions if scope grows
+- Original roadmap features (Alarm System, Device Templates, Calculation Engine, MQTT, Historian) consolidated into v6.0.0
 - Community contributions may accelerate timeline
 - Critical bug fixes may result in patch versions between planned releases
+- This roadmap prioritizes incremental improvements and technical debt reduction before major feature additions

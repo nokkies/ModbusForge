@@ -33,6 +33,18 @@ namespace ModbusForge
             
             // Handle window closing to properly dispose resources
             this.Closing += MainWindow_Closing;
+            
+            // Handle keyboard shortcut navigation requests
+            _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+        }
+
+        private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MainViewModel.RequestedViewIndex) && _viewModel.RequestedViewIndex >= 0)
+            {
+                NavigateToView(_viewModel.RequestedViewIndex, null);
+                _viewModel.RequestedViewIndex = -1; // Reset
+            }
         }
 
         private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -255,39 +267,69 @@ namespace ModbusForge
             {
                 if (int.TryParse(item.Tag.ToString(), out int index))
                 {
-                    LayoutDocument targetDoc = null;
-                    switch (index)
-                    {
-                        case 0: targetDoc = DocRegisters; break;
-                        case 1: targetDoc = DocInputRegisters; break;
-                        case 2: targetDoc = DocCoils; break;
-                        case 3: targetDoc = DocDiscreteInputs; break;
-                        case 4: targetDoc = DocCustomWatch; break;
-                        case 5: targetDoc = DocSimulation; break;
-                        case 6: targetDoc = DocDecode; break;
-                        case 7: targetDoc = DocTrend; break;
-                        case 8: targetDoc = DocConsole; break;
-                        case 9: targetDoc = DocDebug; break;
-                    }
-
-                    if (targetDoc != null)
-                    {
-                        if (targetDoc.Parent == null)
-                        {
-                            MainDocumentPane.Children.Insert(Math.Min(index, MainDocumentPane.Children.Count), targetDoc);
-                        }
-                        targetDoc.IsActive = true;
-                        targetDoc.IsSelected = true;
-                    }
-                    
-                    foreach (var menuItemObj in RootNavigation.MenuItems)
-                    {
-                        if (menuItemObj is Wpf.Ui.Controls.NavigationViewItem navItem)
-                        {
-                            navItem.SetValue(Wpf.Ui.Controls.NavigationViewItem.IsActiveProperty, navItem == item);
-                        }
-                    }
+                    NavigateToView(index, item);
                     e.Handled = true;
+                }
+            }
+        }
+
+        private void NavigateToView(int index, Wpf.Ui.Controls.NavigationViewItem? item = null)
+        {
+            LayoutDocument targetDoc = null;
+            switch (index)
+            {
+                case 0: targetDoc = DocRegisters; break;
+                case 1: targetDoc = DocInputRegisters; break;
+                case 2: targetDoc = DocCoils; break;
+                case 3: targetDoc = DocDiscreteInputs; break;
+                case 4: targetDoc = DocCustomWatch; break;
+                case 5: targetDoc = DocSimulation; break;
+                case 6: targetDoc = DocDecode; break;
+                case 7: targetDoc = DocTrend; break;
+                case 8: targetDoc = DocConsole; break;
+                case 9: targetDoc = DocDebug; break;
+            }
+
+            if (targetDoc != null)
+            {
+                if (targetDoc.Parent == null)
+                {
+                    MainDocumentPane.Children.Insert(Math.Min(index, MainDocumentPane.Children.Count), targetDoc);
+                }
+                targetDoc.IsActive = true;
+                targetDoc.IsSelected = true;
+            }
+            
+            // Update navigation item selection
+            if (item != null)
+            {
+                foreach (var menuItemObj in RootNavigation.MenuItems)
+                {
+                    if (menuItemObj is Wpf.Ui.Controls.NavigationViewItem navItem)
+                    {
+                        navItem.SetValue(Wpf.Ui.Controls.NavigationViewItem.IsActiveProperty, navItem == item);
+                    }
+                }
+            }
+            else
+            {
+                // Find the navigation item corresponding to the index
+                foreach (var menuItemObj in RootNavigation.MenuItems)
+                {
+                    if (menuItemObj is Wpf.Ui.Controls.NavigationViewItem navItem && navItem.Tag != null)
+                    {
+                        if (int.TryParse(navItem.Tag.ToString(), out int navIndex) && navIndex == index)
+                        {
+                            foreach (var menuItemObj2 in RootNavigation.MenuItems)
+                            {
+                                if (menuItemObj2 is Wpf.Ui.Controls.NavigationViewItem navItem2)
+                                {
+                                    navItem2.SetValue(Wpf.Ui.Controls.NavigationViewItem.IsActiveProperty, navItem2 == navItem);
+                                }
+                            }
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -422,6 +464,17 @@ namespace ModbusForge
             }
 
             _viewModel.GlobalMonitorEnabled = true;
+            
+            // Automatically enable the specific continuous read for the area
+            if (area == "HoldingRegister")
+            {
+                _viewModel.HoldingMonitorEnabled = true;
+            }
+            else if (area == "InputRegister")
+            {
+                _viewModel.InputRegistersMonitorEnabled = true;
+            }
+            
             _viewModel.StatusMessage = $"Added {area} {entry.Address} to trend logger.";
         }
 

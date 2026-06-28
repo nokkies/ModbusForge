@@ -1,8 +1,16 @@
-# ModbusForge v5.2.0
+# ModbusForge v5.3.0
 
 A professional Modbus TCP client/server application built with .NET 8.0 and WPF. ModbusForge provides comprehensive tools for testing, monitoring, and automating Modbus communications.
 
 ![ModbusForge](ModbusForge/Resources/ModbusForgeLOGO.png)
+
+## What's New in v5.3.0
+
+- **Automatic Continuous Read**: Trend lines now automatically enable continuous read when added, eliminating manual checkbox toggling
+- **Enhanced Error Logging**: Replaced generic catch blocks with specific exception handling and detailed logging for better debugging
+- **Global Keyboard Shortcuts**: Added keyboard shortcuts for common operations (Ctrl+R read, Ctrl+T trends, Ctrl+S save, F5 refresh)
+- **Improved Error Messages**: Enhanced error handling service provides user-friendly messages with recovery suggestions
+- **Better User Experience**: Streamlined workflows and reduced manual steps for common operations
 
 ## What's New in v5.2.0
 
