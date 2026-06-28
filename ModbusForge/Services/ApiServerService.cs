@@ -60,6 +60,8 @@ public class ApiServerService : IApiServerService, IDisposable
             builder.Services.AddSingleton(_wpfServiceProvider.GetRequiredService<ICustomEntryService>());
             builder.Services.AddSingleton(_wpfServiceProvider.GetRequiredService<IConsoleLoggerService>());
             builder.Services.AddSingleton(_wpfServiceProvider.GetRequiredService<ITrendLogger>());
+            builder.Services.AddSingleton(_wpfServiceProvider.GetRequiredService<ModbusTcpService>());
+            builder.Services.AddSingleton(_wpfServiceProvider.GetRequiredService<ModbusServerService>());
 
             var port = _settingsService.ApiPort;
             builder.WebHost.UseUrls($"http://localhost:{port}");
@@ -114,48 +116,86 @@ public class ApiServerService : IApiServerService, IDisposable
            .WithTags("Application");
 
         app.MapPost("/api/app/connect", async (MainViewModel vm) => {
-            if (!vm.IsConnected && vm.ConnectCommand.CanExecute(null))
+            bool initiated = false;
+            await Application.Current.Dispatcher.InvokeAsync(() => {
+                if (!vm.IsConnected && vm.ConnectCommand.CanExecute(null))
+                {
+                    vm.ConnectCommand.Execute(null);
+                    initiated = true;
+                }
+            });
+            if (initiated)
             {
-                vm.ConnectCommand.Execute(null);
-                await Task.Delay(500);
+                for (int i = 0; i < 20 && !vm.IsConnected; i++)
+                {
+                    await Task.Delay(100);
+                }
                 return Results.Ok(new { Success = vm.IsConnected });
             }
             return Results.BadRequest(new { Error = "Already connected or cannot connect." });
         }).WithTags("Application");
 
         app.MapPost("/api/app/disconnect", async (MainViewModel vm) => {
-            if (vm.IsConnected && vm.DisconnectCommand.CanExecute(null))
+            bool initiated = false;
+            await Application.Current.Dispatcher.InvokeAsync(() => {
+                if (vm.IsConnected && vm.DisconnectCommand.CanExecute(null))
+                {
+                    vm.DisconnectCommand.Execute(null);
+                    initiated = true;
+                }
+            });
+            if (initiated)
             {
-                vm.DisconnectCommand.Execute(null);
-                await Task.Delay(500);
+                for (int i = 0; i < 20 && vm.IsConnected; i++)
+                {
+                    await Task.Delay(100);
+                }
                 return Results.Ok(new { Success = !vm.IsConnected });
             }
             return Results.BadRequest(new { Error = "Already disconnected or cannot disconnect." });
         }).WithTags("Application");
 
         // --- Modbus Operations ---
-        app.MapGet("/api/modbus/registers/{address}", async (MainViewModel vm, [FromRoute] ushort address, [FromQuery] int length = 1) => {
-            vm.RegisterStart = address;
-            vm.RegisterCount = length;
-            if (vm.ReadRegistersCommand.CanExecute(null))
+        app.MapGet("/api/modbus/registers/{address}", async (MainViewModel vm, ModbusTcpService clientService, ModbusServerService serverService, [FromRoute] ushort address, [FromQuery] int length = 1) => {
+            if (!vm.IsConnected)
             {
-                 vm.ReadRegistersCommand.Execute(null);
-                 await Task.Delay(200);
-                 return Results.Ok(new { Address = address, Length = length, Data = vm.HoldingRegisters });
+                return Results.BadRequest(new { Error = "Not connected." });
             }
-            return Results.BadRequest(new { Error = "Cannot read registers." });
+            var service = vm.IsServerMode ? (IModbusService)serverService : (IModbusService)clientService;
+            try
+            {
+                var values = await service.ReadHoldingRegistersAsync(vm.EffectiveUnitId, address, length);
+                if (values != null)
+                {
+                    return Results.Ok(new { Address = address, Length = length, Data = values });
+                }
+                return Results.BadRequest(new { Error = "Failed to read registers from device." });
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Error = ex.Message });
+            }
         }).WithTags("Modbus");
 
-        app.MapGet("/api/modbus/coils/{address}", async (MainViewModel vm, [FromRoute] ushort address, [FromQuery] int length = 1) => {
-            vm.CoilStart = address;
-            vm.CoilCount = length;
-            if (vm.ReadCoilsCommand.CanExecute(null))
+        app.MapGet("/api/modbus/coils/{address}", async (MainViewModel vm, ModbusTcpService clientService, ModbusServerService serverService, [FromRoute] ushort address, [FromQuery] int length = 1) => {
+            if (!vm.IsConnected)
             {
-                 vm.ReadCoilsCommand.Execute(null);
-                 await Task.Delay(200);
-                 return Results.Ok(new { Address = address, Length = length, Data = vm.Coils });
+                return Results.BadRequest(new { Error = "Not connected." });
             }
-            return Results.BadRequest(new { Error = "Cannot read coils." });
+            var service = vm.IsServerMode ? (IModbusService)serverService : (IModbusService)clientService;
+            try
+            {
+                var values = await service.ReadCoilsAsync(vm.EffectiveUnitId, address, length);
+                if (values != null)
+                {
+                    return Results.Ok(new { Address = address, Length = length, Data = values });
+                }
+                return Results.BadRequest(new { Error = "Failed to read coils from device." });
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Error = ex.Message });
+            }
         }).WithTags("Modbus");
 
         // --- Custom Tags ---
@@ -163,16 +203,16 @@ public class ApiServerService : IApiServerService, IDisposable
             return Results.Ok(vm.CustomEntries);
         }).WithTags("CustomTags");
 
-        app.MapPost("/api/custom-tags", (MainViewModel vm, [FromBody] CustomEntry entry) => {
-            vm.CustomEntries.Add(entry);
+        app.MapPost("/api/custom-tags", async (MainViewModel vm, [FromBody] CustomEntry entry) => {
+            await Application.Current.Dispatcher.InvokeAsync(() => vm.CustomEntries.Add(entry));
             return Results.Ok(entry);
         }).WithTags("CustomTags");
 
-        app.MapDelete("/api/custom-tags/{address}", (MainViewModel vm, [FromRoute] int address) => {
+        app.MapDelete("/api/custom-tags/{address}", async (MainViewModel vm, [FromRoute] int address) => {
             var entry = vm.CustomEntries.FirstOrDefault(e => e.Address == address);
             if (entry != null)
             {
-                vm.CustomEntries.Remove(entry);
+                await Application.Current.Dispatcher.InvokeAsync(() => vm.CustomEntries.Remove(entry));
                 return Results.Ok();
             }
             return Results.NotFound();
@@ -183,21 +223,25 @@ public class ApiServerService : IApiServerService, IDisposable
             return Results.Ok(vm.CurrentConfig.SimulationSettings.VisualNodes);
         }).WithTags("Simulation");
 
-        app.MapPost("/api/simulation/nodes", (MainViewModel vm, [FromBody] VisualNode node) => {
-            var existing = vm.CurrentConfig.SimulationSettings.VisualNodes.FirstOrDefault(n => n.Id == node.Id);
-            if (existing != null)
-            {
-                vm.CurrentConfig.SimulationSettings.VisualNodes.Remove(existing);
-            }
-            vm.CurrentConfig.SimulationSettings.VisualNodes.Add(node);
+        app.MapPost("/api/simulation/nodes", async (MainViewModel vm, [FromBody] VisualNode node) => {
+            await Application.Current.Dispatcher.InvokeAsync(() => {
+                var existing = vm.CurrentConfig.SimulationSettings.VisualNodes.FirstOrDefault(n => n.Id == node.Id);
+                if (existing != null)
+                {
+                    vm.CurrentConfig.SimulationSettings.VisualNodes.Remove(existing);
+                }
+                vm.CurrentConfig.SimulationSettings.VisualNodes.Add(node);
+            });
             return Results.Ok(node);
         }).WithTags("Simulation");
 
-        app.MapDelete("/api/simulation/nodes/{id}", (MainViewModel vm, [FromRoute] string id) => {
+        app.MapDelete("/api/simulation/nodes/{id}", async (MainViewModel vm, [FromRoute] string id) => {
             var existing = vm.CurrentConfig.SimulationSettings.VisualNodes.FirstOrDefault(n => n.Id == id);
             if (existing != null)
             {
-                vm.CurrentConfig.SimulationSettings.VisualNodes.Remove(existing);
+                await Application.Current.Dispatcher.InvokeAsync(() => {
+                    vm.CurrentConfig.SimulationSettings.VisualNodes.Remove(existing);
+                });
                 return Results.Ok();
             }
             return Results.NotFound();
