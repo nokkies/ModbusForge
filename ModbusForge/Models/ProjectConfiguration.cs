@@ -53,6 +53,7 @@ namespace ModbusForge.Models
         public int WindowHeight { get; set; } = 800;
         public bool WindowMaximized { get; set; } = false;
         public string SelectedTab { get; set; } = "Connection";
+        public List<string> VisibleTabs { get; set; } = new();
     }
 
     /// <summary>

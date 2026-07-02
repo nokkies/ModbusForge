@@ -135,9 +135,23 @@
                 <MenuItem Header="_Script Editor..." Click="MenuItem_ScriptEditor_Click" InputGestureText="Ctrl+E" ToolTip="Open the script editor (Ctrl+E)"/>
             </MenuItem>
             <MenuItem Header="_View">
-                <MenuItem Header="_Simulation Palette" Click="MenuItem_ShowSimPalette_Click"/>
+                <MenuItem Header="Simulation _Palette" Click="MenuItem_ShowSimPalette_Click"/>
                 <MenuItem Header="Simulation _Controls" Click="MenuItem_ShowSimControls_Click"/>
                 <MenuItem Header="Simulation _Programs" Click="MenuItem_ShowSimPrograms_Click"/>
+                <Separator/>
+                <MenuItem Header="_Registers" IsCheckable="True" IsChecked="{Binding IsRegistersTabVisible}" ToolTip="Show/hide Registers tab"/>
+                <MenuItem Header="_Input Registers" IsCheckable="True" IsChecked="{Binding IsInputRegistersTabVisible}" ToolTip="Show/hide Input Registers tab"/>
+                <MenuItem Header="_Coils" IsCheckable="True" IsChecked="{Binding IsCoilsTabVisible}" ToolTip="Show/hide Coils tab"/>
+                <MenuItem Header="_Discrete Inputs" IsCheckable="True" IsChecked="{Binding IsDiscreteInputsTabVisible}" ToolTip="Show/hide Discrete Inputs tab"/>
+                <MenuItem Header="_Custom Watch" IsCheckable="True" IsChecked="{Binding IsCustomWatchTabVisible}" ToolTip="Show/hide Custom Watch tab"/>
+                <MenuItem Header="_Simulation" IsCheckable="True" IsChecked="{Binding IsSimulationTabVisible}" ToolTip="Show/hide Simulation tab"/>
+                <MenuItem Header="_Decode" IsCheckable="True" IsChecked="{Binding IsDecodeTabVisible}" ToolTip="Show/hide Decode tab"/>
+                <MenuItem Header="_Trend" IsCheckable="True" IsChecked="{Binding IsTrendTabVisible}" ToolTip="Show/hide Trend tab"/>
+                <MenuItem Header="_Console" IsCheckable="True" IsChecked="{Binding IsConsoleTabVisible}" ToolTip="Show/hide Console tab"/>
+                <MenuItem Header="_Debug" IsCheckable="True" IsChecked="{Binding IsDebugTabVisible}" ToolTip="Show/hide Debug tab"/>
+                <Separator/>
+                <MenuItem Header="_Show All" Click="WindowMenu_ShowAll_Click"/>
+                <MenuItem Header="_Reset to Default" Click="WindowMenu_Reset_Click"/>
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_Help..." Click="MenuItem_Help_Click" InputGestureText="F1" ToolTip="Open the help window (F1)"/>
@@ -171,6 +185,8 @@
                     <ui:NavigationViewItem Content="Trend" Icon="{ui:SymbolIcon Symbol=DataTrending24}" Tag="7" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
                     <ui:NavigationViewItem Content="Console" Icon="{ui:SymbolIcon Symbol=WindowConsole20}" Tag="8" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
                     <ui:NavigationViewItem Content="Debug" Icon="{ui:SymbolIcon Symbol=Bug24}" Tag="9" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
+                    <ui:NavigationViewItemSeparator/>
+                    <ui:NavigationViewItem Content="Script Editor" Icon="{ui:SymbolIcon Symbol=Edit24}" Tag="ScriptEditor" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
                 </ui:NavigationView.MenuItems>
             </ui:NavigationView>
 

@@ -60,6 +60,84 @@ namespace ModbusForge
                 MenuItem_ScriptEditor_Click(null!, null!);
                 _viewModel.RequestShowScriptEditor = false; // Reset
             }
+            else if (e.PropertyName == nameof(MainViewModel.IsRegistersTabVisible))
+            {
+                ToggleDocumentVisibility(DocRegisters, _viewModel.IsRegistersTabVisible);
+            }
+            else if (e.PropertyName == nameof(MainViewModel.IsInputRegistersTabVisible))
+            {
+                ToggleDocumentVisibility(DocInputRegisters, _viewModel.IsInputRegistersTabVisible);
+            }
+            else if (e.PropertyName == nameof(MainViewModel.IsCoilsTabVisible))
+            {
+                ToggleDocumentVisibility(DocCoils, _viewModel.IsCoilsTabVisible);
+            }
+            else if (e.PropertyName == nameof(MainViewModel.IsDiscreteInputsTabVisible))
+            {
+                ToggleDocumentVisibility(DocDiscreteInputs, _viewModel.IsDiscreteInputsTabVisible);
+            }
+            else if (e.PropertyName == nameof(MainViewModel.IsCustomWatchTabVisible))
+            {
+                ToggleDocumentVisibility(DocCustomWatch, _viewModel.IsCustomWatchTabVisible);
+            }
+            else if (e.PropertyName == nameof(MainViewModel.IsSimulationTabVisible))
+            {
+                ToggleDocumentVisibility(DocSimulation, _viewModel.IsSimulationTabVisible);
+            }
+            else if (e.PropertyName == nameof(MainViewModel.IsDecodeTabVisible))
+            {
+                ToggleDocumentVisibility(DocDecode, _viewModel.IsDecodeTabVisible);
+            }
+            else if (e.PropertyName == nameof(MainViewModel.IsTrendTabVisible))
+            {
+                ToggleDocumentVisibility(DocTrend, _viewModel.IsTrendTabVisible);
+            }
+            else if (e.PropertyName == nameof(MainViewModel.IsConsoleTabVisible))
+            {
+                ToggleDocumentVisibility(DocConsole, _viewModel.IsConsoleTabVisible);
+            }
+            else if (e.PropertyName == nameof(MainViewModel.IsDebugTabVisible))
+            {
+                ToggleDocumentVisibility(DocDebug, _viewModel.IsDebugTabVisible);
+            }
+        }
+
+        private void ToggleDocumentVisibility(AvalonDock.Layout.LayoutDocument document, bool isVisible)
+        {
+            if (isVisible)
+            {
+                if (document.Parent == null)
+                {
+                    // Add the document back to the main pane
+                    var index = GetDocumentIndex(document);
+                    MainDocumentPane.Children.Insert(Math.Min(index, MainDocumentPane.Children.Count), document);
+                }
+            }
+            else
+            {
+                if (document.Parent != null)
+                {
+                    MainDocumentPane.Children.Remove(document);
+                }
+            }
+        }
+
+        private int GetDocumentIndex(AvalonDock.Layout.LayoutDocument document)
+        {
+            return document.ContentId switch
+            {
+                "Registers" => 0,
+                "InputRegisters" => 1,
+                "Coils" => 2,
+                "DiscreteInputs" => 3,
+                "CustomWatch" => 4,
+                "Simulation" => 5,
+                "Decode" => 6,
+                "Trend" => 7,
+                "Console" => 8,
+                "Debug" => 9,
+                _ => MainDocumentPane.Children.Count
+            };
         }
 
         private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -147,6 +225,34 @@ namespace ModbusForge
                 };
                 preferencesWindow.ShowDialog();
             }
+        }
+
+        private void WindowMenu_ShowAll_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.IsRegistersTabVisible = true;
+            _viewModel.IsInputRegistersTabVisible = true;
+            _viewModel.IsCoilsTabVisible = true;
+            _viewModel.IsDiscreteInputsTabVisible = true;
+            _viewModel.IsCustomWatchTabVisible = true;
+            _viewModel.IsSimulationTabVisible = true;
+            _viewModel.IsDecodeTabVisible = true;
+            _viewModel.IsTrendTabVisible = true;
+            _viewModel.IsConsoleTabVisible = true;
+            _viewModel.IsDebugTabVisible = true;
+        }
+
+        private void WindowMenu_Reset_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.IsRegistersTabVisible = true;
+            _viewModel.IsInputRegistersTabVisible = true;
+            _viewModel.IsCoilsTabVisible = true;
+            _viewModel.IsDiscreteInputsTabVisible = true;
+            _viewModel.IsCustomWatchTabVisible = true;
+            _viewModel.IsSimulationTabVisible = true;
+            _viewModel.IsDecodeTabVisible = true;
+            _viewModel.IsTrendTabVisible = true;
+            _viewModel.IsConsoleTabVisible = true;
+            _viewModel.IsDebugTabVisible = true;
         }
 
         private void MenuItem_ConnectionManager_Click(object sender, RoutedEventArgs e)
@@ -313,7 +419,13 @@ namespace ModbusForge
         {
             if (sender is Wpf.Ui.Controls.NavigationViewItem item && item.Tag != null)
             {
-                if (int.TryParse(item.Tag.ToString(), out int index))
+                var tag = item.Tag.ToString();
+                if (tag == "ScriptEditor")
+                {
+                    MenuItem_ScriptEditor_Click(null!, null!);
+                    e.Handled = true;
+                }
+                else if (int.TryParse(tag, out int index))
                 {
                     NavigateToView(index, item);
                     e.Handled = true;

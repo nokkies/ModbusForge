@@ -513,6 +513,37 @@ namespace ModbusForge.ViewModels
         partial void OnCoilsSearchTextChanged(string value) => CoilsView.Refresh();
         partial void OnDiscreteSearchTextChanged(string value) => DiscreteInputsView.Refresh();
 
+        // Tab visibility settings
+        [ObservableProperty]
+        private bool _isRegistersTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isInputRegistersTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isCoilsTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isDiscreteInputsTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isCustomWatchTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isSimulationTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isDecodeTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isTrendTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isConsoleTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isDebugTabVisible = true;
+
         public IAsyncRelayCommand<DataGridCellEditEndingEventArgs> UpdateHoldingRegisterCommand { get; private set; } = null!;
         public IRelayCommand ConnectCommand { get; private set; } = null!;
 
@@ -541,6 +572,58 @@ namespace ModbusForge.ViewModels
 
         // Helper to get the correct Unit ID based on mode
         public byte EffectiveUnitId => IsServerMode ? SelectedUnitId : UnitId;
+
+        /// <summary>
+        /// Returns the list of visible tab content IDs for saving with the project.
+        /// </summary>
+        public List<string> GetVisibleTabs()
+        {
+            var visibleTabs = new List<string>();
+            if (IsRegistersTabVisible) visibleTabs.Add("Registers");
+            if (IsInputRegistersTabVisible) visibleTabs.Add("InputRegisters");
+            if (IsCoilsTabVisible) visibleTabs.Add("Coils");
+            if (IsDiscreteInputsTabVisible) visibleTabs.Add("DiscreteInputs");
+            if (IsCustomWatchTabVisible) visibleTabs.Add("CustomWatch");
+            if (IsSimulationTabVisible) visibleTabs.Add("Simulation");
+            if (IsDecodeTabVisible) visibleTabs.Add("Decode");
+            if (IsTrendTabVisible) visibleTabs.Add("Trend");
+            if (IsConsoleTabVisible) visibleTabs.Add("Console");
+            if (IsDebugTabVisible) visibleTabs.Add("Debug");
+            return visibleTabs;
+        }
+
+        /// <summary>
+        /// Sets tab visibility from a saved list of content IDs.
+        /// </summary>
+        public void SetVisibleTabs(List<string>? visibleTabs)
+        {
+            if (visibleTabs == null || visibleTabs.Count == 0)
+            {
+                // Default: all visible
+                IsRegistersTabVisible = true;
+                IsInputRegistersTabVisible = true;
+                IsCoilsTabVisible = true;
+                IsDiscreteInputsTabVisible = true;
+                IsCustomWatchTabVisible = true;
+                IsSimulationTabVisible = true;
+                IsDecodeTabVisible = true;
+                IsTrendTabVisible = true;
+                IsConsoleTabVisible = true;
+                IsDebugTabVisible = true;
+                return;
+            }
+
+            IsRegistersTabVisible = visibleTabs.Contains("Registers");
+            IsInputRegistersTabVisible = visibleTabs.Contains("InputRegisters");
+            IsCoilsTabVisible = visibleTabs.Contains("Coils");
+            IsDiscreteInputsTabVisible = visibleTabs.Contains("DiscreteInputs");
+            IsCustomWatchTabVisible = visibleTabs.Contains("CustomWatch");
+            IsSimulationTabVisible = visibleTabs.Contains("Simulation");
+            IsDecodeTabVisible = visibleTabs.Contains("Decode");
+            IsTrendTabVisible = visibleTabs.Contains("Trend");
+            IsConsoleTabVisible = visibleTabs.Contains("Console");
+            IsDebugTabVisible = visibleTabs.Contains("Debug");
+        }
 
         // Properties that now delegate to current configuration
         public ObservableCollection<CustomEntry> CustomEntries => CurrentConfig.CustomEntries;
@@ -1597,7 +1680,8 @@ namespace ModbusForge.ViewModels
                                 ServerAddress = ServerAddress,
                                 Port = Port,
                                 ServerUnitId = ServerUnitId,
-                                ClientUnitId = UnitId
+                                ClientUnitId = UnitId,
+                                VisibleTabs = GetVisibleTabs()
                             },
                             UnitConfigurations = new Dictionary<byte, UnitIdConfiguration>(UnitConfigurations),
                             // Save visual simulation data
@@ -1621,7 +1705,8 @@ namespace ModbusForge.ViewModels
                                 ServerAddress = ServerAddress,
                                 Port = Port,
                                 ServerUnitId = ServerUnitId,
-                                ClientUnitId = UnitId
+                                ClientUnitId = UnitId,
+                                VisibleTabs = GetVisibleTabs()
                             },
                             UnitConfigurations = new Dictionary<byte, UnitIdConfiguration>
                             {
@@ -1686,6 +1771,9 @@ namespace ModbusForge.ViewModels
                         {
                             UnitConfigurations[kvp.Key] = kvp.Value.Clone();
                         }
+
+                        // Restore tab visibility
+                        SetVisibleTabs(projectConfig.GlobalSettings?.VisibleTabs);
 
                         // Restore visual simulation data
                         _visualNodeEditorViewModel.Nodes.Clear();

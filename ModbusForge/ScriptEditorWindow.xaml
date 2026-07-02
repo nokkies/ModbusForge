@@ -6,6 +6,8 @@
         Title="Script Editor" 
         Height="720" 
         Width="1000"
+        MinWidth="900"
+        MinHeight="500"
         WindowStartupLocation="CenterOwner"
         Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png"
         ResizeMode="CanResize"
@@ -98,13 +100,14 @@
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="110"/>
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0" 
                             BorderBrush="{StaticResource FluentBorder}" 
                             BorderThickness="1" 
-                            CornerRadius="4">
+                            CornerRadius="4"
+                            MinWidth="300">
                         <DataGrid x:Name="CommandsGrid"
                                   ItemsSource="{Binding Script.Commands}"
                                   SelectedItem="{Binding SelectedCommand}"
