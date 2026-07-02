@@ -707,7 +707,7 @@ If you continue to experience issues:
 1. Check the diagnostic information (Help → Diagnostics)
 2. Export diagnostic logs and share them
 3. Visit https://github.com/nokkies/ModbusForge/issues
-4. Contact support at skordonkels@gmail.com
+4. Contact support at reinach@softwareForge.cc
 
 ## Diagnostic Information
 

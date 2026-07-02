@@ -7,10 +7,11 @@
         mc:Ignorable="d"
         Title="About ModbusForge" 
         Width="500" 
-        Height="520"
+        Height="560"
+        MinHeight="400"
         WindowStartupLocation="CenterOwner"
         Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png"
-        ResizeMode="NoResize">
+        ResizeMode="CanResize">
     
     <Window.Resources>
         <ResourceDictionary>
@@ -46,73 +47,88 @@
             </Border>
 
             <!-- Content -->
-            <Border Grid.Row="1" Background="White" Padding="32,24">
-                <StackPanel>
-                    <TextBlock Text="A professional Modbus TCP client/server application built with .NET 8.0 and WPF." 
-                               TextAlignment="Center"
-                               TextWrapping="Wrap"
-                               Foreground="{StaticResource FluentText}"
-                               Margin="0,0,0,24"
-                               FontSize="14"/>
+            <Border Grid.Row="1" Background="White" Padding="0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="32,24">
+                        <TextBlock Text="A professional Modbus TCP client/server application built with .NET 8.0 and WPF." 
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   Foreground="{StaticResource FluentText}"
+                                   Margin="0,0,0,24"
+                                   FontSize="14"/>
 
-                    <Border Background="{StaticResource FluentSurface}" 
-                            Padding="16" 
-                            CornerRadius="8"
-                            Margin="0,0,0,24">
-                        <StackPanel>
-                            <TextBlock Text="Created by" 
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource FluentText}"
+                        <Border Background="{StaticResource FluentSurface}" 
+                                Padding="16" 
+                                CornerRadius="8"
+                                Margin="0,0,0,24">
+                            <StackPanel>
+                                <TextBlock Text="Created by" 
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource FluentText}"
+                                           Margin="0,0,0,4"/>
+                                <TextBlock Text="Reinach van Nieuwenhuizen" 
+                                           Foreground="{StaticResource FluentTextSecondary}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="Connect &amp; Support" 
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource FluentText}"
+                                   Margin="0,0,0,12"/>
+
+                        <StackPanel Margin="0,0,0,8">
+                            <TextBlock Text="🔗 LinkedIn" 
+                                       Foreground="{StaticResource FluentTextSecondary}"
                                        Margin="0,0,0,4"/>
-                            <TextBlock Text="Reinach van Nieuwenhuizen" 
-                                       Foreground="{StaticResource FluentTextSecondary}"/>
+                            <TextBlock>
+                                <Hyperlink NavigateUri="https://www.linkedin.com/in/nokkies/" 
+                                           RequestNavigate="Hyperlink_RequestNavigate"
+                                           Foreground="{StaticResource FluentPrimary}">
+                                    linkedin.com/in/nokkies/
+                                </Hyperlink>
+                            </TextBlock>
                         </StackPanel>
-                    </Border>
 
-                    <TextBlock Text="Connect &amp; Support" 
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource FluentText}"
-                               Margin="0,0,0,12"/>
+                        <StackPanel Margin="0,0,0,8">
+                            <TextBlock Text="💻 GitHub" 
+                                       Foreground="{StaticResource FluentTextSecondary}"
+                                       Margin="0,0,0,4"/>
+                            <TextBlock>
+                                <Hyperlink NavigateUri="https://github.com/nokkies/ModbusForge" 
+                                           RequestNavigate="Hyperlink_RequestNavigate"
+                                           Foreground="{StaticResource FluentPrimary}">
+                                    github.com/nokkies/ModbusForge
+                                </Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
 
-                    <StackPanel Margin="0,0,0,8">
-                        <TextBlock Text="🔗 LinkedIn" 
-                                   Foreground="{StaticResource FluentTextSecondary}"
-                                   Margin="0,0,0,4"/>
-                        <TextBlock>
-                            <Hyperlink NavigateUri="https://www.linkedin.com/in/nokkies/" 
-                                       RequestNavigate="Hyperlink_RequestNavigate"
-                                       Foreground="{StaticResource FluentPrimary}">
-                                linkedin.com/in/nokkies/
-                            </Hyperlink>
-                        </TextBlock>
+                        <StackPanel Margin="0,0,0,8">
+                            <TextBlock Text="📧 Email" 
+                                       Foreground="{StaticResource FluentTextSecondary}"
+                                       Margin="0,0,0,4"/>
+                            <TextBlock>
+                                <Hyperlink NavigateUri="mailto:reinach@softwareForge.cc" 
+                                           RequestNavigate="Hyperlink_RequestNavigate"
+                                           Foreground="{StaticResource FluentPrimary}">
+                                    reinach@softwareForge.cc
+                                </Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+
+                        <StackPanel Margin="0,0,0,8">
+                            <TextBlock Text="☕ Support Development" 
+                                       Foreground="{StaticResource FluentTextSecondary}"
+                                       Margin="0,0,0,4"/>
+                            <TextBlock>
+                                <Hyperlink NavigateUri="https://www.paypal.com/donate/?hosted_button_id=ELTVNJEYLZE3W" 
+                                           RequestNavigate="Hyperlink_RequestNavigate"
+                                           Foreground="{StaticResource FluentPrimary}">
+                                    Donate via ECI Tech PayPal
+                                </Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
                     </StackPanel>
-
-                    <StackPanel Margin="0,0,0,8">
-                        <TextBlock Text="💻 GitHub" 
-                                   Foreground="{StaticResource FluentTextSecondary}"
-                                   Margin="0,0,0,4"/>
-                        <TextBlock>
-                            <Hyperlink NavigateUri="https://github.com/nokkies/ModbusForge" 
-                                       RequestNavigate="Hyperlink_RequestNavigate"
-                                       Foreground="{StaticResource FluentPrimary}">
-                                github.com/nokkies/ModbusForge
-                            </Hyperlink>
-                        </TextBlock>
-                    </StackPanel>
-
-                    <StackPanel Margin="0,0,0,8">
-                        <TextBlock Text="📧 Email" 
-                                   Foreground="{StaticResource FluentTextSecondary}"
-                                   Margin="0,0,0,4"/>
-                        <TextBlock>
-                            <Hyperlink NavigateUri="mailto:skordonkels@gmail.com" 
-                                       RequestNavigate="Hyperlink_RequestNavigate"
-                                       Foreground="{StaticResource FluentPrimary}">
-                                skordonkels@gmail.com
-                            </Hyperlink>
-                        </TextBlock>
-                    </StackPanel>
-                </StackPanel>
+                </ScrollViewer>
             </Border>
 
             <!-- Footer -->

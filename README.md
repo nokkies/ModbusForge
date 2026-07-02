@@ -380,7 +380,7 @@ Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$ve
 ## Support
 
 - **GitHub Issues**: [https://github.com/nokkies/ModbusForge/issues](https://github.com/nokkies/ModbusForge/issues)
-- **Email**: [skordonkels@gmail.com](mailto:skordonkels@gmail.com)
+- **Email**: [reinach@softwareForge.cc](mailto:reinach@softwareForge.cc)
 - **Documentation**: See the `docs/` folder and in-app Help (F1)
 
 ---

@@ -167,7 +167,7 @@
                                     Visit <Hyperlink NavigateUri="https://github.com/nokkies/ModbusForge/issues" RequestNavigate="Hyperlink_RequestNavigate">GitHub Issues</Hyperlink> to report bugs or request features.
                                 </TextBlock>
                                 <TextBlock TextWrapping="Wrap" Margin="0,4">
-                                    Contact: <Hyperlink NavigateUri="mailto:skordonkels@gmail.com" RequestNavigate="Hyperlink_RequestNavigate">skordonkels@gmail.com</Hyperlink>
+                                    Contact: <Hyperlink NavigateUri="mailto:reinach@softwareForge.cc" RequestNavigate="Hyperlink_RequestNavigate">reinach@softwareForge.cc</Hyperlink>
                                 </TextBlock>
                             </StackPanel>
                         </Border>
