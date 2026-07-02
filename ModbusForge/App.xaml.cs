@@ -154,6 +154,7 @@ namespace ModbusForge
             services.AddSingleton<IConfigurationValidator, ConfigurationValidator>();
             services.AddSingleton<IErrorHandlingService, ErrorHandlingService>();
             services.AddSingleton<ICircuitBreakerService, CircuitBreakerService>();
+            services.AddSingleton<IHelpContentService, HelpContentService>();
             
             // Register Coordinators
             services.AddSingleton<ConnectionCoordinator>(provider => new ConnectionCoordinator(
@@ -182,6 +183,7 @@ namespace ModbusForge
             services.AddTransient<TrendViewModel>();
             services.AddTransient<DecodeViewModel>();
             services.AddTransient<ScriptEditorViewModel>();
+            services.AddTransient<HelpViewModel>();
         }
 
 

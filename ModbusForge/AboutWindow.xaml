@@ -3,48 +3,131 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
-        Title="About ModbusForge" SizeToContent="WidthAndHeight" WindowStartupLocation="CenterOwner"
-        Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png">
-    <Border Padding="16" Background="White">
-        <StackPanel>
-            <Image Source="Resources/ModbusForgeLOGO.png" Height="80" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-            <TextBlock Text="ModbusForge" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
-            <TextBlock x:Name="VersionText" FontSize="12" Foreground="Gray" HorizontalAlignment="Center" Margin="0,2,0,8"/>
-            <TextBlock Text="A WPF Modbus client/server tool." Margin="0,6,0,12" HorizontalAlignment="Center"/>
+        Title="About ModbusForge" 
+        Width="500" 
+        Height="520"
+        WindowStartupLocation="CenterOwner"
+        Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png"
+        ResizeMode="NoResize">
+    
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/FluentTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
 
-            <TextBlock TextWrapping="Wrap">
-                Created by <Run Text="Reinach van Nieuwenhuizen"/>. Visit:
-            </TextBlock>
+    <Border Background="{StaticResource FluentBackground}" Padding="0">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                <TextBlock Text="LinkedIn: "/>
-                <TextBlock>
-                    <Hyperlink NavigateUri="https://www.linkedin.com/in/nokkies/" RequestNavigate="Hyperlink_RequestNavigate">
-                        https://www.linkedin.com/in/nokkies/
-                    </Hyperlink>
-                </TextBlock>
-            </StackPanel>
+            <!-- Header -->
+            <Border Background="{StaticResource FluentPrimary}" Padding="24,20">
+                <StackPanel HorizontalAlignment="Center">
+                    <Image Source="Resources/ModbusForgeLOGO.png" Height="64" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                    <TextBlock Text="ModbusForge" 
+                               FontSize="24" 
+                               FontWeight="SemiBold" 
+                               Foreground="White"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="VersionText" 
+                               FontSize="14" 
+                               Foreground="#E0E0E0" 
+                               HorizontalAlignment="Center" 
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
 
-            <StackPanel Orientation="Horizontal" Margin="0,2,0,12">
-                <TextBlock Text="GitHub: "/>
-                <TextBlock>
-                    <Hyperlink NavigateUri="https://github.com/nokkies/ModbusForge" RequestNavigate="Hyperlink_RequestNavigate">
-                        https://github.com/nokkies/ModbusForge
-                    </Hyperlink>
-                </TextBlock>
-            </StackPanel>
+            <!-- Content -->
+            <Border Grid.Row="1" Background="White" Padding="32,24">
+                <StackPanel>
+                    <TextBlock Text="A professional Modbus TCP client/server application built with .NET 8.0 and WPF." 
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource FluentText}"
+                               Margin="0,0,0,24"
+                               FontSize="14"/>
 
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                <TextBlock Text="Email: "/>
-                <TextBlock>
-                    <Hyperlink NavigateUri="mailto:skordonkels@gmail.com" RequestNavigate="Hyperlink_RequestNavigate">
-                        skordonkels@gmail.com
-                    </Hyperlink>
-                </TextBlock>
-            </StackPanel>
+                    <Border Background="{StaticResource FluentSurface}" 
+                            Padding="16" 
+                            CornerRadius="8"
+                            Margin="0,0,0,24">
+                        <StackPanel>
+                            <TextBlock Text="Created by" 
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource FluentText}"
+                                       Margin="0,0,0,4"/>
+                            <TextBlock Text="Reinach van Nieuwenhuizen" 
+                                       Foreground="{StaticResource FluentTextSecondary}"/>
+                        </StackPanel>
+                    </Border>
 
-            <Button Content="Close" Width="80" HorizontalAlignment="Right" IsDefault="True" Click="Close_Click"/>
-        </StackPanel>
+                    <TextBlock Text="Connect &amp; Support" 
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource FluentText}"
+                               Margin="0,0,0,12"/>
+
+                    <StackPanel Margin="0,0,0,8">
+                        <TextBlock Text="🔗 LinkedIn" 
+                                   Foreground="{StaticResource FluentTextSecondary}"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock>
+                            <Hyperlink NavigateUri="https://www.linkedin.com/in/nokkies/" 
+                                       RequestNavigate="Hyperlink_RequestNavigate"
+                                       Foreground="{StaticResource FluentPrimary}">
+                                linkedin.com/in/nokkies/
+                            </Hyperlink>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <StackPanel Margin="0,0,0,8">
+                        <TextBlock Text="💻 GitHub" 
+                                   Foreground="{StaticResource FluentTextSecondary}"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock>
+                            <Hyperlink NavigateUri="https://github.com/nokkies/ModbusForge" 
+                                       RequestNavigate="Hyperlink_RequestNavigate"
+                                       Foreground="{StaticResource FluentPrimary}">
+                                github.com/nokkies/ModbusForge
+                            </Hyperlink>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <StackPanel Margin="0,0,0,8">
+                        <TextBlock Text="📧 Email" 
+                                   Foreground="{StaticResource FluentTextSecondary}"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock>
+                            <Hyperlink NavigateUri="mailto:skordonkels@gmail.com" 
+                                       RequestNavigate="Hyperlink_RequestNavigate"
+                                       Foreground="{StaticResource FluentPrimary}">
+                                skordonkels@gmail.com
+                            </Hyperlink>
+                        </TextBlock>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Footer -->
+            <Border Grid.Row="2" 
+                    Background="{StaticResource FluentSurface}" 
+                    BorderBrush="{StaticResource FluentBorder}" 
+                    BorderThickness="0,1,0,0"
+                    Padding="24,16">
+                <Button Content="Close" 
+                        Width="100" 
+                        HorizontalAlignment="Right"
+                        Style="{StaticResource FluentPrimaryButton}"
+                        IsDefault="True" 
+                        Click="Close_Click"/>
+            </Border>
+        </Grid>
     </Border>
 </Window>

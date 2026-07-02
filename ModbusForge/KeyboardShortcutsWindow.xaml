@@ -3,98 +3,209 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
-        Title="Keyboard Shortcuts" Width="560" Height="500"
+        Title="Keyboard Shortcuts" 
+        Width="650" 
+        Height="580"
         WindowStartupLocation="CenterOwner"
-        Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png">
-    <Border Padding="16" Background="White">
-        <DockPanel>
-            <Button DockPanel.Dock="Bottom" Content="Close" Width="80"
-                    HorizontalAlignment="Right" Margin="0,12,0,0"
-                    IsDefault="True" IsCancel="True" Click="Close_Click"/>
+        Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png"
+        ResizeMode="NoResize">
+    
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/FluentTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
 
-            <TextBlock DockPanel.Dock="Top" Text="Keyboard Shortcuts"
-                       FontSize="20" FontWeight="Bold" Margin="0,0,0,12"/>
+    <Border Background="{StaticResource FluentBackground}" Padding="0">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel>
-                    <TextBlock Text="Visual Node Editor (Simulation tab)"
-                               FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                    <Grid Margin="8,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="180"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl + Z" FontFamily="Consolas" Margin="0,2"/>
-                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Undo last editor action (add / delete / move / connect / parameter edit). Stack capped at 100." TextWrapping="Wrap" Margin="0,2"/>
-
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl + Y" FontFamily="Consolas" Margin="0,2"/>
-                        <TextBlock Grid.Row="1" Grid.Column="1" Text="Redo the most recent undo." TextWrapping="Wrap" Margin="0,2"/>
-
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl + Shift + Z" FontFamily="Consolas" Margin="0,2"/>
-                        <TextBlock Grid.Row="2" Grid.Column="1" Text="Redo (alternate)." TextWrapping="Wrap" Margin="0,2"/>
-
-                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Delete" FontFamily="Consolas" Margin="0,2"/>
-                        <TextBlock Grid.Row="3" Grid.Column="1" Text="Delete the most recently added node." TextWrapping="Wrap" Margin="0,2"/>
-
-                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Esc" FontFamily="Consolas" Margin="0,2"/>
-                        <TextBlock Grid.Row="4" Grid.Column="1" Text="Cancel an in-progress connection drag. Inside the palette search box, clears the search." TextWrapping="Wrap" Margin="0,2"/>
-
-                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Right-click wire" FontFamily="Consolas" Margin="0,2"/>
-                        <TextBlock Grid.Row="5" Grid.Column="1" Text="Delete a connection." TextWrapping="Wrap" Margin="0,2"/>
-
-                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Scroll Wheel" FontFamily="Consolas" Margin="0,2"/>
-                        <TextBlock Grid.Row="6" Grid.Column="1" Text="Scroll canvas vertically." TextWrapping="Wrap" Margin="0,2"/>
-
-                        <TextBlock Grid.Row="7" Grid.Column="0" Text="Shift + Scroll" FontFamily="Consolas" Margin="0,2"/>
-                        <TextBlock Grid.Row="7" Grid.Column="1" Text="Scroll canvas horizontally." TextWrapping="Wrap" Margin="0,2"/>
-
-                        <TextBlock Grid.Row="8" Grid.Column="0" Text="Ctrl + Scroll" FontFamily="Consolas" Margin="0,2"/>
-                        <TextBlock Grid.Row="8" Grid.Column="1" Text="Zoom in / out of canvas." TextWrapping="Wrap" Margin="0,2"/>
-
-                        <TextBlock Grid.Row="9" Grid.Column="0" Text="Middle Drag / Left Hold" FontFamily="Consolas" Margin="0,2"/>
-                        <TextBlock Grid.Row="9" Grid.Column="1" Text="Pan canvas in any direction (Left hold on empty background)." TextWrapping="Wrap" Margin="0,2"/>
-                    </Grid>
-
-                    <TextBlock Text="Visual Affordances"
-                               FontSize="14" FontWeight="SemiBold" Margin="0,8,0,8"/>
-                    <StackPanel Margin="8,0,0,16">
-                        <TextBlock TextWrapping="Wrap" Margin="0,2">
-                            <Run Text="Hover a node:"/> the border lightens and the drop shadow fades.
-                        </TextBlock>
-                        <TextBlock TextWrapping="Wrap" Margin="0,2">
-                            <Run Text="Click a node:"/> the selected node gets a thick blue border (#3B82F6).
-                        </TextBlock>
-                        <TextBlock TextWrapping="Wrap" Margin="0,2">
-                            <Run Text="Hover a connector dot:"/> the dot stroke thickens and fills with a lighter color.
-                        </TextBlock>
-                        <TextBlock TextWrapping="Wrap" Margin="0,2">
-                            <Run Text="Drag a wire from an output:"/> while dragging, the target input dot turns green if the connection would be valid, red if not.
-                        </TextBlock>
-                    </StackPanel>
-
-                    <TextBlock Text="Palette"
-                               FontSize="14" FontWeight="SemiBold" Margin="0,8,0,8"/>
-                    <StackPanel Margin="8,0,0,16">
-                        <TextBlock TextWrapping="Wrap" Margin="0,2">
-                            Type in the <Run FontStyle="Italic">Search nodes...</Run> box at the top of the palette to filter visible nodes by name, tag, or category.
-                        </TextBlock>
-                    </StackPanel>
+            <!-- Header -->
+            <Border Background="{StaticResource FluentPrimary}" Padding="24,20">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="⌨️" FontSize="28" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="Keyboard Shortcuts" 
+                               FontSize="24" 
+                               FontWeight="SemiBold" 
+                               Foreground="White"
+                               VerticalAlignment="Center"/>
                 </StackPanel>
-            </ScrollViewer>
-        </DockPanel>
+            </Border>
+
+            <!-- Content -->
+            <Border Grid.Row="1" Background="White" Padding="24,20">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <!-- Global Shortcuts -->
+                        <TextBlock Text="🌐 Global Shortcuts"
+                                   FontSize="16" 
+                                   FontWeight="SemiBold" 
+                                   Foreground="{StaticResource FluentText}"
+                                   Margin="0,0,0,12"/>
+                        
+                        <Border Background="{StaticResource FluentSurface}" 
+                                Padding="16" 
+                                CornerRadius="8"
+                                Margin="0,0,0,20">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl + R" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="Read registers" TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl + T" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="Open trends" TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl + S" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="Save project" TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="F5" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="Refresh data" TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="F1" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="Open help" TextWrapping="Wrap" Margin="0,4"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Visual Node Editor -->
+                        <TextBlock Text="🎨 Visual Node Editor (Simulation tab)"
+                                   FontSize="16" 
+                                   FontWeight="SemiBold" 
+                                   Foreground="{StaticResource FluentText}"
+                                   Margin="0,0,0,12"/>
+                        
+                        <Border Background="{StaticResource FluentSurface}" 
+                                Padding="16" 
+                                CornerRadius="8"
+                                Margin="0,0,0,20">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl + Z" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="Undo last editor action (add / delete / move / connect / parameter edit). Stack capped at 100." TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl + Y" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="Redo the most recent undo." TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl + Shift + Z" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="Redo (alternate)." TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Delete" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="Delete the most recently added node." TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Esc" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="Cancel an in-progress connection drag. Inside the palette search box, clears the search." TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Right-click wire" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="5" Grid.Column="1" Text="Delete a connection." TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="6" Grid.Column="0" Text="Scroll Wheel" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="6" Grid.Column="1" Text="Scroll canvas vertically." TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="7" Grid.Column="0" Text="Shift + Scroll" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="7" Grid.Column="1" Text="Scroll canvas horizontally." TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="8" Grid.Column="0" Text="Ctrl + Scroll" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="8" Grid.Column="1" Text="Zoom in / out of canvas." TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="9" Grid.Column="0" Text="Middle Drag / Left Hold" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="9" Grid.Column="1" Text="Pan canvas in any direction (Left hold on empty background)." TextWrapping="Wrap" Margin="0,4"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Visual Affordances -->
+                        <TextBlock Text="👁️ Visual Affordances"
+                                   FontSize="16" 
+                                   FontWeight="SemiBold" 
+                                   Foreground="{StaticResource FluentText}"
+                                   Margin="0,0,0,12"/>
+                        
+                        <Border Background="{StaticResource FluentSurface}" 
+                                Padding="16" 
+                                CornerRadius="8"
+                                Margin="0,0,0,20">
+                            <StackPanel>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4">
+                                    <Run FontWeight="SemiBold">Hover a node:</Run> the border lightens and the drop shadow fades.
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4">
+                                    <Run FontWeight="SemiBold">Click a node:</Run> the selected node gets a thick blue border (#3B82F6).
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4">
+                                    <Run FontWeight="SemiBold">Hover a connector dot:</Run> the dot stroke thickens and fills with a lighter color.
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4">
+                                    <Run FontWeight="SemiBold">Drag a wire from an output:</Run> while dragging, the target input dot turns green if the connection would be valid, red if not.
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Palette -->
+                        <TextBlock Text="📋 Palette"
+                                   FontSize="16" 
+                                   FontWeight="SemiBold" 
+                                   Foreground="{StaticResource FluentText}"
+                                   Margin="0,0,0,12"/>
+                        
+                        <Border Background="{StaticResource FluentSurface}" 
+                                Padding="16" 
+                                CornerRadius="8"
+                                Margin="0,0,0,20">
+                            <TextBlock TextWrapping="Wrap">
+                                Type in the <Run FontStyle="Italic" FontWeight="SemiBold">Search nodes...</Run> box at the top of the palette to filter visible nodes by name, tag, or category.
+                            </TextBlock>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Footer -->
+            <Border Grid.Row="2" 
+                    Background="{StaticResource FluentSurface}" 
+                    BorderBrush="{StaticResource FluentBorder}" 
+                    BorderThickness="0,1,0,0"
+                    Padding="24,16">
+                <Button Content="Close" 
+                        Width="100" 
+                        HorizontalAlignment="Right"
+                        Style="{StaticResource FluentPrimaryButton}"
+                        IsDefault="True" 
+                        IsCancel="True"
+                        Click="Close_Click"/>
+            </Border>
+        </Grid>
     </Border>
 </Window>

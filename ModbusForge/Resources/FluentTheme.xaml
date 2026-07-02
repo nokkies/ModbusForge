@@ -132,7 +132,7 @@
 
     <!-- Modern TextBox Style -->
     <Style x:Key="FluentTextBox" TargetType="TextBox">
-        <Setter Property="Background" Value="{StaticResource FluentCard}"/>
+        <Setter Property="Background" Value="{StaticResource FluentCardBackground}"/>
         <Setter Property="BorderBrush" Value="{StaticResource FluentBorder}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Padding" Value="12,8"/>
@@ -273,12 +273,12 @@
 
     <!-- Modern DataGrid Style -->
     <Style x:Key="FluentDataGrid" TargetType="DataGrid">
-        <Setter Property="Background" Value="{StaticResource FluentCard}"/>
+        <Setter Property="Background" Value="{StaticResource FluentCardBackground}"/>
         <Setter Property="BorderBrush" Value="{StaticResource FluentBorder}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="GridLinesVisibility" Value="Horizontal"/>
         <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource FluentDivider}"/>
-        <Setter Property="RowBackground" Value="{StaticResource FluentCard}"/>
+        <Setter Property="RowBackground" Value="{StaticResource FluentCardBackground}"/>
         <Setter Property="AlternatingRowBackground" Value="#FAFAFA"/>
         <Setter Property="HeadersVisibility" Value="Column"/>
         <Setter Property="AutoGenerateColumns" Value="False"/>

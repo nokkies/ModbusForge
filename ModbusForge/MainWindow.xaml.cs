@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using System.Windows.Navigation;
 using ModbusForge.ViewModels;
+using ModbusForge.Views;
 using Microsoft.Win32;
 using System.IO;
 using System.Diagnostics;
@@ -30,26 +31,45 @@ namespace ModbusForge
             InitializeComponent();
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
             DataContext = _viewModel;
-            
+
             // Handle window closing to properly dispose resources
             this.Closing += MainWindow_Closing;
-            
+
             // Handle keyboard shortcut navigation requests
             _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+
+            // Handle F1 for context-sensitive help
+            this.PreviewKeyDown += MainWindow_PreviewKeyDown;
+            this.CommandBindings.Add(new CommandBinding(ApplicationCommands.Help, (s, e) => MenuItem_Help_Click(null!, null!)));
         }
 
         private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(MainViewModel.RequestedViewIndex) && _viewModel.RequestedViewIndex >= 0)
             {
-                NavigateToView(_viewModel.RequestedViewIndex, null);
+                NavigateToView(_viewModel.RequestedViewIndex, null!);
                 _viewModel.RequestedViewIndex = -1; // Reset
+            }
+            else if (e.PropertyName == nameof(MainViewModel.RequestShowHelp) && _viewModel.RequestShowHelp)
+            {
+                MenuItem_Help_Click(null!, null!);
+                _viewModel.RequestShowHelp = false; // Reset
             }
         }
 
         private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
             _viewModel?.Dispose();
+        }
+
+        private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            // F1 for context-sensitive help
+            if (e.Key == Key.F1)
+            {
+                e.Handled = true;
+                MenuItem_Help_Click(null!, null!);
+            }
         }
 
         private void MenuItem_Exit_Click(object sender, RoutedEventArgs e)
@@ -73,6 +93,19 @@ namespace ModbusForge
                 Owner = this
             };
             shortcuts.ShowDialog();
+        }
+
+        private void MenuItem_Help_Click(object sender, RoutedEventArgs e)
+        {
+            var helpViewModel = App.ServiceProvider.GetService(typeof(ViewModels.HelpViewModel)) as ViewModels.HelpViewModel;
+            if (helpViewModel != null)
+            {
+                var helpWindow = new Views.HelpWindow(helpViewModel)
+                {
+                    Owner = this
+                };
+                helpWindow.ShowDialog();
+            }
         }
 
         private void MenuItem_Donate_Click(object sender, RoutedEventArgs e)
@@ -275,7 +308,7 @@ namespace ModbusForge
 
         private void NavigateToView(int index, Wpf.Ui.Controls.NavigationViewItem? item = null)
         {
-            LayoutDocument targetDoc = null;
+            LayoutDocument? targetDoc = null;
             switch (index)
             {
                 case 0: targetDoc = DocRegisters; break;
@@ -299,7 +332,7 @@ namespace ModbusForge
                 targetDoc.IsActive = true;
                 targetDoc.IsSelected = true;
             }
-            
+
             // Update navigation item selection
             if (item != null)
             {
@@ -464,7 +497,7 @@ namespace ModbusForge
             }
 
             _viewModel.GlobalMonitorEnabled = true;
-            
+
             // Automatically enable the specific continuous read for the area
             if (area == "HoldingRegister")
             {
@@ -474,7 +507,7 @@ namespace ModbusForge
             {
                 _viewModel.InputRegistersMonitorEnabled = true;
             }
-            
+
             _viewModel.StatusMessage = $"Added {area} {entry.Address} to trend logger.";
         }
 

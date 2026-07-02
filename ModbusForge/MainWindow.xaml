@@ -138,6 +138,7 @@
                 <MenuItem Header="Simulation _Programs" Click="MenuItem_ShowSimPrograms_Click"/>
             </MenuItem>
             <MenuItem Header="_Help">
+                <MenuItem Header="_Help..." Click="MenuItem_Help_Click" InputGestureText="F1"/>
                 <MenuItem Header="_Keyboard Shortcuts..." Click="MenuItem_KeyboardShortcuts_Click"/>
                 <Separator/>
                 <MenuItem Header="_Donate..." Click="MenuItem_Donate_Click"/>
@@ -286,7 +287,8 @@
                         <ui:TextBox Width="150" Text="{Binding HoldingSearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Address, value, type..."/>
                     </StackPanel>
 
-                    <DataGrid x:Name="HoldingRegistersGrid" Grid.Row="1" ItemsSource="{Binding HoldingRegistersView}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="HoldingRegistersGrid_CellEditEnding" MouseDoubleClick="HoldingRegistersGrid_MouseDoubleClick">
+                    <DataGrid x:Name="HoldingRegistersGrid" Grid.Row="1" ItemsSource="{Binding HoldingRegistersView}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="HoldingRegistersGrid_CellEditEnding" MouseDoubleClick="HoldingRegistersGrid_MouseDoubleClick"
+                              VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
                         <DataGrid.ContextMenu>
                             <ContextMenu>
                                 <MenuItem Header="Quick Write..." Click="HoldingRegisters_Write_Click"/>
@@ -329,7 +331,8 @@
                         <ui:TextBox Width="150" Text="{Binding InputSearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Address, value, type..."/>
                     </StackPanel>
 
-                    <DataGrid Grid.Row="1" ItemsSource="{Binding InputRegistersView}" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="InputRegistersGrid_MouseDoubleClick">
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding InputRegistersView}" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="InputRegistersGrid_MouseDoubleClick"
+                              VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
                         <DataGrid.ContextMenu>
                             <ContextMenu>
                                 <MenuItem Header="Add to Custom Watch" Click="InputRegisters_AddToCustom_Click"/>
@@ -369,7 +372,8 @@
                         <ui:TextBox Width="150" Text="{Binding CoilsSearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Address, state..."/>
                     </StackPanel>
 
-                    <DataGrid x:Name="CoilsGrid" Grid.Row="1" ItemsSource="{Binding CoilsView}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="CoilsGrid_CellEditEnding" CurrentCellChanged="CoilsGrid_CurrentCellChanged" MouseDoubleClick="CoilsGrid_MouseDoubleClick">
+                    <DataGrid x:Name="CoilsGrid" Grid.Row="1" ItemsSource="{Binding CoilsView}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="CoilsGrid_CellEditEnding" CurrentCellChanged="CoilsGrid_CurrentCellChanged" MouseDoubleClick="CoilsGrid_MouseDoubleClick"
+                              VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
                         <DataGrid.ContextMenu>
                             <ContextMenu>
                                 <MenuItem Header="Quick Write..." Click="Coils_Write_Click"/>
@@ -408,7 +412,8 @@
                         <ui:TextBox Width="150" Text="{Binding DiscreteSearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Address, state..."/>
                     </StackPanel>
 
-                    <DataGrid Grid.Row="1" ItemsSource="{Binding DiscreteInputsView}" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="DiscreteInputsGrid_MouseDoubleClick">
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding DiscreteInputsView}" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="DiscreteInputsGrid_MouseDoubleClick"
+                              VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
                         <DataGrid.ContextMenu>
                             <ContextMenu>
                                 <MenuItem Header="Add to Custom Watch" Click="DiscreteInputs_AddToCustom_Click"/>
