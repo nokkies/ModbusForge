@@ -7,8 +7,17 @@
         ResizeMode="NoResize"
         ExtendsContentIntoTitleBar="True"
         WindowBackdropType="Mica">
+    
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Resources/FluentTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
 
-    <Grid Margin="16">
+    <Border Background="{StaticResource FluentBackground}" Padding="0">
+        <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- TitleBar -->
             <RowDefinition Height="Auto"/> <!-- Details -->
@@ -40,4 +49,5 @@
             <ui:Button Content="Cancel" Appearance="Secondary" Width="85" Click="Cancel_Click" IsCancel="True"/>
         </StackPanel>
     </Grid>
+    </Border>
 </ui:FluentWindow>

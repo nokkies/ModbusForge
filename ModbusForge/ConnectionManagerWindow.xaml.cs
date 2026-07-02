@@ -1,13 +1,12 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
-using MahApps.Metro.Controls;
 using ModbusForge.Models;
 using ModbusForge.Services;
 
 namespace ModbusForge;
 
-public partial class ConnectionManagerWindow : MetroWindow, INotifyPropertyChanged
+public partial class ConnectionManagerWindow : Wpf.Ui.Controls.FluentWindow, INotifyPropertyChanged
 {
     private readonly IConnectionManager _connectionManager;
     private ConnectionProfile? _selectedProfile;
@@ -95,6 +94,7 @@ public partial class ConnectionManagerWindow : MetroWindow, INotifyPropertyChang
         if (SelectedProfile == null) return;
 
         ConnectButton.IsEnabled = false;
+        ConnectProgressRing.Visibility = Visibility.Visible;
         try
         {
             var success = await _connectionManager.ConnectProfileAsync(SelectedProfile);
@@ -107,6 +107,7 @@ public partial class ConnectionManagerWindow : MetroWindow, INotifyPropertyChang
         finally
         {
             ConnectButton.IsEnabled = true;
+            ConnectProgressRing.Visibility = Visibility.Collapsed;
         }
     }
 

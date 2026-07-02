@@ -1,10 +1,9 @@
-using MahApps.Metro.Controls;
 using System;
 using ModbusForge.Services;
 
 namespace ModbusForge;
 
-public partial class PreferencesWindow : MetroWindow
+public partial class PreferencesWindow : Wpf.Ui.Controls.FluentWindow
 {
     private readonly ISettingsService _settingsService;
 

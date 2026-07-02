@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:ModbusForge.Views"
              xmlns:models="clr-namespace:ModbusForge.Models"
              xmlns:converters="clr-namespace:ModbusForge.Converters"
-             xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:sys="clr-namespace:System;assembly=mscorlib"
              xmlns:avalonDock="https://github.com/Dirkster99/AvalonDock"
              mc:Ignorable="d" 
@@ -250,14 +250,13 @@
                     <TextBlock Text="Node Palette" FontWeight="Bold" Margin="0,0,0,10" FontSize="14"/>
                     
                     <Grid Margin="0,0,0,10">
-                        <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 mah:TextBoxHelper.Watermark="Search nodes..."
-                                 mah:TextBoxHelper.ClearTextButton="True"
-                                 AutomationProperties.AutomationId="PaletteSearchBox">
-                            <TextBox.InputBindings>
+                        <ui:TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="Search nodes..."
+                                    AutomationProperties.AutomationId="PaletteSearchBox">
+                            <ui:TextBox.InputBindings>
                                 <KeyBinding Key="Esc" Command="{Binding ClearSearchCommand}" />
-                            </TextBox.InputBindings>
-                        </TextBox>
+                            </ui:TextBox.InputBindings>
+                        </ui:TextBox>
                     </Grid>
                     
                     <ItemsControl ItemsSource="{Binding PaletteCategories}">
@@ -307,7 +306,7 @@
                     <Border Background="#E8F5E9" BorderBrush="#4CAF50" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,10">
                         <StackPanel>
                             <TextBlock Text="Master Simulation" FontWeight="SemiBold" Margin="0,0,0,5"/>
-                            <mah:ToggleSwitch IsOn="{Binding ShowLiveValues}" OnContent="Enabled" OffContent="Disabled"/>
+                            <ui:ToggleSwitch IsChecked="{Binding ShowLiveValues}" Content="Enabled"/>
                         </StackPanel>
                     </Border>
                     

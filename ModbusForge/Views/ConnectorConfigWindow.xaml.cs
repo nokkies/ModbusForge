@@ -5,14 +5,13 @@ using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Data;
-using MahApps.Metro.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ModbusForge.Models;
 
 namespace ModbusForge.Views
 {
-    public partial class ConnectorConfigWindow : MetroWindow
+    public partial class ConnectorConfigWindow : Wpf.Ui.Controls.FluentWindow
     {
         public ConnectorConfigWindow(string nodeId, string connectorType, string nodeName,
             IEnumerable<CustomEntry>? customEntries = null, PlcArea initialArea = PlcArea.Coil, int initialAddress = 0, bool initiallyLinked = false, bool initiallyInverted = false)
