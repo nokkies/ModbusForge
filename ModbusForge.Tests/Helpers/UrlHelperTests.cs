@@ -9,8 +9,7 @@ namespace ModbusForge.Tests.Helpers
         [InlineData("https://www.google.com")]
         [InlineData("http://example.com")]
         [InlineData("mailto:test@example.com")]
-        [InlineData("HTTPS://WWW.PAYPAL.COM")]
-        [InlineData("https://www.paypal.com/donate/?hosted_button_id=ELTVNJEYLZE3W")]
+        [InlineData("https://www.example.com/path?query=value")]
         public void IsSafeUrl_ValidUrls_ReturnsTrue(string url)
         {
             // Act

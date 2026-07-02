@@ -115,18 +115,6 @@
                             </TextBlock>
                         </StackPanel>
 
-                        <StackPanel Margin="0,0,0,8">
-                            <TextBlock Text="☕ Support Development" 
-                                       Foreground="{StaticResource FluentTextSecondary}"
-                                       Margin="0,0,0,4"/>
-                            <TextBlock>
-                                <Hyperlink NavigateUri="https://www.paypal.com/donate/?hosted_button_id=ELTVNJEYLZE3W" 
-                                           RequestNavigate="Hyperlink_RequestNavigate"
-                                           Foreground="{StaticResource FluentPrimary}">
-                                    Donate via ECI Tech PayPal
-                                </Hyperlink>
-                            </TextBlock>
-                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </Border>

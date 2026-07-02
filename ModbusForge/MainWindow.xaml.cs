@@ -136,19 +136,6 @@ namespace ModbusForge
             }
         }
 
-        private void MenuItem_Donate_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var url = "https://www.paypal.com/donate/?hosted_button_id=ELTVNJEYLZE3W";
-                UrlHelper.OpenUrl(url);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Could not open browser: {ex.Message}", "Donate", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
         private void MenuItem_Preferences_Click(object sender, RoutedEventArgs e)
         {
             var settingsService = App.ServiceProvider.GetService(typeof(ISettingsService)) as ISettingsService;

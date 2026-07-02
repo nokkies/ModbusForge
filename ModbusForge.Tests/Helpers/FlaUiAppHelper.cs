@@ -96,12 +96,28 @@ public class FlaUiAppHelper : IDisposable
         for (int i = 1; i < menuPath.Length; i++)
         {
             currentMenu.Click();
+            Thread.Sleep(150);
 
-            // Wait for submenu to appear
-            currentMenu = WaitForElement(() =>
-                currentMenu!.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.MenuItem))
-                    .FirstOrDefault(mi => mi.Name == menuPath[i])?.AsMenuItem(), TimeSpan.FromSeconds(2))
-                ?? throw new InvalidOperationException($"Menu item '{menuPath[i]}' not found under '{menuPath[i - 1]}'.");
+            // Submenus appear in a popup under the desktop or main window
+            var nextMenu = WaitForElement(() =>
+            {
+                var searchScope = new[] { _automation.GetDesktop(), window }.Distinct();
+                foreach (var scope in searchScope)
+                {
+                    var candidates = scope.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.MenuItem));
+                    foreach (var candidate in candidates)
+                    {
+                        var menuItem = candidate.AsMenuItem();
+                        if (menuItem != null && (menuItem.Name == menuPath[i] || menuItem.Name.Replace("_", "") == menuPath[i]))
+                        {
+                            return menuItem;
+                        }
+                    }
+                }
+                return null;
+            }, TimeSpan.FromSeconds(3));
+
+            currentMenu = nextMenu ?? throw new InvalidOperationException($"Menu item '{menuPath[i]}' not found under '{menuPath[i - 1]}'.");
         }
 
         currentMenu.Click();

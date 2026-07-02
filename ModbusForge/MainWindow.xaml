@@ -144,7 +144,6 @@
                 <MenuItem Header="_Keyboard Shortcuts..." Click="MenuItem_KeyboardShortcuts_Click" ToolTip="View all keyboard shortcuts"/>
                 <MenuItem Header="_Troubleshooting..." Click="MenuItem_Troubleshooting_Click" ToolTip="View troubleshooting guide and export diagnostics"/>
                 <Separator/>
-                <MenuItem Header="_Donate..." Click="MenuItem_Donate_Click"/>
                 <MenuItem Header="_About" Click="MenuItem_About_Click"/>
             </MenuItem>
         </Menu>
