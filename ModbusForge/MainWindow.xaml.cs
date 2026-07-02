@@ -55,6 +55,11 @@ namespace ModbusForge
                 MenuItem_Help_Click(null!, null!);
                 _viewModel.RequestShowHelp = false; // Reset
             }
+            else if (e.PropertyName == nameof(MainViewModel.RequestShowScriptEditor) && _viewModel.RequestShowScriptEditor)
+            {
+                MenuItem_ScriptEditor_Click(null!, null!);
+                _viewModel.RequestShowScriptEditor = false; // Reset
+            }
         }
 
         private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -115,6 +120,20 @@ namespace ModbusForge
                 Owner = this
             };
             troubleshootingWindow.ShowDialog();
+        }
+
+        private void MenuItem_ScriptEditor_Click(object sender, RoutedEventArgs e)
+        {
+            var scriptRunner = App.ServiceProvider.GetService(typeof(IScriptRunner)) as IScriptRunner;
+            var modbusService = App.ServiceProvider.GetService(typeof(IModbusService)) as IModbusService;
+            if (scriptRunner != null)
+            {
+                var scriptEditor = new ScriptEditorWindow(scriptRunner, modbusService, _viewModel.EffectiveUnitId)
+                {
+                    Owner = this
+                };
+                scriptEditor.ShowDialog();
+            }
         }
 
         private void MenuItem_Donate_Click(object sender, RoutedEventArgs e)

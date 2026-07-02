@@ -1,20 +1,18 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Windows;
-using MahApps.Metro.Controls;
 using Microsoft.Win32;
 using ModbusForge.Models;
 using ModbusForge.Services;
 
 namespace ModbusForge;
 
-public partial class ScriptEditorWindow : MetroWindow, INotifyPropertyChanged
+public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow, INotifyPropertyChanged
 {
     private readonly IScriptRunner _scriptRunner;
     private readonly IModbusService? _modbusService;

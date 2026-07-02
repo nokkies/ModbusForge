@@ -255,6 +255,7 @@ namespace ModbusForge.ViewModels
             TrendCommand = new RelayCommand(ShowTrendView);
             RefreshCommand = new RelayCommand(async () => await RefreshAsync());
             ShowHelpCommand = new RelayCommand(ShowHelp);
+            ShowScriptEditorCommand = new RelayCommand(ShowScriptEditor);
         }
 
         /// <summary>
@@ -479,6 +480,7 @@ namespace ModbusForge.ViewModels
         public IRelayCommand TrendCommand { get; private set; } = null!;
         public IRelayCommand RefreshCommand { get; private set; } = null!;
         public IRelayCommand ShowHelpCommand { get; private set; } = null!;
+        public IRelayCommand ShowScriptEditorCommand { get; private set; } = null!;
 
         public ObservableCollection<string> ConsoleMessages { get; } = new();
 
@@ -1957,11 +1959,20 @@ namespace ModbusForge.ViewModels
             RequestShowHelp = true;
         }
 
+        private void ShowScriptEditor()
+        {
+            // This will be handled by MainWindow via event or direct call
+            RequestShowScriptEditor = true;
+        }
+
         [ObservableProperty]
         private int _requestedViewIndex = -1;
 
         [ObservableProperty]
         private bool _requestShowHelp = false;
+
+        [ObservableProperty]
+        private bool _requestShowScriptEditor = false;
 
         private async Task RefreshAsync()
         {

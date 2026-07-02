@@ -21,6 +21,7 @@
         <KeyBinding Key="R" Modifiers="Control" Command="{Binding ReadRegistersCommand}"/>
         <KeyBinding Key="T" Modifiers="Control" Command="{Binding TrendCommand}"/>
         <KeyBinding Key="S" Modifiers="Control" Command="{Binding SaveProjectCommand}"/>
+        <KeyBinding Key="E" Modifiers="Control" Command="{Binding ShowScriptEditorCommand}"/>
         <KeyBinding Key="F5" Command="{Binding RefreshCommand}"/>
     </Window.InputBindings>
 
@@ -131,6 +132,7 @@
             <MenuItem Header="_Options">
                 <MenuItem Header="_Preferences..." Click="MenuItem_Preferences_Click"/>
                 <MenuItem Header="_Connection Manager..." Click="MenuItem_ConnectionManager_Click"/>
+                <MenuItem Header="_Script Editor..." Click="MenuItem_ScriptEditor_Click" InputGestureText="Ctrl+E" ToolTip="Open the script editor (Ctrl+E)"/>
             </MenuItem>
             <MenuItem Header="_View">
                 <MenuItem Header="_Simulation Palette" Click="MenuItem_ShowSimPalette_Click"/>
