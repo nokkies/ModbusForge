@@ -108,6 +108,15 @@ namespace ModbusForge
             }
         }
 
+        private void MenuItem_Troubleshooting_Click(object sender, RoutedEventArgs e)
+        {
+            var troubleshootingWindow = new Views.TroubleshootingWindow
+            {
+                Owner = this
+            };
+            troubleshootingWindow.ShowDialog();
+        }
+
         private void MenuItem_Donate_Click(object sender, RoutedEventArgs e)
         {
             try

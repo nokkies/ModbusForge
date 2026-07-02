@@ -1,0 +1,194 @@
+<Window x:Class="ModbusForge.Views.TroubleshootingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Troubleshooting" 
+        Width="700" 
+        Height="580"
+        WindowStartupLocation="CenterOwner"
+        Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png"
+        ResizeMode="NoResize">
+    
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Resources/FluentTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Border Background="{StaticResource FluentBackground}" Padding="0">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Background="{StaticResource FluentPrimary}" Padding="24,20">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="🔧" FontSize="28" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="Troubleshooting" 
+                               FontSize="24" 
+                               FontWeight="SemiBold" 
+                               Foreground="White"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Content -->
+            <Border Grid.Row="1" Background="White" Padding="24,20">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <!-- Diagnostic Export -->
+                        <Border Background="{StaticResource FluentSurface}" 
+                                Padding="20" 
+                                CornerRadius="8"
+                                Margin="0,0,0,24">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Diagnostics" 
+                                           FontSize="18" 
+                                           FontWeight="SemiBold" 
+                                           Foreground="{StaticResource FluentText}"
+                                           Margin="0,0,0,8"/>
+                                <TextBlock Grid.Row="1" 
+                                           Text="Export diagnostic information to help troubleshoot issues. This includes application version, settings, and recent log entries."
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource FluentTextSecondary}"
+                                           Margin="0,0,0,12"/>
+                                <Button Grid.Row="2" 
+                                        Content="Export Diagnostics" 
+                                        Width="160"
+                                        HorizontalAlignment="Left"
+                                        Style="{StaticResource FluentPrimaryButton}"
+                                        Click="ExportDiagnostics_Click"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Common Issues -->
+                        <TextBlock Text="Common Issues" 
+                                   FontSize="18" 
+                                   FontWeight="SemiBold" 
+                                   Foreground="{StaticResource FluentText}"
+                                   Margin="0,0,0,12"/>
+
+                        <!-- Connection Issues -->
+                        <TextBlock Text="Connection Issues" 
+                                   FontSize="14" 
+                                   FontWeight="SemiBold" 
+                                   Foreground="{StaticResource FluentText}"
+                                   Margin="0,8,0,8"/>
+                        <Border Background="{StaticResource FluentSurface}" 
+                                Padding="16" 
+                                CornerRadius="8"
+                                Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4">
+                                    <Run FontWeight="SemiBold">"Unable to connect to server"</Run>
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4" Foreground="{StaticResource FluentTextSecondary}">
+                                    Check IP address, port, and ensure the server is running. Verify firewall settings and try the Diagnostics button.
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4">
+                                    <Run FontWeight="SemiBold">"Connection timeout"</Run>
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4" Foreground="{StaticResource FluentTextSecondary}">
+                                    Check network connectivity, verify the server is responsive, and confirm the Unit ID is correct.
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Data Issues -->
+                        <TextBlock Text="Data Issues" 
+                                   FontSize="14" 
+                                   FontWeight="SemiBold" 
+                                   Foreground="{StaticResource FluentText}"
+                                   Margin="0,8,0,8"/>
+                        <Border Background="{StaticResource FluentSurface}" 
+                                Padding="16" 
+                                CornerRadius="8"
+                                Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4">
+                                    <Run FontWeight="SemiBold">"All values are 0"</Run>
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4" Foreground="{StaticResource FluentTextSecondary}">
+                                    Verify the starting address and Unit ID. Try reading a different address range.
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4">
+                                    <Run FontWeight="SemiBold">"Write failed"</Run>
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4" Foreground="{StaticResource FluentTextSecondary}">
+                                    Verify the device allows writes and the address is writable. Check the data type is correct.
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Performance Issues -->
+                        <TextBlock Text="Performance Issues" 
+                                   FontSize="14" 
+                                   FontWeight="SemiBold" 
+                                   Foreground="{StaticResource FluentText}"
+                                   Margin="0,8,0,8"/>
+                        <Border Background="{StaticResource FluentSurface}" 
+                                Padding="16" 
+                                CornerRadius="8"
+                                Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4">
+                                    <Run FontWeight="SemiBold">"Application is slow"</Run>
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4" Foreground="{StaticResource FluentTextSecondary}">
+                                    Reduce continuous reads, decrease address counts, increase polling intervals, and close unused trend charts.
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Contact Support -->
+                        <TextBlock Text="Need More Help?" 
+                                   FontSize="18" 
+                                   FontWeight="SemiBold" 
+                                   Foreground="{StaticResource FluentText}"
+                                   Margin="0,16,0,12"/>
+                        <Border Background="{StaticResource FluentSurface}" 
+                                Padding="16" 
+                                CornerRadius="8"
+                                Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4">
+                                    Visit <Hyperlink NavigateUri="https://github.com/nokkies/ModbusForge/issues" RequestNavigate="Hyperlink_RequestNavigate">GitHub Issues</Hyperlink> to report bugs or request features.
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" Margin="0,4">
+                                    Contact: <Hyperlink NavigateUri="mailto:skordonkels@gmail.com" RequestNavigate="Hyperlink_RequestNavigate">skordonkels@gmail.com</Hyperlink>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Footer -->
+            <Border Grid.Row="2" 
+                    Background="{StaticResource FluentSurface}" 
+                    BorderBrush="{StaticResource FluentBorder}" 
+                    BorderThickness="0,1,0,0"
+                    Padding="24,16">
+                <Button Content="Close" 
+                        Width="100" 
+                        HorizontalAlignment="Right"
+                        Style="{StaticResource FluentPrimaryButton}"
+                        IsDefault="True" 
+                        IsCancel="True"
+                        Click="Close_Click"/>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

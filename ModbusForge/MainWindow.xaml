@@ -106,8 +106,8 @@
 
         <Menu Grid.Row="1">
             <MenuItem Header="_File">
-                <MenuItem Header="_Open Project..." Command="{Binding LoadProjectCommand}" InputGestureText="Ctrl+O"/>
-                <MenuItem Header="_Save Project..." Command="{Binding SaveProjectCommand}" InputGestureText="Ctrl+S"/>
+                <MenuItem Header="_Open Project..." Command="{Binding LoadProjectCommand}" InputGestureText="Ctrl+O" ToolTip="Open an existing project (Ctrl+O)"/>
+                <MenuItem Header="_Save Project..." Command="{Binding SaveProjectCommand}" InputGestureText="Ctrl+S" ToolTip="Save the current project (Ctrl+S)"/>
                 <Separator/>
                 <MenuItem Header="_Import Unit IDs..." Command="{Binding ImportUnitIdsCommand}"/>
                 <MenuItem Header="_Export Unit IDs..." Command="{Binding ExportUnitIdsCommand}"/>
@@ -138,8 +138,9 @@
                 <MenuItem Header="Simulation _Programs" Click="MenuItem_ShowSimPrograms_Click"/>
             </MenuItem>
             <MenuItem Header="_Help">
-                <MenuItem Header="_Help..." Click="MenuItem_Help_Click" InputGestureText="F1"/>
-                <MenuItem Header="_Keyboard Shortcuts..." Click="MenuItem_KeyboardShortcuts_Click"/>
+                <MenuItem Header="_Help..." Click="MenuItem_Help_Click" InputGestureText="F1" ToolTip="Open the help window (F1)"/>
+                <MenuItem Header="_Keyboard Shortcuts..." Click="MenuItem_KeyboardShortcuts_Click" ToolTip="View all keyboard shortcuts"/>
+                <MenuItem Header="_Troubleshooting..." Click="MenuItem_Troubleshooting_Click" ToolTip="View troubleshooting guide and export diagnostics"/>
                 <Separator/>
                 <MenuItem Header="_Donate..." Click="MenuItem_Donate_Click"/>
                 <MenuItem Header="_About" Click="MenuItem_About_Click"/>
@@ -263,7 +264,7 @@
                 <avalonDock:LayoutRoot>
                     <avalonDock:LayoutPanel Orientation="Horizontal">
                         <avalonDock:LayoutDocumentPane x:Name="MainDocumentPane">
-                            <avalonDock:LayoutDocument x:Name="DocRegisters" Title="Registers" ContentId="Registers">
+                            <avalonDock:LayoutDocument CanClose="False" x:Name="DocRegisters" Title="Registers" ContentId="Registers">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -307,7 +308,7 @@
                     </DataGrid>
                 </Grid>
                             </avalonDock:LayoutDocument>
-                            <avalonDock:LayoutDocument x:Name="DocInputRegisters" Title="Input Registers" ContentId="InputRegisters">
+                            <avalonDock:LayoutDocument CanClose="False" x:Name="DocInputRegisters" Title="Input Registers" ContentId="InputRegisters">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -350,7 +351,7 @@
                     </DataGrid>
                 </Grid>
                             </avalonDock:LayoutDocument>
-                            <avalonDock:LayoutDocument x:Name="DocCoils" Title="Coils" ContentId="Coils">
+                            <avalonDock:LayoutDocument CanClose="False" x:Name="DocCoils" Title="Coils" ContentId="Coils">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -390,7 +391,7 @@
                     </DataGrid>
                 </Grid>
                             </avalonDock:LayoutDocument>
-                            <avalonDock:LayoutDocument x:Name="DocDiscreteInputs" Title="Discrete Inputs" ContentId="DiscreteInputs">
+                            <avalonDock:LayoutDocument CanClose="False" x:Name="DocDiscreteInputs" Title="Discrete Inputs" ContentId="DiscreteInputs">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -429,7 +430,7 @@
                     </DataGrid>
                 </Grid>
                             </avalonDock:LayoutDocument>
-                            <avalonDock:LayoutDocument x:Name="DocCustomWatch" Title="Custom Watch" ContentId="CustomWatch">
+                            <avalonDock:LayoutDocument CanClose="False" x:Name="DocCustomWatch" Title="Custom Watch" ContentId="CustomWatch">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -481,25 +482,25 @@
                     </DataGrid>
                 </Grid>
                             </avalonDock:LayoutDocument>
-                            <avalonDock:LayoutDocument x:Name="DocSimulation" Title="Simulation" ContentId="Simulation">
+                            <avalonDock:LayoutDocument CanClose="False" x:Name="DocSimulation" Title="Simulation" ContentId="Simulation">
                 <views:VisualNodeEditor x:Name="VisualEditor" DataContext="{Binding VisualNodeEditorViewModel}"/>
                             </avalonDock:LayoutDocument>
-                            <avalonDock:LayoutDocument x:Name="DocDecode" Title="Decode" ContentId="Decode">
+                            <avalonDock:LayoutDocument CanClose="False" x:Name="DocDecode" Title="Decode" ContentId="Decode">
                 <Grid Margin="5">
                     <views:DecodeView />
                 </Grid>
                             </avalonDock:LayoutDocument>
-                            <avalonDock:LayoutDocument x:Name="DocTrend" Title="Trend" ContentId="Trend">
+                            <avalonDock:LayoutDocument CanClose="False" x:Name="DocTrend" Title="Trend" ContentId="Trend">
                 <Grid Margin="5">
                     <views:TrendView x:Name="TrendViewControl" />
                 </Grid>
                             </avalonDock:LayoutDocument>
-                            <avalonDock:LayoutDocument x:Name="DocConsole" Title="Console" ContentId="Console">
+                            <avalonDock:LayoutDocument CanClose="False" x:Name="DocConsole" Title="Console" ContentId="Console">
                 <Grid Margin="5">
                     <ListView ItemsSource="{Binding ConsoleMessages}" />
                 </Grid>
                             </avalonDock:LayoutDocument>
-                            <avalonDock:LayoutDocument x:Name="DocDebug" Title="Debug" ContentId="Debug">
+                            <avalonDock:LayoutDocument CanClose="False" x:Name="DocDebug" Title="Debug" ContentId="Debug">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>

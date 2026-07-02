@@ -66,6 +66,8 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl + R" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
@@ -82,6 +84,49 @@
 
                                 <TextBlock Grid.Row="4" Grid.Column="0" Text="F1" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
                                 <TextBlock Grid.Row="4" Grid.Column="1" Text="Open help" TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Ctrl + O" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="5" Grid.Column="1" Text="Open project" TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="6" Grid.Column="0" Text="Ctrl + N" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="6" Grid.Column="1" Text="New project" TextWrapping="Wrap" Margin="0,4"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Script Editor -->
+                        <TextBlock Text="📝 Script Editor"
+                                   FontSize="16" 
+                                   FontWeight="SemiBold" 
+                                   Foreground="{StaticResource FluentText}"
+                                   Margin="0,0,0,12"/>
+                        
+                        <Border Background="{StaticResource FluentSurface}" 
+                                Padding="16" 
+                                CornerRadius="8"
+                                Margin="0,0,0,20">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl + N" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="New script" TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl + O" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="Open script" TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl + S" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="Save script" TextWrapping="Wrap" Margin="0,4"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl + E" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource FluentPrimary}" Margin="0,4"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="Execute script" TextWrapping="Wrap" Margin="0,4"/>
                             </Grid>
                         </Border>
 
@@ -198,13 +243,25 @@
                     BorderBrush="{StaticResource FluentBorder}" 
                     BorderThickness="0,1,0,0"
                     Padding="24,16">
-                <Button Content="Close" 
-                        Width="100" 
-                        HorizontalAlignment="Right"
-                        Style="{StaticResource FluentPrimaryButton}"
-                        IsDefault="True" 
-                        IsCancel="True"
-                        Click="Close_Click"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" 
+                            Content="Print Quick Reference" 
+                            Width="160"
+                            Style="{StaticResource FluentSecondaryButton}"
+                            Click="Print_Click"/>
+                    <Button Grid.Column="1" 
+                            Content="Close" 
+                            Width="100" 
+                            HorizontalAlignment="Right"
+                            Style="{StaticResource FluentPrimaryButton}"
+                            IsDefault="True" 
+                            IsCancel="True"
+                            Click="Close_Click"/>
+                </Grid>
             </Border>
         </Grid>
     </Border>
