@@ -23,6 +23,7 @@ namespace ModbusForge.ViewModels.Coordinators
         private readonly ITrendLogger _trendLogger;
         private readonly ILogger<TrendCoordinator> _logger;
         private readonly ISettingsService _settingsService;
+        private readonly IDialogService _dialogService;
         private bool _isTrending;
 
         public TrendCoordinator(
@@ -30,13 +31,15 @@ namespace ModbusForge.ViewModels.Coordinators
             IModbusService serverService,
             ITrendLogger trendLogger,
             ILogger<TrendCoordinator> logger,
-            ISettingsService settingsService)
+            ISettingsService settingsService,
+            IDialogService? dialogService = null)
         {
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
             _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
             _trendLogger = trendLogger ?? throw new ArgumentNullException(nameof(trendLogger));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+            _dialogService = dialogService ?? new NullDialogService();
         }
 
         /// <summary>
@@ -87,7 +90,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 if (errorCount[0] > 0 && successCount[0] == 0)
                 {
                     setGlobalMonitorEnabled(false);
-                    MessageBox.Show(
+                    _dialogService.Show(
                         "All trend reads failed. Continuous monitoring has been paused. Fix the issue and re-enable monitoring.",
                         "Trend Read Error",
                         MessageBoxButton.OK,
@@ -226,7 +229,7 @@ namespace ModbusForge.ViewModels.Coordinators
             if (area == "holdingregister")
             {
                 var data = await service.ReadHoldingRegistersAsync(unitId, startAddress, count);
-                if (data == null) throw new Exception("Read returned null");
+                if (data == null) throw new InvalidOperationException("Read returned null");
                 foreach (var entry in chunk)
                 {
                     int offset = entry.Address - startAddress;
@@ -237,7 +240,7 @@ namespace ModbusForge.ViewModels.Coordinators
             else if (area == "inputregister")
             {
                 var data = await service.ReadInputRegistersAsync(unitId, startAddress, count);
-                if (data == null) throw new Exception("Read returned null");
+                if (data == null) throw new InvalidOperationException("Read returned null");
                 foreach (var entry in chunk)
                 {
                     int offset = entry.Address - startAddress;
@@ -248,7 +251,7 @@ namespace ModbusForge.ViewModels.Coordinators
             else if (area == "coil")
             {
                 var data = await service.ReadCoilsAsync(unitId, startAddress, count);
-                if (data == null) throw new Exception("Read returned null");
+                if (data == null) throw new InvalidOperationException("Read returned null");
                 foreach (var entry in chunk)
                 {
                     int offset = entry.Address - startAddress;
@@ -259,7 +262,7 @@ namespace ModbusForge.ViewModels.Coordinators
             else if (area == "discreteinput")
             {
                 var data = await service.ReadDiscreteInputsAsync(unitId, startAddress, count);
-                if (data == null) throw new Exception("Read returned null");
+                if (data == null) throw new InvalidOperationException("Read returned null");
                 foreach (var entry in chunk)
                 {
                     int offset = entry.Address - startAddress;

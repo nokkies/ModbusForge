@@ -26,7 +26,7 @@ namespace ModbusForge.Tests.Services
         {
             _loggerMock = new Mock<ILogger<ModbusServerService>>();
             _serverService = new ModbusServerService(_loggerMock.Object);
-            
+
             // Find a free port for testing
             _testPort = GetFreePort();
         }
@@ -52,12 +52,12 @@ namespace ModbusForge.Tests.Services
             // Assert
             Assert.True(connected, "Server should connect successfully when binding to 0.0.0.0");
             Assert.True(_serverService.IsConnected, "Server should report as connected");
-            
+
             // Verify the bound endpoint shows actual interface addresses, not 0.0.0.0
             var boundEndpoint = _serverService.BoundEndpoint;
             Assert.False(string.IsNullOrEmpty(boundEndpoint), "Bound endpoint should not be empty");
             Assert.False(boundEndpoint.Contains("0.0.0.0"), "Bound endpoint should resolve 0.0.0.0 to actual interface IPs");
-            
+
             // Should contain actual IP addresses and port
             Assert.Contains(_testPort.ToString(), boundEndpoint);
         }
@@ -67,7 +67,7 @@ namespace ModbusForge.Tests.Services
         {
             // Arrange
             string serverAddress = "0.0.0.0";
-            
+
             // Start server on publishing port
             var serverConnected = await _serverService.ConnectAsync(serverAddress, _testPort, _testUnitIds);
             Assert.True(serverConnected, "Server should start successfully");
@@ -77,7 +77,7 @@ namespace ModbusForge.Tests.Services
             var boundEndpoint = _serverService.BoundEndpoint;
             var ipPart = boundEndpoint.Split(':')[0]; // Get IP list part
             var actualIp = ipPart.Split(',')[0].Trim(); // Get first IP
-            
+
             var clientConnected = await clientService.ConnectAsync(actualIp, _testPort, "1");
 
             // Assert
@@ -95,7 +95,7 @@ namespace ModbusForge.Tests.Services
             // Arrange
             string serverAddress = "0.0.0.0";
             const int clientCount = 3;
-            
+
             // Start server on publishing port
             var serverConnected = await _serverService.ConnectAsync(serverAddress, _testPort, _testUnitIds);
             Assert.True(serverConnected, "Server should start successfully");
@@ -139,19 +139,19 @@ namespace ModbusForge.Tests.Services
 
             // Assert
             Assert.True(connected, "Server should connect successfully");
-            
+
             var availableUnitIds = _serverService.GetUnitIds().ToList();
             Assert.True(availableUnitIds.Count >= 8, "Should have at least 8 unit IDs (1,5,10,11,12,13,14,15,20)");
-            
-            Assert.True(availableUnitIds.Contains(1));
-            Assert.True(availableUnitIds.Contains(5));
-            Assert.True(availableUnitIds.Contains(10));
-            Assert.True(availableUnitIds.Contains(11));
-            Assert.True(availableUnitIds.Contains(12));
-            Assert.True(availableUnitIds.Contains(13));
-            Assert.True(availableUnitIds.Contains(14));
-            Assert.True(availableUnitIds.Contains(15));
-            Assert.True(availableUnitIds.Contains(20));
+
+            Assert.Contains((byte)1, availableUnitIds);
+            Assert.Contains((byte)5, availableUnitIds);
+            Assert.Contains((byte)10, availableUnitIds);
+            Assert.Contains((byte)11, availableUnitIds);
+            Assert.Contains((byte)12, availableUnitIds);
+            Assert.Contains((byte)13, availableUnitIds);
+            Assert.Contains((byte)14, availableUnitIds);
+            Assert.Contains((byte)15, availableUnitIds);
+            Assert.Contains((byte)20, availableUnitIds);
         }
 
         [Fact]
@@ -169,18 +169,18 @@ namespace ModbusForge.Tests.Services
             // Assert
             Assert.False(string.IsNullOrEmpty(boundEndpoint), "Bound endpoint should not be empty");
             Assert.Contains(_testPort.ToString(), boundEndpoint);
-            
+
             // Should resolve to actual interface addresses, not 0.0.0.0
             Assert.DoesNotContain("0.0.0.0", boundEndpoint);
-            
+
             // Should contain valid IP addresses (IPv4 format)
             var ipPortPart = boundEndpoint.Split(':').First();
             var ipAddresses = ipPortPart.Split(',').Select(ip => ip.Trim());
-            
+
             foreach (var ip in ipAddresses)
             {
                 Assert.True(IPAddress.TryParse(ip, out _), $"'{ip}' should be a valid IP address");
-                Assert.True(IPAddress.Parse(ip).AddressFamily == AddressFamily.InterNetwork, 
+                Assert.True(IPAddress.Parse(ip).AddressFamily == AddressFamily.InterNetwork,
                     $"'{ip}' should be an IPv4 address");
             }
         }
@@ -197,12 +197,12 @@ namespace ModbusForge.Tests.Services
             // Assert
             Assert.True(connected, "Server should connect successfully on localhost");
             Assert.True(_serverService.IsConnected, "Server should report as connected");
-            
+
             // Client should be able to connect to localhost
             using var clientService = new ModbusTcpService(new Mock<ILogger<ModbusTcpService>>().Object);
             var clientConnected = await clientService.ConnectAsync("127.0.0.1", _testPort, "1");
             Assert.True(clientConnected, "Client should be able to connect to server via localhost");
-            
+
             var boundEndpoint = _serverService.BoundEndpoint;
             Assert.Contains(_testPort.ToString(), boundEndpoint);
         }

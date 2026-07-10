@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Documents;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 using ModbusForge.Services;
 
 namespace ModbusForge.ViewModels
@@ -19,6 +20,7 @@ namespace ModbusForge.ViewModels
     public partial class HelpViewModel : ViewModelBase
     {
         private readonly IHelpContentService _helpContentService;
+        private readonly ILogger<HelpViewModel> _logger;
         private FlowDocument? _helpContent;
 
         [ObservableProperty]
@@ -33,9 +35,10 @@ namespace ModbusForge.ViewModels
             private set => SetProperty(ref _helpContent, value);
         }
 
-        public HelpViewModel(IHelpContentService helpContentService)
+        public HelpViewModel(IHelpContentService helpContentService, ILogger<HelpViewModel> logger)
         {
             _helpContentService = helpContentService;
+            _logger = logger;
             LoadHelpTopics();
             LoadDefaultTopic();
         }
@@ -73,7 +76,7 @@ namespace ModbusForge.ViewModels
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Navigation error: {ex.Message}");
+                _logger.LogError(ex, "Navigation error: {Message}", ex.Message);
                 // Load default topic on error
                 LoadTopic("getting-started");
             }
@@ -87,7 +90,7 @@ namespace ModbusForge.ViewModels
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Load topic error: {ex.Message}");
+                _logger.LogError(ex, "Load topic error: {Message}", ex.Message);
                 // Show error message
                 HelpContent = _helpContentService.GetHelpContent("troubleshooting");
             }
@@ -131,7 +134,7 @@ namespace ModbusForge.ViewModels
             catch (Exception ex)
             {
                 // Log error and reset to all topics
-                System.Diagnostics.Debug.WriteLine($"Search error: {ex.Message}");
+                _logger.LogError(ex, "Search error: {Message}", ex.Message);
                 LoadHelpTopics();
             }
         }

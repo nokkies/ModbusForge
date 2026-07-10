@@ -4,6 +4,8 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using ModbusForge.Models;
 using ModbusForge.Services;
 using ModbusForge.Services.EditorCommands;
@@ -36,6 +38,8 @@ namespace ModbusForge.ViewModels
 
     public partial class VisualNodeEditorViewModel : ViewModelBase
     {
+        private readonly ILogger<VisualNodeEditorViewModel> _logger;
+
         [ObservableProperty]
         private VisualNodeEditorConfig _config = new VisualNodeEditorConfig();
         
@@ -104,8 +108,10 @@ namespace ModbusForge.ViewModels
         public IRelayCommand AlignTopCommand { get; }
         public IRelayCommand DistributeHorizontallyCommand { get; }
 
-        public VisualNodeEditorViewModel()
+        public VisualNodeEditorViewModel(ILogger<VisualNodeEditorViewModel>? logger = null)
         {
+            _logger = logger ?? NullLogger<VisualNodeEditorViewModel>.Instance;
+
             AlignLeftCommand = new RelayCommand(AlignLeft);
             AlignTopCommand = new RelayCommand(AlignTop);
             DistributeHorizontallyCommand = new RelayCommand(DistributeHorizontally);
@@ -364,18 +370,17 @@ namespace ModbusForge.ViewModels
                         break;
                 }
                 
-                System.Diagnostics.Debug.WriteLine($"DEBUG: About to add node to Nodes collection. Current count: {Nodes.Count}");
-                
+                _logger.LogDebug("About to add node to Nodes collection. Current count: {Count}", Nodes.Count);
+
                 var command = new AddNodeCommand(this, newNode, SelectedProgram);
                 command.Execute();
                 UndoRedo.Push(command);
-                
-                System.Diagnostics.Debug.WriteLine($"DEBUG: SelectedNode set to: {newNode.Id}");
+
+                _logger.LogDebug("SelectedNode set to: {Id}", newNode.Id);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Exception in AddNode: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"DEBUG: Stack trace: {ex.StackTrace}");
+                _logger.LogError(ex, "Exception in AddNode");
             }
         }
         
@@ -792,39 +797,39 @@ namespace ModbusForge.ViewModels
         
         public void CreateConnection(string sourceNodeId, string targetNodeId, string targetConnector = "Input1")
         {
-            System.Diagnostics.Debug.WriteLine($"CreateConnection called: {sourceNodeId} -> {targetNodeId} ({targetConnector})");
-            
+            _logger.LogDebug("CreateConnection called: {Source} -> {Target} ({TargetConnector})", sourceNodeId, targetNodeId, targetConnector);
+
             // Check if connection already exists
-            var existingConnection = Connections.FirstOrDefault(c => 
-                c.SourceNodeId == sourceNodeId && 
-                c.TargetNodeId == targetNodeId && 
+            var existingConnection = Connections.FirstOrDefault(c =>
+                c.SourceNodeId == sourceNodeId &&
+                c.TargetNodeId == targetNodeId &&
                 c.TargetConnector == targetConnector);
-            
+
             if (existingConnection != null)
             {
-                System.Diagnostics.Debug.WriteLine($"Connection already exists, skipping");
+                _logger.LogDebug("Connection already exists, skipping");
                 return; // Connection already exists
             }
-            
+
             var sourceNode = Nodes.FirstOrDefault(n => n.Id == sourceNodeId);
             var targetNode = Nodes.FirstOrDefault(n => n.Id == targetNodeId);
-            
-            System.Diagnostics.Debug.WriteLine($"Source node found: {sourceNode != null}, Target node found: {targetNode != null}");
-            
+
+            _logger.LogDebug("Source node found: {SourceFound}, Target node found: {TargetFound}", sourceNode != null, targetNode != null);
+
             if (sourceNode != null && targetNode != null)
             {
                 var connection = new NodeConnection(sourceNodeId, targetNodeId, targetConnector);
-                
+
                 var command = new AddConnectionCommand(this, connection);
                 command.Execute();
                 UndoRedo.Push(command);
-                
-                System.Diagnostics.Debug.WriteLine($"Connection added to collection. Total: {Connections.Count}");
-                System.Diagnostics.Debug.WriteLine($"Connection points: Start({connection.StartX}, {connection.StartY}) -> End({connection.EndX}, {connection.EndY})");
+
+                _logger.LogDebug("Connection added to collection. Total: {Count}", Connections.Count);
+                _logger.LogDebug("Connection points: Start({StartX}, {StartY}) -> End({EndX}, {EndY})", connection.StartX, connection.StartY, connection.EndX, connection.EndY);
             }
             else
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to create connection - missing nodes");
+                _logger.LogDebug("Failed to create connection - missing nodes");
             }
         }
         
@@ -872,8 +877,8 @@ namespace ModbusForge.ViewModels
             // Target point (input connector on left side of target node)
             connection.EndX = targetNode.X + 6;
             connection.EndY = targetNode.Y + targetNode.Height / 2;
-            
-            System.Diagnostics.Debug.WriteLine($"Updated connection points: Start({connection.StartX}, {connection.StartY}) -> End({connection.EndX}, {connection.EndY})");
+
+            _logger.LogDebug("Updated connection points: Start({StartX}, {StartY}) -> End({EndX}, {EndY})", connection.StartX, connection.StartY, connection.EndX, connection.EndY);
         }
         
         public void UpdateNodeValues(bool showLiveValues)

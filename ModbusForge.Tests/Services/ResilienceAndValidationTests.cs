@@ -23,7 +23,7 @@ namespace ModbusForge.Tests.Services
             Assert.True(service.ValidateIpAddress("localhost").IsValid);
             Assert.True(service.ValidateIpAddress("0.0.0.0").IsValid);
             Assert.True(service.ValidateIpAddress("2001:db8::ff00:42:8329").IsValid); // IPv6
-            
+
             Assert.False(service.ValidateIpAddress("").IsValid);
             Assert.False(service.ValidateIpAddress("999.999.999.999").IsValid);
             Assert.False(service.ValidateIpAddress("invalid-ip").IsValid);
@@ -131,14 +131,13 @@ namespace ModbusForge.Tests.Services
             var service = new RetryPolicyService(logger);
             int callCount = 0;
 
-            await Assert.ThrowsAsync<SocketException>(async () =>
-            {
-                await service.ExecuteWithRetryAsync(async () =>
+            await Assert.ThrowsAsync<SocketException>(() =>
+                service.ExecuteWithRetryAsync(() =>
                 {
                     callCount++;
-                    throw new SocketException((int)SocketError.ConnectionRefused);
-                }, "TestMaxRetries", maxRetries: 2, initialDelayMs: 1);
-            });
+                    return Task.FromException<bool>(
+                        new SocketException((int)SocketError.ConnectionRefused));
+                }, "TestMaxRetries", maxRetries: 2, initialDelayMs: 1));
 
             Assert.Equal(3, callCount); // 1 initial try + 2 retries
         }

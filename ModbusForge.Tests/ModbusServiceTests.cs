@@ -13,7 +13,7 @@ namespace ModbusForge.Tests
 {
     public class ModbusServiceTests : IDisposable
     {
-        private readonly Mock<ILogger<ModbusTcpService>> _loggerMock;
+        private readonly Mock<ILogger<ModbusTcpService>> _loggerMock = null!;
         private readonly ModbusTcpService _service;
         private readonly Mock<IModbusMaster> _modbusMasterMock;
         private readonly TcpListener _listener;
@@ -62,18 +62,18 @@ namespace ModbusForge.Tests
             await _service.WriteSingleRegisterAsync(unitId, registerAddress, sensitiveValue);
 
             // Assert - Check that the sensitive value is NOT logged
-            _loggerMock.Verify(
+            _loggerMock!.Verify(
                 x => x.Log(
                     LogLevel.Debug,
                     It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, t) => v.ToString().Contains(sensitiveValueStr)),
+                    It.Is<It.IsAnyType>((v, t) => v!.ToString()!.Contains(sensitiveValueStr)),
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Never,
                 $"Log message should NOT contain sensitive value '{sensitiveValueStr}'");
 
             // Also assert that something WAS logged (to ensure we didn't just remove logging entirely)
-            _loggerMock.Verify(
+            _loggerMock!.Verify(
                 x => x.Log(
                     LogLevel.Debug,
                     It.IsAny<EventId>(),
@@ -96,18 +96,18 @@ namespace ModbusForge.Tests
             await _service.WriteSingleCoilAsync(unitId, coilAddress, sensitiveValue);
 
             // Assert - Check that the sensitive value is NOT logged
-            _loggerMock.Verify(
+            _loggerMock!.Verify(
                 x => x.Log(
                     LogLevel.Debug,
                     It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, t) => v.ToString().Contains(sensitiveValueStr)),
+                    It.Is<It.IsAnyType>((v, t) => v!.ToString()!.Contains(sensitiveValueStr)),
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Never,
                 $"Log message should NOT contain sensitive value '{sensitiveValueStr}'");
 
             // Also assert that something WAS logged
-            _loggerMock.Verify(
+            _loggerMock!.Verify(
                 x => x.Log(
                     LogLevel.Debug,
                     It.IsAny<EventId>(),

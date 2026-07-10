@@ -19,6 +19,7 @@ namespace ModbusForge.ViewModels.Coordinators
         private readonly IValidationService _validationService;
         private readonly IErrorHandlingService _errorHandlingService;
         private readonly ICircuitBreakerService _circuitBreakerService;
+        private readonly IDialogService _dialogService;
 
         public ConnectionCoordinator(
             IModbusService clientService,
@@ -28,7 +29,8 @@ namespace ModbusForge.ViewModels.Coordinators
             IRetryPolicyService retryPolicyService,
             IValidationService validationService,
             IErrorHandlingService errorHandlingService,
-            ICircuitBreakerService circuitBreakerService)
+            ICircuitBreakerService circuitBreakerService,
+            IDialogService? dialogService = null)
         {
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
             _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
@@ -38,6 +40,7 @@ namespace ModbusForge.ViewModels.Coordinators
             _validationService = validationService ?? throw new ArgumentNullException(nameof(validationService));
             _errorHandlingService = errorHandlingService ?? throw new ArgumentNullException(nameof(errorHandlingService));
             _circuitBreakerService = circuitBreakerService ?? throw new ArgumentNullException(nameof(circuitBreakerService));
+            _dialogService = dialogService ?? new NullDialogService();
         }
 
         /// <summary>
@@ -69,7 +72,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 {
                     setStatusMessage($"Invalid IP address: {ipValidation.ErrorMessage}");
                     _consoleLoggerService.Log($"Invalid IP address: {ipValidation.ErrorMessage}");
-                    MessageBox.Show(ipValidation.ErrorMessage, "Validation Error", 
+                    _dialogService.Show(ipValidation.ErrorMessage, "Validation Error", 
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                     return false;
                 }
@@ -79,7 +82,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 {
                     setStatusMessage($"Invalid port: {portValidation.ErrorMessage}");
                     _consoleLoggerService.Log($"Invalid port: {portValidation.ErrorMessage}");
-                    MessageBox.Show(portValidation.ErrorMessage, "Validation Error", 
+                    _dialogService.Show(portValidation.ErrorMessage, "Validation Error", 
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                     return false;
                 }
@@ -117,7 +120,7 @@ namespace ModbusForge.ViewModels.Coordinators
                     _consoleLoggerService.Log($"Connection blocked by circuit breaker: {cbEx.Message}");
                     
                     var circuitMsg = $"Connection temporarily blocked due to repeated failures.\n\n{cbEx.Message}\n\nThe circuit breaker will automatically reset after the timeout period.";
-                    MessageBox.Show(circuitMsg, "Circuit Breaker Active",
+                    _dialogService.Show(circuitMsg, "Circuit Breaker Active",
                         MessageBoxButton.OK, MessageBoxImage.Information);
                     return false;
                 }
@@ -158,25 +161,25 @@ namespace ModbusForge.ViewModels.Coordinators
                     try
                     {
                         // Create a synthetic exception for error handling
-                        var exception = new Exception(errorMsg);
+                        var exception = new InvalidOperationException(errorMsg);
                         var errorResult = _errorHandlingService.HandleError(exception, isServerMode ? "ServerStart" : "ClientConnect");
                         
                         // Show user-friendly message with recovery suggestions
                         var userMessage = $"{errorResult.UserMessage}\n\nRecovery Suggestions:\n{errorResult.RecoverySuggestion}";
-                        MessageBox.Show(userMessage, isServerMode ? "Server Error" : "Connection Error",
+                        _dialogService.Show(userMessage, isServerMode ? "Server Error" : "Connection Error",
                             MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                     catch
                     {
                         // Fallback to basic error message if error handling fails
-                        MessageBox.Show(errorMsg, isServerMode ? "Server Error" : "Connection Error",
+                        _dialogService.Show(errorMsg, isServerMode ? "Server Error" : "Connection Error",
                             MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
 
                     // If in Server mode, offer to retry automatically on alternative port 1502
                     if (isServerMode)
                     {
-                        var retry = MessageBox.Show(
+                        var retry = _dialogService.Show(
                             "Would you like to retry starting the server on port 1502 now?",
                             "Try Alternative Port",
                             MessageBoxButton.YesNo,
@@ -208,7 +211,7 @@ namespace ModbusForge.ViewModels.Coordinators
                                     _logger.LogWarning("Failed to start Modbus server on alternative port {AltPort}", port);
                                     var failMsg = $"Failed to start server on alternative port {port}. The port may also be in use or blocked.";
                                     _consoleLoggerService.Log(failMsg);
-                                    MessageBox.Show(failMsg,
+                                    _dialogService.Show(failMsg,
                                         "Server Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                                 }
                             }
@@ -217,7 +220,7 @@ namespace ModbusForge.ViewModels.Coordinators
                                 setStatusMessage($"Server error: {rex.Message}");
                                 _logger.LogError(rex, "Error retrying server start on alternative port 1502");
                                 _consoleLoggerService.Log($"Failed to start server on alternative port 1502: {rex.Message}");
-                                MessageBox.Show($"Failed to start server on alternative port 1502: {rex.Message}",
+                                _dialogService.Show($"Failed to start server on alternative port 1502: {rex.Message}",
                                     "Server Error", MessageBoxButton.OK, MessageBoxImage.Error);
                             }
                         }
@@ -231,7 +234,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 setStatusMessage(isServerMode ? $"Server error: {ex.Message}" : $"Error: {ex.Message}");
                 _logger.LogError(ex, isServerMode ? "Error starting Modbus server" : "Error connecting to Modbus server");
                 _consoleLoggerService.Log(isServerMode ? $"Server error: {ex.Message}" : $"Error: {ex.Message}");
-                MessageBox.Show(isServerMode ? $"Failed to start server: {ex.Message}" : $"Failed to connect: {ex.Message}", 
+                _dialogService.Show(isServerMode ? $"Failed to start server: {ex.Message}" : $"Failed to connect: {ex.Message}", 
                     isServerMode ? "Server Error" : "Connection Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }
@@ -262,7 +265,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 setStatusMessage(isServerMode ? $"Error stopping server: {ex.Message}" : $"Error disconnecting: {ex.Message}");
                 _logger.LogError(ex, isServerMode ? "Error stopping Modbus server" : "Error disconnecting from Modbus server");
                 _consoleLoggerService.Log(isServerMode ? $"Error stopping server: {ex.Message}" : $"Error disconnecting: {ex.Message}");
-                MessageBox.Show(isServerMode ? $"Failed to stop server: {ex.Message}" : $"Failed to disconnect: {ex.Message}", 
+                _dialogService.Show(isServerMode ? $"Failed to stop server: {ex.Message}" : $"Failed to disconnect: {ex.Message}", 
                     isServerMode ? "Server Stop Error" : "Disconnection Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }

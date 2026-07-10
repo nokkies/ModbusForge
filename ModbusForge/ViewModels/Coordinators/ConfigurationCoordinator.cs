@@ -9,6 +9,7 @@ using System.Windows;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using ModbusForge.Models;
+using ModbusForge.Services;
 
 namespace ModbusForge.ViewModels.Coordinators
 {
@@ -19,10 +20,12 @@ namespace ModbusForge.ViewModels.Coordinators
     public class ConfigurationCoordinator
     {
         private readonly ILogger<ConfigurationCoordinator> _logger;
+        private readonly IDialogService _dialogService;
 
-        public ConfigurationCoordinator(ILogger<ConfigurationCoordinator> logger)
+        public ConfigurationCoordinator(ILogger<ConfigurationCoordinator> logger, IDialogService? dialogService = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _dialogService = dialogService ?? new NullDialogService();
         }
 
         private const long MaxFileSize = 5 * 1024 * 1024; // 5MB limit for full configuration
@@ -71,7 +74,7 @@ namespace ModbusForge.ViewModels.Coordinators
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error saving configuration");
-                MessageBox.Show($"Failed to save configuration: {ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.Show($"Failed to save configuration: {ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -109,7 +112,7 @@ namespace ModbusForge.ViewModels.Coordinators
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading configuration");
-                MessageBox.Show($"Failed to load configuration: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.Show($"Failed to load configuration: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
 
             return null;

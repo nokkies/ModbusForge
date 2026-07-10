@@ -14,7 +14,7 @@ namespace ModbusForge.Views
         public SignalGeneratorConfigWindow(VisualNode node)
         {
             InitializeComponent();
-            
+
             WaveformCombo.ItemsSource = new[] { "Ramp", "Sine", "Triangle", "Square" };
             WaveformCombo.SelectedItem = node.Waveform ?? "Ramp";
             PeriodText.Text = node.PeriodMs.ToString();
@@ -26,7 +26,7 @@ namespace ModbusForge.Views
         {
             if (WaveformCombo.SelectedItem != null)
             {
-                SelectedWaveform = WaveformCombo.SelectedItem.ToString();
+                SelectedWaveform = WaveformCombo.SelectedItem.ToString()!;
             }
 
             if (!int.TryParse(PeriodText.Text, out int period) || period <= 0)

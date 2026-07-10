@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
@@ -81,7 +80,7 @@ namespace ModbusForge
         {
             LogFatalException(e.Exception, "DispatcherUnhandledException");
             e.Handled = true; // Prevent immediate crash to allow logger to finish
-            MessageBox.Show($"A fatal error occurred: {e.Exception.Message}\n\nDetails logged to crash.log", "Fatal Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"A fatal error occurred: {e.Exception.Message}\n\nDetails have been logged.", "Fatal Error", MessageBoxButton.OK, MessageBoxImage.Error);
             Application.Current.Shutdown();
         }
 
@@ -97,9 +96,11 @@ namespace ModbusForge
         {
             try
             {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash.log");
-                var message = $"[{DateTime.Now}] FATAL ERROR ({source}): {ex}\n\n";
-                File.AppendAllText(logPath, message);
+                var logger = ServiceProvider.GetService<ILogger<App>>();
+                if (logger != null)
+                {
+                    logger.LogError(ex, "FATAL ERROR ({Source}): {Message}", source, ex.Message);
+                }
             }
             catch { /* can't even log */ }
         }
@@ -140,6 +141,7 @@ namespace ModbusForge
             });
             services.AddSingleton<ITrendLogger, TrendLoggingService>();
             services.AddSingleton<IFileDialogService, FileDialogService>();
+            services.AddSingleton<IDialogService, MessageBoxDialogService>();
             services.AddSingleton<ICustomEntryService, CustomEntryService>();
             services.AddSingleton<IConsoleLoggerService, ConsoleLoggerService>();
             services.AddSingleton<ISettingsService, SettingsService>();
@@ -165,7 +167,8 @@ namespace ModbusForge
                 provider.GetRequiredService<IRetryPolicyService>(),
                 provider.GetRequiredService<IValidationService>(),
                 provider.GetRequiredService<IErrorHandlingService>(),
-                provider.GetRequiredService<ICircuitBreakerService>()
+                provider.GetRequiredService<ICircuitBreakerService>(),
+                provider.GetRequiredService<IDialogService>()
             ));
             services.AddSingleton<RegisterCoordinator>();
             services.AddSingleton<CustomEntryCoordinator>();

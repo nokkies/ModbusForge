@@ -96,7 +96,7 @@ public class UIInteractionTests : E2ETestBase
 
                 System.Threading.Thread.Sleep(1000);
 
-                var tagBrowserWindow = App.GetAllTopLevelWindows(Automation).FirstOrDefault(w => w.Title.Contains("Tag Browser"))
+                var tagBrowserWindow = App.GetAllTopLevelWindows(Automation!).FirstOrDefault(w => w.Title.Contains("Tag Browser"))
                     ?? MainWindow.FindFirstDescendant(cf.ByName("Tag Browser - Symbolic Addressing"))?.AsWindow();
                 Assert.NotNull(tagBrowserWindow);
 

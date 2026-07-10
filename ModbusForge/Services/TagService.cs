@@ -1,4 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using ModbusForge.Models;
 using System;
 using System.Collections.Generic;
@@ -15,8 +17,9 @@ namespace ModbusForge.Services
     /// </summary>
     public partial class TagService : ObservableObject
     {
-        private readonly string _tagsFilePath;
-        private readonly JsonSerializerOptions _jsonOptions;
+        private string _tagsFilePath = null!;
+        private JsonSerializerOptions _jsonOptions = null!;
+        private readonly ILogger<Tag> _tagLogger;
 
         [ObservableProperty]
         private ObservableCollection<Tag> _tags = new();
@@ -28,6 +31,18 @@ namespace ModbusForge.Services
         private ObservableCollection<WatchEntry> _watchEntries = new();
 
         public TagService()
+        {
+            _tagLogger = NullLogger<Tag>.Instance;
+            Initialize();
+        }
+
+        public TagService(ILogger<Tag> tagLogger)
+        {
+            _tagLogger = tagLogger ?? NullLogger<Tag>.Instance;
+            Initialize();
+        }
+
+        private void Initialize()
         {
             _tagsFilePath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -41,7 +56,7 @@ namespace ModbusForge.Services
             };
 
             // Create default group
-            _groups.Add(new TagGroup { Name = "Default", Description = "Default tag group" });
+            Groups.Add(new TagGroup { Name = "Default", Description = "Default tag group" });
 
             // Load existing tags
             LoadTagsAsync().ConfigureAwait(false);
@@ -52,7 +67,7 @@ namespace ModbusForge.Services
         /// </summary>
         public Tag CreateTag(string name, string group, PlcArea area, int address, TagDataType dataType)
         {
-            var tag = new Tag
+            var tag = new Tag(_tagLogger)
             {
                 Name = name,
                 Group = group,

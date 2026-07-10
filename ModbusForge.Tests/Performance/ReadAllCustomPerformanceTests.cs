@@ -109,7 +109,7 @@ namespace ModbusForge.Tests.Performance
             var sw = Stopwatch.StartNew();
             // Use reflection to call the private method ReadAllCustomNowAsync
             var method = typeof(MainViewModel).GetMethod("ReadAllCustomNowAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            await (Task)method.Invoke(viewModel, null);
+            await (Task)method!.Invoke(viewModel, null)!;
             sw.Stop();
 
             // Assert
@@ -177,7 +177,7 @@ namespace ModbusForge.Tests.Performance
             // Act
             var sw = Stopwatch.StartNew();
             var method = typeof(MainViewModel).GetMethod("ReadAllCustomNowAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            await (Task)method.Invoke(viewModel, null);
+            await (Task)method!.Invoke(viewModel, null)!;
             sw.Stop();
 
             // Assert

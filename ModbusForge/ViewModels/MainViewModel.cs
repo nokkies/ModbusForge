@@ -50,6 +50,7 @@ namespace ModbusForge.ViewModels
         private readonly CustomEntryCoordinator _customEntryCoordinator;
         private readonly TrendCoordinator _trendCoordinator;
         private readonly ConfigurationCoordinator _configurationCoordinator;
+        private readonly IDialogService _dialogService;
         private readonly VisualNodeEditorViewModel _visualNodeEditorViewModel;
         private readonly IVisualSimulationService _visualSimulationService;
         private bool _disposed = false;
@@ -73,7 +74,8 @@ namespace ModbusForge.ViewModels
             App.ServiceProvider.GetRequiredService<RegisterCoordinator>(),
             App.ServiceProvider.GetRequiredService<CustomEntryCoordinator>(),
             App.ServiceProvider.GetRequiredService<TrendCoordinator>(),
-            App.ServiceProvider.GetRequiredService<ConfigurationCoordinator>())
+            App.ServiceProvider.GetRequiredService<ConfigurationCoordinator>(),
+            App.ServiceProvider.GetRequiredService<IDialogService>())
         {
         }
 
@@ -86,7 +88,7 @@ namespace ModbusForge.ViewModels
 
         public VisualNodeEditorViewModel VisualNodeEditorViewModel => _visualNodeEditorViewModel;
 
-        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator)
+        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, IDialogService? dialogService = null)
         {
             // Store dependencies
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
@@ -100,8 +102,10 @@ namespace ModbusForge.ViewModels
             _customEntryCoordinator = customEntryCoordinator ?? throw new ArgumentNullException(nameof(customEntryCoordinator));
             _trendCoordinator = trendCoordinator ?? throw new ArgumentNullException(nameof(trendCoordinator));
             _configurationCoordinator = configurationCoordinator ?? throw new ArgumentNullException(nameof(configurationCoordinator));
+            _dialogService = dialogService ?? new NullDialogService();
             // Initialize visual node editor
-            _visualNodeEditorViewModel = new VisualNodeEditorViewModel();
+            _visualNodeEditorViewModel = new VisualNodeEditorViewModel(
+                App.ServiceProvider?.GetRequiredService<ILogger<VisualNodeEditorViewModel>>()!);
             _visualSimulationService = App.ServiceProvider?.GetService<IVisualSimulationService>()!;
             // VisualSimulationService will be started/stopped by ShowLiveValues toggle
 
@@ -447,6 +451,8 @@ namespace ModbusForge.ViewModels
         private readonly ITrendLogger _trendLogger;
         private readonly ICustomEntryService _customEntryService;
         private bool _isMonitoring;
+        private bool _isCustomTimerRunning;
+        private bool _isTrendTimerRunning;
         private DateTime _lastHoldingReadUtc = DateTime.MinValue;
         private DateTime _lastInputRegReadUtc = DateTime.MinValue;
         private DateTime _lastCoilsReadUtc = DateTime.MinValue;
@@ -1268,6 +1274,8 @@ namespace ModbusForge.ViewModels
 
         private async void CustomTimer_Tick(object? sender, EventArgs e)
         {
+            if (_isCustomTimerRunning) return;
+            _isCustomTimerRunning = true;
             try
             {
                 if (!IsConnected) return;
@@ -1288,7 +1296,7 @@ namespace ModbusForge.ViewModels
                         {
                             _logger.LogError(ex, "Continuous write failed for {Area} {Address}", entry.Area, entry.Address);
                             entry.Continuous = false;
-                            MessageBox.Show($"Continuous write failed for {entry.Area} {entry.Address}: {ex.Message}\n\nContinuous write has been paused for this entry. Fix the issue and re-enable if needed.", "Write Error",
+                            _dialogService.Show($"Continuous write failed for {entry.Area} {entry.Address}: {ex.Message}\n\nContinuous write has been paused for this entry. Fix the issue and re-enable if needed.", "Write Error",
                                 MessageBoxButton.OK, MessageBoxImage.Error);
                         }
                     }
@@ -1297,6 +1305,10 @@ namespace ModbusForge.ViewModels
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in CustomTimer_Tick");
+            }
+            finally
+            {
+                _isCustomTimerRunning = false;
             }
         }
 
@@ -1330,7 +1342,7 @@ namespace ModbusForge.ViewModels
                             _logger.LogWarning("Heartbeat check failed - connection lost");
                             await _modbusService.DisconnectAsync();
                             IsConnected = false;
-                            MessageBox.Show("Connection to server lost.\n\nPlease reconnect when the server is available.",
+                            _dialogService.Show("Connection to server lost.\n\nPlease reconnect when the server is available.",
                                 "Connection Lost", MessageBoxButton.OK, MessageBoxImage.Warning);
                             return;
                         }
@@ -1340,7 +1352,7 @@ namespace ModbusForge.ViewModels
                         _logger.LogWarning(ex, "Heartbeat check failed");
                         await _modbusService.DisconnectAsync();
                         IsConnected = false;
-                        MessageBox.Show("Connection to server lost.\n\nPlease reconnect when the server is available.",
+                        _dialogService.Show("Connection to server lost.\n\nPlease reconnect when the server is available.",
                             "Connection Lost", MessageBoxButton.OK, MessageBoxImage.Warning);
                         return;
                     }
@@ -1544,6 +1556,8 @@ namespace ModbusForge.ViewModels
 
         private async void TrendTimer_Tick(object? sender, EventArgs e)
         {
+            if (_isTrendTimerRunning) return;
+            _isTrendTimerRunning = true;
             try
             {
                 if (!IsConnected) return;
@@ -1559,6 +1573,10 @@ namespace ModbusForge.ViewModels
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in TrendTimer_Tick");
+            }
+            finally
+            {
+                _isTrendTimerRunning = false;
             }
         }
 
@@ -1938,7 +1956,7 @@ namespace ModbusForge.ViewModels
             {
                 if (!IsServerMode)
                 {
-                    MessageBox.Show("Export Unit ID is only available in Server mode.", "Export Unit ID", MessageBoxButton.OK, MessageBoxImage.Information);
+                    _dialogService.Show("Export Unit ID is only available in Server mode.", "Export Unit ID", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
@@ -2099,7 +2117,7 @@ namespace ModbusForge.ViewModels
             {
                 if (!IsServerMode)
                 {
-                    MessageBox.Show("Import Unit ID As is only available in Server mode.", "Import Unit ID As", MessageBoxButton.OK, MessageBoxImage.Information);
+                    _dialogService.Show("Import Unit ID As is only available in Server mode.", "Import Unit ID As", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
@@ -2146,13 +2164,13 @@ namespace ModbusForge.ViewModels
                             }
                             else
                             {
-                                MessageBox.Show("Invalid Unit ID. Please enter a value between 1 and 247.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                _dialogService.Show("Invalid Unit ID. Please enter a value between 1 and 247.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
                             }
                         }
                     }
                     else
                     {
-                        MessageBox.Show("No Unit ID configurations found in the selected file.", "Import Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        _dialogService.Show("No Unit ID configurations found in the selected file.", "Import Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                 }
             }
@@ -2192,7 +2210,7 @@ namespace ModbusForge.ViewModels
                                     }
                                     else
                                     {
-                                        MessageBox.Show($"Invalid float value: '{editedText}'", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                        _dialogService.Show($"Invalid float value: '{editedText}'", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                                         e.Cancel = true;
                                     }
                                     break;
@@ -2215,7 +2233,7 @@ namespace ModbusForge.ViewModels
                                     }
                                     else
                                     {
-                                        MessageBox.Show($"Invalid integer value: '{editedText}'", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                        _dialogService.Show($"Invalid integer value: '{editedText}'", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                                         e.Cancel = true;
                                     }
                                     break;
@@ -2238,7 +2256,7 @@ namespace ModbusForge.ViewModels
                                     }
                                     else
                                     {
-                                        MessageBox.Show($"Invalid unsigned value: '{editedText}' (0..65535)", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                        _dialogService.Show($"Invalid unsigned value: '{editedText}' (0..65535)", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                                         e.Cancel = true;
                                     }
                                     break;
@@ -2248,7 +2266,7 @@ namespace ModbusForge.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Failed to write register {entry.Address}: {ex.Message}", "Write Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    _dialogService.Show($"Failed to write register {entry.Address}: {ex.Message}", "Write Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     e.Cancel = true;
                 }
             }

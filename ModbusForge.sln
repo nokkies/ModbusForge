@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModbusForge", "ModbusForge\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UI.TestFramework", "UI.TestFramework\UI.TestFramework.csproj", "{270AF449-6A1A-4EBA-9FB3-2FF2BADC1EF0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModbusForge.Tests", "ModbusForge.Tests\ModbusForge.Tests.csproj", "{AA100AD2-8336-42DD-89E5-1E651CD8857D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,18 @@ Global
 		{270AF449-6A1A-4EBA-9FB3-2FF2BADC1EF0}.Release|x64.Build.0 = Release|Any CPU
 		{270AF449-6A1A-4EBA-9FB3-2FF2BADC1EF0}.Release|x86.ActiveCfg = Release|Any CPU
 		{270AF449-6A1A-4EBA-9FB3-2FF2BADC1EF0}.Release|x86.Build.0 = Release|Any CPU
+		{AA100AD2-8336-42DD-89E5-1E651CD8857D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA100AD2-8336-42DD-89E5-1E651CD8857D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA100AD2-8336-42DD-89E5-1E651CD8857D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{AA100AD2-8336-42DD-89E5-1E651CD8857D}.Debug|x64.Build.0 = Debug|Any CPU
+		{AA100AD2-8336-42DD-89E5-1E651CD8857D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{AA100AD2-8336-42DD-89E5-1E651CD8857D}.Debug|x86.Build.0 = Debug|Any CPU
+		{AA100AD2-8336-42DD-89E5-1E651CD8857D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA100AD2-8336-42DD-89E5-1E651CD8857D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA100AD2-8336-42DD-89E5-1E651CD8857D}.Release|x64.ActiveCfg = Release|Any CPU
+		{AA100AD2-8336-42DD-89E5-1E651CD8857D}.Release|x64.Build.0 = Release|Any CPU
+		{AA100AD2-8336-42DD-89E5-1E651CD8857D}.Release|x86.ActiveCfg = Release|Any CPU
+		{AA100AD2-8336-42DD-89E5-1E651CD8857D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

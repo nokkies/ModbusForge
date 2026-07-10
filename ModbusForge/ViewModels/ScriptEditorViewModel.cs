@@ -15,6 +15,7 @@ namespace ModbusForge.ViewModels
     {
         private readonly IScriptRuleService _scriptRuleService;
         private readonly ILogger<ScriptEditorViewModel> _logger;
+        private readonly IDialogService _dialogService;
         private int _ruleCounter = 1;
 
         public ObservableCollection<ScriptRule> Rules { get; } = new();
@@ -25,10 +26,11 @@ namespace ModbusForge.ViewModels
         [ObservableProperty]
         private bool _rulesEnabled = true;
 
-        public ScriptEditorViewModel(IScriptRuleService scriptRuleService, ILogger<ScriptEditorViewModel> logger)
+        public ScriptEditorViewModel(IScriptRuleService scriptRuleService, ILogger<ScriptEditorViewModel> logger, IDialogService? dialogService = null)
         {
             _scriptRuleService = scriptRuleService ?? throw new ArgumentNullException(nameof(scriptRuleService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _dialogService = dialogService ?? new NullDialogService();
 
             // Load existing rules
             LoadRules();
@@ -91,7 +93,7 @@ namespace ModbusForge.ViewModels
         {
             if (SelectedRule == null) return;
 
-            var result = MessageBox.Show(
+            var result = _dialogService.Show(
                 $"Delete rule '{SelectedRule.Name}'?",
                 "Confirm Delete",
                 MessageBoxButton.YesNo,
@@ -111,13 +113,13 @@ namespace ModbusForge.ViewModels
         private void ResetOneTime()
         {
             _scriptRuleService.ResetOneTimeRules();
-            MessageBox.Show("One-time rules have been reset.", "Rules Reset", MessageBoxButton.OK, MessageBoxImage.Information);
+            _dialogService.Show("One-time rules have been reset.", "Rules Reset", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         [RelayCommand]
         private void ClearAll()
         {
-            var result = MessageBox.Show(
+            var result = _dialogService.Show(
                 "Delete ALL script rules? This cannot be undone.",
                 "Confirm Clear All",
                 MessageBoxButton.YesNo,
@@ -180,7 +182,7 @@ TIPS:
 
 For more help, check the ModbusForge documentation.";
 
-            MessageBox.Show(helpText, "Script Rules Help", MessageBoxButton.OK, MessageBoxImage.Information);
+            _dialogService.Show(helpText, "Script Rules Help", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         partial void OnRulesEnabledChanged(bool value)

@@ -94,7 +94,7 @@ namespace ModbusForge.Tests.ViewModels
             {
                 ElementType = PlcElementType.InputInt,
                 Input1Address = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 5 },
-                OutputAddress = null
+                OutputAddress = null!
             };
 
             // Act
@@ -115,7 +115,7 @@ namespace ModbusForge.Tests.ViewModels
             {
                 ElementType = PlcElementType.InputBool,
                 Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 },
-                OutputAddress = null
+                OutputAddress = null!
             };
 
             // Act

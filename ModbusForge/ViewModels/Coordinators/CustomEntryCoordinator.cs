@@ -22,19 +22,22 @@ namespace ModbusForge.ViewModels.Coordinators
         private readonly ModbusTcpService _clientService;
         private readonly ModbusServerService _serverService;
         private readonly ILogger<CustomEntryCoordinator> _logger;
+        private readonly IDialogService _dialogService;
 
         public CustomEntryCoordinator(
             RegisterCoordinator registerCoordinator,
             ICustomEntryService customEntryService,
             ModbusTcpService clientService,
             ModbusServerService serverService,
-            ILogger<CustomEntryCoordinator> logger)
+            ILogger<CustomEntryCoordinator> logger,
+            IDialogService? dialogService = null)
         {
             _registerCoordinator = registerCoordinator ?? throw new ArgumentNullException(nameof(registerCoordinator));
             _customEntryService = customEntryService ?? throw new ArgumentNullException(nameof(customEntryService));
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
             _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _dialogService = dialogService ?? new NullDialogService();
         }
 
         /// <summary>
@@ -297,7 +300,7 @@ namespace ModbusForge.ViewModels.Coordinators
             if (area == "holdingregister")
             {
                 var data = await service.ReadHoldingRegistersAsync(unitId, startAddress, count);
-                if (data == null) throw new Exception("Read returned null");
+                if (data == null) throw new InvalidOperationException("Read returned null");
                 foreach (var entry in chunk)
                 {
                     int offset = entry.Address - startAddress;
@@ -308,7 +311,7 @@ namespace ModbusForge.ViewModels.Coordinators
             else if (area == "inputregister")
             {
                 var data = await service.ReadInputRegistersAsync(unitId, startAddress, count);
-                if (data == null) throw new Exception("Read returned null");
+                if (data == null) throw new InvalidOperationException("Read returned null");
                 foreach (var entry in chunk)
                 {
                     int offset = entry.Address - startAddress;
@@ -319,7 +322,7 @@ namespace ModbusForge.ViewModels.Coordinators
             else if (area == "coil")
             {
                 var data = await service.ReadCoilsAsync(unitId, startAddress, count);
-                if (data == null) throw new Exception("Read returned null");
+                if (data == null) throw new InvalidOperationException("Read returned null");
                 foreach (var entry in chunk)
                 {
                     int offset = entry.Address - startAddress;
@@ -330,7 +333,7 @@ namespace ModbusForge.ViewModels.Coordinators
             else if (area == "discreteinput")
             {
                 var data = await service.ReadDiscreteInputsAsync(unitId, startAddress, count);
-                if (data == null) throw new Exception("Read returned null");
+                if (data == null) throw new InvalidOperationException("Read returned null");
                 foreach (var entry in chunk)
                 {
                     int offset = entry.Address - startAddress;
@@ -500,7 +503,7 @@ namespace ModbusForge.ViewModels.Coordinators
             {
                 _logger.LogError(ex, "Error saving custom entries");
                 setStatusMessage($"Error saving: {ex.Message}");
-                MessageBox.Show($"Failed to save custom entries: {ex.Message}", "Save Error",
+                _dialogService.Show($"Failed to save custom entries: {ex.Message}", "Save Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -531,7 +534,7 @@ namespace ModbusForge.ViewModels.Coordinators
             {
                 _logger.LogError(ex, "Error loading custom entries");
                 setStatusMessage($"Error loading: {ex.Message}");
-                MessageBox.Show($"Failed to load custom entries: {ex.Message}", "Load Error",
+                _dialogService.Show($"Failed to load custom entries: {ex.Message}", "Load Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

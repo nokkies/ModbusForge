@@ -181,7 +181,7 @@ namespace ModbusForge.Tests.Coordinators
             // Arrange
             var entries = new List<CustomEntry>
             {
-                new CustomEntry { Address = 1, Type = "uint", Area = null, Trend = true },
+                new CustomEntry { Address = 1, Type = "uint", Area = null!, Trend = true },
                 new CustomEntry { Address = 2, Type = "uint", Area = "HoldingRegister", Trend = true }
             };
 

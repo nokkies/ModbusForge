@@ -28,7 +28,7 @@ namespace ModbusForge.Tests.Services
         {
             // Arrange
             _mockFileDialogService.Setup(s => s.ShowOpenFileDialog(It.IsAny<string>(), It.IsAny<string>()))
-                .Returns((string)null);
+                .Returns((string?)null);
 
             // Act
             var result = await _service.LoadCustomAsync();

@@ -1,4 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -25,8 +27,15 @@ namespace ModbusForge.Models
     /// </summary>
     public partial class Tag : ObservableObject
     {
+        private readonly ILogger<Tag> _logger;
+
         [ObservableProperty]
         private string _id = Guid.NewGuid().ToString();
+
+        public Tag(ILogger<Tag>? logger = null)
+        {
+            _logger = logger ?? NullLogger<Tag>.Instance;
+        }
 
         [ObservableProperty]
         private string _name = "";
@@ -100,25 +109,25 @@ namespace ModbusForge.Models
                 catch (FormatException ex)
                 {
                     // Log format conversion errors - current value cannot be converted to double
-                    System.Diagnostics.Debug.WriteLine($"Tag '{Name}': Format error converting '{CurrentValue}' to double for scaling. {ex.Message}");
+                    _logger.LogDebug(ex, "Tag '{TagName}': Format error converting '{CurrentValue}' to double for scaling", Name, CurrentValue);
                     return null;
                 }
                 catch (InvalidCastException ex)
                 {
                     // Log type conversion errors - current value type is incompatible
-                    System.Diagnostics.Debug.WriteLine($"Tag '{Name}': Invalid cast converting '{CurrentValue?.GetType().Name}' to double for scaling. {ex.Message}");
+                    _logger.LogDebug(ex, "Tag '{TagName}': Invalid cast converting '{CurrentValueType}' to double for scaling", Name, CurrentValue?.GetType().Name);
                     return null;
                 }
                 catch (OverflowException ex)
                 {
                     // Log overflow errors - value is too large/small for double
-                    System.Diagnostics.Debug.WriteLine($"Tag '{Name}': Overflow error converting '{CurrentValue}' to double for scaling. {ex.Message}");
+                    _logger.LogDebug(ex, "Tag '{TagName}': Overflow error converting '{CurrentValue}' to double for scaling", Name, CurrentValue);
                     return null;
                 }
                 catch (Exception ex)
                 {
                     // Log any unexpected errors during scaling
-                    System.Diagnostics.Debug.WriteLine($"Tag '{Name}': Unexpected error during scaling calculation. {ex.Message}");
+                    _logger.LogDebug(ex, "Tag '{TagName}': Unexpected error during scaling calculation", Name);
                     return null;
                 }
             }

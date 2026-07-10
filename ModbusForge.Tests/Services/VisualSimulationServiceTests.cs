@@ -63,7 +63,7 @@ namespace ModbusForge.Tests.Services
             return port;
         }
 
-        private DataStore GetDataStore() => _serverService.GetDataStore();
+        private DataStore GetDataStore() => _serverService.GetDataStore()!;
 
         // ───────── Helper: build nodes + connections and call UpdateNodeValues ─────────
 
@@ -75,7 +75,7 @@ namespace ModbusForge.Tests.Services
             _simService.UpdateNodeValues();
         }
 
-        private VisualNode MakeNode(PlcElementType type, string id = null)
+        private VisualNode MakeNode(PlcElementType type, string? id = null)
         {
             var node = new VisualNode
             {

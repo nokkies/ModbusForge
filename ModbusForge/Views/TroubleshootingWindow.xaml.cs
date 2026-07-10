@@ -101,13 +101,6 @@ namespace ModbusForge.Views
             AppendFileInfo(sb, "connection-profiles.json", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ModbusForge", "connection-profiles.json"));
             sb.AppendLine();
 
-            // Crash Log
-            sb.AppendLine("Crash Log");
-            sb.AppendLine("---------");
-            var crashLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash.log");
-            AppendFileContents(sb, crashLogPath, 100);
-            sb.AppendLine();
-
             sb.AppendLine("End of Diagnostics Report");
             return sb.ToString();
         }
@@ -150,34 +143,6 @@ namespace ModbusForge.Views
             catch (Exception ex)
             {
                 sb.AppendLine($"{name}: Error reading info - {ex.Message}");
-            }
-        }
-
-        private static void AppendFileContents(StringBuilder sb, string path, int maxLines)
-        {
-            try
-            {
-                if (!File.Exists(path))
-                {
-                    sb.AppendLine("No crash log found.");
-                    return;
-                }
-
-                var lines = File.ReadAllLines(path);
-                var startIndex = Math.Max(0, lines.Length - maxLines);
-                for (int i = startIndex; i < lines.Length; i++)
-                {
-                    sb.AppendLine(lines[i]);
-                }
-
-                if (lines.Length > maxLines)
-                {
-                    sb.AppendLine($"... ({lines.Length - maxLines} earlier lines omitted)");
-                }
-            }
-            catch (Exception ex)
-            {
-                sb.AppendLine($"Error reading crash log: {ex.Message}");
             }
         }
     }

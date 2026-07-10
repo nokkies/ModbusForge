@@ -21,6 +21,7 @@ namespace ModbusForge.ViewModels
     {
         private readonly ITrendLogger _loggerSvc;
         private readonly IFileDialogService _fileDialogService;
+        private readonly IDialogService _dialogService;
         private readonly Dictionary<string, ObservableCollection<double>> _valuesByKey = new();
         private readonly Dictionary<string, List<(DateTime ts, double v)>> _samplesByKey = new();
         private readonly Dictionary<string, SKColor> _colorByKey = new();
@@ -48,10 +49,11 @@ namespace ModbusForge.ViewModels
             public string Name { get; init; } = string.Empty;
         }
 
-        public TrendViewModel(ITrendLogger loggerSvc, IOptions<LoggingSettings> options, IFileDialogService fileDialogService)
+        public TrendViewModel(ITrendLogger loggerSvc, IOptions<LoggingSettings> options, IFileDialogService fileDialogService, IDialogService? dialogService = null)
         {
             _loggerSvc = loggerSvc;
             _fileDialogService = fileDialogService;
+            _dialogService = dialogService ?? new NullDialogService();
             var s = options?.Value ?? new LoggingSettings();
             s.Clamp();
 
@@ -164,7 +166,7 @@ namespace ModbusForge.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Export CSV failed: {ex.Message}", "Trend Export", MessageBoxButton.OK, MessageBoxImage.Error);
+                    _dialogService.Show($"Export CSV failed: {ex.Message}", "Trend Export", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -203,7 +205,7 @@ namespace ModbusForge.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Import CSV failed: {ex.Message}", "Trend Import", MessageBoxButton.OK, MessageBoxImage.Error);
+                    _dialogService.Show($"Import CSV failed: {ex.Message}", "Trend Import", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }

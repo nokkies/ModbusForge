@@ -35,7 +35,7 @@ public class ConnectionManagerPerformanceTests
 
         // Use reflection to get the private _services dictionary
         var servicesField = typeof(ConnectionManager).GetField("_services", BindingFlags.NonPublic | BindingFlags.Instance);
-        var services = (ConcurrentDictionary<string, ModbusTcpService>)servicesField.GetValue(manager);
+        var services = (ConcurrentDictionary<string, ModbusTcpService>)servicesField!.GetValue(manager)!;
 
         for (int i = 0; i < connectionCount; i++)
         {

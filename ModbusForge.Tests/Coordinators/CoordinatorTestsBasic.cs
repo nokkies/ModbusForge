@@ -32,7 +32,7 @@ namespace ModbusForge.Tests.Coordinators
             // Arrange
             var entry = new ModbusForge.Models.CustomEntry
             {
-                Area = null,
+                Area = null!,
                 Address = 50
             };
 
@@ -87,7 +87,7 @@ namespace ModbusForge.Tests.Coordinators
             // Arrange
             var entry = new ModbusForge.Models.CustomEntry
             {
-                Name = null,
+                Name = null!,
                 Area = "InputRegister",
                 Address = 200,
                 Type = "int"

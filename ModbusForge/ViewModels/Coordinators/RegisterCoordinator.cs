@@ -19,17 +19,20 @@ namespace ModbusForge.ViewModels.Coordinators
         private readonly ModbusServerService _serverService;
         private readonly IConsoleLoggerService _consoleLoggerService;
         private readonly ILogger<RegisterCoordinator> _logger;
+        private readonly IDialogService _dialogService;
 
         public RegisterCoordinator(
             ModbusTcpService clientService,
             ModbusServerService serverService,
             IConsoleLoggerService consoleLoggerService,
-            ILogger<RegisterCoordinator> logger)
+            ILogger<RegisterCoordinator> logger,
+            IDialogService? dialogService = null)
         {
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
             _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
             _consoleLoggerService = consoleLoggerService ?? throw new ArgumentNullException(nameof(consoleLoggerService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _dialogService = dialogService ?? new NullDialogService();
         }
 
         /// <summary>
@@ -144,12 +147,12 @@ namespace ModbusForge.ViewModels.Coordinators
                 
                 if (isMonitoringEnabled)
                 {
-                    MessageBox.Show($"Failed to read registers: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
+                    _dialogService.Show($"Failed to read registers: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 else
                 {
-                    MessageBox.Show($"Failed to read registers: {ex.Message}", "Read Error",
+                    _dialogService.Show($"Failed to read registers: {ex.Message}", "Read Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
@@ -217,12 +220,12 @@ namespace ModbusForge.ViewModels.Coordinators
                 
                 if (isMonitoringEnabled)
                 {
-                    MessageBox.Show($"Failed to read input registers: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
+                    _dialogService.Show($"Failed to read input registers: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 else
                 {
-                    MessageBox.Show($"Failed to read input registers: {ex.Message}", "Read Error",
+                    _dialogService.Show($"Failed to read input registers: {ex.Message}", "Read Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
@@ -252,7 +255,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 setStatusMessage($"Error writing register: {ex.Message}");
                 _logger.LogError(ex, "Error writing register");
                 _consoleLoggerService.Log($"Error writing register: {ex.Message}");
-                MessageBox.Show($"Failed to write register: {ex.Message}", "Write Error",
+                _dialogService.Show($"Failed to write register: {ex.Message}", "Write Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -355,12 +358,12 @@ namespace ModbusForge.ViewModels.Coordinators
                 
                 if (isMonitoringEnabled)
                 {
-                    MessageBox.Show($"Failed to read coils: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
+                    _dialogService.Show($"Failed to read coils: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 else
                 {
-                    MessageBox.Show($"Failed to read coils: {ex.Message}", "Read Error",
+                    _dialogService.Show($"Failed to read coils: {ex.Message}", "Read Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
@@ -426,12 +429,12 @@ namespace ModbusForge.ViewModels.Coordinators
                 
                 if (isMonitoringEnabled)
                 {
-                    MessageBox.Show($"Failed to read discrete inputs: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
+                    _dialogService.Show($"Failed to read discrete inputs: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 else
                 {
-                    MessageBox.Show($"Failed to read discrete inputs: {ex.Message}", "Read Error",
+                    _dialogService.Show($"Failed to read discrete inputs: {ex.Message}", "Read Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
@@ -461,7 +464,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 setStatusMessage($"Error writing coil: {ex.Message}");
                 _logger.LogError(ex, "Error writing coil");
                 _consoleLoggerService.Log($"Error writing coil: {ex.Message}");
-                MessageBox.Show($"Failed to write coil: {ex.Message}", "Write Error",
+                _dialogService.Show($"Failed to write coil: {ex.Message}", "Write Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

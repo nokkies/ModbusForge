@@ -52,12 +52,6 @@ namespace ModbusForge.Services
         private int _lastNodeCount;
         private int _lastConnectionCount;
 
-#if DEBUG
-        private static bool _debugLogging = true;
-#else
-        private static bool _debugLogging = false;
-#endif
-
         public VisualSimulationService(
             ILogger<VisualSimulationService> logger,
             ModbusServerService serverService)
@@ -188,7 +182,7 @@ namespace ModbusForge.Services
                 _topoOrder = BuildTopologicalOrder();
                 _lastNodeCount = nodeCount;
                 _lastConnectionCount = connCount;
-                DebugLog($"Rebuilt topo order: {_topoOrder.Count} nodes");
+                _logger.LogDebug("Rebuilt topo order: {Count} nodes", _topoOrder.Count);
             }
         }
 
@@ -689,12 +683,6 @@ namespace ModbusForge.Services
         public bool GetNodeValue(string nodeId)
         {
             return _nodeValueCache.GetValueOrDefault(nodeId, false);
-        }
-
-        private void DebugLog(string message)
-        {
-            if (_debugLogging)
-                System.Diagnostics.Debug.WriteLine($"[VisualSim] {message}");
         }
 
         public void Dispose()

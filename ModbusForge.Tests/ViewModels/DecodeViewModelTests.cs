@@ -13,10 +13,10 @@ namespace ModbusForge.Tests.ViewModels
 {
     public class DecodeViewModelTests
     {
-        private Mock<ModbusTcpService> _mockTcpService;
-        private Mock<ModbusServerService> _mockServerService;
-        private Mock<ILogger<DecodeViewModel>> _mockLogger;
-        private Mock<MainViewModel> _mockMainViewModel;
+        private Mock<ModbusTcpService> _mockTcpService = null!;
+        private Mock<ModbusServerService> _mockServerService = null!;
+        private Mock<ILogger<DecodeViewModel>> _mockLogger = null!;
+        private Mock<MainViewModel> _mockMainViewModel = null!;
 
         private DecodeViewModel CreateViewModel()
         {
@@ -62,7 +62,8 @@ namespace ModbusForge.Tests.ViewModels
                 registerCoordinator,
                 customEntryCoordinator,
                 trendCoordinator,
-                configurationCoordinator
+                configurationCoordinator,
+                new Mock<IDialogService>().Object
             );
 
             // Important: Call CallBase so we don't null-ref on PropertyChanged, etc.
@@ -207,7 +208,7 @@ namespace ModbusForge.Tests.ViewModels
             var vm = CreateViewModel();
             vm.Area = "HoldingRegister";
 
-            var tcs = new TaskCompletionSource<ushort[]>();
+            var tcs = new TaskCompletionSource<ushort[]?>();
             _mockTcpService.Setup(s => s.ReadHoldingRegistersAsync(1, 1, 2))
                 .Returns(tcs.Task);
 
