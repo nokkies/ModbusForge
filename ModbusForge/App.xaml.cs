@@ -178,6 +178,8 @@ namespace ModbusForge
             services.AddSingleton<IErrorHandlingService, ErrorHandlingService>();
             services.AddSingleton<ICircuitBreakerService, CircuitBreakerService>();
             services.AddSingleton<IHelpContentService, HelpContentService>();
+            services.AddSingleton<IWindowOwnerProvider, MainWindowOwnerProvider>();
+            services.AddSingleton<ITagWindowService, TagWindowService>();
             
             // Register Coordinators
             services.AddSingleton<ConnectionCoordinator>(provider => new ConnectionCoordinator(

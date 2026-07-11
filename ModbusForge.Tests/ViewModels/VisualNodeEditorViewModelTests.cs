@@ -1,10 +1,24 @@
 using System.Linq;
 using ModbusForge.Models;
+using ModbusForge.Services;
 using ModbusForge.ViewModels;
 using Xunit;
 
 namespace ModbusForge.Tests.ViewModels
 {
+    /// <summary>
+    /// Test double for <see cref="ITagWindowService"/> that records calls without
+    /// creating any real WPF windows.
+    /// </summary>
+    internal sealed class StubTagWindowService : ITagWindowService
+    {
+        public int ShowTagBrowserCallCount { get; private set; }
+        public int ShowWatchWindowCallCount { get; private set; }
+
+        public void ShowTagBrowser() => ShowTagBrowserCallCount++;
+        public void ShowWatchWindow() => ShowWatchWindowCallCount++;
+    }
+
     public class VisualNodeEditorViewModelTests
     {
         [Fact]
@@ -87,6 +101,77 @@ namespace ModbusForge.Tests.ViewModels
             Assert.False(node1.IsSelected);
             Assert.False(node2.IsSelected);
             Assert.Null(viewModel.SelectedNode);
+        }
+
+        // ------------------------------------------------------------------
+        // ITagWindowService tests — no real WPF windows created
+        // ------------------------------------------------------------------
+
+        [Fact]
+        public void OpenTagBrowserCommand_WhenTagWindowServiceInjected_CallsShowTagBrowser()
+        {
+            // Arrange
+            var stub = new StubTagWindowService();
+            var viewModel = new VisualNodeEditorViewModel(tagWindowService: stub);
+
+            // Act
+            viewModel.OpenTagBrowserCommand.Execute(null);
+
+            // Assert
+            Assert.Equal(1, stub.ShowTagBrowserCallCount);
+            Assert.Equal(0, stub.ShowWatchWindowCallCount);
+        }
+
+        [Fact]
+        public void OpenWatchWindowCommand_WhenTagWindowServiceInjected_CallsShowWatchWindow()
+        {
+            // Arrange
+            var stub = new StubTagWindowService();
+            var viewModel = new VisualNodeEditorViewModel(tagWindowService: stub);
+
+            // Act
+            viewModel.OpenWatchWindowCommand.Execute(null);
+
+            // Assert
+            Assert.Equal(0, stub.ShowTagBrowserCallCount);
+            Assert.Equal(1, stub.ShowWatchWindowCallCount);
+        }
+
+        [Fact]
+        public void OpenTagBrowserCommand_ExecutedTwice_CallsShowTagBrowserTwice()
+        {
+            // Arrange
+            var stub = new StubTagWindowService();
+            var viewModel = new VisualNodeEditorViewModel(tagWindowService: stub);
+
+            // Act
+            viewModel.OpenTagBrowserCommand.Execute(null);
+            viewModel.OpenTagBrowserCommand.Execute(null);
+
+            // Assert
+            Assert.Equal(2, stub.ShowTagBrowserCallCount);
+        }
+
+        [Fact]
+        public void OpenTagBrowserCommand_WhenNoTagWindowServiceRegistered_DoesNotThrow()
+        {
+            // Arrange — no ITagWindowService injected (simulates misconfigured DI or test env)
+            var viewModel = new VisualNodeEditorViewModel();
+
+            // Act & Assert — should log a warning and return, not throw
+            var ex = Record.Exception(() => viewModel.OpenTagBrowserCommand.Execute(null));
+            Assert.Null(ex);
+        }
+
+        [Fact]
+        public void OpenWatchWindowCommand_WhenNoTagWindowServiceRegistered_DoesNotThrow()
+        {
+            // Arrange — no ITagWindowService injected
+            var viewModel = new VisualNodeEditorViewModel();
+
+            // Act & Assert
+            var ex = Record.Exception(() => viewModel.OpenWatchWindowCommand.Execute(null));
+            Assert.Null(ex);
         }
     }
 }

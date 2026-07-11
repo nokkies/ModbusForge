@@ -42,6 +42,7 @@ namespace ModbusForge.ViewModels
         private readonly TagService? _tagService;
         private readonly ModbusServerService? _modbusServerService;
         private readonly IDialogService _dialogService;
+        private readonly ITagWindowService? _tagWindowService;
 
         [ObservableProperty]
         private VisualNodeEditorConfig _config = new VisualNodeEditorConfig();
@@ -120,13 +121,15 @@ namespace ModbusForge.ViewModels
             IVisualSimulationService? visualSimulationService = null,
             TagService? tagService = null,
             ModbusServerService? modbusServerService = null,
-            IDialogService? dialogService = null)
+            IDialogService? dialogService = null,
+            ITagWindowService? tagWindowService = null)
         {
             _logger = logger ?? NullLogger<VisualNodeEditorViewModel>.Instance;
             _visualSimulationService = visualSimulationService;
             _tagService = tagService;
             _modbusServerService = modbusServerService;
             _dialogService = dialogService ?? new NullDialogService();
+            _tagWindowService = tagWindowService;
 
             AlignLeftCommand = new RelayCommand(AlignLeft);
             AlignTopCommand = new RelayCommand(AlignTop);
@@ -1021,42 +1024,22 @@ namespace ModbusForge.ViewModels
 
         private void OpenTagBrowser()
         {
-            try
+            if (_tagWindowService == null)
             {
-                if (_tagService == null) return;
-
-                var browser = new ModbusForge.Views.TagBrowserWindow(_tagService, _dialogService);
-                if (App.Current?.MainWindow is Window owner)
-                {
-                    browser.Owner = owner;
-                }
-                browser.Show();
+                _logger.LogWarning("OpenTagBrowser called but ITagWindowService is not registered");
+                return;
             }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-            {
-                _logger.LogError(ex, "Failed to open tag browser");
-                _dialogService.Show($"Error opening Tag Browser: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            _tagWindowService.ShowTagBrowser();
         }
 
         private void OpenWatchWindow()
         {
-            try
+            if (_tagWindowService == null)
             {
-                if (_tagService == null) return;
-
-                var watchWindow = new ModbusForge.Views.WatchWindow(_tagService, _dialogService);
-                if (App.Current?.MainWindow is Window owner)
-                {
-                    watchWindow.Owner = owner;
-                }
-                watchWindow.Show();
+                _logger.LogWarning("OpenWatchWindow called but ITagWindowService is not registered");
+                return;
             }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-            {
-                _logger.LogError(ex, "Failed to open watch window");
-                _dialogService.Show($"Error opening Watch Window: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            _tagWindowService.ShowWatchWindow();
         }
 
         public int GetOutputRegisterValue(VisualNode node, byte selectedUnitId)

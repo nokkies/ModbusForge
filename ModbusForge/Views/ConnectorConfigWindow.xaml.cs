@@ -21,6 +21,14 @@ namespace ModbusForge.Views
             // Create view model with the initial values
             var viewModel = new ConnectorConfigViewModel(nodeId, connectorType, nodeName, customEntries, initialArea, initialAddress, initiallyLinked, initiallyInverted);
             DataContext = viewModel;
+
+            // Subscribe so the view model can close this window without reaching into
+            // Application.Current.Windows — it raises an event, we close ourselves.
+            viewModel.CloseRequested += dialogResult =>
+            {
+                this.DialogResult = dialogResult;
+                this.Close();
+            };
             
             // Force the view model properties to update after DataContext is set
             this.Dispatcher.BeginInvoke(() =>
@@ -176,6 +184,14 @@ namespace ModbusForge.Views
         }
         
         public ConnectorConfiguration? Result { get; private set; }
+
+        /// <summary>
+        /// Raised when the view model wants to close its host window.
+        /// The bool argument is the desired <see cref="System.Windows.Window.DialogResult"/> value.
+        /// The window subscribes to this event and calls <c>this.Close()</c> — no
+        /// <c>Application.Current.Windows</c> traversal needed.
+        /// </summary>
+        public event Action<bool>? CloseRequested;
         
         public PlcArea[] AvailableAreas => Enum.GetValues<PlcArea>();
         
@@ -327,24 +343,16 @@ namespace ModbusForge.Views
                 };
             }
             
-            // Close the window
-            if (Application.Current.Windows.OfType<ConnectorConfigWindow>().FirstOrDefault() is ConnectorConfigWindow window)
-            {
-                window.DialogResult = true;
-                window.Close();
-            }
+            // Ask the host window to close itself — it subscribed to this event
+            // in its constructor so we never need Application.Current.Windows here.
+            CloseRequested?.Invoke(true);
         }
         
         [RelayCommand]
         private void Cancel()
         {
             Result = null;
-            
-            if (Application.Current.Windows.OfType<ConnectorConfigWindow>().FirstOrDefault() is ConnectorConfigWindow window)
-            {
-                window.DialogResult = false;
-                window.Close();
-            }
+            CloseRequested?.Invoke(false);
         }
         
         private void ShowStatus(string message)
