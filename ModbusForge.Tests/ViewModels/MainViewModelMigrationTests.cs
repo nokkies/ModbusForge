@@ -78,7 +78,7 @@ namespace ModbusForge.Tests.ViewModels
                 };
 
                 // Act
-                vm.MigrateOldNodeAddresses(node);
+                vm.VisualNodeEditorViewModel.MigrateNode(node);
 
                 // Assert
                 Assert.Equal(1, node.Input1Address.Address);
@@ -100,7 +100,7 @@ namespace ModbusForge.Tests.ViewModels
             };
 
             // Act
-            vm.MigrateOldNodeAddresses(node);
+            vm.VisualNodeEditorViewModel.MigrateNode(node);
 
             // Assert
             Assert.NotNull(node.OutputAddress);
@@ -121,7 +121,7 @@ namespace ModbusForge.Tests.ViewModels
             };
 
             // Act
-            vm.MigrateOldNodeAddresses(node);
+            vm.VisualNodeEditorViewModel.MigrateNode(node);
 
             // Assert
             Assert.NotNull(node.OutputAddress);
@@ -146,7 +146,7 @@ namespace ModbusForge.Tests.ViewModels
             vm.VisualNodeEditorViewModel.ConnectorConfigs.Add(config3);
 
             // Act
-            vm.MigrateOldNodeAddresses(node);
+            vm.VisualNodeEditorViewModel.MigrateNode(node);
 
             // Assert
             Assert.Equal(1, config1.Address);

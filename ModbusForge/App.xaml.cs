@@ -146,6 +146,8 @@ namespace ModbusForge
             });
             services.AddSingleton<ITrendLogger, TrendLoggingService>();
             services.AddSingleton<IFileDialogService, FileDialogService>();
+            services.AddSingleton<IFileSystem, FileSystem>();
+            services.AddSingleton<IInputDialogService, WpfInputDialogService>();
             services.AddSingleton<IDialogService, MessageBoxDialogService>();
             services.AddSingleton<ICustomEntryService, CustomEntryService>();
             services.AddSingleton<IDispatcher, WpfDispatcher>();
@@ -204,7 +206,13 @@ namespace ModbusForge
                 provider.GetRequiredService<ILogger<TrendCoordinator>>(),
                 provider.GetRequiredService<ISettingsService>()
             ));
-            services.AddSingleton<ConfigurationCoordinator>();
+            services.AddSingleton<ConfigurationCoordinator>(provider => new ConfigurationCoordinator(
+                provider.GetRequiredService<ILogger<ConfigurationCoordinator>>(),
+                provider.GetRequiredService<IFileDialogService>(),
+                provider.GetRequiredService<IFileSystem>(),
+                provider.GetRequiredService<IInputDialogService>(),
+                provider.GetRequiredService<IDialogService>()
+            ));
             
             // Register ViewModels
             services.AddSingleton<MainViewModel>();

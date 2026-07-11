@@ -64,40 +64,41 @@ namespace ModbusForge.ViewModels.Coordinators
         }
 
         /// <summary>
-        /// Writes a custom entry value.
+        /// Writes a custom entry value and returns a typed result.
         /// </summary>
-        public async Task WriteCustomNowAsync(CustomEntry entry, byte unitId, Action<string> setStatusMessage, bool isServerMode)
+        public async Task<CustomEntryOperationResult> WriteCustomNowAsync(CustomEntry entry, byte unitId, bool isServerMode)
         {
-            if (entry is null) return;
-            
+            if (entry is null)
+                return new CustomEntryOperationResult { Success = false, Message = "No custom entry selected" };
+
             try
             {
                 var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
                 switch (area)
                 {
                     case "holdingregister":
-                        await WriteHoldingRegisterByTypeAsync(entry, unitId, setStatusMessage, isServerMode);
-                        break;
+                        return await WriteHoldingRegisterByTypeAsync(entry, unitId, isServerMode);
                     case "coil":
-                        await WriteCoilAsync(entry, unitId, setStatusMessage, isServerMode);
-                        break;
+                        return await WriteCoilAsync(entry, unitId, isServerMode);
                     case "inputregister":
                     case "discreteinput":
-                        setStatusMessage($"{entry.Area} is read-only. Select HoldingRegister or Coil to write.");
-                        break;
+                        return new CustomEntryOperationResult
+                        {
+                            Success = false,
+                            Message = $"{entry.Area} is read-only. Select HoldingRegister or Coil to write."
+                        };
                     default:
-                        setStatusMessage($"Unknown area: {entry.Area}");
-                        break;
+                        return new CustomEntryOperationResult { Success = false, Message = $"Unknown area: {entry.Area}" };
                 }
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error writing custom entry");
-                setStatusMessage($"Custom write error: {ex.Message}");
+                return new CustomEntryOperationResult { Success = false, Message = $"Custom write error: {ex.Message}" };
             }
         }
 
-        private async Task WriteHoldingRegisterByTypeAsync(CustomEntry entry, byte unitId, Action<string> setStatusMessage, bool isServerMode)
+        private async Task<CustomEntryOperationResult> WriteHoldingRegisterByTypeAsync(CustomEntry entry, byte unitId, bool isServerMode)
         {
             var type = (entry.Type ?? "uint").ToLowerInvariant();
             switch (type)
@@ -107,88 +108,72 @@ namespace ModbusForge.ViewModels.Coordinators
                         float.TryParse(entry.Value, NumberStyles.Float, CultureInfo.CurrentCulture, out f))
                     {
                         await _registerCoordinator.WriteFloatAtAsync(unitId, entry.Address, f, isServerMode);
-                        setStatusMessage($"Wrote REAL {f} at {entry.Address}");
+                        return new CustomEntryOperationResult { Success = true, Message = $"Wrote REAL {f} at {entry.Address}" };
                     }
-                    else
-                    {
-                        setStatusMessage($"Invalid float: {entry.Value}");
-                    }
-                    break;
+                    return new CustomEntryOperationResult { Success = false, Message = $"Invalid float: {entry.Value}" };
+
                 case "string":
                     await _registerCoordinator.WriteStringAtAsync(unitId, entry.Address, entry.Value ?? string.Empty, isServerMode);
-                    setStatusMessage($"Wrote STRING '{entry.Value}' at {entry.Address}");
-                    break;
+                    return new CustomEntryOperationResult { Success = true, Message = $"Wrote STRING '{entry.Value}' at {entry.Address}" };
+
                 case "int":
                     if (int.TryParse(entry.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int iv))
                     {
                         await _registerCoordinator.WriteRegisterAtAsync(unitId, entry.Address, unchecked((ushort)iv), isServerMode);
-                        setStatusMessage($"Wrote INT {iv} at {entry.Address}");
+                        return new CustomEntryOperationResult { Success = true, Message = $"Wrote INT {iv} at {entry.Address}" };
                     }
-                    else
-                    {
-                        setStatusMessage($"Invalid int: {entry.Value}");
-                    }
-                    break;
+                    return new CustomEntryOperationResult { Success = false, Message = $"Invalid int: {entry.Value}" };
+
                 default: // uint
                     if (uint.TryParse(entry.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out uint uv))
                     {
                         if (uv > 0xFFFF) uv = 0xFFFF;
                         await _registerCoordinator.WriteRegisterAtAsync(unitId, entry.Address, (ushort)uv, isServerMode);
-                        setStatusMessage($"Wrote UINT {uv} at {entry.Address}");
+                        return new CustomEntryOperationResult { Success = true, Message = $"Wrote UINT {uv} at {entry.Address}" };
                     }
-                    else
-                    {
-                        setStatusMessage($"Invalid uint: {entry.Value}");
-                    }
-                    break;
+                    return new CustomEntryOperationResult { Success = false, Message = $"Invalid uint: {entry.Value}" };
             }
         }
 
-        private async Task WriteCoilAsync(CustomEntry entry, byte unitId, Action<string> setStatusMessage, bool isServerMode)
+        private async Task<CustomEntryOperationResult> WriteCoilAsync(CustomEntry entry, byte unitId, bool isServerMode)
         {
             if (TryParseBool(entry.Value, out bool b))
             {
                 await _registerCoordinator.WriteCoilAtAsync(unitId, entry.Address, b, isServerMode);
-                setStatusMessage($"Wrote COIL {(b ? 1 : 0)} at {entry.Address}");
+                return new CustomEntryOperationResult { Success = true, Message = $"Wrote COIL {(b ? 1 : 0)} at {entry.Address}" };
             }
-            else
-            {
-                setStatusMessage($"Invalid coil value: {entry.Value}. Use true/false or 1/0.");
-            }
+            return new CustomEntryOperationResult { Success = false, Message = $"Invalid coil value: {entry.Value}. Use true/false or 1/0." };
         }
 
         /// <summary>
-        /// Reads a custom entry value.
+        /// Reads a custom entry value and returns a typed result.
         /// </summary>
-        public async Task ReadCustomNowAsync(CustomEntry entry, byte unitId, Action<string> setStatusMessage, bool isServerMode)
+        public async Task<CustomEntryOperationResult> ReadCustomNowAsync(CustomEntry entry, byte unitId, bool isServerMode)
         {
-            if (entry is null) return;
+            if (entry is null)
+                return new CustomEntryOperationResult { Success = false, Message = "No custom entry selected" };
+
             try
             {
                 var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
                 switch (area)
                 {
                     case "holdingregister":
-                        await ReadHoldingRegisterByTypeAsync(entry, unitId, setStatusMessage, isServerMode);
-                        break;
+                        return await ReadHoldingRegisterByTypeAsync(entry, unitId, isServerMode);
                     case "inputregister":
-                        await ReadInputRegisterByTypeAsync(entry, unitId, setStatusMessage, isServerMode);
-                        break;
+                        return await ReadInputRegisterByTypeAsync(entry, unitId, isServerMode);
                     case "coil":
-                        await ReadCoilAsync(entry, unitId, setStatusMessage, isServerMode);
-                        break;
+                        return await ReadCoilAsync(entry, unitId, isServerMode);
                     case "discreteinput":
-                        await ReadDiscreteInputAsync(entry, unitId, setStatusMessage, isServerMode);
-                        break;
+                        return await ReadDiscreteInputAsync(entry, unitId, isServerMode);
                     default:
-                        setStatusMessage($"Unknown area: {entry.Area}");
-                        break;
+                        return new CustomEntryOperationResult { Success = false, Message = $"Unknown area: {entry.Area}" };
                 }
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error reading custom entry");
-                setStatusMessage($"Custom read error: {ex.Message}");
+                return new CustomEntryOperationResult { Success = false, Message = $"Custom read error: {ex.Message}" };
             }
         }
 
@@ -234,7 +219,12 @@ namespace ModbusForge.ViewModels.Coordinators
                     _logger.LogDebug(ex, "Batch read failed for chunk in {Area}, falling back to individual reads", area);
                     foreach (var entry in chunk)
                     {
-                        try { await ReadCustomNowAsync(entry, unitId, setStatusMessage, isServerMode); }
+                        try
+                        {
+                            var result = await ReadCustomNowAsync(entry, unitId, isServerMode);
+                            if (!string.IsNullOrEmpty(result.Message))
+                                setStatusMessage(result.Message);
+                        }
                         catch { /* suppress individual fallback errors to continue with others */ }
                     }
                 }
@@ -373,7 +363,7 @@ namespace ModbusForge.ViewModels.Coordinators
         /// <summary>
         /// Reads a holding register value based on the entry's data type.
         /// </summary>
-        private async Task ReadHoldingRegisterByTypeAsync(CustomEntry entry, byte unitId, Action<string> setStatusMessage, bool isServerMode)
+        private async Task<CustomEntryOperationResult> ReadHoldingRegisterByTypeAsync(CustomEntry entry, byte unitId, bool isServerMode)
         {
             var type = (entry.Type ?? "uint").ToLowerInvariant();
             var address = entry.Address;
@@ -383,35 +373,31 @@ namespace ModbusForge.ViewModels.Coordinators
             {
                 case "real":
                     var regsReal = await service.ReadHoldingRegistersAsync(unitId, address, 2);
-                    if (regsReal is null) return;
+                    if (regsReal is null) return new CustomEntryOperationResult { Success = false };
                     entry.Value = DataTypeConverter.ToSingle(regsReal[0], regsReal[1]).ToString(CultureInfo.InvariantCulture);
-                    setStatusMessage($"Read REAL {entry.Value} from HR {address}");
-                    break;
+                    return new CustomEntryOperationResult { Success = true, Message = $"Read REAL {entry.Value} from HR {address}" };
                 case "int":
                     var regsInt = await service.ReadHoldingRegistersAsync(unitId, address, 1);
-                    if (regsInt is null) return;
+                    if (regsInt is null) return new CustomEntryOperationResult { Success = false };
                     entry.Value = unchecked((short)regsInt[0]).ToString(CultureInfo.InvariantCulture);
-                    setStatusMessage($"Read INT {entry.Value} from HR {address}");
-                    break;
+                    return new CustomEntryOperationResult { Success = true, Message = $"Read INT {entry.Value} from HR {address}" };
                 case "string":
                     var regsString = await service.ReadHoldingRegistersAsync(unitId, address, 1);
-                    if (regsString is null) return;
+                    if (regsString is null) return new CustomEntryOperationResult { Success = false };
                     entry.Value = DataTypeConverter.ToString(regsString[0]);
-                    setStatusMessage($"Read STRING '{entry.Value}' from HR {address}");
-                    break;
+                    return new CustomEntryOperationResult { Success = true, Message = $"Read STRING '{entry.Value}' from HR {address}" };
                 default: // uint
                     var regsUInt = await service.ReadHoldingRegistersAsync(unitId, address, 1);
-                    if (regsUInt is null) return;
+                    if (regsUInt is null) return new CustomEntryOperationResult { Success = false };
                     entry.Value = regsUInt[0].ToString(CultureInfo.InvariantCulture);
-                    setStatusMessage($"Read UINT {entry.Value} from HR {address}");
-                    break;
+                    return new CustomEntryOperationResult { Success = true, Message = $"Read UINT {entry.Value} from HR {address}" };
             }
         }
 
         /// <summary>
         /// Reads an input register value based on the entry's data type.
         /// </summary>
-        private async Task ReadInputRegisterByTypeAsync(CustomEntry entry, byte unitId, Action<string> setStatusMessage, bool isServerMode)
+        private async Task<CustomEntryOperationResult> ReadInputRegisterByTypeAsync(CustomEntry entry, byte unitId, bool isServerMode)
         {
             var type = (entry.Type ?? "uint").ToLowerInvariant();
             var address = entry.Address;
@@ -421,53 +407,49 @@ namespace ModbusForge.ViewModels.Coordinators
             {
                 case "real":
                     var regsReal = await service.ReadInputRegistersAsync(unitId, address, 2);
-                    if (regsReal is null) return;
+                    if (regsReal is null) return new CustomEntryOperationResult { Success = false };
                     entry.Value = DataTypeConverter.ToSingle(regsReal[0], regsReal[1]).ToString(CultureInfo.InvariantCulture);
-                    setStatusMessage($"Read REAL {entry.Value} from IR {address}");
-                    break;
+                    return new CustomEntryOperationResult { Success = true, Message = $"Read REAL {entry.Value} from IR {address}" };
                 case "int":
                     var regsInt = await service.ReadInputRegistersAsync(unitId, address, 1);
-                    if (regsInt is null) return;
+                    if (regsInt is null) return new CustomEntryOperationResult { Success = false };
                     entry.Value = unchecked((short)regsInt[0]).ToString(CultureInfo.InvariantCulture);
-                    setStatusMessage($"Read INT {entry.Value} from IR {address}");
-                    break;
+                    return new CustomEntryOperationResult { Success = true, Message = $"Read INT {entry.Value} from IR {address}" };
                 case "string":
                     var regsString = await service.ReadInputRegistersAsync(unitId, address, 1);
-                    if (regsString is null) return;
+                    if (regsString is null) return new CustomEntryOperationResult { Success = false };
                     entry.Value = DataTypeConverter.ToString(regsString[0]);
-                    setStatusMessage($"Read STRING '{entry.Value}' from IR {address}");
-                    break;
+                    return new CustomEntryOperationResult { Success = true, Message = $"Read STRING '{entry.Value}' from IR {address}" };
                 default: // uint
                     var regsUInt = await service.ReadInputRegistersAsync(unitId, address, 1);
-                    if (regsUInt is null) return;
+                    if (regsUInt is null) return new CustomEntryOperationResult { Success = false };
                     entry.Value = regsUInt[0].ToString(CultureInfo.InvariantCulture);
-                    setStatusMessage($"Read UINT {entry.Value} from IR {address}");
-                    break;
+                    return new CustomEntryOperationResult { Success = true, Message = $"Read UINT {entry.Value} from IR {address}" };
             }
         }
 
         /// <summary>
         /// Reads a coil (boolean) value.
         /// </summary>
-        private async Task ReadCoilAsync(CustomEntry entry, byte unitId, Action<string> setStatusMessage, bool isServerMode)
+        private async Task<CustomEntryOperationResult> ReadCoilAsync(CustomEntry entry, byte unitId, bool isServerMode)
         {
             var service = GetService(isServerMode);
             var states = await service.ReadCoilsAsync(unitId, entry.Address, 1);
-            if (states is null) return;
+            if (states is null) return new CustomEntryOperationResult { Success = false };
             entry.Value = states[0] ? "1" : "0";
-            setStatusMessage($"Read COIL {entry.Value} from {entry.Address}");
+            return new CustomEntryOperationResult { Success = true, Message = $"Read COIL {entry.Value} from {entry.Address}" };
         }
 
         /// <summary>
         /// Reads a discrete input (boolean) value.
         /// </summary>
-        private async Task ReadDiscreteInputAsync(CustomEntry entry, byte unitId, Action<string> setStatusMessage, bool isServerMode)
+        private async Task<CustomEntryOperationResult> ReadDiscreteInputAsync(CustomEntry entry, byte unitId, bool isServerMode)
         {
             var service = GetService(isServerMode);
             var states = await service.ReadDiscreteInputsAsync(unitId, entry.Address, 1);
-            if (states is null) return;
+            if (states is null) return new CustomEntryOperationResult { Success = false };
             entry.Value = states[0] ? "1" : "0";
-            setStatusMessage($"Read DI {entry.Value} from {entry.Address}");
+            return new CustomEntryOperationResult { Success = true, Message = $"Read DI {entry.Value} from {entry.Address}" };
         }
 
         private static bool TryParseBool(string? value, out bool result)

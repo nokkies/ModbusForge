@@ -29,7 +29,6 @@ using ModbusForge.Models;
 using System.Windows.Controls;
 using ModbusForge.Helpers;
 using ModbusForge.ViewModels.Coordinators;
-using ModbusForge.Controls;
 
 namespace ModbusForge.ViewModels
 {
@@ -219,7 +218,10 @@ namespace ModbusForge.ViewModels
             ReadCustomNowCommand = new AsyncRelayCommand<object?>(async param =>
             {
                 if (param is CustomEntry ce)
-                    await _customEntryCoordinator.ReadCustomNowAsync(ce, EffectiveUnitId, msg => StatusMessage = msg, IsServerMode);
+                {
+                    var result = await _customEntryCoordinator.ReadCustomNowAsync(ce, EffectiveUnitId, IsServerMode);
+                    StatusMessage = result.Message;
+                }
             });
             ReadAllCustomNowCommand = new RelayCommand(async () => await ReadAllCustomNowAsync());
             // Project commands (replacing Custom save/load)
@@ -1039,212 +1041,8 @@ namespace ModbusForge.ViewModels
 
         private async Task WriteCustomNowAsync(CustomEntry entry)
         {
-            await _customEntryCoordinator.WriteCustomNowAsync(entry, EffectiveUnitId, msg => StatusMessage = msg, IsServerMode);
-        }
-
-        /// <summary>
-        /// Writes a holding register value based on the entry's data type.
-        /// </summary>
-        private async Task WriteHoldingRegisterByTypeAsync(CustomEntry entry)
-        {
-            var type = (entry.Type ?? "uint").ToLowerInvariant();
-            switch (type)
-            {
-                case "real":
-                    await WriteRealValueAsync(entry);
-                    break;
-                case "string":
-                    await WriteStringAtAsync(entry.Address, entry.Value ?? string.Empty);
-                    StatusMessage = $"Wrote STRING '{entry.Value}' at {entry.Address}";
-                    break;
-                case "int":
-                    await WriteIntValueAsync(entry);
-                    break;
-                default: // uint
-                    await WriteUIntValueAsync(entry);
-                    break;
-            }
-        }
-
-        /// <summary>
-        /// Writes a float (REAL) value to holding registers.
-        /// </summary>
-        private async Task WriteRealValueAsync(CustomEntry entry)
-        {
-            if (!float.TryParse(entry.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out float f))
-            {
-                if (!float.TryParse(entry.Value, NumberStyles.Float, CultureInfo.CurrentCulture, out f))
-                {
-                    StatusMessage = $"Invalid float: {entry.Value}";
-                    return;
-                }
-            }
-            await WriteFloatAtAsync(entry.Address, f);
-            StatusMessage = $"Wrote REAL {f} at {entry.Address}";
-        }
-
-        /// <summary>
-        /// Writes a signed int value to a holding register.
-        /// </summary>
-        private async Task WriteIntValueAsync(CustomEntry entry)
-        {
-            if (int.TryParse(entry.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int iv))
-            {
-                await WriteRegisterAtAsync(entry.Address, unchecked((ushort)iv));
-                StatusMessage = $"Wrote INT {iv} at {entry.Address}";
-            }
-            else
-            {
-                StatusMessage = $"Invalid int: {entry.Value}";
-            }
-        }
-
-        /// <summary>
-        /// Writes an unsigned int value to a holding register.
-        /// </summary>
-        private async Task WriteUIntValueAsync(CustomEntry entry)
-        {
-            if (uint.TryParse(entry.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out uint uv))
-            {
-                if (uv > 0xFFFF) uv = 0xFFFF;
-                await WriteRegisterAtAsync(entry.Address, (ushort)uv);
-                StatusMessage = $"Wrote UINT {uv} at {entry.Address}";
-            }
-            else
-            {
-                StatusMessage = $"Invalid uint: {entry.Value}";
-            }
-        }
-
-        /// <summary>
-        /// Writes a coil (boolean) value.
-        /// </summary>
-        private async Task WriteCoilAsync(CustomEntry entry)
-        {
-            if (TryParseBool(entry.Value, out bool b))
-            {
-                await WriteCoilAtAsync(entry.Address, b);
-                StatusMessage = $"Wrote COIL {(b ? 1 : 0)} at {entry.Address}";
-            }
-            else
-            {
-                StatusMessage = $"Invalid coil value: {entry.Value}. Use true/false or 1/0.";
-            }
-        }
-
-        private async Task ReadCustomNowAsync(CustomEntry entry)
-        {
-            if (entry is null) return;
-            try
-            {
-                var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
-                switch (area)
-                {
-                    case "holdingregister":
-                        await ReadHoldingRegisterByTypeAsync(entry);
-                        break;
-                    case "inputregister":
-                        await ReadInputRegisterByTypeAsync(entry);
-                        break;
-                    case "coil":
-                        await ReadCoilAsync(entry);
-                        break;
-                    case "discreteinput":
-                        await ReadDiscreteInputAsync(entry);
-                        break;
-                    default:
-                        StatusMessage = $"Unknown area: {entry.Area}";
-                        break;
-                }
-            }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-            {
-                _logger.LogError(ex, "Error reading custom entry");
-                StatusMessage = $"Custom read error: {ex.Message}";
-            }
-        }
-
-        /// <summary>
-        /// Reads a holding register value based on the entry's data type.
-        /// </summary>
-        private async Task ReadHoldingRegisterByTypeAsync(CustomEntry entry)
-        {
-            await ReadRegisterGenericAsync(entry, _modbusService.ReadHoldingRegistersAsync, "HR");
-        }
-
-        /// <summary>
-        /// Reads an input register value based on the entry's data type.
-        /// </summary>
-        private async Task ReadInputRegisterByTypeAsync(CustomEntry entry)
-        {
-            await ReadRegisterGenericAsync(entry, _modbusService.ReadInputRegistersAsync, "IR");
-        }
-
-        private async Task ReadRegisterGenericAsync(CustomEntry entry, Func<byte, int, int, Task<ushort[]?>> readFunc, string logPrefix)
-        {
-            var type = (entry.Type ?? "uint").ToLowerInvariant();
-            var address = entry.Address;
-
-            switch (type)
-            {
-                case "real":
-                    var regsReal = await readFunc(UnitId, address, 2);
-                    if (regsReal is null) return;
-                    entry.Value = DataTypeConverter.ToSingle(regsReal[0], regsReal[1]).ToString(CultureInfo.InvariantCulture);
-                    StatusMessage = $"Read REAL {entry.Value} from {logPrefix} {address}";
-                    break;
-                case "int":
-                    var regsInt = await readFunc(UnitId, address, 1);
-                    if (regsInt is null) return;
-                    entry.Value = unchecked((short)regsInt[0]).ToString(CultureInfo.InvariantCulture);
-                    StatusMessage = $"Read INT {entry.Value} from {logPrefix} {address}";
-                    break;
-                case "string":
-                    var regsString = await readFunc(UnitId, address, 1);
-                    if (regsString is null) return;
-                    entry.Value = DataTypeConverter.ToString(regsString[0]);
-                    StatusMessage = $"Read STRING '{entry.Value}' from {logPrefix} {address}";
-                    break;
-                default: // uint
-                    var regsUInt = await readFunc(UnitId, address, 1);
-                    if (regsUInt is null) return;
-                    entry.Value = regsUInt[0].ToString(CultureInfo.InvariantCulture);
-                    StatusMessage = $"Read UINT {entry.Value} from {logPrefix} {address}";
-                    break;
-            }
-        }
-
-        /// <summary>
-        /// Reads a coil (boolean) value.
-        /// </summary>
-        private async Task ReadCoilAsync(CustomEntry entry)
-        {
-            var states = await _modbusService.ReadCoilsAsync(UnitId, entry.Address, 1);
-            if (states is null) return;
-            entry.Value = states[0] ? "1" : "0";
-            StatusMessage = $"Read COIL {entry.Value} from {entry.Address}";
-        }
-
-        /// <summary>
-        /// Reads a discrete input (boolean) value.
-        /// </summary>
-        private async Task ReadDiscreteInputAsync(CustomEntry entry)
-        {
-            var states = await _modbusService.ReadDiscreteInputsAsync(UnitId, entry.Address, 1);
-            if (states is null) return;
-            entry.Value = states[0] ? "1" : "0";
-            StatusMessage = $"Read DI {entry.Value} from {entry.Address}";
-        }
-
-        private static bool TryParseBool(string? value, out bool result)
-        {
-            result = false;
-            if (string.IsNullOrWhiteSpace(value)) return false;
-            var v = value.Trim();
-            if (bool.TryParse(v, out result)) return true;
-            if (v == "1") { result = true; return true; }
-            if (v == "0") { result = false; return true; }
-            return false;
+            var result = await _customEntryCoordinator.WriteCustomNowAsync(entry, EffectiveUnitId, IsServerMode);
+            StatusMessage = result.Message;
         }
 
         private async void CustomTimer_Tick(object? sender, EventArgs e)
@@ -1609,434 +1407,143 @@ namespace ModbusForge.ViewModels
             }
         }
 
-        private string GenerateAutoFileName()
-        {
-            try
-            {
-                var ipAddress = IsServerMode ? "Server" : SanitizeIpAddress(ServerAddress);
-                var unitId = IsServerMode ? SelectedUnitId : UnitId;
-                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-
-                return $"MBIP{ipAddress}_ID{unitId}_{timestamp}";
-            }
-            catch
-            {
-                // Fallback to simple timestamp if IP address processing fails
-                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                var unitId = IsServerMode ? SelectedUnitId : UnitId;
-                return $"ModbusForge_ID{unitId}_{timestamp}";
-            }
-        }
-
-        private string SanitizeIpAddress(string ipAddress)
-        {
-            if (string.IsNullOrWhiteSpace(ipAddress))
-                return "Unknown";
-
-            // Remove invalid characters and replace dots with zeros for filename compatibility
-            var sanitized = ipAddress.Replace(".", "000");
-
-            // Remove any remaining invalid filename characters
-            var invalidChars = Path.GetInvalidFileNameChars();
-            foreach (var c in invalidChars)
-            {
-                sanitized = sanitized.Replace(c, '_');
-            }
-
-            // Ensure it doesn't start with a number (for filename compatibility)
-            if (char.IsDigit(sanitized[0]))
-            {
-                sanitized = "IP" + sanitized;
-            }
-
-            return sanitized;
-        }
-
         private async Task SaveProjectAsync()
         {
-            try
+            var snapshot = BuildWorkspaceSnapshot();
+            var result = await _configurationCoordinator.SaveProjectAsync(snapshot);
+            StatusMessage = result.Message;
+        }
+
+        private ProjectWorkspaceSnapshot BuildWorkspaceSnapshot()
+        {
+            var snapshot = new ProjectWorkspaceSnapshot
             {
-                var defaultFileName = GenerateAutoFileName();
-                var saveFileDialog = new SaveFileDialog
-                {
-                    Filter = "ModbusForge Project (*.mfp)|*.mfp|All Files (*.*)|*.*",
-                    DefaultExt = "mfp",
-                    Title = IsServerMode ? "Save Server Project" : "Save Client Project",
-                    FileName = defaultFileName
-                };
+                Mode = Mode,
+                ServerAddress = ServerAddress,
+                Port = Port,
+                ServerUnitId = ServerUnitId,
+                ClientUnitId = UnitId,
+                SelectedUnitId = SelectedUnitId,
+                IsServerMode = IsServerMode,
+                VisibleTabs = GetVisibleTabs(),
+                VisualNodes = new List<VisualNode>(_visualNodeEditorViewModel.Nodes),
+                VisualConnections = new List<NodeConnection>(_visualNodeEditorViewModel.Connections)
+            };
 
-                if (saveFileDialog.ShowDialog() == true)
-                {
-                    ProjectConfiguration projectConfig;
+            foreach (var kvp in UnitConfigurations)
+                snapshot.UnitConfigurations[kvp.Key] = kvp.Value.Clone();
 
-                    if (IsServerMode)
-                    {
-                        // Server mode: Save all Unit ID configurations
-                        projectConfig = new ProjectConfiguration
-                        {
-                            ProjectInfo = new ProjectInfo
-                            {
-                                Name = System.IO.Path.GetFileNameWithoutExtension(saveFileDialog.FileName),
-                                Modified = DateTime.Now
-                            },
-                            GlobalSettings = new GlobalSettings
-                            {
-                                Mode = Mode,
-                                ServerAddress = ServerAddress,
-                                Port = Port,
-                                ServerUnitId = ServerUnitId,
-                                ClientUnitId = UnitId,
-                                VisibleTabs = GetVisibleTabs()
-                            },
-                            UnitConfigurations = new Dictionary<byte, UnitIdConfiguration>(UnitConfigurations),
-                            // Save visual simulation data
-                            VisualNodes = new List<VisualNode>(_visualNodeEditorViewModel.Nodes),
-                            VisualConnections = new List<NodeConnection>(_visualNodeEditorViewModel.Connections)
-                        };
-                    }
-                    else
-                    {
-                        // Client mode: Save only single client configuration
-                        projectConfig = new ProjectConfiguration
-                        {
-                            ProjectInfo = new ProjectInfo
-                            {
-                                Name = System.IO.Path.GetFileNameWithoutExtension(saveFileDialog.FileName),
-                                Modified = DateTime.Now
-                            },
-                            GlobalSettings = new GlobalSettings
-                            {
-                                Mode = Mode,
-                                ServerAddress = ServerAddress,
-                                Port = Port,
-                                ServerUnitId = ServerUnitId,
-                                ClientUnitId = UnitId,
-                                VisibleTabs = GetVisibleTabs()
-                            },
-                            UnitConfigurations = new Dictionary<byte, UnitIdConfiguration>
-                            {
-                                [UnitId] = CurrentConfig.Clone()
-                            },
-                            // Save visual simulation data
-                            VisualNodes = new List<VisualNode>(_visualNodeEditorViewModel.Nodes),
-                            VisualConnections = new List<NodeConnection>(_visualNodeEditorViewModel.Connections)
-                        };
-                    }
+            return snapshot;
+        }
 
-                    var options = new JsonSerializerOptions
-                    {
-                        WriteIndented = true,
-                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                    };
+        private void ApplyWorkspaceSnapshot(ProjectWorkspaceSnapshot snapshot)
+        {
+            Mode = snapshot.Mode;
+            ServerAddress = snapshot.ServerAddress;
+            Port = snapshot.Port;
+            ServerUnitId = snapshot.ServerUnitId;
+            UnitId = snapshot.ClientUnitId;
 
-                    var json = JsonSerializer.Serialize(projectConfig, options);
-                    await File.WriteAllTextAsync(saveFileDialog.FileName, json);
-                    StatusMessage = $"{(IsServerMode ? "Server" : "Client")} project saved to {System.IO.Path.GetFileName(saveFileDialog.FileName)}";
-                }
-            }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            UnitConfigurations.Clear();
+            foreach (var kvp in snapshot.UnitConfigurations)
+                UnitConfigurations[kvp.Key] = kvp.Value.Clone();
+
+            if (snapshot.UnitConfigurations.Count > 0 && !snapshot.UnitConfigurations.ContainsKey(SelectedUnitId))
             {
-                _logger.LogError(ex, "Error saving project");
-                StatusMessage = $"Error saving project: {ex.Message}";
+                SelectedUnitId = snapshot.UnitConfigurations.ContainsKey(snapshot.SelectedUnitId)
+                    ? snapshot.SelectedUnitId
+                    : snapshot.UnitConfigurations.Keys.First();
             }
+
+            SetVisibleTabs(snapshot.VisibleTabs);
+
+            _visualNodeEditorViewModel.Nodes.Clear();
+            _visualNodeEditorViewModel.Connections.Clear();
+
+            foreach (var node in snapshot.VisualNodes ?? new List<VisualNode>())
+                _visualNodeEditorViewModel.Nodes.Add(node);
+            foreach (var connection in snapshot.VisualConnections ?? new List<NodeConnection>())
+                _visualNodeEditorViewModel.Connections.Add(connection);
+
+            _visualNodeEditorViewModel.MigrateNodes();
+
+            OnPropertyChanged(nameof(CustomEntries));
+            OnPropertyChanged(nameof(SimulationEnabled));
+            OnPropertyChanged(nameof(GlobalMonitorEnabled));
+            OnPropertyChanged(nameof(HoldingMonitorEnabled));
+            OnPropertyChanged(nameof(InputRegistersMonitorEnabled));
+            OnPropertyChanged(nameof(CoilsMonitorEnabled));
+            OnPropertyChanged(nameof(DiscreteInputsMonitorEnabled));
+            OnPropertyChanged(nameof(CustomMonitorEnabled));
+            OnPropertyChanged(nameof(CustomReadMonitorEnabled));
         }
 
         private async Task LoadProjectAsync()
         {
-            try
+            var result = await _configurationCoordinator.LoadProjectAsync();
+            if (result.Success && result.Snapshot != null)
             {
-                var openFileDialog = new OpenFileDialog
-                {
-                    Filter = "ModbusForge Project (*.mfp)|*.mfp|All Files (*.*)|*.*",
-                    Title = "Load ModbusForge Project"
-                };
-
-                if (openFileDialog.ShowDialog() == true)
-                {
-                    var json = await File.ReadAllTextAsync(openFileDialog.FileName);
-                    var options = new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true,
-                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                    };
-
-                    var projectConfig = JsonSerializer.Deserialize<ProjectConfiguration>(json, options);
-                    if (projectConfig != null)
-                    {
-                        // Apply global settings
-                        Mode = projectConfig.GlobalSettings.Mode;
-                        ServerAddress = projectConfig.GlobalSettings.ServerAddress;
-                        Port = projectConfig.GlobalSettings.Port;
-                        ServerUnitId = projectConfig.GlobalSettings.ServerUnitId;
-                        UnitId = projectConfig.GlobalSettings.ClientUnitId;
-
-                        // Apply Unit ID configurations
-                        UnitConfigurations.Clear();
-                        foreach (var kvp in projectConfig.UnitConfigurations)
-                        {
-                            UnitConfigurations[kvp.Key] = kvp.Value.Clone();
-                        }
-
-                        // Restore tab visibility
-                        SetVisibleTabs(projectConfig.GlobalSettings?.VisibleTabs);
-
-                        // Restore visual simulation data
-                        _visualNodeEditorViewModel.Nodes.Clear();
-                        _visualNodeEditorViewModel.Connections.Clear();
-
-                        if (projectConfig.VisualNodes != null)
-                        {
-                            foreach (var node in projectConfig.VisualNodes)
-                            {
-                                _visualNodeEditorViewModel.Nodes.Add(node);
-                            }
-                            // Fix old nodes with invalid addresses (migration)
-                            _visualNodeEditorViewModel.MigrateNodes();
-                        }
-
-                        if (projectConfig.VisualConnections != null)
-                        {
-                            foreach (var connection in projectConfig.VisualConnections)
-                            {
-                                _visualNodeEditorViewModel.Connections.Add(connection);
-                            }
-                        }
-
-                        // Ensure we have a configuration for the selected Unit ID
-                        if (!UnitConfigurations.ContainsKey(SelectedUnitId))
-                        {
-                            SelectedUnitId = UnitConfigurations.Keys.First();
-                        }
-
-                        // Refresh UI
-                        OnPropertyChanged(nameof(CustomEntries));
-                        OnPropertyChanged(nameof(SimulationEnabled));
-                        OnPropertyChanged(nameof(GlobalMonitorEnabled));
-                        OnPropertyChanged(nameof(HoldingMonitorEnabled));
-                        OnPropertyChanged(nameof(InputRegistersMonitorEnabled));
-                        OnPropertyChanged(nameof(CoilsMonitorEnabled));
-                        OnPropertyChanged(nameof(DiscreteInputsMonitorEnabled));
-                        OnPropertyChanged(nameof(CustomMonitorEnabled));
-                        OnPropertyChanged(nameof(CustomReadMonitorEnabled));
-
-                        StatusMessage = $"Project loaded: {System.IO.Path.GetFileName(openFileDialog.FileName)}";
-                    }
-                }
+                ApplyWorkspaceSnapshot(result.Snapshot);
             }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-            {
-                _logger.LogError(ex, "Error loading project");
-                StatusMessage = $"Error loading project: {ex.Message}";
-            }
+            StatusMessage = result.Message;
         }
 
         private async Task ImportUnitIdsAsync()
         {
-            try
+            var result = await _configurationCoordinator.ImportUnitIdsAsync();
+            if (result.Success && result.Snapshot != null)
             {
-                var openFileDialog = new OpenFileDialog
+                var importedCount = 0;
+                foreach (var kvp in result.Snapshot.UnitConfigurations)
                 {
-                    Filter = "ModbusForge Project (*.mfp)|*.mfp|All Files (*.*)|*.*",
-                    Title = "Import Unit ID Configurations"
-                };
-
-                if (openFileDialog.ShowDialog() == true)
-                {
-                    var json = await File.ReadAllTextAsync(openFileDialog.FileName);
-                    var options = new JsonSerializerOptions
+                    if (!UnitConfigurations.ContainsKey(kvp.Key))
                     {
-                        PropertyNameCaseInsensitive = true,
-                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                    };
-
-                    var projectConfig = JsonSerializer.Deserialize<ProjectConfiguration>(json, options);
-                    if (projectConfig?.UnitConfigurations != null)
-                    {
-                        var importedCount = 0;
-                        foreach (var kvp in projectConfig.UnitConfigurations)
-                        {
-                            // Import only Unit IDs that don't already exist
-                            if (!UnitConfigurations.ContainsKey(kvp.Key))
-                            {
-                                UnitConfigurations[kvp.Key] = kvp.Value.Clone();
-                                importedCount++;
-                            }
-                        }
-
-                        // Refresh AvailableUnitIds if in server mode
-                        if (IsServerMode)
-                        {
-                            PopulateAvailableUnitIds();
-                        }
-
-                        StatusMessage = $"Imported {importedCount} new Unit ID configurations";
+                        UnitConfigurations[kvp.Key] = kvp.Value.Clone();
+                        importedCount++;
                     }
                 }
+
+                if (IsServerMode)
+                    PopulateAvailableUnitIds();
+
+                StatusMessage = $"Imported {importedCount} new Unit ID configurations";
             }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            else
             {
-                _logger.LogError(ex, "Error importing Unit IDs");
-                StatusMessage = $"Error importing Unit IDs: {ex.Message}";
+                StatusMessage = result.Message;
             }
         }
 
         private async Task ExportUnitIdsAsync()
         {
-            try
-            {
-                var defaultFileName = GenerateAutoFileName() + "_AllUnitIDs";
-                var saveFileDialog = new SaveFileDialog
-                {
-                    Filter = "ModbusForge Project (*.mfp)|*.mfp|All Files (*.*)|*.*",
-                    DefaultExt = "mfp",
-                    Title = "Export Unit ID Configurations",
-                    FileName = defaultFileName
-                };
-
-                if (saveFileDialog.ShowDialog() == true)
-                {
-                    var projectConfig = new ProjectConfiguration
-                    {
-                        ProjectInfo = new ProjectInfo
-                        {
-                            Name = $"Exported Unit IDs - {DateTime.Now:yyyy-MM-dd HH:mm:ss}",
-                            Modified = DateTime.Now
-                        },
-                        GlobalSettings = new GlobalSettings
-                        {
-                            Mode = Mode,
-                            ServerAddress = ServerAddress,
-                            Port = Port,
-                            ServerUnitId = ServerUnitId,
-                            ClientUnitId = UnitId
-                        },
-                        UnitConfigurations = new Dictionary<byte, UnitIdConfiguration>()
-                    };
-
-                    // Export all Unit ID configurations
-                    foreach (var kvp in UnitConfigurations)
-                    {
-                        projectConfig.UnitConfigurations[kvp.Key] = kvp.Value.Clone();
-                    }
-
-                    var options = new JsonSerializerOptions
-                    {
-                        WriteIndented = true,
-                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                    };
-
-                    var json = JsonSerializer.Serialize(projectConfig, options);
-                    await File.WriteAllTextAsync(saveFileDialog.FileName, json);
-                    StatusMessage = $"Exported {UnitConfigurations.Count} Unit ID configurations";
-                }
-            }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-            {
-                _logger.LogError(ex, "Error exporting Unit IDs");
-                StatusMessage = $"Error exporting Unit IDs: {ex.Message}";
-            }
+            var snapshot = BuildWorkspaceSnapshot();
+            var result = await _configurationCoordinator.ExportUnitIdsAsync(snapshot);
+            StatusMessage = result.Message;
         }
 
         private async Task ExportUnitIdAsync()
         {
-            try
-            {
-                if (!IsServerMode)
-                {
-                    _dialogService.Show("Export Unit ID is only available in Server mode.", "Export Unit ID", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                var defaultFileName = GenerateAutoFileName() + $"_ID{SelectedUnitId}";
-                var saveFileDialog = new SaveFileDialog
-                {
-                    Filter = "ModbusForge Unit ID (*.mui)|*.mui|All Files (*.*)|*.*",
-                    DefaultExt = "mui",
-                    Title = $"Export Unit ID {SelectedUnitId}",
-                    FileName = defaultFileName
-                };
-
-                if (saveFileDialog.ShowDialog() == true)
-                {
-                    var unitConfig = CurrentConfig.Clone();
-
-                    var projectConfig = new ProjectConfiguration
-                    {
-                        ProjectInfo = new ProjectInfo
-                        {
-                            Name = $"Unit ID {SelectedUnitId} - {DateTime.Now:yyyy-MM-dd HH:mm:ss}",
-                            Modified = DateTime.Now
-                        },
-                        GlobalSettings = new GlobalSettings
-                        {
-                            Mode = Mode,
-                            ServerAddress = ServerAddress,
-                            Port = Port,
-                            ServerUnitId = ServerUnitId,
-                            ClientUnitId = UnitId
-                        },
-                        UnitConfigurations = new Dictionary<byte, UnitIdConfiguration>
-                        {
-                            [SelectedUnitId] = unitConfig
-                        }
-                    };
-
-                    var options = new JsonSerializerOptions
-                    {
-                        WriteIndented = true,
-                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                    };
-
-                    var json = JsonSerializer.Serialize(projectConfig, options);
-                    await File.WriteAllTextAsync(saveFileDialog.FileName, json);
-                    StatusMessage = $"Unit ID {SelectedUnitId} exported to {System.IO.Path.GetFileName(saveFileDialog.FileName)}";
-                }
-            }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-            {
-                _logger.LogError(ex, "Error exporting Unit ID");
-                StatusMessage = $"Error exporting Unit ID: {ex.Message}";
-            }
+            var snapshot = BuildWorkspaceSnapshot();
+            var result = await _configurationCoordinator.ExportUnitIdAsync(snapshot, SelectedUnitId);
+            StatusMessage = result.Message;
         }
 
-        internal void MigrateOldNodeAddresses(VisualNode node)
+        private async Task ImportUnitIdAsAsync()
         {
-            // Fix InputInt nodes with missing OutputAddress
-            if (node.ElementType == PlcElementType.InputInt && node.OutputAddress == null)
+            if (!IsServerMode)
             {
-                node.OutputAddress = new PlcAddressReference
-                {
-                    Area = PlcArea.HoldingRegister,
-                    Address = node.Input1Address?.Address ?? 1
-                };
+                _dialogService.Show("Import Unit ID As is only available in Server mode.", "Import Unit ID As", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
             }
 
-            // Fix InputBool nodes with missing OutputAddress
-            if (node.ElementType == PlcElementType.InputBool && node.OutputAddress == null)
+            var result = await _configurationCoordinator.ImportUnitIdAsAsync();
+            if (result.Success && result.ImportedUnitId.HasValue && result.ImportedConfiguration != null)
             {
-                node.OutputAddress = new PlcAddressReference
-                {
-                    Area = PlcArea.Coil,
-                    Address = node.Input1Address?.Address ?? 1
-                };
+                UnitConfigurations[result.ImportedUnitId.Value] = result.ImportedConfiguration.Clone();
+                SelectedUnitId = result.ImportedUnitId.Value;
+                PopulateAvailableUnitIds();
             }
-
-            // Fix any nodes with address 0 (invalid in UI's 1-based convention)
-            MigrateAddress(node.OutputAddress);
-            MigrateAddress(node.Input1Address);
-            MigrateAddress(node.Input2Address);
-
-            // Also fix any associated connector configurations
-            if (_visualNodeEditorViewModel?.ConnectorConfigs != null)
-            {
-                foreach (var config in _visualNodeEditorViewModel.ConnectorConfigs.Where(c => c.NodeId == node.Id))
-                {
-                    if (config.Address == 0)
-                    {
-                        config.Address = 1;
-                    }
-                }
-            }
+            StatusMessage = result.Message;
         }
 
         private void ShowTrendView()
@@ -2088,83 +1595,6 @@ namespace ModbusForge.ViewModels
             {
                 _logger.LogError(ex, "Error during refresh");
                 StatusMessage = $"Refresh failed: {ex.Message}";
-            }
-        }
-
-        internal void MigrateAddress(PlcAddressReference? address)
-        {
-            if (address != null && address.Address == 0)
-            {
-                address.Address = 1;
-            }
-        }
-        private async Task ImportUnitIdAsAsync()
-        {
-            try
-            {
-                if (!IsServerMode)
-                {
-                    _dialogService.Show("Import Unit ID As is only available in Server mode.", "Import Unit ID As", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                var openFileDialog = new OpenFileDialog
-                {
-                    Filter = "ModbusForge Unit ID (*.mui)|*.mui|ModbusForge Project (*.mfp)|*.mfp|All Files (*.*)|*.*",
-                    Title = "Import Unit ID Configuration"
-                };
-
-                if (openFileDialog.ShowDialog() == true)
-                {
-                    var json = await File.ReadAllTextAsync(openFileDialog.FileName);
-                    var options = new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true,
-                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                    };
-
-                    var projectConfig = JsonSerializer.Deserialize<ProjectConfiguration>(json, options);
-                    if (projectConfig?.UnitConfigurations != null && projectConfig.UnitConfigurations.Count > 0)
-                    {
-                        // Get the first Unit ID from the imported file
-                        var importedUnitId = projectConfig.UnitConfigurations.Keys.First();
-                        var importedConfig = projectConfig.UnitConfigurations[importedUnitId];
-
-                        // Ask user for target Unit ID
-                        var dialog = new InputDialog("Import Unit ID As", $"Enter target Unit ID (1-247) to import Unit ID {importedUnitId} as:", "1");
-                        if (dialog.ShowDialog() == true)
-                        {
-                            if (byte.TryParse(dialog.InputText, out byte targetUnitId) && targetUnitId >= 1 && targetUnitId <= 247)
-                            {
-                                // Clone the imported configuration and change its Unit ID
-                                var newConfig = importedConfig.Clone();
-                                // Note: We would need to add a method to change the Unit ID in the configuration
-                                // For now, we'll store it under the target Unit ID key
-
-                                UnitConfigurations[targetUnitId] = newConfig;
-                                SelectedUnitId = targetUnitId;
-
-                                // Refresh AvailableUnitIds
-                                PopulateAvailableUnitIds();
-
-                                StatusMessage = $"Unit ID {importedUnitId} imported as Unit ID {targetUnitId}";
-                            }
-                            else
-                            {
-                                _dialogService.Show("Invalid Unit ID. Please enter a value between 1 and 247.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        _dialogService.Show("No Unit ID configurations found in the selected file.", "Import Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    }
-                }
-            }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-            {
-                _logger.LogError(ex, "Error importing Unit ID");
-                StatusMessage = $"Error importing Unit ID: {ex.Message}";
             }
         }
 

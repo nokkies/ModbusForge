@@ -815,6 +815,56 @@ namespace ModbusForge.ViewModels
                 }
             }
         }
+
+        /// <summary>
+        /// Migrates a single node and any matching connector configurations to the latest format.
+        /// </summary>
+        public void MigrateNode(VisualNode node)
+        {
+            if (node == null) return;
+
+            // Fix InputInt nodes with missing OutputAddress
+            if (node.ElementType == PlcElementType.InputInt && node.OutputAddress == null)
+            {
+                node.OutputAddress = new PlcAddressReference
+                {
+                    Area = PlcArea.HoldingRegister,
+                    Address = node.Input1Address?.Address ?? 1
+                };
+            }
+
+            // Fix InputBool nodes with missing OutputAddress
+            if (node.ElementType == PlcElementType.InputBool && node.OutputAddress == null)
+            {
+                node.OutputAddress = new PlcAddressReference
+                {
+                    Area = PlcArea.Coil,
+                    Address = node.Input1Address?.Address ?? 1
+                };
+            }
+
+            // Fix any nodes with address 0 (invalid in UI's 1-based convention)
+            MigrateAddress(node.OutputAddress);
+            MigrateAddress(node.Input1Address);
+            MigrateAddress(node.Input2Address);
+
+            // Also fix any associated connector configurations
+            foreach (var config in ConnectorConfigs.Where(c => c.NodeId == node.Id))
+            {
+                if (config.Address == 0)
+                {
+                    config.Address = 1;
+                }
+            }
+        }
+
+        private static void MigrateAddress(PlcAddressReference? address)
+        {
+            if (address != null && address.Address == 0)
+            {
+                address.Address = 1;
+            }
+        }
         
         public void CreateConnection(string sourceNodeId, string targetNodeId, string targetConnector = "Input1")
         {
