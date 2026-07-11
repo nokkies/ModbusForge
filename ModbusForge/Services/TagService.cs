@@ -286,7 +286,7 @@ namespace ModbusForge.Services
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
             {
                 _tagLogger.LogError(ex, "Failed to load tags from {TagsFilePath}", _tagsFilePath);
                 // If load fails, start with empty database
@@ -310,7 +310,7 @@ namespace ModbusForge.Services
                 var json = JsonSerializer.Serialize(data, _jsonOptions);
                 await File.WriteAllTextAsync(_tagsFilePath, json);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
             {
                 _tagLogger.LogError(ex, "Failed to save tags to {TagsFilePath}", _tagsFilePath);
                 // Silent fail - will retry on next save
