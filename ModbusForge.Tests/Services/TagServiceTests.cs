@@ -233,15 +233,15 @@ namespace ModbusForge.Tests.Services
                 groups = new[]
                 {
                     new { id = "root1", name = "Root", description = "", parentGroup = "", parentGroupId = (string?)null },
-                    new { id = "child1", name = "Child", description = "", parentGroup = "Root", parentGroupId = "root1" },
-                    new { id = "grandchild1", name = "GrandChild", description = "", parentGroup = "Child", parentGroupId = "child1" }
+                    new { id = "child1", name = "Child", description = "", parentGroup = "Root", parentGroupId = (string?)"root1" },
+                    new { id = "grandchild1", name = "GrandChild", description = "", parentGroup = "Child", parentGroupId = (string?)"child1" }
                 }
             }, JsonOptions);
 
             var (service, _, _) = await CreateServiceWithFileAsync(v2Json);
 
             // Root-level Groups should contain only "Root"
-            Assert.Single(service.Groups.Where(g => g.Name == "Root"));
+            Assert.Single(service.Groups, g => g.Name == "Root");
             Assert.DoesNotContain(service.Groups, g => g.Name == "Child");
             Assert.DoesNotContain(service.Groups, g => g.Name == "GrandChild");
 

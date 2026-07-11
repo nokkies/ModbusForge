@@ -1,7 +1,20 @@
 # ModbusForge Feature Roadmap
 
 ## Current Version
-**v5.2.0** - Released with centralized validation, resilience, and error handling
+**v5.8.6** - Tag hierarchy stable, service-locator globals removed, local API hardened, MainViewModel slimmed
+
+---
+
+## Recently Completed (v5.8.1 - v5.8.6)
+
+- **v5.8.1** - Stabilized tag hierarchy with stable GroupId/ParentGroupId, versioned persistence schema, and atomic saves.
+- **v5.8.2** - Refactored local API: removed WPF service-provider resolution, added facade/DTOs, validation, rate limiting, and optional API-key auth.
+- **v5.8.3** - Removed window globals from visual editor workflows via ITagWindowService and IWindowOwnerProvider.
+- **v5.8.4** - Implemented transactional tag-group deletion with preview dialog and rollback on save failure.
+- **v5.8.5** - Replaced MainWindow service locator with IShellWindowService and IApplicationLifetime.
+- **v5.8.6** - Reduced MainViewModel by extracting project persistence and custom-entry operations into coordinators.
+
+Test baseline: **338 passed, 0 failed**.
 
 ---
 
@@ -10,7 +23,7 @@
 
 ### Tasks
 - [ ] Automatically enable 'continuous read' when trend line is added
-- [ ] Replace generic catch blocks with proper logging and user feedback in conversion operations
+- [x] Replace generic catch blocks with proper logging and user feedback in conversion operations
 - [ ] Add global keyboard shortcuts (Ctrl+R read, Ctrl+W write, Ctrl+T trends, Ctrl+S save, F5 refresh)
 - [ ] Improve error messages with recovery suggestions
 
@@ -24,9 +37,9 @@
 ### Tasks
 - [ ] Implement data grid virtualization for large address ranges
 - [ ] Add connection pooling for multi-device support
-- [ ] Refactor MainViewModel (1,846 lines) into smaller, focused ViewModels
+- [x] Refactor MainViewModel into smaller, focused coordinators
 - [ ] Add structured logging with correlation IDs
-- [ ] Implement comprehensive input sanitization
+- [x] Implement comprehensive input sanitization
 
 **Estimated Effort:** 3-4 weeks
 
@@ -51,9 +64,9 @@
 
 ### Tasks
 - [ ] Bulk export of all data (registers, coils, custom entries, trends)
-- [ ] Import validation with conflict resolution
+- [x] Import validation with conflict resolution
+- [x] Configuration versioning and migration logic
 - [ ] Excel export format for business users
-- [ ] Configuration versioning and migration logic
 - [ ] Enhanced save/load dialogs with recent files
 
 **Estimated Effort:** 2-3 weeks
@@ -64,9 +77,9 @@
 **Focus:** Test coverage expansion and built-in performance monitoring
 
 ### Tasks
-- [ ] Expand unit test coverage for API server endpoints
-- [ ] Add error handling scenario tests
-- [ ] Implement concurrent operations testing
+- [x] Expand unit test coverage for API server endpoints
+- [x] Add error handling scenario tests
+- [x] Implement concurrent operations testing
 - [ ] Add built-in performance metrics (latency tracking, memory monitoring, operation timing)
 - [ ] Performance dashboard with real-time metrics
 
@@ -78,11 +91,11 @@
 **Focus:** Technical debt reduction and architecture improvements
 
 ### Tasks
-- [ ] Dependency injection cleanup and circular dependency resolution
+- [x] Dependency injection cleanup and service-locator removal
 - [ ] Plugin architecture foundation for extensibility
-- [ ] API documentation with OpenAPI/Swagger
+- [ ] API documentation with OpenAPI/Swagger (Swagger opt-in only; disabled by default)
 - [ ] Code signing investigation for installer
-- [ ] Security audit and hardening
+- [x] Security audit and hardening
 
 **Estimated Effort:** 3-4 weeks
 
