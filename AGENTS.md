@@ -80,6 +80,23 @@ This file provides instructions for AI coding assistants working on this project
 - `installers/` - Built installers (gitignored)
 - `.windsurf/workflows/` - Workflow definitions
 
+## Build & Test
+
+```powershell
+# Build the solution
+dotnet build c:/Users/rvn/source/repos/ModbusForge/ModbusForge.sln
+
+# Run unit tests (excluding UI automation and smoke tests)
+dotnet test c:/Users/rvn/source/repos/ModbusForge/ModbusForge.Tests/ModbusForge.Tests.csproj --filter "FullyQualifiedName!~UITests & FullyQualifiedName!~SmokeTests" --no-build
+```
+
+If the build fails because `obj\Debug\net8.0-windows\ModbusForge.dll` is locked, terminate any lingering `dotnet.exe` processes and retry:
+
+```powershell
+taskkill /f /im dotnet.exe
+dotnet build c:/Users/rvn/source/repos/ModbusForge/ModbusForge.sln
+```
+
 ## Code Style
 
 - Use `ILogger` for all logging (no `Debug.WriteLine` or custom file logging)
