@@ -38,10 +38,11 @@ namespace ModbusForge.Views
                 TagTreeView.Items.Add(groupItem);
             }
 
-            // Add tags not in any group
-            var ungroupedTags = _tagService.Tags.Where(t => 
-                !_tagService.Groups.Any(g => g.Tags.Any(tag => tag.Id == t.Id))).ToList();
-            
+            // Add tags not in any group (no GroupId or GroupId not found)
+            var allGroupIds = _tagService.GetAllGroupsFlat().Select(g => g.Id).ToHashSet();
+            var ungroupedTags = _tagService.Tags.Where(t =>
+                string.IsNullOrEmpty(t.GroupId) || !allGroupIds.Contains(t.GroupId)).ToList();
+
             if (ungroupedTags.Any())
             {
                 var ungroupedItem = new TreeViewItem
@@ -49,13 +50,13 @@ namespace ModbusForge.Views
                     Header = $"Ungrouped ({ungroupedTags.Count})",
                     Tag = null
                 };
-                
+
                 foreach (var tag in ungroupedTags)
                 {
                     var tagItem = CreateTagTreeItem(tag);
                     ungroupedItem.Items.Add(tagItem);
                 }
-                
+
                 TagTreeView.Items.Add(ungroupedItem);
             }
         }
@@ -174,7 +175,16 @@ namespace ModbusForge.Views
             {
                 _selectedTag.Name = TagNameBox.Text;
                 _selectedTag.Description = TagDescriptionBox.Text;
-                _selectedTag.Group = TagGroupCombo.Text;
+
+                // Resolve group name to GroupId for stable identity
+                var groupName = TagGroupCombo.Text;
+                _selectedTag.Group = groupName;
+                var resolvedGroup = _tagService.FindGroupByName(groupName);
+                if (resolvedGroup != null)
+                {
+                    _selectedTag.GroupId = resolvedGroup.Id;
+                }
+
                 _selectedTag.Area = (PlcArea)TagAreaCombo.SelectedIndex;
                 _selectedTag.Address = int.Parse(TagAddressBox.Text);
                 _selectedTag.DataType = (TagDataType)TagDataTypeCombo.SelectedIndex;
@@ -201,6 +211,7 @@ namespace ModbusForge.Views
             var dialog = new InputDialog("New Group", "Enter group name:", "NewGroup");
             if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputText))
             {
+                // Use parent group name for backward compat; CreateGroup resolves to ParentGroupId internally
                 var parentGroup = _selectedGroup?.Name;
                 await _tagService.CreateGroup(dialog.InputText, parentGroup);
                 LoadTreeView();

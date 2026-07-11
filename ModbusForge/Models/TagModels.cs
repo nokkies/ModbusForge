@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Text.Json.Serialization;
 
 namespace ModbusForge.Models
 {
@@ -32,7 +33,12 @@ namespace ModbusForge.Models
         [ObservableProperty]
         private string _id = Guid.NewGuid().ToString();
 
-        public Tag(ILogger<Tag>? logger = null)
+        [JsonConstructor]
+        public Tag() : this(null)
+        {
+        }
+
+        public Tag(ILogger<Tag>? logger)
         {
             _logger = logger ?? NullLogger<Tag>.Instance;
         }
@@ -43,6 +49,16 @@ namespace ModbusForge.Models
         [ObservableProperty]
         private string _description = "";
 
+        /// <summary>
+        /// Stable group identity. Points to TagGroup.Id.
+        /// </summary>
+        [ObservableProperty]
+        private string? _groupId;
+
+        /// <summary>
+        /// Legacy group name used for v1 schema migration only.
+        /// Do not use for runtime logic — use GroupId instead.
+        /// </summary>
         [ObservableProperty]
         private string _group = "Default";  // For hierarchical organization
 
@@ -167,6 +183,16 @@ namespace ModbusForge.Models
         [ObservableProperty]
         private string _description = "";
 
+        /// <summary>
+        /// Stable parent identity. Points to another TagGroup.Id, or null/empty for root.
+        /// </summary>
+        [ObservableProperty]
+        private string? _parentGroupId;
+
+        /// <summary>
+        /// Legacy parent group name used for v1 schema migration only.
+        /// Do not use for runtime logic — use ParentGroupId instead.
+        /// </summary>
         [ObservableProperty]
         private string _parentGroup = "";  // Empty = root level
 

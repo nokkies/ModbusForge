@@ -62,6 +62,10 @@ namespace ModbusForge
                 }
             }
 
+            // Initialize TagService (loads persisted data)
+            var tagService = ServiceProvider.GetRequiredService<TagService>();
+            await tagService.InitializeAsync();
+
             // Start API Service if enabled
             var settingsService = ServiceProvider.GetRequiredService<ISettingsService>();
             var apiServerService = ServiceProvider.GetRequiredService<IApiServerService>();

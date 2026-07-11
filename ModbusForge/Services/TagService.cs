@@ -8,10 +8,22 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ModbusForge.Services
 {
+    /// <summary>
+    /// Persistence wrapper with schema versioning for the tag database.
+    /// </summary>
+    public class TagDatabase
+    {
+        public int SchemaVersion { get; set; } = 2;
+        public List<Tag> Tags { get; set; } = new();
+        public List<TagGroup> Groups { get; set; } = new();
+    }
+
     /// <summary>
     /// Service for managing the tag database - symbolic addressing for Modbus registers
     /// </summary>
@@ -20,6 +32,7 @@ namespace ModbusForge.Services
         private string _tagsFilePath = null!;
         private JsonSerializerOptions _jsonOptions = null!;
         private readonly ILogger<Tag> _tagLogger;
+        private bool _initialized;
 
         [ObservableProperty]
         private ObservableCollection<Tag> _tags = new();
@@ -33,16 +46,16 @@ namespace ModbusForge.Services
         public TagService()
         {
             _tagLogger = NullLogger<Tag>.Instance;
-            Initialize();
+            SetupPaths();
         }
 
         public TagService(ILogger<Tag> tagLogger)
         {
             _tagLogger = tagLogger ?? NullLogger<Tag>.Instance;
-            Initialize();
+            SetupPaths();
         }
 
-        private void Initialize()
+        private void SetupPaths()
         {
             _tagsFilePath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -52,14 +65,25 @@ namespace ModbusForge.Services
             _jsonOptions = new JsonSerializerOptions
             {
                 WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
             };
 
             // Create default group
             Groups.Add(new TagGroup { Name = "Default", Description = "Default tag group" });
+        }
 
-            // Load existing tags
-            LoadTagsAsync().ConfigureAwait(false);
+        /// <summary>
+        /// Initializes the tag service by loading persisted data.
+        /// Must be called before using the service. Safe to call multiple times.
+        /// </summary>
+        public async Task InitializeAsync(CancellationToken cancellationToken = default)
+        {
+            if (_initialized)
+                return;
+
+            await LoadTagsAsync(cancellationToken);
+            _initialized = true;
         }
 
         /// <summary>
@@ -67,22 +91,30 @@ namespace ModbusForge.Services
         /// </summary>
         public async Task<Tag> CreateTag(string name, string group, PlcArea area, int address, TagDataType dataType)
         {
+            // Resolve group to ID
+            var targetGroup = FindGroupByName(group);
+            if (targetGroup == null)
+            {
+                targetGroup = EnsureGroupExists(group);
+            }
+
             var tag = new Tag(_tagLogger)
             {
                 Name = name,
                 Group = group,
+                GroupId = targetGroup.Id,
                 Area = area,
                 Address = address,
                 DataType = dataType
             };
 
             Tags.Add(tag);
-            
-            // Ensure group exists
-            EnsureGroupExists(group);
-            
+
+            // Add to group's tag collection
+            targetGroup.Tags.Add(tag);
+
             await SaveTagsAsync();
-            
+
             return tag;
         }
 
@@ -95,12 +127,19 @@ namespace ModbusForge.Services
             if (tag != null)
             {
                 Tags.Remove(tag);
-                
+
+                // Remove from group's tag collection
+                if (!string.IsNullOrEmpty(tag.GroupId))
+                {
+                    var group = FindGroupById(tag.GroupId);
+                    group?.Tags.Remove(tag);
+                }
+
                 // Remove from watch entries too
                 var watchEntry = WatchEntries.FirstOrDefault(w => w.TagId == tagId);
                 if (watchEntry != null)
                     WatchEntries.Remove(watchEntry);
-                
+
                 await SaveTagsAsync();
             }
         }
@@ -129,7 +168,7 @@ namespace ModbusForge.Services
             var tag = GetTagByName(symbolicName);
             if (tag != null)
                 return (tag.Area, tag.Address);
-            
+
             return null;
         }
 
@@ -224,11 +263,16 @@ namespace ModbusForge.Services
 
             if (!string.IsNullOrEmpty(parentGroup))
             {
-                var parent = Groups.FirstOrDefault(g => g.Name == parentGroup);
+                var parent = FindGroupByName(parentGroup);
                 if (parent != null)
+                {
+                    group.ParentGroupId = parent.Id;
                     parent.SubGroups.Add(group);
+                }
                 else
+                {
                     Groups.Add(group);
+                }
             }
             else
             {
@@ -240,17 +284,61 @@ namespace ModbusForge.Services
         }
 
         /// <summary>
+        /// Rename a group. Updates display name only; GroupId-based references remain stable.
+        /// </summary>
+        public async Task RenameGroup(string groupId, string newName)
+        {
+            var group = FindGroupById(groupId);
+            if (group == null)
+                throw new ArgumentException($"Group with ID '{groupId}' not found.");
+
+            var oldName = group.Name;
+            group.Name = newName;
+
+            // Update legacy Group property on tags pointing to this group
+            foreach (var tag in Tags.Where(t => t.GroupId == groupId))
+            {
+                tag.Group = newName;
+            }
+
+            // Update legacy ParentGroup property on child groups
+            foreach (var child in GetAllGroupsFlat().Where(g => g.ParentGroupId == groupId))
+            {
+                child.ParentGroup = newName;
+            }
+
+            _tagLogger.LogInformation("Renamed group '{OldName}' to '{NewName}' (ID: {GroupId})", oldName, newName, groupId);
+
+            await SaveTagsAsync();
+        }
+
+        /// <summary>
+        /// Get all tags in a group (including subgroups) by group ID.
+        /// </summary>
+        public IEnumerable<Tag> GetTagsInGroupById(string groupId)
+        {
+            var group = FindGroupById(groupId);
+            if (group == null) return Enumerable.Empty<Tag>();
+
+            var tags = new List<Tag>(Tags.Where(t => t.GroupId == groupId));
+            foreach (var sub in group.SubGroups)
+                tags.AddRange(GetTagsInGroupById(sub.Id));
+
+            return tags;
+        }
+
+        /// <summary>
         /// Get all tags in a group (including subgroups)
         /// </summary>
         public IEnumerable<Tag> GetTagsInGroup(string groupName)
         {
-            var group = Groups.FirstOrDefault(g => g.Name == groupName);
+            var group = FindGroupByName(groupName);
             if (group == null) return Enumerable.Empty<Tag>();
 
             var tags = new List<Tag>(group.Tags);
             foreach (var sub in group.SubGroups)
                 tags.AddRange(GetTagsInGroupRecursive(sub));
-            
+
             return tags;
         }
 
@@ -262,29 +350,85 @@ namespace ModbusForge.Services
             return tags;
         }
 
-        private void EnsureGroupExists(string groupName)
+        /// <summary>
+        /// Find a group by its stable ID across all levels.
+        /// </summary>
+        internal TagGroup? FindGroupById(string groupId)
         {
-            if (!Groups.Any(g => g.Name == groupName))
+            return GetAllGroupsFlat().FirstOrDefault(g => g.Id == groupId);
+        }
+
+        /// <summary>
+        /// Find a group by name across all levels (first match wins).
+        /// </summary>
+        internal TagGroup? FindGroupByName(string name)
+        {
+            return GetAllGroupsFlat().FirstOrDefault(g => g.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
+        /// Returns a flat enumeration of all groups including nested subgroups.
+        /// </summary>
+        internal IEnumerable<TagGroup> GetAllGroupsFlat()
+        {
+            foreach (var group in Groups)
             {
-                Groups.Add(new TagGroup { Name = groupName });
+                yield return group;
+                foreach (var sub in FlattenSubGroups(group))
+                    yield return sub;
             }
         }
 
-        private async Task LoadTagsAsync()
+        private static IEnumerable<TagGroup> FlattenSubGroups(TagGroup parent)
+        {
+            foreach (var sub in parent.SubGroups)
+            {
+                yield return sub;
+                foreach (var nested in FlattenSubGroups(sub))
+                    yield return nested;
+            }
+        }
+
+        private TagGroup EnsureGroupExists(string groupName)
+        {
+            var existing = FindGroupByName(groupName);
+            if (existing != null)
+                return existing;
+
+            var newGroup = new TagGroup { Name = groupName };
+            Groups.Add(newGroup);
+            return newGroup;
+        }
+
+        private async Task LoadTagsAsync(CancellationToken cancellationToken = default)
         {
             try
             {
-                if (File.Exists(_tagsFilePath))
+                if (!File.Exists(_tagsFilePath))
+                    return;
+
+                var json = await File.ReadAllTextAsync(_tagsFilePath, cancellationToken);
+                if (string.IsNullOrWhiteSpace(json))
+                    return;
+
+                // Detect schema version
+                int schemaVersion = DetectSchemaVersion(json);
+
+                var data = JsonSerializer.Deserialize<TagDatabase>(json, _jsonOptions);
+                if (data == null)
+                    return;
+
+                if (schemaVersion < 2)
                 {
-                    var json = await File.ReadAllTextAsync(_tagsFilePath);
-                    var data = JsonSerializer.Deserialize<TagDatabase>(json, _jsonOptions);
-                    
-                    if (data != null)
-                    {
-                        Tags = new ObservableCollection<Tag>(data.Tags);
-                        Groups = new ObservableCollection<TagGroup>(data.Groups);
-                    }
+                    _tagLogger.LogInformation("Migrating tag database from schema v{OldVersion} to v2", schemaVersion);
+                    MigrateFromV1(data);
                 }
+
+                Tags = new ObservableCollection<Tag>(data.Tags);
+                Groups = new ObservableCollection<TagGroup>(data.Groups);
+
+                // Rebuild SubGroups hierarchy and Tags collections from flat data
+                RebuildHierarchy();
             }
             catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
             {
@@ -293,34 +437,188 @@ namespace ModbusForge.Services
             }
         }
 
-        private async Task SaveTagsAsync()
+        /// <summary>
+        /// Detects the schema version from raw JSON. Returns 1 if no schemaVersion field found.
+        /// </summary>
+        private static int DetectSchemaVersion(string json)
         {
             try
             {
-                var directory = Path.GetDirectoryName(_tagsFilePath);
-                if (!string.IsNullOrEmpty(directory))
-                    Directory.CreateDirectory(directory);
-
-                var data = new TagDatabase
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("schemaVersion", out var versionElement))
                 {
-                    Tags = Tags.ToList(),
-                    Groups = Groups.ToList()
-                };
-
-                var json = JsonSerializer.Serialize(data, _jsonOptions);
-                await File.WriteAllTextAsync(_tagsFilePath, json);
+                    return versionElement.GetInt32();
+                }
             }
-            catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+            catch
             {
-                _tagLogger.LogError(ex, "Failed to save tags to {TagsFilePath}", _tagsFilePath);
-                // Silent fail - will retry on next save
+                // Fall through to default
             }
+            return 1;
         }
 
-        private class TagDatabase
+        /// <summary>
+        /// Migrates v1 data (name-based references) to v2 (ID-based references).
+        /// </summary>
+        internal void MigrateFromV1(TagDatabase data)
         {
-            public List<Tag> Tags { get; set; } = new();
-            public List<TagGroup> Groups { get; set; } = new();
+            // Build a lookup from group name to group (first match wins for duplicates)
+            var groupByName = new Dictionary<string, TagGroup>(StringComparer.OrdinalIgnoreCase);
+            foreach (var group in data.Groups)
+            {
+                if (!groupByName.ContainsKey(group.Name))
+                {
+                    groupByName[group.Name] = group;
+                }
+                else
+                {
+                    _tagLogger.LogWarning(
+                        "Duplicate group name '{GroupName}' found during migration. Using first occurrence (ID: {GroupId})",
+                        group.Name, groupByName[group.Name].Id);
+                }
+            }
+
+            // Assign ParentGroupId from ParentGroup name (snapshot to allow adding fallbacks)
+            var fallbackGroups = new List<TagGroup>();
+            foreach (var group in data.Groups.ToList())
+            {
+                if (!string.IsNullOrEmpty(group.ParentGroup))
+                {
+                    if (groupByName.TryGetValue(group.ParentGroup, out var parent))
+                    {
+                        group.ParentGroupId = parent.Id;
+                    }
+                    else
+                    {
+                        _tagLogger.LogWarning(
+                            "Group '{GroupName}' references missing parent '{ParentGroup}'. Creating fallback group.",
+                            group.Name, group.ParentGroup);
+                        var fallback = new TagGroup { Name = group.ParentGroup };
+                        fallbackGroups.Add(fallback);
+                        groupByName[group.ParentGroup] = fallback;
+                        group.ParentGroupId = fallback.Id;
+                    }
+                }
+            }
+
+            // Add fallback parent groups
+            data.Groups.AddRange(fallbackGroups);
+
+            // Assign GroupId from Group name on tags
+            var tagFallbackGroups = new List<TagGroup>();
+            foreach (var tag in data.Tags)
+            {
+                if (!string.IsNullOrEmpty(tag.Group))
+                {
+                    if (groupByName.TryGetValue(tag.Group, out var group))
+                    {
+                        tag.GroupId = group.Id;
+                    }
+                    else
+                    {
+                        _tagLogger.LogWarning(
+                            "Tag '{TagName}' references missing group '{GroupName}'. Creating fallback group.",
+                            tag.Name, tag.Group);
+                        var fallback = new TagGroup { Name = tag.Group };
+                        tagFallbackGroups.Add(fallback);
+                        groupByName[tag.Group] = fallback;
+                        tag.GroupId = fallback.Id;
+                    }
+                }
+            }
+
+            // Add fallback tag groups
+            data.Groups.AddRange(tagFallbackGroups);
+
+            data.SchemaVersion = 2;
+        }
+
+        /// <summary>
+        /// Rebuilds the SubGroups hierarchy and group Tags collections from flat lists using IDs.
+        /// </summary>
+        private void RebuildHierarchy()
+        {
+            var groupLookup = new Dictionary<string, TagGroup>();
+            foreach (var group in Groups)
+            {
+                groupLookup[group.Id] = group;
+                group.SubGroups.Clear();
+                group.Tags.Clear();
+            }
+
+            // Build parent-child relationships
+            var rootGroups = new List<TagGroup>();
+            foreach (var group in Groups.ToList())
+            {
+                if (!string.IsNullOrEmpty(group.ParentGroupId) && groupLookup.TryGetValue(group.ParentGroupId, out var parent))
+                {
+                    parent.SubGroups.Add(group);
+                }
+                else
+                {
+                    rootGroups.Add(group);
+                }
+            }
+
+            // Place tags into their groups
+            foreach (var tag in Tags)
+            {
+                if (!string.IsNullOrEmpty(tag.GroupId) && groupLookup.TryGetValue(tag.GroupId, out var group))
+                {
+                    group.Tags.Add(tag);
+                }
+            }
+
+            // Replace Groups with root-level only (children are in SubGroups)
+            Groups = new ObservableCollection<TagGroup>(rootGroups);
+        }
+
+        /// <summary>
+        /// Saves the tag database atomically (write to temp file, then replace).
+        /// Throws on failure so callers can handle it.
+        /// </summary>
+        internal async Task SaveTagsAsync()
+        {
+            var directory = Path.GetDirectoryName(_tagsFilePath);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
+            // Collect all groups (flattened) for persistence
+            var allGroups = GetAllGroupsFlat().ToList();
+
+            var data = new TagDatabase
+            {
+                SchemaVersion = 2,
+                Tags = Tags.ToList(),
+                Groups = allGroups
+            };
+
+            var json = JsonSerializer.Serialize(data, _jsonOptions);
+
+            // Atomic write: write to temp file, flush, then replace
+            var tempFilePath = _tagsFilePath + ".tmp";
+            try
+            {
+                await using (var stream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                await using (var writer = new StreamWriter(stream))
+                {
+                    await writer.WriteAsync(json);
+                    await writer.FlushAsync();
+                    await stream.FlushAsync();
+                }
+
+                // Atomic replace
+                File.Move(tempFilePath, _tagsFilePath, overwrite: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _tagLogger.LogError(ex, "Failed to save tags to {TagsFilePath}", _tagsFilePath);
+
+                // Clean up temp file if it exists
+                try { if (File.Exists(tempFilePath)) File.Delete(tempFilePath); } catch { /* best effort */ }
+
+                throw; // Surface failure to callers
+            }
         }
     }
 }
