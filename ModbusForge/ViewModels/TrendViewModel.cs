@@ -22,6 +22,7 @@ namespace ModbusForge.ViewModels
         private readonly ITrendLogger _loggerSvc;
         private readonly IFileDialogService _fileDialogService;
         private readonly IDialogService _dialogService;
+        private readonly IDispatcher _dispatcher;
         private readonly Dictionary<string, ObservableCollection<double>> _valuesByKey = new();
         private readonly Dictionary<string, List<(DateTime ts, double v)>> _samplesByKey = new();
         private readonly Dictionary<string, SKColor> _colorByKey = new();
@@ -49,11 +50,12 @@ namespace ModbusForge.ViewModels
             public string Name { get; init; } = string.Empty;
         }
 
-        public TrendViewModel(ITrendLogger loggerSvc, IOptions<LoggingSettings> options, IFileDialogService fileDialogService, IDialogService? dialogService = null)
+        public TrendViewModel(ITrendLogger loggerSvc, IOptions<LoggingSettings> options, IFileDialogService fileDialogService, IDialogService? dialogService = null, IDispatcher? dispatcher = null)
         {
             _loggerSvc = loggerSvc;
             _fileDialogService = fileDialogService;
             _dialogService = dialogService ?? new NullDialogService();
+            _dispatcher = dispatcher ?? new WpfDispatcher();
             var s = options?.Value ?? new LoggingSettings();
             s.Clamp();
 
@@ -233,7 +235,7 @@ namespace ModbusForge.ViewModels
 
         private void OnAdded(string key, string displayName)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            _dispatcher.Invoke(() =>
             {
                 if (_valuesByKey.ContainsKey(key)) return;
                 var values = new ObservableCollection<double>();
@@ -256,7 +258,7 @@ namespace ModbusForge.ViewModels
 
         private void OnRemoved(string key)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            _dispatcher.Invoke(() =>
             {
                 if (_valuesByKey.ContainsKey(key)) _valuesByKey.Remove(key);
                 if (_samplesByKey.ContainsKey(key)) _samplesByKey.Remove(key);
@@ -282,7 +284,7 @@ namespace ModbusForge.ViewModels
 
         private void OnSampled(string key, double value, DateTime timestampUtc)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            _dispatcher.Invoke(() =>
             {
                 if (!_valuesByKey.TryGetValue(key, out var values)) return;
                 values.Add(value);

@@ -143,6 +143,7 @@ namespace ModbusForge
             services.AddSingleton<IFileDialogService, FileDialogService>();
             services.AddSingleton<IDialogService, MessageBoxDialogService>();
             services.AddSingleton<ICustomEntryService, CustomEntryService>();
+            services.AddSingleton<IDispatcher, WpfDispatcher>();
             services.AddSingleton<IConsoleLoggerService, ConsoleLoggerService>();
             services.AddSingleton<ISettingsService, SettingsService>();
             services.AddSingleton<IConnectionManager, ConnectionManager>();

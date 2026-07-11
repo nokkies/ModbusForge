@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ModbusForge.ViewModels;
-using System.Windows;
 using ModbusForge.Models;
 
 namespace ModbusForge.Services;
@@ -22,6 +21,7 @@ public class ApiServerService : IApiServerService
     private readonly ISettingsService _settingsService;
     private readonly ILogger<ApiServerService> _logger;
     private readonly IServiceProvider _wpfServiceProvider;
+    private readonly IDispatcher _dispatcher;
 
     private WebApplication? _app;
     private MainViewModel? _mainViewModel;
@@ -31,11 +31,13 @@ public class ApiServerService : IApiServerService
     public ApiServerService(
         ISettingsService settingsService,
         ILogger<ApiServerService> logger,
-        IServiceProvider wpfServiceProvider)
+        IServiceProvider wpfServiceProvider,
+        IDispatcher? dispatcher = null)
     {
         _settingsService = settingsService;
         _logger = logger;
         _wpfServiceProvider = wpfServiceProvider;
+        _dispatcher = dispatcher ?? new WpfDispatcher();
     }
 
     private MainViewModel MainViewModel
@@ -137,7 +139,7 @@ public class ApiServerService : IApiServerService
         app.MapPost("/api/app/connect", async (MainViewModel vm, CancellationToken ct) =>
         {
             bool initiated = false;
-            await Application.Current.Dispatcher.InvokeAsync(() =>
+            await _dispatcher.InvokeAsync(() =>
             {
                 if (!vm.IsConnected && vm.ConnectCommand.CanExecute(null))
                 {
@@ -182,7 +184,7 @@ public class ApiServerService : IApiServerService
         app.MapPost("/api/app/disconnect", async (MainViewModel vm, CancellationToken ct) =>
         {
             bool initiated = false;
-            await Application.Current.Dispatcher.InvokeAsync(() =>
+            await _dispatcher.InvokeAsync(() =>
             {
                 if (vm.IsConnected && vm.DisconnectCommand.CanExecute(null))
                 {
@@ -266,19 +268,19 @@ public class ApiServerService : IApiServerService
         // --- Custom Tags ---
         app.MapGet("/api/custom-tags", async (MainViewModel vm) =>
         {
-            var snapshot = await Application.Current.Dispatcher.InvokeAsync(() => vm.CustomEntries.ToList());
+            var snapshot = await _dispatcher.InvokeAsync(() => vm.CustomEntries.ToList());
             return Results.Ok(snapshot);
         }).WithTags("CustomTags");
 
         app.MapPost("/api/custom-tags", async (MainViewModel vm, [FromBody] CustomEntry entry) =>
         {
-            await Application.Current.Dispatcher.InvokeAsync(() => vm.CustomEntries.Add(entry));
+            await _dispatcher.InvokeAsync(() => vm.CustomEntries.Add(entry));
             return Results.Ok(entry);
         }).WithTags("CustomTags");
 
         app.MapDelete("/api/custom-tags/{address}", async (MainViewModel vm, [FromRoute] int address) =>
         {
-            var removed = await Application.Current.Dispatcher.InvokeAsync(() =>
+            var removed = await _dispatcher.InvokeAsync(() =>
             {
                 var entry = vm.CustomEntries.FirstOrDefault(e => e.Address == address);
                 if (entry != null)
@@ -294,13 +296,13 @@ public class ApiServerService : IApiServerService
         // --- Simulation Nodes ---
         app.MapGet("/api/simulation/nodes", async (MainViewModel vm) =>
         {
-            var snapshot = await Application.Current.Dispatcher.InvokeAsync(() => vm.CurrentConfig.SimulationSettings.VisualNodes.ToList());
+            var snapshot = await _dispatcher.InvokeAsync(() => vm.CurrentConfig.SimulationSettings.VisualNodes.ToList());
             return Results.Ok(snapshot);
         }).WithTags("Simulation");
 
         app.MapPost("/api/simulation/nodes", async (MainViewModel vm, [FromBody] VisualNode node) =>
         {
-            await Application.Current.Dispatcher.InvokeAsync(() =>
+            await _dispatcher.InvokeAsync(() =>
             {
                 var existing = vm.CurrentConfig.SimulationSettings.VisualNodes.FirstOrDefault(n => n.Id == node.Id);
                 if (existing != null)
@@ -312,7 +314,7 @@ public class ApiServerService : IApiServerService
 
         app.MapDelete("/api/simulation/nodes/{id}", async (MainViewModel vm, [FromRoute] string id) =>
         {
-            var removed = await Application.Current.Dispatcher.InvokeAsync(() =>
+            var removed = await _dispatcher.InvokeAsync(() =>
             {
                 var existing = vm.CurrentConfig.SimulationSettings.VisualNodes.FirstOrDefault(n => n.Id == id);
                 if (existing != null)
@@ -328,13 +330,13 @@ public class ApiServerService : IApiServerService
         // --- Scripts ---
         app.MapGet("/api/scripts", async (IScriptRuleService scriptService) =>
         {
-            var snapshot = await Application.Current.Dispatcher.InvokeAsync(() => scriptService.Rules.ToList());
+            var snapshot = await _dispatcher.InvokeAsync(() => scriptService.Rules.ToList());
             return Results.Ok(snapshot);
         }).WithTags("Scripts");
 
         app.MapPost("/api/scripts", async (IScriptRuleService scriptService, [FromBody] ScriptRule rule) =>
         {
-            await Application.Current.Dispatcher.InvokeAsync(() =>
+            await _dispatcher.InvokeAsync(() =>
             {
                 var existing = scriptService.Rules.FirstOrDefault(r => r.Name == rule.Name);
                 if (existing != null)
@@ -346,7 +348,7 @@ public class ApiServerService : IApiServerService
 
         app.MapDelete("/api/scripts/{name}", async (IScriptRuleService scriptService, [FromRoute] string name) =>
         {
-            var removed = await Application.Current.Dispatcher.InvokeAsync(() =>
+            var removed = await _dispatcher.InvokeAsync(() =>
             {
                 var existing = scriptService.Rules.FirstOrDefault(r => r.Name == name);
                 if (existing != null)
@@ -362,14 +364,14 @@ public class ApiServerService : IApiServerService
         // --- Logs ---
         app.MapGet("/api/logs", async (IConsoleLoggerService loggerService) =>
         {
-            var snapshot = await Application.Current.Dispatcher.InvokeAsync(() => loggerService.LogMessages.ToList());
+            var snapshot = await _dispatcher.InvokeAsync(() => loggerService.LogMessages.ToList());
             return Results.Ok(snapshot);
         }).WithTags("Logs");
 
         // --- Trends ---
         app.MapPost("/api/trends/{key}", async (ITrendLogger trendLogger, [FromRoute] string key, [FromQuery] string displayName) =>
         {
-            await Application.Current.Dispatcher.InvokeAsync(() =>
+            await _dispatcher.InvokeAsync(() =>
                 trendLogger.Add(key, string.IsNullOrEmpty(displayName) ? key : displayName));
             return Results.Ok(new { Success = true });
         }).WithTags("Trends");

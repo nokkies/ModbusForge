@@ -1,13 +1,12 @@
 using System;
 using System.Collections.ObjectModel;
-using System.Windows;
-using System.Windows.Threading;
 
 namespace ModbusForge.Services
 {
     public class ConsoleLoggerService : IConsoleLoggerService, IDisposable
     {
         private readonly ISettingsService? _settingsService;
+        private readonly IDispatcher _dispatcher;
         private const int Headroom = 50;
 
         public event EventHandler<LogMessageEventArgs>? LogMessageReceived;
@@ -15,13 +14,15 @@ namespace ModbusForge.Services
         public ObservableCollection<string> LogMessages { get; } = new ObservableCollection<string>();
 
         // Default constructor for backwards compatibility / tests without settings
-        public ConsoleLoggerService()
+        public ConsoleLoggerService(IDispatcher? dispatcher = null)
         {
+            _dispatcher = dispatcher ?? new WpfDispatcher();
         }
 
-        public ConsoleLoggerService(ISettingsService settingsService)
+        public ConsoleLoggerService(ISettingsService settingsService, IDispatcher? dispatcher = null)
         {
             _settingsService = settingsService;
+            _dispatcher = dispatcher ?? new WpfDispatcher();
             if (_settingsService != null)
             {
                 _settingsService.SettingsChanged += OnSettingsChanged;
@@ -37,15 +38,7 @@ namespace ModbusForge.Services
         {
             LogMessageReceived?.Invoke(this, new LogMessageEventArgs(message));
 
-            var dispatcher = Application.Current?.Dispatcher;
-            if (dispatcher != null && !dispatcher.CheckAccess())
-            {
-                dispatcher.Invoke(() => AddAndTrim(message));
-            }
-            else
-            {
-                AddAndTrim(message);
-            }
+            _dispatcher.Invoke(() => AddAndTrim(message));
         }
 
         private void AddAndTrim(string message)
@@ -71,15 +64,7 @@ namespace ModbusForge.Services
 
         private void TrimMessages()
         {
-            var dispatcher = Application.Current?.Dispatcher;
-            if (dispatcher != null && !dispatcher.CheckAccess())
-            {
-                dispatcher.Invoke(TrimMessagesInternal);
-            }
-            else
-            {
-                TrimMessagesInternal();
-            }
+            _dispatcher.Invoke(TrimMessagesInternal);
         }
 
         private void TrimMessagesInternal()

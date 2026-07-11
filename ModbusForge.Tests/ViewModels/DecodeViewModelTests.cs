@@ -64,7 +64,8 @@ namespace ModbusForge.Tests.ViewModels
                 trendCoordinator,
                 configurationCoordinator,
                 new Mock<IDialogService>().Object,
-                new VisualNodeEditorViewModel()
+                new VisualNodeEditorViewModel(),
+                new Mock<IDispatcher>().Object
             );
 
             // Important: Call CallBase so we don't null-ref on PropertyChanged, etc.

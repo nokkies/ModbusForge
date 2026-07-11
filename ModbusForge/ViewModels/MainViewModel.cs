@@ -50,6 +50,7 @@ namespace ModbusForge.ViewModels
         private readonly TrendCoordinator _trendCoordinator;
         private readonly ConfigurationCoordinator _configurationCoordinator;
         private readonly IDialogService _dialogService;
+        private readonly IDispatcher _dispatcher;
         private readonly VisualNodeEditorViewModel _visualNodeEditorViewModel;
         private bool _disposed = false;
         // Mode-aware UI helpers
@@ -69,7 +70,7 @@ namespace ModbusForge.ViewModels
 
         public VisualNodeEditorViewModel VisualNodeEditorViewModel => _visualNodeEditorViewModel;
 
-        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, IDialogService? dialogService = null, VisualNodeEditorViewModel? visualNodeEditorViewModel = null)
+        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, IDialogService? dialogService = null, VisualNodeEditorViewModel? visualNodeEditorViewModel = null, IDispatcher? dispatcher = null)
         {
             // Store dependencies
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
@@ -84,6 +85,7 @@ namespace ModbusForge.ViewModels
             _trendCoordinator = trendCoordinator ?? throw new ArgumentNullException(nameof(trendCoordinator));
             _configurationCoordinator = configurationCoordinator ?? throw new ArgumentNullException(nameof(configurationCoordinator));
             _dialogService = dialogService ?? new NullDialogService();
+            _dispatcher = dispatcher ?? new WpfDispatcher();
             // Initialize visual node editor
             _visualNodeEditorViewModel = visualNodeEditorViewModel ?? new VisualNodeEditorViewModel();
             // VisualSimulationService will be started/stopped by ShowLiveValues toggle
@@ -328,7 +330,7 @@ namespace ModbusForge.ViewModels
 
         private void ConsoleLoggerService_LogMessageReceived(object? sender, LogMessageEventArgs e)
         {
-            Application.Current?.Dispatcher?.Invoke(() =>
+            _dispatcher.Invoke(() =>
             {
                 ConsoleMessages.Add(e.Message);
 

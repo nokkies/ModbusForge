@@ -1,6 +1,5 @@
 using System;
 using System.Collections.ObjectModel;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.Logging;
 
@@ -19,12 +18,12 @@ namespace ModbusForge.ViewModels
             {
                 var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
                 var formattedMessage = $"[{timestamp}] {message}";
-                
+
                 // Add to UI collection only (file logging handled by ILogger infrastructure)
-                Application.Current.Dispatcher.Invoke(() =>
+                _dispatcher.Invoke(() =>
                 {
                     DebugMessages.Insert(0, formattedMessage);
-                    
+
                     // Keep only the last 100 messages to prevent memory issues
                     while (DebugMessages.Count > 100)
                     {
