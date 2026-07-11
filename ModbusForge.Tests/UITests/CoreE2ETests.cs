@@ -46,9 +46,7 @@ public class CoreE2ETests : E2ETestBase
 
                 var cf = new ConditionFactory(new FlaUI.UIA3.UIA3PropertyLibrary());
 
-                var simulationTab = MainWindow.FindFirstDescendant(cf.ByAutomationId("SimulationTab"))?.AsTabItem();
-                Assert.NotNull(simulationTab);
-                simulationTab.Select();
+                OpenSimulation();
 
                 var inputBoolBtn = MainWindow.FindFirstDescendant(cf.ByName("Input BOOL"))?.AsButton();
                 Assert.NotNull(inputBoolBtn);

@@ -180,7 +180,7 @@
                     <ui:NavigationViewItem Content="Coils" Icon="{ui:SymbolIcon Symbol=ToggleLeft24}" Tag="2" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
                     <ui:NavigationViewItem Content="Discrete Inputs" Icon="{ui:SymbolIcon Symbol=ToggleRight24}" Tag="3" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
                     <ui:NavigationViewItem Content="Custom Watch" Icon="{ui:SymbolIcon Symbol=Star24}" Tag="4" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
-                    <ui:NavigationViewItem Content="Simulation" Icon="{ui:SymbolIcon Symbol=VirtualNetwork24}" Tag="5" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
+                    <ui:NavigationViewItem Content="Simulation" Icon="{ui:SymbolIcon Symbol=VirtualNetwork24}" Tag="5" PreviewMouseLeftButtonDown="NavItem_MouseDown" AutomationProperties.AutomationId="SimulationNavItem"/>
                     <ui:NavigationViewItem Content="Decode" Icon="{ui:SymbolIcon Symbol=Code24}" Tag="6" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
                     <ui:NavigationViewItem Content="Trend" Icon="{ui:SymbolIcon Symbol=DataTrending24}" Tag="7" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
                     <ui:NavigationViewItem Content="Console" Icon="{ui:SymbolIcon Symbol=WindowConsole20}" Tag="8" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>

@@ -143,6 +143,23 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
+        public async Task RetryPolicyService_DoesNotRetryCancellation()
+        {
+            var logger = new Mock<ILogger<RetryPolicyService>>().Object;
+            var service = new RetryPolicyService(logger);
+            int callCount = 0;
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                service.ExecuteWithRetryAsync<bool>(() =>
+                {
+                    callCount++;
+                    return Task.FromCanceled<bool>(new CancellationToken(true));
+                }, "TestCancellation", maxRetries: 3, initialDelayMs: 1));
+
+            Assert.Equal(1, callCount);
+        }
+
+        [Fact]
         public async Task CircuitBreakerService_TripsOpen_AfterFailureThreshold()
         {
             var logger = new Mock<ILogger<CircuitBreakerService>>().Object;

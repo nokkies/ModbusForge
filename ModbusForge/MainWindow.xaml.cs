@@ -310,7 +310,10 @@ namespace ModbusForge
                 {
                     await _viewModel.WriteCoilAtAsync(entry.Address, entry.State);
                 }
-                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                catch (OperationCanceledException)
+                {
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
                 {
                     _dialogService.Show($"Failed to write coil {entry.Address}: {ex.Message}", "Write Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }

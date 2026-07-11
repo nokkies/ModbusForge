@@ -160,7 +160,10 @@ public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow, INotifyP
         {
             await _scriptRunner.RunScriptAsync(Script, _modbusService, _unitId, _cts.Token);
         }
-        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             _dialogService.Show(ex.Message, "Script Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }

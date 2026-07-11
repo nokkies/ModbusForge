@@ -129,7 +129,11 @@ namespace ModbusForge.Services
             {
                 await EvaluateRulesAsync();
             }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug("Script rule evaluation was canceled");
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 _logger.LogError(ex, "Error evaluating script rules in timer callback");
             }

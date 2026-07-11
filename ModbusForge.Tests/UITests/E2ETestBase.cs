@@ -1,4 +1,5 @@
 using FlaUI.Core;
+using FlaUI.Core.AutomationElements;
 using FlaUI.UIA3;
 using UI.TestFramework;
 using Xunit;
@@ -49,6 +50,42 @@ public class E2ETestBase : IDisposable
                 // We keep properties null to mock tests.
             }
         }
+    }
+
+    protected AutomationElement WaitForElementByAutomationId(string automationId, TimeSpan? timeout = null)
+    {
+        if (MainWindow == null)
+            throw new InvalidOperationException("Main window is not available.");
+
+        var expiresAt = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(10));
+        while (DateTime.UtcNow < expiresAt)
+        {
+            var element = MainWindow.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
+            if (element != null)
+                return element;
+            Thread.Sleep(100);
+        }
+
+        throw new TimeoutException($"Element with automation ID '{automationId}' was not found.");
+    }
+
+    protected void OpenSimulation()
+    {
+        if (MainWindow == null)
+            throw new InvalidOperationException("Main window is not available.");
+
+        var simulationNavItem = WaitForElementByAutomationId("SimulationNavItem");
+        var expiresAt = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (DateTime.UtcNow < expiresAt)
+        {
+            simulationNavItem.Click();
+            var paletteSearchBox = MainWindow.FindFirstDescendant(cf => cf.ByAutomationId("PaletteSearchBox"));
+            if (paletteSearchBox != null)
+                return;
+            Thread.Sleep(250);
+        }
+
+        throw new TimeoutException("Simulation content did not become active.");
     }
 
     protected void ReportResult(string testName, string description, Action testAction)

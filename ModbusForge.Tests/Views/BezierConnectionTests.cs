@@ -68,5 +68,15 @@ namespace ModbusForge.Tests.Views
             Assert.Equal(50, c1.X);  // 10 + 40
             Assert.Equal(-30, c2.X); // 10 - 40
         }
+
+        [Fact]
+        public void BoolToDashArrayConverter_ConvertBack_ReturnsBindingDoNothing()
+        {
+            var converter = new BoolToDashArrayConverter();
+
+            var result = converter.ConvertBack(true, typeof(bool), null!, System.Globalization.CultureInfo.InvariantCulture);
+
+            Assert.Same(System.Windows.Data.Binding.DoNothing, result);
+        }
     }
 }

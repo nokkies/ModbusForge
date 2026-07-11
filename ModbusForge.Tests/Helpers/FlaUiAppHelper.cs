@@ -120,7 +120,14 @@ public class FlaUiAppHelper : IDisposable
             currentMenu = nextMenu ?? throw new InvalidOperationException($"Menu item '{menuPath[i]}' not found under '{menuPath[i - 1]}'.");
         }
 
-        currentMenu.Click();
+        if (currentMenu.Patterns.Invoke.IsSupported)
+        {
+            currentMenu.Patterns.Invoke.Pattern.Invoke();
+        }
+        else
+        {
+            currentMenu.Click();
+        }
     }
 
     private T? WaitForElement<T>(Func<T?> findFunc, TimeSpan timeout) where T : class

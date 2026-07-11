@@ -1277,7 +1277,11 @@ namespace ModbusForge.ViewModels
                     }
                 }
             }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug("Custom timer operation was canceled");
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 _logger.LogError(ex, "Error in CustomTimer_Tick");
             }
@@ -1376,7 +1380,11 @@ namespace ModbusForge.ViewModels
                 // Continuous reads for Custom entries are handled exclusively by TrendTimer_Tick
                 // for rows where ce.Trend == true, gated by GlobalMonitorEnabled.
             }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug("Monitor timer operation was canceled");
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 _logger.LogError(ex, "Error in MonitorTimer_Tick");
             }
@@ -1545,7 +1553,11 @@ namespace ModbusForge.ViewModels
                     IsServerMode,
                     enabled => SetGlobalMonitorEnabled(enabled));
             }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug("Trend timer operation was canceled");
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 _logger.LogError(ex, "Error in TrendTimer_Tick");
             }

@@ -153,6 +153,9 @@ namespace ModbusForge.Services
                         await stream.WriteAsync(response, ct);
                     }
                 }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                }
                 catch (Exception ex) when (ex is not OutOfMemoryException)
                 {
                     if (!ct.IsCancellationRequested)
@@ -168,6 +171,10 @@ namespace ModbusForge.Services
             {
                 int read;
                 try { read = await stream.ReadAsync(buffer.AsMemory(offset, count - offset), ct); }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    return false;
+                }
                 catch (Exception ex) when (ex is not OutOfMemoryException)
                 {
                     _logger.LogDebug(ex, "Error reading from stream");

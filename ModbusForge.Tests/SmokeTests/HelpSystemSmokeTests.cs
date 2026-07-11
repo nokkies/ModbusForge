@@ -8,6 +8,7 @@ using Xunit.Abstractions;
 
 namespace ModbusForge.Tests.SmokeTests;
 
+[Collection("Sequential UI Tests")]
 public class HelpSystemSmokeTests : IDisposable
 {
     private readonly FlaUiAppHelper _app;

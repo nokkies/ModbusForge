@@ -106,7 +106,10 @@ public partial class ConnectionManagerWindow : Wpf.Ui.Controls.FluentWindow, INo
                     "Connection Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
-        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             _dialogService.Show($"Connection failed: {ex.Message}", "Connection Error",
                 MessageBoxButton.OK, MessageBoxImage.Error);
@@ -126,7 +129,10 @@ public partial class ConnectionManagerWindow : Wpf.Ui.Controls.FluentWindow, INo
         {
             await _connectionManager.DisconnectProfileAsync(SelectedProfile);
         }
-        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             _dialogService.Show($"Disconnect failed: {ex.Message}", "Disconnect Error",
                 MessageBoxButton.OK, MessageBoxImage.Error);

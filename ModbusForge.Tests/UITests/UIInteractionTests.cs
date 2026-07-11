@@ -85,9 +85,7 @@ public class UIInteractionTests : E2ETestBase
 
                 var cf = new ConditionFactory(new FlaUI.UIA3.UIA3PropertyLibrary());
 
-                var simulationTab = MainWindow.FindFirstDescendant(cf.ByAutomationId("SimulationTab"))?.AsTabItem();
-                Assert.NotNull(simulationTab);
-                simulationTab.Select();
+                OpenSimulation();
 
                 var tagBrowserButton = MainWindow.FindFirstDescendant(cf.ByAutomationId("TagBrowserButton"))?.AsButton();
                 Assert.NotNull(tagBrowserButton);
@@ -120,9 +118,7 @@ public class UIInteractionTests : E2ETestBase
 
                 var cf = new ConditionFactory(new FlaUI.UIA3.UIA3PropertyLibrary());
 
-                var simulationTab = MainWindow.FindFirstDescendant(cf.ByAutomationId("SimulationTab"))?.AsTabItem();
-                Assert.NotNull(simulationTab);
-                simulationTab.Select();
+                OpenSimulation();
 
                 var paletteSearchBox = MainWindow.FindFirstDescendant(cf.ByAutomationId("PaletteSearchBox"))?.AsTextBox();
                 Assert.NotNull(paletteSearchBox);
@@ -166,9 +162,7 @@ public class UIInteractionTests : E2ETestBase
 
                 var cf = new ConditionFactory(new FlaUI.UIA3.UIA3PropertyLibrary());
 
-                var simulationTab = MainWindow.FindFirstDescendant(cf.ByAutomationId("SimulationTab"))?.AsTabItem();
-                Assert.NotNull(simulationTab);
-                simulationTab.Select();
+                OpenSimulation();
 
                 var zoomSlider = MainWindow.FindFirstDescendant(cf.ByAutomationId("ZoomSlider"))?.AsSlider();
                 Assert.NotNull(zoomSlider);

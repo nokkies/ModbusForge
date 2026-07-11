@@ -110,7 +110,10 @@ namespace ModbusForge.Views
                 DialogResult = true;
                 Close();
             }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 _dialogService.Show($"Write failed: {ex.Message}", "Write Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
