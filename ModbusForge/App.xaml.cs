@@ -76,7 +76,7 @@ namespace ModbusForge
             }
 
             // Create and show the main window
-            var mainWindow = new MainWindow(ServiceProvider.GetRequiredService<MainViewModel>(), ServiceProvider);
+            var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
             Wpf.Ui.Appearance.SystemThemeWatcher.Watch(mainWindow);
             mainWindow.Show();
         }
@@ -180,6 +180,8 @@ namespace ModbusForge
             services.AddSingleton<IHelpContentService, HelpContentService>();
             services.AddSingleton<IWindowOwnerProvider, MainWindowOwnerProvider>();
             services.AddSingleton<ITagWindowService, TagWindowService>();
+            services.AddSingleton<IShellWindowService, ShellWindowService>();
+            services.AddSingleton<IApplicationLifetime, WpfApplicationLifetime>();
             
             // Register Coordinators
             services.AddSingleton<ConnectionCoordinator>(provider => new ConnectionCoordinator(
@@ -210,6 +212,9 @@ namespace ModbusForge
             services.AddTransient<DecodeViewModel>();
             services.AddTransient<VisualNodeEditorViewModel>();
             services.AddTransient<HelpViewModel>();
+
+            // Register Windows
+            services.AddTransient<MainWindow>();
         }
 
 

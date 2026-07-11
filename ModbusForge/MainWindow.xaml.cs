@@ -15,9 +15,6 @@ using ModbusForge.Helpers;
 using MahApps.Metro.Controls;
 using System.Collections.ObjectModel;
 using AvalonDock.Layout;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
-
 namespace ModbusForge
 {
     /// <summary>
@@ -26,21 +23,29 @@ namespace ModbusForge
     public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     {
         private readonly MainViewModel _viewModel;
-        private readonly IServiceProvider _serviceProvider;
         private readonly IDialogService _dialogService;
+        private readonly IShellWindowService _shellWindowService;
+        private readonly IApplicationLifetime _applicationLifetime;
         private bool _isCommittingCustom;
 
-        public MainWindow(MainViewModel viewModel, IServiceProvider serviceProvider)
+        public MainWindow(
+            MainViewModel viewModel,
+            DecodeViewModel decodeViewModel,
+            TrendViewModel trendViewModel,
+            IDialogService dialogService,
+            IShellWindowService shellWindowService,
+            IApplicationLifetime applicationLifetime)
         {
             InitializeComponent();
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
-            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            _dialogService = _serviceProvider.GetRequiredService<IDialogService>();
+            _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+            _shellWindowService = shellWindowService ?? throw new ArgumentNullException(nameof(shellWindowService));
+            _applicationLifetime = applicationLifetime ?? throw new ArgumentNullException(nameof(applicationLifetime));
             DataContext = _viewModel;
 
             // Set the data contexts for the view-model-backed user controls
-            if (DecodeViewControl != null) DecodeViewControl.DataContext = _serviceProvider.GetRequiredService<DecodeViewModel>();
-            if (TrendViewControl != null) TrendViewControl.DataContext = _serviceProvider.GetRequiredService<TrendViewModel>();
+            if (DecodeViewControl != null) DecodeViewControl.DataContext = decodeViewModel ?? throw new ArgumentNullException(nameof(decodeViewModel));
+            if (TrendViewControl != null) TrendViewControl.DataContext = trendViewModel ?? throw new ArgumentNullException(nameof(trendViewModel));
 
             // Handle window closing to properly dispose resources
             this.Closing += MainWindow_Closing;
@@ -167,66 +172,37 @@ namespace ModbusForge
 
         private void MenuItem_Exit_Click(object sender, RoutedEventArgs e)
         {
-            Application.Current.Shutdown();
+            _applicationLifetime.Shutdown();
         }
 
         private void MenuItem_About_Click(object sender, RoutedEventArgs e)
         {
-            var aboutLogger = _serviceProvider.GetRequiredService<ILogger<AboutWindow>>();
-            var about = new AboutWindow(aboutLogger, _dialogService)
-            {
-                Owner = this
-            };
-            about.ShowDialog();
+            _shellWindowService.ShowAbout(this);
         }
 
         private void MenuItem_KeyboardShortcuts_Click(object sender, RoutedEventArgs e)
         {
-            var shortcuts = new KeyboardShortcutsWindow(_dialogService)
-            {
-                Owner = this
-            };
-            shortcuts.ShowDialog();
+            _shellWindowService.ShowKeyboardShortcuts(this);
         }
 
         private void MenuItem_Help_Click(object sender, RoutedEventArgs e)
         {
-            var helpViewModel = _serviceProvider.GetRequiredService<ViewModels.HelpViewModel>();
-            var helpWindow = new Views.HelpWindow(helpViewModel)
-            {
-                Owner = this
-            };
-            helpWindow.ShowDialog();
+            _shellWindowService.ShowHelp(this);
         }
 
         private void MenuItem_Troubleshooting_Click(object sender, RoutedEventArgs e)
         {
-            var troubleshootingWindow = new Views.TroubleshootingWindow(_dialogService)
-            {
-                Owner = this
-            };
-            troubleshootingWindow.ShowDialog();
+            _shellWindowService.ShowTroubleshooting(this);
         }
 
         private void MenuItem_ScriptEditor_Click(object sender, RoutedEventArgs e)
         {
-            var scriptRunner = _serviceProvider.GetRequiredService<IScriptRunner>();
-            var modbusService = _serviceProvider.GetRequiredService<IModbusService>();
-            var scriptEditor = new ScriptEditorWindow(scriptRunner, modbusService, _viewModel.EffectiveUnitId, _dialogService)
-            {
-                Owner = this
-            };
-            scriptEditor.ShowDialog();
+            _shellWindowService.ShowScriptEditor(this, _viewModel.EffectiveUnitId);
         }
 
         private void MenuItem_Preferences_Click(object sender, RoutedEventArgs e)
         {
-            var settingsService = _serviceProvider.GetRequiredService<ISettingsService>();
-            var preferencesWindow = new PreferencesWindow(settingsService, _dialogService)
-            {
-                Owner = this
-            };
-            preferencesWindow.ShowDialog();
+            _shellWindowService.ShowPreferences(this);
         }
 
         private void WindowMenu_ShowAll_Click(object sender, RoutedEventArgs e)
@@ -259,12 +235,7 @@ namespace ModbusForge
 
         private void MenuItem_ConnectionManager_Click(object sender, RoutedEventArgs e)
         {
-            var connectionManager = _serviceProvider.GetRequiredService<IConnectionManager>();
-            var connectionManagerWindow = new ConnectionManagerWindow(connectionManager, _dialogService)
-            {
-                Owner = this
-            };
-            connectionManagerWindow.ShowDialog();
+            _shellWindowService.ShowConnectionManager(this);
         }
 
 
