@@ -573,6 +573,368 @@ namespace ModbusForge.Services
             Groups = new ObservableCollection<TagGroup>(rootGroups);
         }
 
+        // ----------------------------------------------------------------
+        //  Group Deletion – Preview
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// Returns a read-only preview describing what a group deletion would affect,
+        /// without making any changes.  The destination shown is for MoveToParent mode.
+        /// </summary>
+        public GroupDeletionPreview PreviewGroupDeletion(string groupId)
+        {
+            var group = FindGroupById(groupId);
+            if (group == null)
+            {
+                return new GroupDeletionPreview
+                {
+                    GroupId = groupId,
+                    GroupName = "(not found)",
+                    IsProtected = true,
+                    Message = $"Group '{groupId}' was not found."
+                };
+            }
+
+            var defaultGroup = GetOrFindDefaultGroup();
+            bool isDefault = defaultGroup != null && group.Id == defaultGroup.Id;
+
+            // Collect all descendant groups using IDs
+            var allDescendants = GetAllGroupsFlat()
+                .Where(g => !string.IsNullOrEmpty(g.ParentGroupId) && IsDescendantOf(g, groupId))
+                .ToList();
+
+            int directSubCount  = group.SubGroups.Count;
+            int recursiveSubCount = allDescendants.Count;
+
+            // Tags: count by GroupId references
+            int directTagCount    = Tags.Count(t => t.GroupId == groupId);
+            int recursiveTagCount = allDescendants.Sum(sub => Tags.Count(t => t.GroupId == sub.Id))
+                                    + directTagCount;
+
+            // Watch entries that would be removed under CascadeDelete
+            var allAffectedGroupIds = new HashSet<string> { groupId };
+            foreach (var d in allDescendants)
+                allAffectedGroupIds.Add(d.Id);
+
+            var affectedTagIds = Tags
+                .Where(t => !string.IsNullOrEmpty(t.GroupId) && allAffectedGroupIds.Contains(t.GroupId!))
+                .Select(t => t.Id)
+                .ToHashSet();
+
+            int watchToRemove = WatchEntries.Count(w => affectedTagIds.Contains(w.TagId));
+
+            // Destination for MoveToParent
+            TagGroup? destinationGroup = null;
+            if (!string.IsNullOrEmpty(group.ParentGroupId))
+            {
+                destinationGroup = FindGroupById(group.ParentGroupId);
+            }
+            destinationGroup ??= defaultGroup;
+
+            return new GroupDeletionPreview
+            {
+                GroupId                = group.Id,
+                GroupName              = group.Name,
+                FullPath               = group.FullPath,
+                DirectSubgroupCount    = directSubCount,
+                RecursiveSubgroupCount = recursiveSubCount,
+                DirectTagCount         = directTagCount,
+                RecursiveTagCount      = recursiveTagCount,
+                WatchEntriesToRemove   = watchToRemove,
+                DestinationGroupId     = destinationGroup?.Id   ?? string.Empty,
+                DestinationGroupName   = destinationGroup?.Name ?? "Default",
+                IsProtected            = isDefault
+            };
+        }
+
+        // ----------------------------------------------------------------
+        //  Group Deletion – Atomic Operation
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// Atomically deletes a group.  Tags and sub-groups are handled according to
+        /// <paramref name="mode"/>.  Rolls back in-memory state if persistence fails.
+        /// </summary>
+        public async Task<GroupDeletionResult> DeleteGroupAsync(
+            string groupId,
+            GroupDeletionMode mode,
+            CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return Fail("Operation was cancelled before it started.");
+
+            var group = FindGroupById(groupId);
+            if (group == null)
+                return Fail($"Group '{groupId}' was not found.");
+
+            var defaultGroup = GetOrFindDefaultGroup();
+            if (defaultGroup != null && group.Id == defaultGroup.Id)
+                return Fail("The Default group cannot be deleted.");
+
+            // Check again via preview so the IsProtected path is consistent
+            var preview = PreviewGroupDeletion(groupId);
+            if (preview.IsProtected)
+                return Fail($"Group '{group.Name}' is protected and cannot be deleted.");
+
+            // Resolve the parent group that will receive moved content (for MoveToParent)
+            TagGroup? parentGroup = null;
+            if (!string.IsNullOrEmpty(group.ParentGroupId))
+                parentGroup = FindGroupById(group.ParentGroupId);
+            parentGroup ??= defaultGroup;
+
+            // Destination for move modes
+            TagGroup? destinationGroup = mode switch
+            {
+                GroupDeletionMode.MoveToParent  => parentGroup,
+                GroupDeletionMode.MoveToDefault => defaultGroup,
+                _                               => null   // CascadeDelete – no destination
+            };
+
+            // Collect all descendant groups (bottom-up to remove children first when cascading)
+            var allDescendants = GetAllGroupsFlat()
+                .Where(g => IsDescendantOf(g, groupId))
+                .ToList();
+
+            var allAffectedGroupIds = new HashSet<string> { groupId };
+            foreach (var d in allDescendants)
+                allAffectedGroupIds.Add(d.Id);
+
+            var affectedTags = Tags
+                .Where(t => !string.IsNullOrEmpty(t.GroupId) && allAffectedGroupIds.Contains(t.GroupId!))
+                .ToList();
+
+            var affectedTagIds = affectedTags.Select(t => t.Id).ToHashSet();
+
+            var affectedWatchEntries = WatchEntries
+                .Where(w => affectedTagIds.Contains(w.TagId))
+                .ToList();
+
+            // ---- Snapshot for rollback ----
+            // Snapshots: parent's SubGroups list, tags collection, watch entries, group Tags
+            var snapshotTags        = Tags.ToList();
+            var snapshotGroups      = GetAllGroupsFlat().ToList();
+            var snapshotWatchEntries = WatchEntries.ToList();
+
+            // Per-group Tags-collection snapshots (needed to restore group.Tags on rollback)
+            var groupTagsSnapshot = GetAllGroupsFlat()
+                .ToDictionary(g => g.Id, g => g.Tags.ToList());
+            var groupSubsSnapshot = GetAllGroupsFlat()
+                .ToDictionary(g => g.Id, g => g.SubGroups.ToList());
+
+            // ---- Apply mutation ----
+            try
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    return Fail("Operation was cancelled.");
+
+                int movedTagCount   = 0;
+                int deletedTagCount = 0;
+                int removedWatchCount = 0;
+
+                if (mode == GroupDeletionMode.CascadeDelete)
+                {
+                    // Remove all affected tags from flat Tags list
+                    foreach (var tag in affectedTags)
+                        Tags.Remove(tag);
+
+                    // Remove watch entries for deleted tags
+                    foreach (var we in affectedWatchEntries)
+                        WatchEntries.Remove(we);
+
+                    deletedTagCount  = affectedTags.Count;
+                    removedWatchCount = affectedWatchEntries.Count;
+                }
+                else
+                {
+                    // Move mode: re-parent tags and sub-groups
+                    if (destinationGroup == null)
+                        return Fail("Could not resolve destination group for move.");
+
+                    // Move direct tags of the deleted group
+                    foreach (var tag in affectedTags.Where(t => t.GroupId == groupId).ToList())
+                    {
+                        tag.GroupId = destinationGroup.Id;
+                        tag.Group   = destinationGroup.Name;
+                        group.Tags.Remove(tag);
+                        destinationGroup.Tags.Add(tag);
+                        movedTagCount++;
+                    }
+
+                    // Move direct sub-groups of the deleted group
+                    foreach (var sub in group.SubGroups.ToList())
+                    {
+                        sub.ParentGroupId = destinationGroup.Id;
+                        sub.ParentGroup   = destinationGroup.Name;
+                        group.SubGroups.Remove(sub);
+                        destinationGroup.SubGroups.Add(sub);
+                    }
+
+                    // For tags in deeper descendants: reparent them to the destination group as well
+                    var deepTags = affectedTags
+                        .Where(t => t.GroupId != groupId)
+                        .ToList();
+                    foreach (var tag in deepTags)
+                    {
+                        var oldGroup = FindGroupById(tag.GroupId!);
+                        // These tags stay in their own subgroup (which moved up) – no relocation needed
+                        // unless MoveToDefault flattens all levels.
+                        // Under MoveToParent the descendants also moved up so tags remain correct.
+                        movedTagCount++;
+                    }
+
+                    // Update watch entries to reflect new group name (TagGroup field is display only)
+                    foreach (var we in affectedWatchEntries)
+                    {
+                        var relocatedTag = Tags.FirstOrDefault(t => t.Id == we.TagId);
+                        if (relocatedTag != null)
+                            we.TagGroup = relocatedTag.Group;
+                    }
+                }
+
+                // Remove the target group from its parent's SubGroups or from root Groups
+                RemoveGroupFromParent(group);
+
+                // Also remove all descendant groups from the flat registry
+                // (they live only inside SubGroups hierarchies so after RemoveGroupFromParent
+                //  the whole subtree disappears from GetAllGroupsFlat automatically;
+                //  but under cascade we must also remove any whose tags were removed).
+                // Nothing extra needed – the subtree is gone via the hierarchy.
+
+                // ---- Persist ----
+                await SaveTagsAsync();
+
+                _tagLogger.LogInformation(
+                    "Deleted group '{GroupName}' (ID: {GroupId}) Mode={Mode}. " +
+                    "Moved={MovedTags}, Deleted={DeletedTags}, RemovedWatch={RemovedWatch}",
+                    group.Name, groupId, mode, movedTagCount, deletedTagCount, removedWatchCount);
+
+                return new GroupDeletionResult
+                {
+                    Success               = true,
+                    Message               = $"Group '{group.Name}' deleted successfully.",
+                    DeletedGroupCount     = 1 + allDescendants.Count,
+                    MovedTagCount         = movedTagCount,
+                    DeletedTagCount       = deletedTagCount,
+                    RemovedWatchEntryCount = removedWatchCount
+                };
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+            {
+                // ---- Rollback ----
+                _tagLogger.LogError(ex, "DeleteGroupAsync failed for '{GroupId}'; rolling back.", groupId);
+                RollbackDeletion(snapshotTags, snapshotGroups, snapshotWatchEntries,
+                                 groupTagsSnapshot, groupSubsSnapshot);
+                return Fail($"Deletion failed and was rolled back: {ex.Message}");
+            }
+        }
+
+        // ---- Helpers ----
+
+        private static GroupDeletionResult Fail(string message) =>
+            new() { Success = false, Message = message };
+
+        /// <summary>Returns true if <paramref name="group"/> is a descendant of the group
+        /// with ID <paramref name="ancestorId"/>.</summary>
+        private bool IsDescendantOf(TagGroup group, string ancestorId)
+        {
+            var current = group;
+            var visited = new HashSet<string>();
+            while (!string.IsNullOrEmpty(current.ParentGroupId))
+            {
+                if (!visited.Add(current.Id))
+                    break; // Cycle guard
+                if (current.ParentGroupId == ancestorId)
+                    return true;
+                var parent = FindGroupById(current.ParentGroupId);
+                if (parent == null)
+                    break;
+                current = parent;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Finds the top-level Default group (first group named "Default" at root level).
+        /// </summary>
+        private TagGroup? GetOrFindDefaultGroup()
+        {
+            return Groups.FirstOrDefault(g => g.Name.Equals("Default", StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
+        /// Removes <paramref name="group"/> from its parent's SubGroups, or from the root
+        /// Groups collection if it has no parent.
+        /// </summary>
+        private void RemoveGroupFromParent(TagGroup group)
+        {
+            if (!string.IsNullOrEmpty(group.ParentGroupId))
+            {
+                var parent = FindGroupById(group.ParentGroupId);
+                parent?.SubGroups.Remove(group);
+            }
+            else
+            {
+                Groups.Remove(group);
+            }
+        }
+
+        /// <summary>
+        /// Restores all in-memory collections to their pre-deletion snapshots.
+        /// </summary>
+        private void RollbackDeletion(
+            List<Tag> snapshotTags,
+            List<TagGroup> snapshotGroups,
+            List<WatchEntry> snapshotWatchEntries,
+            Dictionary<string, List<Tag>> groupTagsSnapshot,
+            Dictionary<string, List<TagGroup>> groupSubsSnapshot)
+        {
+            // Restore flat tags list
+            Tags.Clear();
+            foreach (var t in snapshotTags) Tags.Add(t);
+
+            // Restore watch entries
+            WatchEntries.Clear();
+            foreach (var w in snapshotWatchEntries) WatchEntries.Add(w);
+
+            // Restore group SubGroups and Tags collections from snapshots
+            foreach (var group in snapshotGroups)
+            {
+                if (groupTagsSnapshot.TryGetValue(group.Id, out var tags))
+                {
+                    group.Tags.Clear();
+                    foreach (var t in tags) group.Tags.Add(t);
+                }
+                if (groupSubsSnapshot.TryGetValue(group.Id, out var subs))
+                {
+                    group.SubGroups.Clear();
+                    foreach (var s in subs) group.SubGroups.Add(s);
+                }
+            }
+
+            // Restore root Groups collection (rebuild from snapshot root-level groups)
+            var snapshotRoots = snapshotGroups
+                .Where(g => string.IsNullOrEmpty(g.ParentGroupId))
+                .ToList();
+            Groups.Clear();
+            foreach (var g in snapshotRoots) Groups.Add(g);
+        }
+
+        // ----------------------------------------------------------------
+        //  Preview helper (declared here, shared with GroupDeletionPreview)
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// Workaround property accessor for GroupDeletionPreview.Message —
+        /// available only on the preview object, declared here as a private static extension point.
+        /// </summary>
+        private static GroupDeletionPreview ErrorPreview(string groupId, string message) =>
+            new()
+            {
+                GroupId     = groupId,
+                IsProtected = true,
+                Message     = message
+            };
+
         /// <summary>
         /// Saves the tag database atomically (write to temp file, then replace).
         /// Throws on failure so callers can handle it.

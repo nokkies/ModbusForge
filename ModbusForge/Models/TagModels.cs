@@ -231,6 +231,52 @@ namespace ModbusForge.Models
     }
 
     /// <summary>
+    /// Specifies how the contents of a group are handled when the group is deleted.
+    /// </summary>
+    public enum GroupDeletionMode
+    {
+        /// <summary>Tags and sub-groups are moved up to the deleted group's parent (or Default if root).</summary>
+        MoveToParent,
+        /// <summary>Tags and sub-groups are moved to the top-level Default group.</summary>
+        MoveToDefault,
+        /// <summary>The group and all descendant groups and tags are permanently deleted.</summary>
+        CascadeDelete
+    }
+
+    /// <summary>
+    /// Read-only summary of what a group deletion will affect, used to inform the user before committing.
+    /// </summary>
+    public class GroupDeletionPreview
+    {
+        public string GroupId { get; set; } = string.Empty;
+        public string GroupName { get; set; } = string.Empty;
+        public string FullPath { get; set; } = string.Empty;
+        public int DirectSubgroupCount { get; set; }
+        public int RecursiveSubgroupCount { get; set; }
+        public int DirectTagCount { get; set; }
+        public int RecursiveTagCount { get; set; }
+        public int WatchEntriesToRemove { get; set; }
+        public string DestinationGroupId { get; set; } = string.Empty;
+        public string DestinationGroupName { get; set; } = string.Empty;
+        public bool IsProtected { get; set; }
+        /// <summary>Set when the preview could not be computed (e.g., group not found).</summary>
+        public string Message { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Result returned by <c>TagService.DeleteGroupAsync</c> describing what was changed.
+    /// </summary>
+    public class GroupDeletionResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public int DeletedGroupCount { get; set; }
+        public int MovedTagCount { get; set; }
+        public int DeletedTagCount { get; set; }
+        public int RemovedWatchEntryCount { get; set; }
+    }
+
+    /// <summary>
     /// Watch window entry - a tag being monitored
     /// </summary>
     public partial class WatchEntry : ObservableObject

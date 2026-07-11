@@ -481,5 +481,328 @@ namespace ModbusForge.Tests.Services
         }
 
         #endregion
+
+        // ====================================================================
+        //  Group Deletion Tests (Phase 2)
+        // ====================================================================
+
+        #region Helper – build a hierarchy
+
+        /// <summary>
+        /// Builds: Default (root), Parent, Child (under Parent), GrandChild (under Child)
+        /// and creates one tag in each non-default group.
+        /// Returns the created groups and tags for easy reference.
+        /// </summary>
+        private async Task<(TagService service,
+                             TagGroup defaultGroup,
+                             TagGroup parent,
+                             TagGroup child,
+                             TagGroup grandChild,
+                             Tag parentTag,
+                             Tag childTag,
+                             Tag grandChildTag)>
+            BuildDeepHierarchyAsync()
+        {
+            var service = CreateService(out _, out _);
+
+            var defaultGroup = service.Groups.First(g => g.Name == "Default");
+            var parent       = await service.CreateGroup("Parent");
+            var child        = await service.CreateGroup("Child", "Parent");
+            var grandChild   = await service.CreateGroup("GrandChild", "Child");
+
+            var parentTag    = await service.CreateTag("ParentTag",    "Parent",     PlcArea.HoldingRegister, 1, TagDataType.UInt16);
+            var childTag     = await service.CreateTag("ChildTag",     "Child",      PlcArea.HoldingRegister, 2, TagDataType.UInt16);
+            var grandChildTag = await service.CreateTag("GrandChildTag","GrandChild", PlcArea.HoldingRegister, 3, TagDataType.UInt16);
+
+            return (service, defaultGroup, parent, child, grandChild, parentTag, childTag, grandChildTag);
+        }
+
+        #endregion
+
+        #region Delete empty groups
+
+        [Fact]
+        public async Task DeleteGroup_EmptyRootGroup_Succeeds()
+        {
+            var service = CreateService(out _, out _);
+            var group = await service.CreateGroup("EmptyRoot");
+
+            var result = await service.DeleteGroupAsync(group.Id, GroupDeletionMode.MoveToParent);
+
+            Assert.True(result.Success);
+            Assert.Equal(1, result.DeletedGroupCount);
+            Assert.Null(service.GetAllGroupsFlat().FirstOrDefault(g => g.Id == group.Id));
+        }
+
+        [Fact]
+        public async Task DeleteGroup_EmptyNestedGroup_Succeeds()
+        {
+            var service = CreateService(out _, out _);
+            var parent = await service.CreateGroup("Parent");
+            var child  = await service.CreateGroup("Child", "Parent");
+
+            var result = await service.DeleteGroupAsync(child.Id, GroupDeletionMode.MoveToParent);
+
+            Assert.True(result.Success);
+            Assert.Equal(1, result.DeletedGroupCount);
+            // Parent should no longer list child as sub-group
+            Assert.Empty(parent.SubGroups);
+        }
+
+        #endregion
+
+        #region Reject deletion of Default
+
+        [Fact]
+        public async Task DeleteGroup_DefaultGroup_IsRejected()
+        {
+            var service = CreateService(out _, out _);
+            var defaultGroup = service.Groups.First(g => g.Name == "Default");
+
+            var result = await service.DeleteGroupAsync(defaultGroup.Id, GroupDeletionMode.MoveToParent);
+
+            Assert.False(result.Success);
+            Assert.NotEmpty(result.Message);
+            // Default group must still exist
+            Assert.NotNull(service.GetAllGroupsFlat().FirstOrDefault(g => g.Id == defaultGroup.Id));
+        }
+
+        #endregion
+
+        #region MoveToParent
+
+        [Fact]
+        public async Task DeleteGroup_MoveToParent_DirectTagsMovedUp()
+        {
+            var (service, _, parent, child, _, _, childTag, _) = await BuildDeepHierarchyAsync();
+
+            var result = await service.DeleteGroupAsync(child.Id, GroupDeletionMode.MoveToParent);
+
+            Assert.True(result.Success);
+            Assert.True(result.MovedTagCount > 0);
+
+            // childTag should now belong to Parent
+            var reloadedTag = service.Tags.First(t => t.Id == childTag.Id);
+            Assert.Equal(parent.Id, reloadedTag.GroupId);
+            Assert.Equal("Parent", reloadedTag.Group);
+
+            // child group must be gone
+            Assert.Null(service.GetAllGroupsFlat().FirstOrDefault(g => g.Id == child.Id));
+        }
+
+        [Fact]
+        public async Task DeleteGroup_MoveToParent_DirectSubgroupsMovedUp()
+        {
+            var (service, _, parent, child, grandChild, _, _, _) = await BuildDeepHierarchyAsync();
+
+            var result = await service.DeleteGroupAsync(child.Id, GroupDeletionMode.MoveToParent);
+
+            Assert.True(result.Success);
+
+            // GrandChild should now be a direct subgroup of Parent
+            Assert.Contains(parent.SubGroups, g => g.Id == grandChild.Id);
+            Assert.Equal(parent.Id, grandChild.ParentGroupId);
+        }
+
+        #endregion
+
+        #region MoveToDefault
+
+        [Fact]
+        public async Task DeleteGroup_MoveToDefault_TagsMovedToDefault()
+        {
+            var (service, defaultGroup, _, child, _, _, childTag, _) = await BuildDeepHierarchyAsync();
+
+            var result = await service.DeleteGroupAsync(child.Id, GroupDeletionMode.MoveToDefault);
+
+            Assert.True(result.Success);
+
+            // childTag should now belong to Default
+            var reloadedTag = service.Tags.First(t => t.Id == childTag.Id);
+            Assert.Equal(defaultGroup.Id, reloadedTag.GroupId);
+
+            // child group must be gone
+            Assert.Null(service.GetAllGroupsFlat().FirstOrDefault(g => g.Id == child.Id));
+        }
+
+        [Fact]
+        public async Task DeleteGroup_MoveToDefault_SubgroupsMovedToDefault()
+        {
+            var (service, defaultGroup, _, child, grandChild, _, _, _) = await BuildDeepHierarchyAsync();
+
+            var result = await service.DeleteGroupAsync(child.Id, GroupDeletionMode.MoveToDefault);
+
+            Assert.True(result.Success);
+
+            // GrandChild should now be a direct subgroup of Default
+            Assert.Contains(defaultGroup.SubGroups, g => g.Id == grandChild.Id);
+            Assert.Equal(defaultGroup.Id, grandChild.ParentGroupId);
+        }
+
+        #endregion
+
+        #region CascadeDelete
+
+        [Fact]
+        public async Task DeleteGroup_CascadeDelete_RemovesAllDescendantGroups()
+        {
+            var (service, _, parent, child, grandChild, _, _, _) = await BuildDeepHierarchyAsync();
+
+            var result = await service.DeleteGroupAsync(parent.Id, GroupDeletionMode.CascadeDelete);
+
+            Assert.True(result.Success);
+            // parent, child, grandChild all gone
+            Assert.Null(service.GetAllGroupsFlat().FirstOrDefault(g => g.Id == parent.Id));
+            Assert.Null(service.GetAllGroupsFlat().FirstOrDefault(g => g.Id == child.Id));
+            Assert.Null(service.GetAllGroupsFlat().FirstOrDefault(g => g.Id == grandChild.Id));
+        }
+
+        [Fact]
+        public async Task DeleteGroup_CascadeDelete_RemovesAllDescendantTags()
+        {
+            var (service, _, parent, _, _, parentTag, childTag, grandChildTag) = await BuildDeepHierarchyAsync();
+
+            var result = await service.DeleteGroupAsync(parent.Id, GroupDeletionMode.CascadeDelete);
+
+            Assert.True(result.Success);
+            Assert.Equal(3, result.DeletedTagCount);  // parentTag + childTag + grandChildTag
+
+            Assert.Null(service.Tags.FirstOrDefault(t => t.Id == parentTag.Id));
+            Assert.Null(service.Tags.FirstOrDefault(t => t.Id == childTag.Id));
+            Assert.Null(service.Tags.FirstOrDefault(t => t.Id == grandChildTag.Id));
+        }
+
+        [Fact]
+        public async Task DeleteGroup_CascadeDelete_RemovesWatchEntries()
+        {
+            var (service, _, parent, _, _, parentTag, childTag, grandChildTag) = await BuildDeepHierarchyAsync();
+
+            // Add all tags to watch
+            service.AddToWatch(parentTag.Id);
+            service.AddToWatch(childTag.Id);
+            service.AddToWatch(grandChildTag.Id);
+            Assert.Equal(3, service.WatchEntries.Count);
+
+            var result = await service.DeleteGroupAsync(parent.Id, GroupDeletionMode.CascadeDelete);
+
+            Assert.True(result.Success);
+            Assert.Equal(3, result.RemovedWatchEntryCount);
+            Assert.Empty(service.WatchEntries);
+        }
+
+        #endregion
+
+        #region Watch entries preserved on move
+
+        [Fact]
+        public async Task DeleteGroup_MoveToParent_PreservesWatchEntries()
+        {
+            var (service, _, _, child, _, _, childTag, _) = await BuildDeepHierarchyAsync();
+
+            service.AddToWatch(childTag.Id);
+            Assert.Single(service.WatchEntries);
+
+            var result = await service.DeleteGroupAsync(child.Id, GroupDeletionMode.MoveToParent);
+
+            Assert.True(result.Success);
+            // Watch entry should still exist (tag was moved, not deleted)
+            Assert.Single(service.WatchEntries);
+            Assert.Equal(childTag.Id, service.WatchEntries[0].TagId);
+        }
+
+        #endregion
+
+        #region Persistence: no dangling group IDs after deletion
+
+        [Fact]
+        public async Task DeleteGroup_Persistence_NoDanglingGroupIds()
+        {
+            var service = CreateService(out var tagsFilePath, out _);
+            var parent  = await service.CreateGroup("ToDeleteGroup");
+            var child   = await service.CreateGroup("ChildOfToDelete", "ToDeleteGroup");
+            await service.CreateTag("T1", "ChildOfToDelete", PlcArea.HoldingRegister, 1, TagDataType.UInt16);
+
+            await service.DeleteGroupAsync(parent.Id, GroupDeletionMode.CascadeDelete);
+
+            // Reload and verify
+            var service2 = CreateService(out _, out _);
+            TagsFilePathField.SetValue(service2, tagsFilePath);
+            await service2.InitializeAsync();
+
+            var allGroupIds = service2.GetAllGroupsFlat().Select(g => g.Id).ToHashSet();
+
+            // No tag should reference a non-existent group
+            foreach (var tag in service2.Tags)
+            {
+                if (!string.IsNullOrEmpty(tag.GroupId))
+                    Assert.Contains(tag.GroupId, allGroupIds);
+            }
+
+            // Neither parent nor child group should be in the file
+            Assert.Null(service2.GetAllGroupsFlat().FirstOrDefault(g => g.Id == parent.Id));
+            Assert.Null(service2.GetAllGroupsFlat().FirstOrDefault(g => g.Id == child.Id));
+        }
+
+        #endregion
+
+        #region Rollback on save failure
+
+        [Fact]
+        public async Task DeleteGroup_SaveFailure_RollsBackInMemoryChanges()
+        {
+            var service = CreateService(out var tagsFilePath, out _);
+            var group   = await service.CreateGroup("ToDelete");
+            var tag     = await service.CreateTag("T1", "ToDelete", PlcArea.HoldingRegister, 1, TagDataType.UInt16);
+
+            // Capture state before deletion attempt
+            int tagsBefore   = service.Tags.Count;
+            int groupsBefore = service.GetAllGroupsFlat().Count();
+
+            // Sabotage the save path so SaveTagsAsync will throw
+            var readOnlyDir = Path.Combine(Path.GetTempPath(), "RO_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(readOnlyDir);
+            _tempDirs.Add(readOnlyDir);
+            var readOnlyFile = Path.Combine(readOnlyDir, "tags.json");
+            File.Copy(tagsFilePath, readOnlyFile);
+            Directory.CreateDirectory(readOnlyFile + ".tmp");  // forces IOException
+            TagsFilePathField.SetValue(service, readOnlyFile);
+
+            var result = await service.DeleteGroupAsync(group.Id, GroupDeletionMode.CascadeDelete);
+
+            Assert.False(result.Success);
+            Assert.Contains("rolled back", result.Message, StringComparison.OrdinalIgnoreCase);
+
+            // Collections should be unchanged
+            Assert.Equal(tagsBefore,   service.Tags.Count);
+            Assert.Equal(groupsBefore, service.GetAllGroupsFlat().Count());
+            Assert.NotNull(service.Tags.FirstOrDefault(t => t.Id == tag.Id));
+        }
+
+        #endregion
+
+        #region Cancellation leaves collections unchanged
+
+        [Fact]
+        public async Task DeleteGroup_Cancellation_LeavesCollectionsUnchanged()
+        {
+            var service = CreateService(out _, out _);
+            var group   = await service.CreateGroup("CancelGroup");
+            await service.CreateTag("CT1", "CancelGroup", PlcArea.HoldingRegister, 1, TagDataType.UInt16);
+
+            int tagsBefore   = service.Tags.Count;
+            int groupsBefore = service.GetAllGroupsFlat().Count();
+
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();  // Pre-cancelled
+
+            var result = await service.DeleteGroupAsync(
+                group.Id, GroupDeletionMode.CascadeDelete, cts.Token);
+
+            Assert.False(result.Success);
+            Assert.Equal(tagsBefore,   service.Tags.Count);
+            Assert.Equal(groupsBefore, service.GetAllGroupsFlat().Count());
+        }
+
+        #endregion
     }
 }

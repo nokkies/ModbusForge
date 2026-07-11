@@ -240,7 +240,7 @@ namespace ModbusForge.Views
             {
                 var result = _dialogService.Show($"Delete tag '{_selectedTag.Name}'?", "Confirm Delete",
                     MessageBoxButton.YesNo, MessageBoxImage.Question);
-                
+
                 if (result == MessageBoxResult.Yes)
                 {
                     await _tagService.DeleteTag(_selectedTag.Id);
@@ -252,7 +252,63 @@ namespace ModbusForge.Views
             }
             else if (_selectedGroup != null)
             {
-                _dialogService.Show("Group deletion not yet implemented.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                await DeleteSelectedGroupAsync();
+            }
+        }
+
+        private async System.Threading.Tasks.Task DeleteSelectedGroupAsync()
+        {
+            if (_selectedGroup == null) return;
+
+            var preview = _tagService.PreviewGroupDeletion(_selectedGroup.Id);
+
+            if (preview.IsProtected)
+            {
+                _dialogService.Show(
+                    string.IsNullOrEmpty(preview.Message)
+                        ? $"Group \"{_selectedGroup.Name}\" is protected and cannot be deleted."
+                        : preview.Message,
+                    "Cannot Delete",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            var dialog = new GroupDeletionDialog(preview) { Owner = this };
+            if (dialog.ShowDialog() != true) return;
+
+            try
+            {
+                var deletionResult = await _tagService.DeleteGroupAsync(
+                    _selectedGroup.Id,
+                    dialog.ChosenMode);
+
+                if (deletionResult.Success)
+                {
+                    _selectedGroup = null;
+                    DetailsPanel.Visibility = Visibility.Collapsed;
+                    LoadTreeView();
+                    UpdateStatus();
+                    StatusText.Text = deletionResult.Message;
+                }
+                else
+                {
+                    _dialogService.Show(
+                        deletionResult.Message,
+                        "Deletion Failed",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    StatusText.Text = "Group deletion failed — data unchanged.";
+                }
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _dialogService.Show(
+                    $"Unexpected error during deletion: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                StatusText.Text = "Group deletion failed — data unchanged.";
             }
         }
 
