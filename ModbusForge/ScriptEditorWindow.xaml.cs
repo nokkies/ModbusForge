@@ -160,7 +160,7 @@ public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow, INotifyP
         {
             await _scriptRunner.RunScriptAsync(Script, _modbusService, _unitId, _cts.Token);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
             _dialogService.Show(ex.Message, "Script Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -216,7 +216,7 @@ public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow, INotifyP
                 await JsonSerializer.SerializeAsync(stream, data, options);
                 _dialogService.Show("Script saved successfully.", "Save Script", MessageBoxButton.OK, MessageBoxImage.Information);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _dialogService.Show($"Failed to save script: {ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -277,7 +277,7 @@ public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow, INotifyP
                     _dialogService.Show("Script loaded successfully.", "Load Script", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _dialogService.Show($"Failed to load script: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }

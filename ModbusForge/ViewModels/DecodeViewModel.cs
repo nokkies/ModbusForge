@@ -31,13 +31,13 @@ namespace ModbusForge.ViewModels
 
             _readNowCommand = new AsyncRelayCommand(ReadAsync, CanRead);
             // Ensure initial enable/disable state reflects current connection
-            try { _readNowCommand.NotifyCanExecuteChanged(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to notify CanExecuteChanged during initialization"); }
+            try { _readNowCommand.NotifyCanExecuteChanged(); } catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException)) { _logger.LogWarning(ex, "Failed to notify CanExecuteChanged during initialization"); }
             _main.PropertyChanged += (s, e) =>
             {
                 if (string.Equals(e.PropertyName, nameof(MainViewModel.IsConnected), StringComparison.Ordinal) ||
                     string.Equals(e.PropertyName, nameof(MainViewModel.Mode), StringComparison.Ordinal))
                 {
-                    try { _readNowCommand.NotifyCanExecuteChanged(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to notify CanExecuteChanged on PropertyChanged"); }
+                    try { _readNowCommand.NotifyCanExecuteChanged(); } catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException)) { _logger.LogWarning(ex, "Failed to notify CanExecuteChanged on PropertyChanged"); }
                 }
             };
         }
@@ -119,12 +119,12 @@ namespace ModbusForge.ViewModels
 
         private bool CanRead()
         {
-            try { return _main.IsConnected && !IsBusy; } catch (Exception ex) { _logger.LogWarning(ex, "Error checking CanRead status"); return false; }
+            try { return _main.IsConnected && !IsBusy; } catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException)) { _logger.LogWarning(ex, "Error checking CanRead status"); return false; }
         }
 
         partial void OnIsBusyChanged(bool value)
         {
-            try { _readNowCommand.NotifyCanExecuteChanged(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to notify CanExecuteChanged on IsBusy changed"); }
+            try { _readNowCommand.NotifyCanExecuteChanged(); } catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException)) { _logger.LogWarning(ex, "Failed to notify CanExecuteChanged on IsBusy changed"); }
         }
 
         private async Task ReadAsync()
@@ -145,7 +145,7 @@ namespace ModbusForge.ViewModels
 
                 ProcessAndDisplayResults(regs);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Decode read failed");
                 Status = $"Error: {ex.Message}";
@@ -359,7 +359,7 @@ namespace ModbusForge.ViewModels
                 var cleansed = bytes.Select(ch => ch >= 32 && ch <= 126 ? ch : (byte)46).ToArray();
                 return Encoding.ASCII.GetString(cleansed);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogWarning(ex, "Failed to convert bytes to ASCII");
                 return string.Empty;

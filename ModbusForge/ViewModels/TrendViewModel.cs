@@ -168,7 +168,7 @@ namespace ModbusForge.ViewModels
                 {
                     await ExportCsvAsync(path, SelectedSeriesItem);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _dialogService.Show($"Export CSV failed: {ex.Message}", "Trend Export", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
@@ -207,7 +207,7 @@ namespace ModbusForge.ViewModels
                 {
                     await ImportCsvAsync(path);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _dialogService.Show($"Import CSV failed: {ex.Message}", "Trend Import", MessageBoxButton.OK, MessageBoxImage.Error);
                 }

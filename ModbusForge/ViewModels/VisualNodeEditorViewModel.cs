@@ -396,7 +396,7 @@ namespace ModbusForge.ViewModels
 
                 _logger.LogDebug("SelectedNode set to: {Id}", newNode.Id);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Exception in AddNode");
             }
@@ -1032,7 +1032,7 @@ namespace ModbusForge.ViewModels
                 }
                 browser.Show();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Failed to open tag browser");
                 _dialogService.Show($"Error opening Tag Browser: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -1052,7 +1052,7 @@ namespace ModbusForge.ViewModels
                 }
                 watchWindow.Show();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Failed to open watch window");
                 _dialogService.Show($"Error opening Watch Window: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -1086,7 +1086,7 @@ namespace ModbusForge.ViewModels
                     return dataStore.InputDiscretes[outputAddress.Address] ? 1 : 0;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error reading output register value for node {NodeId}", node.Id);
             }
@@ -1124,7 +1124,7 @@ namespace ModbusForge.ViewModels
 
                 return value;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error reading register value for node {NodeId}", node.Id);
             }

@@ -90,7 +90,7 @@ namespace ModbusForge.Services
 
                 return ValidationResult.Success;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error validating IP address: {IpAddress}", ipAddress);
                 return ValidationResult.Failure($"Error validating IP address: {ex.Message}");

@@ -215,7 +215,7 @@ namespace ModbusForge.ViewModels.Coordinators
                                         "Server Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                                 }
                             }
-                            catch (Exception rex)
+                            catch (Exception rex) when (rex is not (OutOfMemoryException or OperationCanceledException))
                             {
                                 setStatusMessage($"Server error: {rex.Message}");
                                 _logger.LogError(rex, "Error retrying server start on alternative port 1502");
@@ -228,7 +228,7 @@ namespace ModbusForge.ViewModels.Coordinators
                     return false;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 setConnected(false);
                 setStatusMessage(isServerMode ? $"Server error: {ex.Message}" : $"Error: {ex.Message}");
@@ -260,7 +260,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 _consoleLoggerService.Log(isServerMode ? "Server stopped" : "Disconnected");
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 setStatusMessage(isServerMode ? $"Error stopping server: {ex.Message}" : $"Error disconnecting: {ex.Message}");
                 _logger.LogError(ex, isServerMode ? "Error stopping Modbus server" : "Error disconnecting from Modbus server");
@@ -314,7 +314,7 @@ namespace ModbusForge.ViewModels.Coordinators
 
                 return result.TcpConnected && result.ModbusResponding;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error running diagnostics");
                 _consoleLoggerService.Log($"Diagnostics error: {ex.Message}");

@@ -39,7 +39,7 @@ namespace ModbusForge
                     ver = Assembly.GetEntryAssembly()?.GetName()?.Version?.ToString();
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 logger?.LogWarning(ex, "Failed to retrieve application version information.");
             }
@@ -52,7 +52,7 @@ namespace ModbusForge
             {
                 UrlHelper.OpenUrl(e.Uri.AbsoluteUri);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _dialogService.Show($"Failed to open link: {ex.Message}", "Navigation Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }

@@ -66,7 +66,7 @@ namespace ModbusForge.Services
 
                 return ValidationResult.Success;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error during configuration validation");
                 return ValidationResult.Failure($"Configuration validation error: {ex.Message}");

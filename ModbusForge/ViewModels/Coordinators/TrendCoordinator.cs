@@ -123,7 +123,7 @@ namespace ModbusForge.ViewModels.Coordinators
                     await ReadChunkAsync(area, chunk, service, unitId, now);
                     foreach (var _ in chunk) onSuccess();
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _logger.LogDebug(ex, "Trend read failed for chunk in {Area}", area);
                     // If a chunk fails, try to fallback to individual reads?
@@ -151,7 +151,7 @@ namespace ModbusForge.ViewModels.Coordinators
                                 onError();
                             }
                         }
-                        catch (Exception innerEx)
+                        catch (Exception innerEx) when (innerEx is not (OutOfMemoryException or OperationCanceledException))
                         {
                             _logger.LogDebug(innerEx, "Individual fallback failed for {Area} {Address}", entry.Area, entry.Address);
                             onError();

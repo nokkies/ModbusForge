@@ -55,7 +55,7 @@ namespace ModbusForge.Services
                 {
                     return _client != null && _tcpClient != null && _tcpClient.Connected;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _logger.LogError(ex, "Error checking connection status");
                     return false;
@@ -80,7 +80,7 @@ namespace ModbusForge.Services
                         _logger.LogInformation($"Connected to Modbus server at {ipAddress}:{port}");
                         return true;
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
                         _logger.LogError(ex, "Failed to connect to Modbus server");
                         _client?.Dispose();
@@ -112,7 +112,7 @@ namespace ModbusForge.Services
                     _logger.LogInformation("Successfully disconnected from Modbus server");
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error disconnecting from Modbus server");
                 throw;
@@ -200,7 +200,7 @@ namespace ModbusForge.Services
                         var result = readFunc(_client, protocolAddress);
                         return result ?? Array.Empty<T>();
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
                         _logger.LogError(ex, errorLogContext);
                         HandleConnectionLoss();
@@ -238,7 +238,7 @@ namespace ModbusForge.Services
                         if (_client != null)
                             writeAction(_client, protocolAddress);
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
                         _logger.LogError(ex, errorLogContext);
                         HandleConnectionLoss();
@@ -261,7 +261,7 @@ namespace ModbusForge.Services
                 _tcpClient?.Close();
                 _tcpClient = null;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error during explicit disconnect after connection loss.");
             }
@@ -385,7 +385,7 @@ namespace ModbusForge.Services
                 _logger.LogWarning($"Diagnostics: TCP failed - {result.TcpError}");
                 return result;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 result.TcpConnected = false;
                 result.TcpError = ex.Message;
@@ -441,7 +441,7 @@ namespace ModbusForge.Services
 
                 master.Dispose();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 result.ModbusResponding = false;
                 result.ModbusError = ex.Message;

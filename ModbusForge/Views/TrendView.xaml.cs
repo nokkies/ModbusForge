@@ -89,7 +89,7 @@ namespace ModbusForge.Views
                     SaveChartAsPng(dlg.FileName);
                     vm.DialogService.Show("PNG export complete.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     vm.DialogService.Show($"PNG export failed: {ex.Message}", "Trend", MessageBoxButton.OK, MessageBoxImage.Error);
                 }

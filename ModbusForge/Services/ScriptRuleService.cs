@@ -96,7 +96,7 @@ namespace ModbusForge.Services
                         _consoleLoggerService.Log($"Rule triggered: {rule.GetDescription()}");
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _logger.LogError(ex, "Error evaluating script rule: {RuleName}", rule.Name);
                     _consoleLoggerService.Log($"Rule error: {rule.Name} - {ex.Message}");
@@ -129,7 +129,7 @@ namespace ModbusForge.Services
             {
                 await EvaluateRulesAsync();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error evaluating script rules in timer callback");
             }
@@ -166,7 +166,7 @@ namespace ModbusForge.Services
                         return null;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error reading register value for rule evaluation: {Area}[{Address}]", area, address);
                 return null;
@@ -249,7 +249,7 @@ namespace ModbusForge.Services
                 _logger.LogWarning(ex, "Overflow error during numeric conversion. Current: '{CurrentValue}', Trigger: '{TriggerValue}'", currentValue, triggerValue);
                 return false;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Unexpected error during numeric value comparison. Current: '{CurrentValue}', Trigger: '{TriggerValue}'", currentValue, triggerValue);
                 return false;
@@ -294,7 +294,7 @@ namespace ModbusForge.Services
                     _logger.LogInformation("Rule set register {Area}[{Address}] = {Value}", area, address, value);
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Rule failed to set register {Area}[{Address}] = {Value}", area, address, value);
             }
@@ -316,7 +316,7 @@ namespace ModbusForge.Services
                     _logger.LogInformation("Rule set coil[{Address}] = {Value}", address, coilState);
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Rule failed to set coil[{Address}] = {Value}", address, value);
             }

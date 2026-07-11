@@ -95,7 +95,7 @@ public class ScriptRunner : IScriptRunner
             Log("Script cancelled");
             allSuccess = false;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
             Log($"Script error: {ex.Message}");
             _logger.LogError(ex, "Script execution error");
@@ -165,7 +165,7 @@ public class ScriptRunner : IScriptRunner
                     return (false, "Unknown command type");
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
             Log($"Command failed: {ex.Message}");
             return (false, ex.Message);

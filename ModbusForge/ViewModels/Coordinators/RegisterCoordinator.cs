@@ -140,7 +140,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 setHasConnectionError(false);
                 _consoleLoggerService.Log($"Read {values.Length} registers");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 setStatusMessage($"Error reading registers: {ex.Message}");
                 _logger.LogError(ex, "Error reading registers");
@@ -213,7 +213,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 setHasConnectionError(false);
                 _consoleLoggerService.Log($"Read {values.Length} input registers");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 setStatusMessage($"Error reading input registers: {ex.Message}");
                 _logger.LogError(ex, "Error reading input registers");
@@ -250,7 +250,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 // Optionally refresh
                 await refreshRegisters();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 setStatusMessage($"Error writing register: {ex.Message}");
                 _logger.LogError(ex, "Error writing register");
@@ -351,7 +351,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 setHasConnectionError(false);
                 _consoleLoggerService.Log($"Read {states.Length} coils");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 setStatusMessage($"Error reading coils: {ex.Message}");
                 _logger.LogError(ex, "Error reading coils");
@@ -422,7 +422,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 setHasConnectionError(false);
                 _consoleLoggerService.Log($"Read {states.Length} discrete inputs");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 setStatusMessage($"Error reading discrete inputs: {ex.Message}");
                 _logger.LogError(ex, "Error reading discrete inputs");
@@ -459,7 +459,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 // Optionally refresh
                 await refreshCoils();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 setStatusMessage($"Error writing coil: {ex.Message}");
                 _logger.LogError(ex, "Error writing coil");

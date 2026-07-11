@@ -76,7 +76,7 @@ namespace ModbusForge.Services
                 RecordSuccess(circuitName, state);
                 return result;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 RecordFailure(circuitName, state, ex);
                 throw;
@@ -108,7 +108,7 @@ namespace ModbusForge.Services
                 await action();
                 RecordSuccess(circuitName, state);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 RecordFailure(circuitName, state, ex);
                 throw;

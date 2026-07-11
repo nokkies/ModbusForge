@@ -119,7 +119,7 @@ public class ConnectionManager : IConnectionManager
 
             return success;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
             profile.IsConnected = false;
             profile.Status = $"Error: {ex.Message}";
@@ -142,7 +142,7 @@ public class ConnectionManager : IConnectionManager
             ProfileDisconnected?.Invoke(this, profile);
             _logger.LogInformation("Disconnected profile: {Name}", profile.Name);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
             _logger.LogError(ex, "Error disconnecting profile: {Name}", profile.Name);
         }
@@ -193,7 +193,7 @@ public class ConnectionManager : IConnectionManager
             File.WriteAllText(ProfilesFilePath, json);
             _logger.LogInformation("Saved {Count} connection profiles", Profiles.Count);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
             _logger.LogError(ex, "Failed to save connection profiles");
         }
@@ -234,7 +234,7 @@ public class ConnectionManager : IConnectionManager
                 _logger.LogInformation("Loaded {Count} connection profiles", Profiles.Count);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
             _logger.LogError(ex, "Failed to load connection profiles");
         }

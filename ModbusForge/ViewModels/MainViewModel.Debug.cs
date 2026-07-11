@@ -31,7 +31,7 @@ namespace ModbusForge.ViewModels
                     }
                 });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Failed to add debug message: {Message}", message);
             }

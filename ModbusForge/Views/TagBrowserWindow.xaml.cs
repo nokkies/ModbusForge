@@ -190,7 +190,7 @@ namespace ModbusForge.Views
                 StatusText.Text = "Changes saved";
                 LoadTreeView();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _dialogService.Show($"Error saving changes: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -273,7 +273,7 @@ namespace ModbusForge.Views
                         StatusText.Text = $"Imported {imported.Count} tags";
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _dialogService.Show($"Import failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
@@ -297,7 +297,7 @@ namespace ModbusForge.Views
                     File.WriteAllText(dialog.FileName, json);
                     StatusText.Text = $"Exported {_tagService.Tags.Count} tags";
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _dialogService.Show($"Export failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }

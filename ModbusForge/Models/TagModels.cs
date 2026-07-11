@@ -124,7 +124,7 @@ namespace ModbusForge.Models
                     _logger.LogDebug(ex, "Tag '{TagName}': Overflow error converting '{CurrentValue}' to double for scaling", Name, CurrentValue);
                     return null;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     // Log any unexpected errors during scaling
                     _logger.LogDebug(ex, "Tag '{TagName}': Unexpected error during scaling calculation", Name);

@@ -33,7 +33,7 @@ namespace ModbusForge.Views
             {
                 UrlHelper.OpenUrl(e.Uri.AbsoluteUri);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _dialogService.Show($"Failed to open link: {ex.Message}", "Navigation Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -58,7 +58,7 @@ namespace ModbusForge.Views
                     _dialogService.Show("Diagnostics exported successfully.", "Export Complete", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _dialogService.Show($"Failed to export diagnostics: {ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -144,7 +144,7 @@ namespace ModbusForge.Views
                     sb.AppendLine($"{name}: Not found ({path})");
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 sb.AppendLine($"{name}: Error reading info - {ex.Message}");
             }

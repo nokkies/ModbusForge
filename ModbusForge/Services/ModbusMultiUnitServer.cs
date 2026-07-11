@@ -96,7 +96,7 @@ namespace ModbusForge.Services
                     _ = Task.Run(() => HandleClientAsync(client, ct), ct);
                 }
                 catch (OperationCanceledException) { break; }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OutOfMemoryException)
                 {
                     if (!ct.IsCancellationRequested)
                         _logger.LogError(ex, "Error accepting TCP connection");
@@ -153,7 +153,7 @@ namespace ModbusForge.Services
                         await stream.WriteAsync(response, ct);
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OutOfMemoryException)
                 {
                     if (!ct.IsCancellationRequested)
                         _logger.LogDebug(ex, "Client connection closed");
@@ -168,7 +168,7 @@ namespace ModbusForge.Services
             {
                 int read;
                 try { read = await stream.ReadAsync(buffer.AsMemory(offset, count - offset), ct); }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OutOfMemoryException)
                 {
                     _logger.LogDebug(ex, "Error reading from stream");
                     return false;
@@ -200,7 +200,7 @@ namespace ModbusForge.Services
                     _ => ExceptionResponse(fc, 1) // Illegal function
                 };
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 _logger.LogDebug(ex, "Error processing FC{FC} for Unit ID {UnitId}", fc, unitId);
                 return ExceptionResponse(fc, 4); // Slave device failure

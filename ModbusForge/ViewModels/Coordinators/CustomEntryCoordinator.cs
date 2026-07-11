@@ -90,7 +90,7 @@ namespace ModbusForge.ViewModels.Coordinators
                         break;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error writing custom entry");
                 setStatusMessage($"Custom write error: {ex.Message}");
@@ -185,7 +185,7 @@ namespace ModbusForge.ViewModels.Coordinators
                         break;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error reading custom entry");
                 setStatusMessage($"Custom read error: {ex.Message}");
@@ -210,7 +210,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 }
                 setStatusMessage($"Read {snapshot.Count} custom entries");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error reading batched custom entries");
                 setStatusMessage($"Batch read error: {ex.Message}");
@@ -229,7 +229,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 {
                     await ReadChunkAsync(area, chunk, service, unitId);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _logger.LogDebug(ex, "Batch read failed for chunk in {Area}, falling back to individual reads", area);
                     foreach (var entry in chunk)
@@ -499,7 +499,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 await _customEntryService.SaveCustomAsync(customEntries);
                 setStatusMessage($"Saved {customEntries.Count} custom entries");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error saving custom entries");
                 setStatusMessage($"Error saving: {ex.Message}");
@@ -530,7 +530,7 @@ namespace ModbusForge.ViewModels.Coordinators
                     setStatusMessage($"Load cancelled");
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error loading custom entries");
                 setStatusMessage($"Error loading: {ex.Message}");

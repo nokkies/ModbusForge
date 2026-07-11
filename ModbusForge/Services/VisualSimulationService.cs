@@ -113,7 +113,7 @@ namespace ModbusForge.Services
             {
                 UpdateNodeValues();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error updating visual node values");
             }
@@ -223,7 +223,7 @@ namespace ModbusForge.Services
                         _lastNodeUpdate[node.Id] = now;
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _logger.LogDebug(ex, "Failed to evaluate node {NodeId}", node.Id);
                 }
@@ -240,7 +240,7 @@ namespace ModbusForge.Services
 
                     WriteOutputToDataStore(node, result, dataStore);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _logger.LogDebug(ex, "Failed to write output for node {NodeId}", node.Id);
                 }

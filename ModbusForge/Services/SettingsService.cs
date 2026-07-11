@@ -94,7 +94,7 @@ public class SettingsService : ISettingsService
             File.WriteAllText(_settingsFilePath, json);
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
             _logger?.LogError(ex, "Failed to save settings to {FilePath}", _settingsFilePath);
             return false;
@@ -115,7 +115,7 @@ public class SettingsService : ISettingsService
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
             _logger?.LogError(ex, "Failed to load settings from {FilePath}", _settingsFilePath);
             // Use defaults if we can't load

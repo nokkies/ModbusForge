@@ -99,7 +99,7 @@ public class ApiServerService : IApiServerService
             await _app.StartAsync();
             _logger.LogInformation($"API Server started on port {port}");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
             _logger.LogError(ex, "Failed to start API Server.");
             _app = null;
@@ -115,7 +115,7 @@ public class ApiServerService : IApiServerService
                 await _app.StopAsync();
                 await _app.DisposeAsync();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error stopping API Server.");
             }
@@ -240,7 +240,7 @@ public class ApiServerService : IApiServerService
 
                 return Results.BadRequest(new { Error = "Failed to read registers from device." });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
@@ -259,7 +259,7 @@ public class ApiServerService : IApiServerService
 
                 return Results.BadRequest(new { Error = "Failed to read coils from device." });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }

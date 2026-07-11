@@ -71,7 +71,7 @@ namespace ModbusForge.ViewModels.Coordinators
                     setStatusMessage($"Saved configuration to {Path.GetFileName(dialog.FileName)}");
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error saving configuration");
                 _dialogService.Show($"Failed to save configuration: {ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -109,7 +109,7 @@ namespace ModbusForge.ViewModels.Coordinators
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error loading configuration");
                 _dialogService.Show($"Failed to load configuration: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);

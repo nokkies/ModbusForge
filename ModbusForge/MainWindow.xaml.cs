@@ -289,7 +289,7 @@ namespace ModbusForge
                     _viewModel.StatusMessage = $"Exported PNG: {Path.GetFileName(dlg.FileName)}";
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _dialogService.Show($"Export PNG failed: {ex.Message}", "Trend Export", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -310,7 +310,7 @@ namespace ModbusForge
                 {
                     await _viewModel.WriteCoilAtAsync(entry.Address, entry.State);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _dialogService.Show($"Failed to write coil {entry.Address}: {ex.Message}", "Write Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }

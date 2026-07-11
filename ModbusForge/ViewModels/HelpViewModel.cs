@@ -74,7 +74,7 @@ namespace ModbusForge.ViewModels
                     LoadTopic(topicId);
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Navigation error: {Message}", ex.Message);
                 // Load default topic on error
@@ -88,7 +88,7 @@ namespace ModbusForge.ViewModels
             {
                 HelpContent = _helpContentService.GetHelpContent(topicId);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Load topic error: {Message}", ex.Message);
                 // Show error message
@@ -131,7 +131,7 @@ namespace ModbusForge.ViewModels
 
                 HelpTopics = new ObservableCollection<HelpTopic>(filtered);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 // Log error and reset to all topics
                 _logger.LogError(ex, "Search error: {Message}", ex.Message);

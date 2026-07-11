@@ -33,7 +33,7 @@ namespace ModbusForge.Services
 
                 return ParseMarkdownToFlowDocument(content);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Failed to load help content for topic: {TopicId}", topicId);
                 return CreateSimpleDocument(GetErrorContent());
@@ -173,7 +173,7 @@ namespace ModbusForge.Services
                 AddCurrentParagraph(document, ref currentParagraph);
                 return document;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error parsing markdown");
                 return CreateSimpleDocument("Error displaying help content");

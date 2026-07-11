@@ -212,7 +212,7 @@ namespace ModbusForge
                     disposable.Dispose();
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 var logger = ServiceProvider.GetService<ILogger<App>>();
                 logger?.LogError(ex, "Error disposing service provider");

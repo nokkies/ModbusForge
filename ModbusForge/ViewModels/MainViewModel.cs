@@ -187,7 +187,7 @@ namespace ModbusForge.ViewModels
                     }
                 }
             }
-            catch (Exception ex) { _logger.LogDebug(ex, "Failed to load settings, using defaults"); }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException)) { _logger.LogDebug(ex, "Failed to load settings, using defaults"); }
         }
 
         /// <summary>
@@ -324,7 +324,7 @@ namespace ModbusForge.ViewModels
             _trendTimer.Start();
 
             // Start services
-            try { _trendLogger.Start(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to start trend logger"); }
+            try { _trendLogger.Start(); } catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException)) { _logger.LogWarning(ex, "Failed to start trend logger"); }
             SubscribeCustomEntries();
         }
 
@@ -367,7 +367,7 @@ namespace ModbusForge.ViewModels
                         {
                             await serviceToDisconnect.DisconnectAsync();
                         }
-                        catch (Exception ex)
+                        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                         {
                             _logger.LogWarning(ex, "Error disconnecting previous service during mode switch");
                         }
@@ -386,7 +386,7 @@ namespace ModbusForge.ViewModels
                 OnPropertyChanged(nameof(ConnectionHeader));
                 OnPropertyChanged(nameof(AddressLabel));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error switching mode to {Mode}", value);
             }
@@ -965,7 +965,7 @@ namespace ModbusForge.ViewModels
                         _monitorTimer.Tick -= MonitorTimer_Tick;
                         _trendTimer.Stop();
                         _trendTimer.Tick -= TrendTimer_Tick;
-                        try { _trendLogger.Stop(); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to stop trend logger"); }
+                        try { _trendLogger.Stop(); } catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException)) { _logger.LogWarning(ex, "Failed to stop trend logger"); }
                         try
                         {
                             CustomEntries.CollectionChanged -= CustomEntries_CollectionChanged;
@@ -974,12 +974,12 @@ namespace ModbusForge.ViewModels
                                 ce.PropertyChanged -= CustomEntry_PropertyChanged;
                             }
                         }
-                        catch (Exception ex) { _logger.LogDebug(ex, "Error detaching event handlers during disposal"); }
+                        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException)) { _logger.LogDebug(ex, "Error detaching event handlers during disposal"); }
 
                         // Dispose VisualNodeEditorViewModel
                         _visualNodeEditorViewModel?.Dispose();
                     }
-                    catch (Exception ex) { _logger.LogDebug(ex, "Error during timer cleanup in Dispose"); }
+                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException)) { _logger.LogDebug(ex, "Error during timer cleanup in Dispose"); }
                     try
                     {
                         // Attempt a graceful disconnect with timeout to avoid freezing
@@ -993,7 +993,7 @@ namespace ModbusForge.ViewModels
                         }
                         IsConnected = false;
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
                         _logger.LogError(ex, "Error during disconnect in Dispose");
                     }
@@ -1157,7 +1157,7 @@ namespace ModbusForge.ViewModels
                         break;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error reading custom entry");
                 StatusMessage = $"Custom read error: {ex.Message}";
@@ -1267,7 +1267,7 @@ namespace ModbusForge.ViewModels
                             await WriteCustomNowAsync(entry);
                             entry._lastWriteUtc = now;
                         }
-                        catch (Exception ex)
+                        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                         {
                             _logger.LogError(ex, "Continuous write failed for {Area} {Address}", entry.Area, entry.Address);
                             entry.Continuous = false;
@@ -1277,7 +1277,7 @@ namespace ModbusForge.ViewModels
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error in CustomTimer_Tick");
             }
@@ -1322,7 +1322,7 @@ namespace ModbusForge.ViewModels
                             return;
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
                         _logger.LogWarning(ex, "Heartbeat check failed");
                         await _modbusService.DisconnectAsync();
@@ -1376,7 +1376,7 @@ namespace ModbusForge.ViewModels
                 // Continuous reads for Custom entries are handled exclusively by TrendTimer_Tick
                 // for rows where ce.Trend == true, gated by GlobalMonitorEnabled.
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error in MonitorTimer_Tick");
             }
@@ -1412,7 +1412,7 @@ namespace ModbusForge.ViewModels
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogWarning(ex, "Error subscribing to custom entries");
             }
@@ -1545,7 +1545,7 @@ namespace ModbusForge.ViewModels
                     IsServerMode,
                     enabled => SetGlobalMonitorEnabled(enabled));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error in TrendTimer_Tick");
             }
@@ -1722,7 +1722,7 @@ namespace ModbusForge.ViewModels
                     StatusMessage = $"{(IsServerMode ? "Server" : "Client")} project saved to {System.IO.Path.GetFileName(saveFileDialog.FileName)}";
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error saving project");
                 StatusMessage = $"Error saving project: {ex.Message}";
@@ -1811,7 +1811,7 @@ namespace ModbusForge.ViewModels
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error loading project");
                 StatusMessage = $"Error loading project: {ex.Message}";
@@ -1861,7 +1861,7 @@ namespace ModbusForge.ViewModels
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error importing Unit IDs");
                 StatusMessage = $"Error importing Unit IDs: {ex.Message}";
@@ -1918,7 +1918,7 @@ namespace ModbusForge.ViewModels
                     StatusMessage = $"Exported {UnitConfigurations.Count} Unit ID configurations";
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error exporting Unit IDs");
                 StatusMessage = $"Error exporting Unit IDs: {ex.Message}";
@@ -1980,7 +1980,7 @@ namespace ModbusForge.ViewModels
                     StatusMessage = $"Unit ID {SelectedUnitId} exported to {System.IO.Path.GetFileName(saveFileDialog.FileName)}";
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error exporting Unit ID");
                 StatusMessage = $"Error exporting Unit ID: {ex.Message}";
@@ -2072,7 +2072,7 @@ namespace ModbusForge.ViewModels
                 await ReadAllCustomNowAsync();
                 StatusMessage = "All data refreshed";
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error during refresh");
                 StatusMessage = $"Refresh failed: {ex.Message}";
@@ -2149,7 +2149,7 @@ namespace ModbusForge.ViewModels
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error importing Unit ID");
                 StatusMessage = $"Error importing Unit ID: {ex.Message}";
@@ -2239,7 +2239,7 @@ namespace ModbusForge.ViewModels
                         }
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _dialogService.Show($"Failed to write register {entry.Address}: {ex.Message}", "Write Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     e.Cancel = true;

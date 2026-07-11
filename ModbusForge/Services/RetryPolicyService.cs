@@ -80,7 +80,7 @@ namespace ModbusForge.Services
 
                     await Task.Delay(delay);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     lastException = ex;
                     _logger.LogError(ex, "Operation {OperationName} failed after {Attempt} attempts", 

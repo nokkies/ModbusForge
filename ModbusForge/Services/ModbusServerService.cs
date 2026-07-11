@@ -72,7 +72,7 @@ namespace ModbusForge.Services
                         _logger.LogWarning(sockEx, "Port {Port} is already in use.", p);
                         return false;
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
                         _logger.LogError(ex, "Failed to start Modbus TCP server");
                         _isRunning = false;
@@ -88,7 +88,7 @@ namespace ModbusForge.Services
             {
                 _multiServer?.Stop();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogWarning(ex, "Error while stopping ModbusMultiUnitServer during cleanup");
             }
@@ -97,7 +97,7 @@ namespace ModbusForge.Services
             {
                 _multiServer?.Dispose();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogWarning(ex, "Error while disposing ModbusMultiUnitServer during cleanup");
             }
@@ -134,7 +134,7 @@ namespace ModbusForge.Services
                 if (ips.Count > 0)
                     return string.Join(", ", ips);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogWarning(ex, "Failed to retrieve local network IP address");
             }
@@ -262,7 +262,7 @@ namespace ModbusForge.Services
                 {
                     await DisconnectAsync().ConfigureAwait(false);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _logger.LogWarning(ex, "Error during DisposeAsync");
                 }
@@ -280,7 +280,7 @@ namespace ModbusForge.Services
                     {
                         CleanupResources();
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
                         _logger.LogWarning(ex, "Error during synchronous dispose");
                     }
