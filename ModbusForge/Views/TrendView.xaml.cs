@@ -1,5 +1,4 @@
 using System.Windows.Controls;
-using Microsoft.Extensions.DependencyInjection;
 using ModbusForge.ViewModels;
 using System.ComponentModel;
 using System;
@@ -16,21 +15,7 @@ namespace ModbusForge.Views
         public TrendView()
         {
             InitializeComponent();
-            if (!DesignerProperties.GetIsInDesignMode(this))
-            {
-                DataContext = App.ServiceProvider.GetRequiredService<TrendViewModel>();
-            }
-
-            Loaded += TrendView_Loaded;
             Unloaded += TrendView_Unloaded;
-        }
-
-        private void TrendView_Loaded(object sender, RoutedEventArgs e)
-        {
-            if (DataContext == null && !DesignerProperties.GetIsInDesignMode(this))
-            {
-                DataContext = App.ServiceProvider.GetRequiredService<TrendViewModel>();
-            }
         }
 
         private void TrendView_Unloaded(object sender, RoutedEventArgs e)
@@ -87,58 +72,10 @@ namespace ModbusForge.Views
             }
         }
 
-        private async void ExportCsv_Click(object sender, RoutedEventArgs e)
-        {
-            if (DataContext is not TrendViewModel vm) return;
-            var dlg = new SaveFileDialog
-            {
-                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
-                FileName = "trend.csv",
-                InitialDirectory = GetDefaultExportFolder()
-            };
-            if (dlg.ShowDialog() == true)
-            {
-                try
-                {
-                    await vm.ExportCsvAsync(dlg.FileName, vm.SelectedSeriesItem);
-                    var owner = Window.GetWindow(this);
-                    MessageBox.Show(owner, "CSV export complete.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex)
-                {
-                    var owner = Window.GetWindow(this);
-                    MessageBox.Show(owner, $"CSV export failed: {ex.Message}", "Trend", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-        }
-
-        private async void ImportCsv_Click(object sender, RoutedEventArgs e)
-        {
-            if (DataContext is not TrendViewModel vm) return;
-            var dlg = new OpenFileDialog
-            {
-                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
-                Multiselect = false,
-                InitialDirectory = GetDefaultExportFolder()
-            };
-            if (dlg.ShowDialog() == true)
-            {
-                try
-                {
-                    await vm.ImportCsvAsync(dlg.FileName);
-                    var owner = Window.GetWindow(this);
-                    MessageBox.Show(owner, "CSV import complete.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex)
-                {
-                    var owner = Window.GetWindow(this);
-                    MessageBox.Show(owner, $"CSV import failed: {ex.Message}", "Trend", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-        }
-
         private void ExportPng_Click(object sender, RoutedEventArgs e)
         {
+            if (DataContext is not TrendViewModel vm) return;
+
             var dlg = new SaveFileDialog
             {
                 Filter = "PNG Image (*.png)|*.png|All files (*.*)|*.*",
@@ -150,13 +87,11 @@ namespace ModbusForge.Views
                 try
                 {
                     SaveChartAsPng(dlg.FileName);
-                    var owner = Window.GetWindow(this);
-                    MessageBox.Show(owner, "PNG export complete.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
+                    vm.DialogService.Show("PNG export complete.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
                 {
-                    var owner = Window.GetWindow(this);
-                    MessageBox.Show(owner, $"PNG export failed: {ex.Message}", "Trend", MessageBoxButton.OK, MessageBoxImage.Error);
+                    vm.DialogService.Show($"PNG export failed: {ex.Message}", "Trend", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }

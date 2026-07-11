@@ -16,6 +16,7 @@ public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow, INotifyP
 {
     private readonly IScriptRunner _scriptRunner;
     private readonly IModbusService? _modbusService;
+    private readonly IDialogService _dialogService;
     private readonly byte _unitId;
     private CancellationTokenSource? _cts;
     private ScriptCommand? _selectedCommand;
@@ -34,11 +35,12 @@ public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow, INotifyP
         }
     }
 
-    public ScriptEditorWindow(IScriptRunner scriptRunner, IModbusService? modbusService, byte unitId)
+    public ScriptEditorWindow(IScriptRunner scriptRunner, IModbusService? modbusService, byte unitId, IDialogService? dialogService = null)
     {
         InitializeComponent();
         _scriptRunner = scriptRunner;
         _modbusService = modbusService;
+        _dialogService = dialogService ?? new NullDialogService();
         _unitId = unitId;
         Script = new Script("New Script");
         DataContext = this;
@@ -148,7 +150,7 @@ public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow, INotifyP
 
         if (Script.Commands.Count == 0)
         {
-            MessageBox.Show("Please add at least one command to the script.", "Empty Script",
+            _dialogService.Show("Please add at least one command to the script.", "Empty Script",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -160,7 +162,7 @@ public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow, INotifyP
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Script Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            _dialogService.Show(ex.Message, "Script Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

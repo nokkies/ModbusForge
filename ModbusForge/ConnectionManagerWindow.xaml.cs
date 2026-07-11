@@ -9,6 +9,7 @@ namespace ModbusForge;
 public partial class ConnectionManagerWindow : Wpf.Ui.Controls.FluentWindow, INotifyPropertyChanged
 {
     private readonly IConnectionManager _connectionManager;
+    private readonly IDialogService _dialogService;
     private ConnectionProfile? _selectedProfile;
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -29,10 +30,11 @@ public partial class ConnectionManagerWindow : Wpf.Ui.Controls.FluentWindow, INo
 
     public bool HasSelection => SelectedProfile != null;
 
-    public ConnectionManagerWindow(IConnectionManager connectionManager)
+    public ConnectionManagerWindow(IConnectionManager connectionManager, IDialogService? dialogService = null)
     {
         InitializeComponent();
         _connectionManager = connectionManager;
+        _dialogService = dialogService ?? new NullDialogService();
         DataContext = this;
 
         if (Profiles.Count > 0)
@@ -100,13 +102,13 @@ public partial class ConnectionManagerWindow : Wpf.Ui.Controls.FluentWindow, INo
             var success = await _connectionManager.ConnectProfileAsync(SelectedProfile);
             if (!success)
             {
-                MessageBox.Show($"Failed to connect to {SelectedProfile.IpAddress}:{SelectedProfile.Port}",
+                _dialogService.Show($"Failed to connect to {SelectedProfile.IpAddress}:{SelectedProfile.Port}",
                     "Connection Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Connection failed: {ex.Message}", "Connection Error",
+            _dialogService.Show($"Connection failed: {ex.Message}", "Connection Error",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
@@ -126,7 +128,7 @@ public partial class ConnectionManagerWindow : Wpf.Ui.Controls.FluentWindow, INo
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Disconnect failed: {ex.Message}", "Disconnect Error",
+            _dialogService.Show($"Disconnect failed: {ex.Message}", "Disconnect Error",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -136,7 +138,7 @@ public partial class ConnectionManagerWindow : Wpf.Ui.Controls.FluentWindow, INo
         if (SelectedProfile == null) return;
 
         _connectionManager.SetActiveProfile(SelectedProfile);
-        MessageBox.Show($"'{SelectedProfile.Name}' is now the active connection.", "Active Connection",
+        _dialogService.Show($"'{SelectedProfile.Name}' is now the active connection.", "Active Connection",
             MessageBoxButton.OK, MessageBoxImage.Information);
     }
 

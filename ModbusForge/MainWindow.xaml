@@ -125,9 +125,9 @@
                 <MenuItem Header="_Exit" Click="MenuItem_Exit_Click"/>
             </MenuItem>
             <MenuItem Header="_Trend">
-                <MenuItem Header="Export _CSV..." Click="Trend_ExportCsv_Click"/>
+                <MenuItem Header="Export _CSV..." Command="{Binding ElementName=TrendViewControl, Path=DataContext.ExportCsvCommand}" InputGestureText="Ctrl+Shift+E"/>
                 <MenuItem Header="Export _PNG..." Click="Trend_ExportPng_Click"/>
-                <MenuItem Header="_Import CSV..." Click="Trend_ImportCsv_Click"/>
+                <MenuItem Header="_Import CSV..." Command="{Binding ElementName=TrendViewControl, Path=DataContext.ImportCsvCommand}" InputGestureText="Ctrl+Shift+I"/>
             </MenuItem>
             <MenuItem Header="_Options">
                 <MenuItem Header="_Preferences..." Click="MenuItem_Preferences_Click"/>
@@ -504,7 +504,7 @@
                             </avalonDock:LayoutDocument>
                             <avalonDock:LayoutDocument CanClose="False" x:Name="DocDecode" Title="Decode" ContentId="Decode">
                 <Grid Margin="5">
-                    <views:DecodeView />
+                    <views:DecodeView x:Name="DecodeViewControl" />
                 </Grid>
                             </avalonDock:LayoutDocument>
                             <avalonDock:LayoutDocument CanClose="False" x:Name="DocTrend" Title="Trend" ContentId="Trend">

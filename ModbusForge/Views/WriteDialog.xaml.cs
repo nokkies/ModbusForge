@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using ModbusForge.Models;
+using ModbusForge.Services;
 using ModbusForge.ViewModels;
 
 namespace ModbusForge.Views
@@ -8,12 +9,14 @@ namespace ModbusForge.Views
     public partial class WriteDialog : Wpf.Ui.Controls.FluentWindow
     {
         private readonly MainViewModel _viewModel;
+        private readonly IDialogService _dialogService;
         private readonly object _entry; // Can be RegisterEntry or CoilEntry
 
-        public WriteDialog(MainViewModel viewModel, object entry)
+        public WriteDialog(MainViewModel viewModel, object entry, IDialogService? dialogService = null)
         {
             InitializeComponent();
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+            _dialogService = dialogService ?? new NullDialogService();
             _entry = entry ?? throw new ArgumentNullException(nameof(entry));
 
             InitializeDetails();
@@ -40,7 +43,7 @@ namespace ModbusForge.Views
             string rawValue = ValueTextBox.Text;
             if (string.IsNullOrWhiteSpace(rawValue))
             {
-                MessageBox.Show("Please enter a value.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                _dialogService.Show("Please enter a value.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -109,7 +112,7 @@ namespace ModbusForge.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Write failed: {ex.Message}", "Write Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.Show($"Write failed: {ex.Message}", "Write Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

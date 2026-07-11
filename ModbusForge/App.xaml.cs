@@ -71,7 +71,7 @@ namespace ModbusForge
             }
 
             // Create and show the main window
-            var mainWindow = new MainWindow(ServiceProvider.GetRequiredService<MainViewModel>());
+            var mainWindow = new MainWindow(ServiceProvider.GetRequiredService<MainViewModel>(), ServiceProvider);
             Wpf.Ui.Appearance.SystemThemeWatcher.Watch(mainWindow);
             mainWindow.Show();
         }

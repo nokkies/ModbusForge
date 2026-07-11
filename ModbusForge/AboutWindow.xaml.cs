@@ -3,17 +3,20 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Navigation;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ModbusForge.Helpers;
+using ModbusForge.Services;
 
 namespace ModbusForge
 {
     public partial class AboutWindow : Window
     {
-        public AboutWindow()
+        private readonly IDialogService _dialogService;
+
+        public AboutWindow(ILogger<AboutWindow> logger, IDialogService? dialogService = null)
         {
             InitializeComponent();
+            _dialogService = dialogService ?? new NullDialogService();
             string? ver = null;
             try
             {
@@ -38,11 +41,7 @@ namespace ModbusForge
             }
             catch (Exception ex)
             {
-                if (App.ServiceProvider != null)
-                {
-                    var logger = App.ServiceProvider.GetService<ILogger<AboutWindow>>();
-                    logger?.LogWarning(ex, "Failed to retrieve application version information.");
-                }
+                logger?.LogWarning(ex, "Failed to retrieve application version information.");
             }
             VersionText.Text = !string.IsNullOrWhiteSpace(ver) ? $"ModbusForge v{ver}" : "ModbusForge v2.1.3";
         }
@@ -55,7 +54,7 @@ namespace ModbusForge
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to open link: {ex.Message}", "Navigation Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.Show($"Failed to open link: {ex.Message}", "Navigation Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             e.Handled = true;
         }

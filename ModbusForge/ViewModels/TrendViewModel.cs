@@ -112,6 +112,8 @@ namespace ModbusForge.ViewModels
         public Axis[] XAxes { get; }
         public Axis[] YAxes { get; }
 
+        public IDialogService DialogService => _dialogService;
+
         [ObservableProperty]
         private bool lockX;
 

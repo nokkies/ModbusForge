@@ -15,6 +15,8 @@ using ModbusForge.Helpers;
 using MahApps.Metro.Controls;
 using System.Collections.ObjectModel;
 using AvalonDock.Layout;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ModbusForge
 {
@@ -24,13 +26,21 @@ namespace ModbusForge
     public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     {
         private readonly MainViewModel _viewModel;
+        private readonly IServiceProvider _serviceProvider;
+        private readonly IDialogService _dialogService;
         private bool _isCommittingCustom;
 
-        public MainWindow(MainViewModel viewModel)
+        public MainWindow(MainViewModel viewModel, IServiceProvider serviceProvider)
         {
             InitializeComponent();
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+            _dialogService = _serviceProvider.GetRequiredService<IDialogService>();
             DataContext = _viewModel;
+
+            // Set the data contexts for the view-model-backed user controls
+            if (DecodeViewControl != null) DecodeViewControl.DataContext = _serviceProvider.GetRequiredService<DecodeViewModel>();
+            if (TrendViewControl != null) TrendViewControl.DataContext = _serviceProvider.GetRequiredService<TrendViewModel>();
 
             // Handle window closing to properly dispose resources
             this.Closing += MainWindow_Closing;
@@ -162,7 +172,8 @@ namespace ModbusForge
 
         private void MenuItem_About_Click(object sender, RoutedEventArgs e)
         {
-            var about = new AboutWindow
+            var aboutLogger = _serviceProvider.GetRequiredService<ILogger<AboutWindow>>();
+            var about = new AboutWindow(aboutLogger, _dialogService)
             {
                 Owner = this
             };
@@ -180,15 +191,12 @@ namespace ModbusForge
 
         private void MenuItem_Help_Click(object sender, RoutedEventArgs e)
         {
-            var helpViewModel = App.ServiceProvider.GetService(typeof(ViewModels.HelpViewModel)) as ViewModels.HelpViewModel;
-            if (helpViewModel != null)
+            var helpViewModel = _serviceProvider.GetRequiredService<ViewModels.HelpViewModel>();
+            var helpWindow = new Views.HelpWindow(helpViewModel)
             {
-                var helpWindow = new Views.HelpWindow(helpViewModel)
-                {
-                    Owner = this
-                };
-                helpWindow.ShowDialog();
-            }
+                Owner = this
+            };
+            helpWindow.ShowDialog();
         }
 
         private void MenuItem_Troubleshooting_Click(object sender, RoutedEventArgs e)
@@ -202,29 +210,23 @@ namespace ModbusForge
 
         private void MenuItem_ScriptEditor_Click(object sender, RoutedEventArgs e)
         {
-            var scriptRunner = App.ServiceProvider.GetService(typeof(IScriptRunner)) as IScriptRunner;
-            var modbusService = App.ServiceProvider.GetService(typeof(IModbusService)) as IModbusService;
-            if (scriptRunner != null)
+            var scriptRunner = _serviceProvider.GetRequiredService<IScriptRunner>();
+            var modbusService = _serviceProvider.GetRequiredService<IModbusService>();
+            var scriptEditor = new ScriptEditorWindow(scriptRunner, modbusService, _viewModel.EffectiveUnitId, _dialogService)
             {
-                var scriptEditor = new ScriptEditorWindow(scriptRunner, modbusService, _viewModel.EffectiveUnitId)
-                {
-                    Owner = this
-                };
-                scriptEditor.ShowDialog();
-            }
+                Owner = this
+            };
+            scriptEditor.ShowDialog();
         }
 
         private void MenuItem_Preferences_Click(object sender, RoutedEventArgs e)
         {
-            var settingsService = App.ServiceProvider.GetService(typeof(ISettingsService)) as ISettingsService;
-            if (settingsService != null)
+            var settingsService = _serviceProvider.GetRequiredService<ISettingsService>();
+            var preferencesWindow = new PreferencesWindow(settingsService)
             {
-                var preferencesWindow = new PreferencesWindow(settingsService)
-                {
-                    Owner = this
-                };
-                preferencesWindow.ShowDialog();
-            }
+                Owner = this
+            };
+            preferencesWindow.ShowDialog();
         }
 
         private void WindowMenu_ShowAll_Click(object sender, RoutedEventArgs e)
@@ -257,15 +259,12 @@ namespace ModbusForge
 
         private void MenuItem_ConnectionManager_Click(object sender, RoutedEventArgs e)
         {
-            var connectionManager = App.ServiceProvider.GetService(typeof(IConnectionManager)) as IConnectionManager;
-            if (connectionManager != null)
+            var connectionManager = _serviceProvider.GetRequiredService<IConnectionManager>();
+            var connectionManagerWindow = new ConnectionManagerWindow(connectionManager, _dialogService)
             {
-                var connectionManagerWindow = new ConnectionManagerWindow(connectionManager)
-                {
-                    Owner = this
-                };
-                connectionManagerWindow.ShowDialog();
-            }
+                Owner = this
+            };
+            connectionManagerWindow.ShowDialog();
         }
 
 
@@ -276,7 +275,7 @@ namespace ModbusForge
                 var trendView = this.TrendViewControl;
                 if (trendView == null)
                 {
-                    MessageBox.Show("Trend view is not available.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
+                    _dialogService.Show("Trend view is not available.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
                 var dlg = new SaveFileDialog
@@ -292,63 +291,7 @@ namespace ModbusForge
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Export PNG failed: {ex.Message}", "Trend Export", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private async void Trend_ExportCsv_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var trendView = this.TrendViewControl;
-                if (trendView?.DataContext is not TrendViewModel vm)
-                {
-                    MessageBox.Show("Trend view is not available.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                var dlg = new SaveFileDialog
-                {
-                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
-                    FileName = "trend-export.csv"
-                };
-                if (dlg.ShowDialog(this) == true)
-                {
-                    await vm.ExportCsvAsync(dlg.FileName, vm.SelectedSeriesItem);
-                    _viewModel.StatusMessage = $"Exported CSV: {Path.GetFileName(dlg.FileName)}";
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Export CSV failed: {ex.Message}", "Trend Export", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private async void Trend_ImportCsv_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var trendView = this.TrendViewControl;
-                if (trendView?.DataContext is not TrendViewModel vm)
-                {
-                    MessageBox.Show("Trend view is not available.", "Trend", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                var dlg = new OpenFileDialog
-                {
-                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
-                    Multiselect = false
-                };
-                if (dlg.ShowDialog(this) == true)
-                {
-                    await vm.ImportCsvAsync(dlg.FileName);
-                    _viewModel.StatusMessage = $"Imported CSV: {Path.GetFileName(dlg.FileName)}";
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Import CSV failed: {ex.Message}", "Trend Import", MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.Show($"Export PNG failed: {ex.Message}", "Trend Export", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -369,7 +312,7 @@ namespace ModbusForge
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Failed to write coil {entry.Address}: {ex.Message}", "Write Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    _dialogService.Show($"Failed to write coil {entry.Address}: {ex.Message}", "Write Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -524,7 +467,7 @@ namespace ModbusForge
 
         private void OpenWriteDialog(object entry)
         {
-            var dialog = new ModbusForge.Views.WriteDialog(_viewModel, entry)
+            var dialog = new ModbusForge.Views.WriteDialog(_viewModel, entry, _dialogService)
             {
                 Owner = this
             };
