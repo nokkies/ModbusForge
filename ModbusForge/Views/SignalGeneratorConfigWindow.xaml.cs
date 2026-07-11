@@ -1,19 +1,23 @@
 using System;
 using System.Windows;
 using ModbusForge.Models;
+using ModbusForge.Services;
 
 namespace ModbusForge.Views
 {
     public partial class SignalGeneratorConfigWindow : Window
     {
+        private readonly IDialogService _dialogService;
+
         public string SelectedWaveform { get; private set; } = "Ramp";
         public int SelectedPeriod { get; private set; } = 1000;
         public double SelectedAmplitude { get; private set; } = 100;
         public double SelectedOffset { get; private set; } = 0;
 
-        public SignalGeneratorConfigWindow(VisualNode node)
+        public SignalGeneratorConfigWindow(VisualNode node, IDialogService? dialogService = null)
         {
             InitializeComponent();
+            _dialogService = dialogService ?? new NullDialogService();
 
             WaveformCombo.ItemsSource = new[] { "Ramp", "Sine", "Triangle", "Square" };
             WaveformCombo.SelectedItem = node.Waveform ?? "Ramp";
@@ -31,21 +35,21 @@ namespace ModbusForge.Views
 
             if (!int.TryParse(PeriodText.Text, out int period) || period <= 0)
             {
-                MessageBox.Show("Please enter a valid positive period in ms.", "Invalid Period", MessageBoxButton.OK, MessageBoxImage.Warning);
+                _dialogService.Show("Please enter a valid positive period in ms.", "Invalid Period", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             SelectedPeriod = period;
 
             if (!double.TryParse(AmplitudeText.Text, out double amplitude))
             {
-                MessageBox.Show("Please enter a valid height/amplitude value.", "Invalid Height", MessageBoxButton.OK, MessageBoxImage.Warning);
+                _dialogService.Show("Please enter a valid height/amplitude value.", "Invalid Height", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             SelectedAmplitude = amplitude;
 
             if (!double.TryParse(OffsetText.Text, out double offset))
             {
-                MessageBox.Show("Please enter a valid offset value.", "Invalid Offset", MessageBoxButton.OK, MessageBoxImage.Warning);
+                _dialogService.Show("Please enter a valid offset value.", "Invalid Offset", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             SelectedOffset = offset;

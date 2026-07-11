@@ -3,14 +3,18 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
+using ModbusForge.Services;
 
 namespace ModbusForge
 {
     public partial class KeyboardShortcutsWindow : Window
     {
-        public KeyboardShortcutsWindow()
+        private readonly IDialogService _dialogService;
+
+        public KeyboardShortcutsWindow(IDialogService? dialogService = null)
         {
             InitializeComponent();
+            _dialogService = dialogService ?? new NullDialogService();
         }
 
         private void Close_Click(object sender, RoutedEventArgs e)
@@ -86,7 +90,7 @@ namespace ModbusForge
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show($"Failed to print: {ex.Message}", "Print Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.Show($"Failed to print: {ex.Message}", "Print Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

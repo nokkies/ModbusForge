@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -38,6 +39,9 @@ namespace ModbusForge.ViewModels
     {
         private readonly ILogger<VisualNodeEditorViewModel> _logger;
         private readonly IVisualSimulationService? _visualSimulationService;
+        private readonly TagService? _tagService;
+        private readonly ModbusServerService? _modbusServerService;
+        private readonly IDialogService _dialogService;
 
         [ObservableProperty]
         private VisualNodeEditorConfig _config = new VisualNodeEditorConfig();
@@ -106,15 +110,29 @@ namespace ModbusForge.ViewModels
         public IRelayCommand AlignLeftCommand { get; }
         public IRelayCommand AlignTopCommand { get; }
         public IRelayCommand DistributeHorizontallyCommand { get; }
+        public IRelayCommand OpenTagBrowserCommand { get; }
+        public IRelayCommand OpenWatchWindowCommand { get; }
 
-        public VisualNodeEditorViewModel(ILogger<VisualNodeEditorViewModel>? logger = null, IVisualSimulationService? visualSimulationService = null)
+        public IDialogService DialogService => _dialogService;
+
+        public VisualNodeEditorViewModel(
+            ILogger<VisualNodeEditorViewModel>? logger = null,
+            IVisualSimulationService? visualSimulationService = null,
+            TagService? tagService = null,
+            ModbusServerService? modbusServerService = null,
+            IDialogService? dialogService = null)
         {
             _logger = logger ?? NullLogger<VisualNodeEditorViewModel>.Instance;
             _visualSimulationService = visualSimulationService;
+            _tagService = tagService;
+            _modbusServerService = modbusServerService;
+            _dialogService = dialogService ?? new NullDialogService();
 
             AlignLeftCommand = new RelayCommand(AlignLeft);
             AlignTopCommand = new RelayCommand(AlignTop);
             DistributeHorizontallyCommand = new RelayCommand(DistributeHorizontally);
+            OpenTagBrowserCommand = new RelayCommand(OpenTagBrowser);
+            OpenWatchWindowCommand = new RelayCommand(OpenWatchWindow);
 
             // Initialize with a default program
             var defaultProgram = new ProgramModel { Name = "Main", ExecutionOrder = 0 };
@@ -1000,5 +1018,117 @@ namespace ModbusForge.ViewModels
         }
 
         private bool _disposed = false;
+
+        private void OpenTagBrowser()
+        {
+            try
+            {
+                if (_tagService == null) return;
+
+                var browser = new ModbusForge.Views.TagBrowserWindow(_tagService, _dialogService);
+                if (App.Current?.MainWindow is Window owner)
+                {
+                    browser.Owner = owner;
+                }
+                browser.Show();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to open tag browser");
+                _dialogService.Show($"Error opening Tag Browser: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void OpenWatchWindow()
+        {
+            try
+            {
+                if (_tagService == null) return;
+
+                var watchWindow = new ModbusForge.Views.WatchWindow(_tagService, _dialogService);
+                if (App.Current?.MainWindow is Window owner)
+                {
+                    watchWindow.Owner = owner;
+                }
+                watchWindow.Show();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to open watch window");
+                _dialogService.Show($"Error opening Watch Window: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        public int GetOutputRegisterValue(VisualNode node, byte selectedUnitId)
+        {
+            try
+            {
+                if (_modbusServerService == null) return 0;
+
+                var dataStore = _modbusServerService.GetDataStore(selectedUnitId);
+                if (dataStore == null) return 0;
+
+                var outputAddress = node.OutputAddress;
+                if (outputAddress?.Area == PlcArea.HoldingRegister && outputAddress.Address >= 0 && outputAddress.Address < dataStore.HoldingRegisters.Count)
+                {
+                    return dataStore.HoldingRegisters[outputAddress.Address];
+                }
+                else if (outputAddress?.Area == PlcArea.InputRegister && outputAddress.Address >= 0 && outputAddress.Address < dataStore.InputRegisters.Count)
+                {
+                    return dataStore.InputRegisters[outputAddress.Address];
+                }
+                else if (outputAddress?.Area == PlcArea.Coil && outputAddress.Address >= 0 && outputAddress.Address < dataStore.CoilDiscretes.Count)
+                {
+                    return dataStore.CoilDiscretes[outputAddress.Address] ? 1 : 0;
+                }
+                else if (outputAddress?.Area == PlcArea.DiscreteInput && outputAddress.Address >= 0 && outputAddress.Address < dataStore.InputDiscretes.Count)
+                {
+                    return dataStore.InputDiscretes[outputAddress.Address] ? 1 : 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reading output register value for node {NodeId}", node.Id);
+            }
+            return 0;
+        }
+
+        public int GetActualRegisterValue(VisualNode node, byte selectedUnitId)
+        {
+            try
+            {
+                if (_modbusServerService == null) return 0;
+
+                var dataStore = _modbusServerService.GetDataStore(selectedUnitId);
+                if (dataStore == null) return 0;
+
+                var address = node.Input1Address;
+                int value = 0;
+
+                if (address?.Area == PlcArea.HoldingRegister && address.Address >= 0 && address.Address < dataStore.HoldingRegisters.Count)
+                {
+                    value = dataStore.HoldingRegisters[address.Address];
+                }
+                else if (address?.Area == PlcArea.InputRegister && address.Address >= 0 && address.Address < dataStore.InputRegisters.Count)
+                {
+                    value = dataStore.InputRegisters[address.Address];
+                }
+                else if (address?.Area == PlcArea.Coil && address.Address >= 0 && address.Address < dataStore.CoilDiscretes.Count)
+                {
+                    value = dataStore.CoilDiscretes[address.Address] ? 1 : 0;
+                }
+                else if (address?.Area == PlcArea.DiscreteInput && address.Address >= 0 && address.Address < dataStore.InputDiscretes.Count)
+                {
+                    value = dataStore.InputDiscretes[address.Address] ? 1 : 0;
+                }
+
+                return value;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reading register value for node {NodeId}", node.Id);
+            }
+            return 0;
+        }
     }
 }

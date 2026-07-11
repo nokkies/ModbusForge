@@ -6,11 +6,13 @@ namespace ModbusForge;
 public partial class PreferencesWindow : Wpf.Ui.Controls.FluentWindow
 {
     private readonly ISettingsService _settingsService;
+    private readonly IDialogService _dialogService;
 
-    public PreferencesWindow(ISettingsService settingsService)
+    public PreferencesWindow(ISettingsService settingsService, IDialogService? dialogService = null)
     {
         InitializeComponent();
         _settingsService = settingsService;
+        _dialogService = dialogService ?? new NullDialogService();
         LoadSettings();
     }
 
@@ -64,7 +66,7 @@ public partial class PreferencesWindow : Wpf.Ui.Controls.FluentWindow
         }
         else
         {
-            System.Windows.MessageBox.Show(
+            _dialogService.Show(
                 "Failed to save settings. Please check your permissions or disk space.",
                 "Error",
                 System.Windows.MessageBoxButton.OK,

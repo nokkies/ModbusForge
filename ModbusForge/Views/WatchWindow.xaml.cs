@@ -13,14 +13,16 @@ namespace ModbusForge.Views
     public partial class WatchWindow : Window
     {
         private readonly TagService _tagService;
+        private readonly IDialogService _dialogService;
         private readonly DispatcherTimer _updateTimer;
         private bool _isRunning = false;
 
-        public WatchWindow(TagService tagService)
+        public WatchWindow(TagService tagService, IDialogService? dialogService = null)
         {
             // Assign fields BEFORE InitializeComponent so the XAML's initial SelectedIndex="2"
             // does not fire UpdateRate_Changed -> UpdateTimerInterval on null _updateTimer / _tagService.
             _tagService = tagService;
+            _dialogService = dialogService ?? new NullDialogService();
             _updateTimer = new DispatcherTimer();
             _updateTimer.Tick += UpdateTimer_Tick;
 
@@ -104,7 +106,7 @@ namespace ModbusForge.Views
         private void AddTag_Click(object sender, RoutedEventArgs e)
         {
             // Show tag browser to select a tag
-            var browser = new TagBrowserWindow(_tagService);
+            var browser = new TagBrowserWindow(_tagService, _dialogService);
             browser.Owner = this;
             browser.ShowDialog();
             UpdateStatus();
@@ -121,7 +123,7 @@ namespace ModbusForge.Views
 
         private void ClearAll_Click(object sender, RoutedEventArgs e)
         {
-            var result = MessageBox.Show("Remove all watch entries?", "Confirm", 
+            var result = _dialogService.Show("Remove all watch entries?", "Confirm",
                 MessageBoxButton.YesNo, MessageBoxImage.Question);
             
             if (result == MessageBoxResult.Yes)

@@ -143,7 +143,7 @@ public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow, INotifyP
     {
         if (_modbusService == null || !_modbusService.IsConnected)
         {
-            MessageBox.Show("Please connect to a Modbus device first.", "Not Connected",
+            _dialogService.Show("Please connect to a Modbus device first.", "Not Connected",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -214,11 +214,11 @@ public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow, INotifyP
                 var options = new JsonSerializerOptions { WriteIndented = true };
                 using var stream = File.Create(dlg.FileName);
                 await JsonSerializer.SerializeAsync(stream, data, options);
-                MessageBox.Show("Script saved successfully.", "Save Script", MessageBoxButton.OK, MessageBoxImage.Information);
+                _dialogService.Show("Script saved successfully.", "Save Script", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to save script: {ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.Show($"Failed to save script: {ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }
@@ -237,7 +237,7 @@ public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow, INotifyP
                 var fileInfo = new FileInfo(dlg.FileName);
                 if (fileInfo.Length > MaxFileSize)
                 {
-                    MessageBox.Show($"The selected file is too large (max {MaxFileSize / 1024 / 1024}MB).",
+                    _dialogService.Show($"The selected file is too large (max {MaxFileSize / 1024 / 1024}MB).",
                         "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
@@ -274,12 +274,12 @@ public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow, INotifyP
                     }
 
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Script)));
-                    MessageBox.Show("Script loaded successfully.", "Load Script", MessageBoxButton.OK, MessageBoxImage.Information);
+                    _dialogService.Show("Script loaded successfully.", "Load Script", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to load script: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.Show($"Failed to load script: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }

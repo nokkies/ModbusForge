@@ -182,7 +182,7 @@ namespace ModbusForge
 
         private void MenuItem_KeyboardShortcuts_Click(object sender, RoutedEventArgs e)
         {
-            var shortcuts = new KeyboardShortcutsWindow
+            var shortcuts = new KeyboardShortcutsWindow(_dialogService)
             {
                 Owner = this
             };
@@ -201,7 +201,7 @@ namespace ModbusForge
 
         private void MenuItem_Troubleshooting_Click(object sender, RoutedEventArgs e)
         {
-            var troubleshootingWindow = new Views.TroubleshootingWindow
+            var troubleshootingWindow = new Views.TroubleshootingWindow(_dialogService)
             {
                 Owner = this
             };
@@ -222,7 +222,7 @@ namespace ModbusForge
         private void MenuItem_Preferences_Click(object sender, RoutedEventArgs e)
         {
             var settingsService = _serviceProvider.GetRequiredService<ISettingsService>();
-            var preferencesWindow = new PreferencesWindow(settingsService)
+            var preferencesWindow = new PreferencesWindow(settingsService, _dialogService)
             {
                 Owner = this
             };

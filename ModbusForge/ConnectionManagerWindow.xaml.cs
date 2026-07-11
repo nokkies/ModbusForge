@@ -65,12 +65,12 @@ public partial class ConnectionManagerWindow : Wpf.Ui.Controls.FluentWindow, INo
 
         if (Profiles.Count <= 1)
         {
-            MessageBox.Show("Cannot remove the last connection profile.", "Remove Profile", 
+            _dialogService.Show("Cannot remove the last connection profile.", "Remove Profile",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        var result = MessageBox.Show($"Remove connection '{SelectedProfile.Name}'?", "Confirm Remove",
+        var result = _dialogService.Show($"Remove connection '{SelectedProfile.Name}'?", "Confirm Remove",
             MessageBoxButton.YesNo, MessageBoxImage.Question);
 
         if (result == MessageBoxResult.Yes)

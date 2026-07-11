@@ -8,14 +8,18 @@ using System.Windows;
 using System.Windows.Navigation;
 using Microsoft.Win32;
 using ModbusForge.Helpers;
+using ModbusForge.Services;
 
 namespace ModbusForge.Views
 {
     public partial class TroubleshootingWindow : Window
     {
-        public TroubleshootingWindow()
+        private readonly IDialogService _dialogService;
+
+        public TroubleshootingWindow(IDialogService? dialogService = null)
         {
             InitializeComponent();
+            _dialogService = dialogService ?? new NullDialogService();
         }
 
         private void Close_Click(object sender, RoutedEventArgs e)
@@ -31,7 +35,7 @@ namespace ModbusForge.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to open link: {ex.Message}", "Navigation Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.Show($"Failed to open link: {ex.Message}", "Navigation Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             e.Handled = true;
         }
@@ -51,12 +55,12 @@ namespace ModbusForge.Views
                 {
                     var diagnostics = BuildDiagnosticsReport();
                     File.WriteAllText(saveDialog.FileName, diagnostics);
-                    MessageBox.Show("Diagnostics exported successfully.", "Export Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                    _dialogService.Show("Diagnostics exported successfully.", "Export Complete", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to export diagnostics: {ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.Show($"Failed to export diagnostics: {ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

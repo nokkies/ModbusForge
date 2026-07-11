@@ -13,8 +13,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using ModbusForge.Models;
 using ModbusForge.ViewModels;
 using ModbusForge.Services;
-using Modbus.Data;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace ModbusForge.Views
 {
@@ -151,7 +149,7 @@ namespace ModbusForge.Views
 
         private void HelpButton_Click(object sender, RoutedEventArgs e)
         {
-            var shortcuts = new KeyboardShortcutsWindow();
+            var shortcuts = new KeyboardShortcutsWindow(_viewModel?.DialogService);
             var mainWindow = Window.GetWindow(this);
             if (mainWindow != null)
             {
@@ -256,7 +254,7 @@ namespace ModbusForge.Views
                 RefreshCanvas();
                 RefreshConnections();
                 
-                AddDebugMessage($"Deleted node {nodeToDelete.Id} (type: {nodeToDelete.ElementType})");
+                (Window.GetWindow(this)?.DataContext as MainViewModel)?.AddDebugMessage($"Deleted node {nodeToDelete.Id} (type: {nodeToDelete.ElementType})");
             }
         }
         
@@ -1009,6 +1007,11 @@ namespace ModbusForge.Views
 
         private void UpdateLiveTextForElementType(VisualNode node, TextBlock liveText)
         {
+            if (_viewModel == null) return;
+
+            var mainViewModel = Window.GetWindow(this)?.DataContext as MainViewModel;
+            var selectedUnitId = mainViewModel?.SelectedUnitId ?? 1;
+
             switch (node.ElementType)
             {
                 case PlcElementType.InputBool:
@@ -1016,15 +1019,15 @@ namespace ModbusForge.Views
                     liveText.Text = node.CurrentValue ? "● ON" : "● OFF";
                     liveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
                     break;
-                    
+
                 case PlcElementType.InputInt:
-                    var actualValue = GetActualRegisterValue(node);
+                    var actualValue = _viewModel.GetActualRegisterValue(node, selectedUnitId);
                     liveText.Text = $"● VAL:{actualValue}";
                     liveText.Foreground = Brushes.Cyan;
                     break;
-                    
+
                 case PlcElementType.OutputInt:
-                    var outputValue = GetOutputRegisterValue(node);
+                    var outputValue = _viewModel.GetOutputRegisterValue(node, selectedUnitId);
                     liveText.Text = $"● VAL:{outputValue}";
                     liveText.Foreground = Brushes.Cyan;
                     break;
@@ -1033,13 +1036,13 @@ namespace ModbusForge.Views
                     liveText.Text = $"● VAL:{node.IntValue}";
                     liveText.Foreground = Brushes.Cyan;
                     break;
-                    
+
                 case PlcElementType.Input:
                 case PlcElementType.Output:
                     if (node.Input1Address?.Area == PlcArea.HoldingRegister ||
                         node.Input1Address?.Area == PlcArea.InputRegister)
                     {
-                        var actualLegacyValue = GetActualRegisterValue(node);
+                        var actualLegacyValue = _viewModel.GetActualRegisterValue(node, selectedUnitId);
                         liveText.Text = $"● VAL:{actualLegacyValue}";
                         liveText.Foreground = Brushes.Cyan;
                     }
@@ -1049,12 +1052,12 @@ namespace ModbusForge.Views
                         liveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
                     }
                     break;
-                    
+
                 case PlcElementType.MATH_ADD:
                 case PlcElementType.MATH_SUB:
                 case PlcElementType.MATH_MUL:
                 case PlcElementType.MATH_DIV:
-                    var mathResult = GetOutputRegisterValue(node);
+                    var mathResult = _viewModel.GetOutputRegisterValue(node, selectedUnitId);
                     liveText.Text = $"● VAL:{mathResult}";
                     liveText.Foreground = Brushes.Orange;
                     break;
@@ -1832,7 +1835,7 @@ namespace ModbusForge.Views
                 var command = new ModbusForge.Services.EditorCommands.DeleteNodeCommand(_viewModel, node, _viewModel.SelectedProgram);
                 command.Execute();
                 _viewModel.UndoRedo.Push(command);
-                AddDebugMessage($"Deleted node {node.Id} via context menu");
+                (Window.GetWindow(this)?.DataContext as MainViewModel)?.AddDebugMessage($"Deleted node {node.Id} via context menu");
             };
             contextMenu.Items.Add(deleteItem);
             
@@ -1845,7 +1848,7 @@ namespace ModbusForge.Views
                 };
                 configItem.Click += (s, ev) =>
                 {
-                    var dlg = new SignalGeneratorConfigWindow(node)
+                    var dlg = new SignalGeneratorConfigWindow(node, _viewModel?.DialogService)
                     {
                         Owner = Window.GetWindow(this)
                     };
@@ -1860,7 +1863,7 @@ namespace ModbusForge.Views
                         };
                         var composite = new ModbusForge.Services.EditorCommands.CompositeCommand(commandList);
                         composite.Execute();
-                        _viewModel.UndoRedo.Push(composite);
+                        _viewModel?.UndoRedo.Push(composite);
                     }
                 };
                 contextMenu.Items.Insert(0, configItem);
@@ -2053,149 +2056,8 @@ namespace ModbusForge.Views
             };
         }
 
-        private int GetOutputRegisterValue(VisualNode node)
-        {
-            try
-            {
-                // For OutputInt, we want to show the value that's being written to the output address
-                // This should match what the VisualSimulationService is writing
-                
-                // Get the visual simulation service to access DataStore
-                var serverService = App.ServiceProvider?.GetService<ModbusServerService>();
-                if (serverService == null) return 0;
 
-                // Check which Unit ID we're reading from
-                var mainViewModel = Window.GetWindow(this)?.DataContext as MainViewModel;
-                byte selectedUnitId = mainViewModel?.SelectedUnitId ?? 1;
-                
-                var dataStore = serverService.GetDataStore(selectedUnitId);
-                if (dataStore == null) return 0;
 
-                var outputAddress = node.OutputAddress;
-                if (outputAddress?.Area == PlcArea.HoldingRegister && outputAddress.Address >= 0 && outputAddress.Address < dataStore.HoldingRegisters.Count)
-                {
-                    return dataStore.HoldingRegisters[outputAddress.Address];
-                }
-                else if (outputAddress?.Area == PlcArea.InputRegister && outputAddress.Address >= 0 && outputAddress.Address < dataStore.InputRegisters.Count)
-                {
-                    return dataStore.InputRegisters[outputAddress.Address];
-                }
-                else if (outputAddress?.Area == PlcArea.Coil && outputAddress.Address >= 0 && outputAddress.Address < dataStore.CoilDiscretes.Count)
-                {
-                    return dataStore.CoilDiscretes[outputAddress.Address] ? 1 : 0;
-                }
-                else if (outputAddress?.Area == PlcArea.DiscreteInput && outputAddress.Address >= 0 && outputAddress.Address < dataStore.InputDiscretes.Count)
-                {
-                    return dataStore.InputDiscretes[outputAddress.Address] ? 1 : 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                AddDebugMessage($"Error reading output register value: {ex.Message}");
-            }
-            return 0;
-        }
-
-        private int GetActualRegisterValue(VisualNode node)
-        {
-            try
-            {
-                // Get the visual simulation service to access DataStore
-                var visualSimulationService = App.ServiceProvider?.GetService<IVisualSimulationService>();
-                if (visualSimulationService == null) return 0;
-
-                // Access the DataStore through reflection or create a public method
-                // For now, we'll access it through the service's internal structure
-                var serverService = App.ServiceProvider?.GetService<ModbusServerService>();
-                if (serverService == null) return 0;
-
-                // Check which Unit ID we're reading from
-                var mainViewModel = Window.GetWindow(this)?.DataContext as MainViewModel;
-                byte selectedUnitId = mainViewModel?.SelectedUnitId ?? 1;
-                
-                var dataStore = serverService.GetDataStore(selectedUnitId);
-                if (dataStore == null) return 0;
-
-                var address = node.Input1Address;
-                int value = 0;
-                
-                if (address?.Area == PlcArea.HoldingRegister && address.Address >= 0 && address.Address < dataStore.HoldingRegisters.Count)
-                {
-                    // Debug: Check both 0-based and 1-based addressing
-                    int directValue = dataStore.HoldingRegisters[address.Address];
-                    int offsetValue = address.Address > 0 ? dataStore.HoldingRegisters[address.Address - 1] : 0;
-                    
-                    value = directValue;
-                }
-                else if (address?.Area == PlcArea.InputRegister && address.Address >= 0 && address.Address < dataStore.InputRegisters.Count)
-                {
-                    value = dataStore.InputRegisters[address.Address];
-                }
-                else if (address?.Area == PlcArea.Coil && address.Address >= 0 && address.Address < dataStore.CoilDiscretes.Count)
-                {
-                    value = dataStore.CoilDiscretes[address.Address] ? 1 : 0;
-                }
-                else if (address?.Area == PlcArea.DiscreteInput && address.Address >= 0 && address.Address < dataStore.InputDiscretes.Count)
-                {
-                    value = dataStore.InputDiscretes[address.Address] ? 1 : 0;
-                }
-                
-                return value;
-            }
-            catch (Exception ex)
-            {
-                AddDebugMessage($"Error reading register value: {ex.Message}");
-            }
-            return 0;
-        }
-
-        private void AddDebugMessage(string message)
-        {
-            try
-            {
-                var mainViewModel = Window.GetWindow(this)?.DataContext as MainViewModel;
-                if (mainViewModel != null)
-                {
-                    // Use reflection to safely call AddDebugMessage if it exists
-                    var method = mainViewModel.GetType().GetMethod("AddDebugMessage");
-                    method?.Invoke(mainViewModel, new object[] { message });
-                }
-            }
-            catch
-            {
-                // Reflection failed, ignore
-            }
-        }
-
-        private void TagBrowserButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var tagService = App.ServiceProvider.GetRequiredService<TagService>();
-                var browser = new TagBrowserWindow(tagService);
-                browser.Owner = Window.GetWindow(this);
-                browser.Show();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error opening Tag Browser: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-        
-        private void WatchWindowButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var tagService = App.ServiceProvider.GetRequiredService<TagService>();
-                var watchWindow = new WatchWindow(tagService);
-                watchWindow.Owner = Window.GetWindow(this);
-                watchWindow.Show();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error opening Watch Window: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
     }
     
     // Helper converter for boolean to dash array

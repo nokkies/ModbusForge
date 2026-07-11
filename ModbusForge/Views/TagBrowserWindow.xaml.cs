@@ -14,14 +14,16 @@ namespace ModbusForge.Views
     public partial class TagBrowserWindow : Window
     {
         private readonly TagService _tagService;
+        private readonly IDialogService _dialogService;
         private Tag? _selectedTag;
         private TagGroup? _selectedGroup;
         private bool _isDirty = false;
 
-        public TagBrowserWindow(TagService tagService)
+        public TagBrowserWindow(TagService tagService, IDialogService? dialogService = null)
         {
             InitializeComponent();
             _tagService = tagService;
+            _dialogService = dialogService ?? new NullDialogService();
             LoadTreeView();
             UpdateStatus();
         }
@@ -190,7 +192,7 @@ namespace ModbusForge.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error saving changes: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _dialogService.Show($"Error saving changes: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -225,7 +227,7 @@ namespace ModbusForge.Views
         {
             if (_selectedTag != null)
             {
-                var result = MessageBox.Show($"Delete tag '{_selectedTag.Name}'?", "Confirm Delete", 
+                var result = _dialogService.Show($"Delete tag '{_selectedTag.Name}'?", "Confirm Delete",
                     MessageBoxButton.YesNo, MessageBoxImage.Question);
                 
                 if (result == MessageBoxResult.Yes)
@@ -239,7 +241,7 @@ namespace ModbusForge.Views
             }
             else if (_selectedGroup != null)
             {
-                MessageBox.Show("Group deletion not yet implemented.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                _dialogService.Show("Group deletion not yet implemented.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -273,7 +275,7 @@ namespace ModbusForge.Views
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Import failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    _dialogService.Show($"Import failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -297,7 +299,7 @@ namespace ModbusForge.Views
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Export failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    _dialogService.Show($"Export failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
