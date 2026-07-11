@@ -10,7 +10,6 @@ using System.Threading.Tasks;
 using System.ComponentModel;
 using System.Windows.Data;
 using System.Globalization;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Options;
@@ -52,7 +51,6 @@ namespace ModbusForge.ViewModels
         private readonly ConfigurationCoordinator _configurationCoordinator;
         private readonly IDialogService _dialogService;
         private readonly VisualNodeEditorViewModel _visualNodeEditorViewModel;
-        private readonly IVisualSimulationService _visualSimulationService;
         private bool _disposed = false;
         // Mode-aware UI helpers
 
@@ -61,23 +59,6 @@ namespace ModbusForge.ViewModels
         public string ConnectButtonText => IsServerMode ? "Start Server" : "Connect";
         public string ConnectionHeader => IsServerMode ? "Modbus Connection (Server)" : "Modbus Connection (Client)";
         public string AddressLabel => IsServerMode ? "Interface:" : "Server:";
-
-        public MainViewModel() : this(
-            App.ServiceProvider.GetRequiredService<ModbusTcpService>(),
-            App.ServiceProvider.GetRequiredService<ModbusServerService>(),
-            App.ServiceProvider.GetRequiredService<ILogger<MainViewModel>>(),
-            App.ServiceProvider.GetRequiredService<IOptions<ServerSettings>>(),
-            App.ServiceProvider.GetRequiredService<ITrendLogger>(),
-            App.ServiceProvider.GetRequiredService<ICustomEntryService>(),
-            App.ServiceProvider.GetRequiredService<IConsoleLoggerService>(),
-            App.ServiceProvider.GetRequiredService<ConnectionCoordinator>(),
-            App.ServiceProvider.GetRequiredService<RegisterCoordinator>(),
-            App.ServiceProvider.GetRequiredService<CustomEntryCoordinator>(),
-            App.ServiceProvider.GetRequiredService<TrendCoordinator>(),
-            App.ServiceProvider.GetRequiredService<ConfigurationCoordinator>(),
-            App.ServiceProvider.GetRequiredService<IDialogService>())
-        {
-        }
 
         private async Task ReadAllCustomNowAsync()
         {
@@ -88,7 +69,7 @@ namespace ModbusForge.ViewModels
 
         public VisualNodeEditorViewModel VisualNodeEditorViewModel => _visualNodeEditorViewModel;
 
-        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, IDialogService? dialogService = null)
+        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, IDialogService? dialogService = null, VisualNodeEditorViewModel? visualNodeEditorViewModel = null)
         {
             // Store dependencies
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
@@ -104,9 +85,7 @@ namespace ModbusForge.ViewModels
             _configurationCoordinator = configurationCoordinator ?? throw new ArgumentNullException(nameof(configurationCoordinator));
             _dialogService = dialogService ?? new NullDialogService();
             // Initialize visual node editor
-            _visualNodeEditorViewModel = new VisualNodeEditorViewModel(
-                App.ServiceProvider?.GetRequiredService<ILogger<VisualNodeEditorViewModel>>()!);
-            _visualSimulationService = App.ServiceProvider?.GetService<IVisualSimulationService>()!;
+            _visualNodeEditorViewModel = visualNodeEditorViewModel ?? new VisualNodeEditorViewModel();
             // VisualSimulationService will be started/stopped by ShowLiveValues toggle
 
             var settings = options?.Value ?? new ServerSettings();
@@ -1020,12 +999,6 @@ namespace ModbusForge.ViewModels
                 }
                 _disposed = true;
             }
-        }
-
-
-        ~MainViewModel()
-        {
-            Dispose(false);
         }
 
         // propagate global type selection to each row

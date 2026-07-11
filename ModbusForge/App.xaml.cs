@@ -185,7 +185,7 @@ namespace ModbusForge
             services.AddSingleton<MainViewModel>();
             services.AddTransient<TrendViewModel>();
             services.AddTransient<DecodeViewModel>();
-            services.AddTransient<ScriptEditorViewModel>();
+            services.AddTransient<VisualNodeEditorViewModel>();
             services.AddTransient<HelpViewModel>();
         }
 
@@ -200,9 +200,21 @@ namespace ModbusForge
             }
 
             // Clean up services
-            if (ServiceProvider is IDisposable disposable)
+            try
             {
-                disposable.Dispose();
+                if (ServiceProvider is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync();
+                }
+                else if (ServiceProvider is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+            catch (Exception ex)
+            {
+                var logger = ServiceProvider.GetService<ILogger<App>>();
+                logger?.LogError(ex, "Error disposing service provider");
             }
 
             base.OnExit(e);

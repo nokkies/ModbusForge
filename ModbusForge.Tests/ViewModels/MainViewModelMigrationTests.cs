@@ -56,7 +56,9 @@ namespace ModbusForge.Tests.ViewModels
                 registerCoordinator,
                 customEntryCoordinator,
                 trendCoordinator,
-                configurationCoordinator);
+                configurationCoordinator,
+                null,
+                new VisualNodeEditorViewModel());
         }
 
         [Fact]

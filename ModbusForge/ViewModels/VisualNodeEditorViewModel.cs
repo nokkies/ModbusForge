@@ -9,8 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using ModbusForge.Models;
 using ModbusForge.Services;
 using ModbusForge.Services.EditorCommands;
-using Microsoft.Extensions.DependencyInjection;
-
 namespace ModbusForge.ViewModels
 {
     public partial class PaletteNode : ObservableObject
@@ -39,6 +37,7 @@ namespace ModbusForge.ViewModels
     public partial class VisualNodeEditorViewModel : ViewModelBase
     {
         private readonly ILogger<VisualNodeEditorViewModel> _logger;
+        private readonly IVisualSimulationService? _visualSimulationService;
 
         [ObservableProperty]
         private VisualNodeEditorConfig _config = new VisualNodeEditorConfig();
@@ -108,9 +107,10 @@ namespace ModbusForge.ViewModels
         public IRelayCommand AlignTopCommand { get; }
         public IRelayCommand DistributeHorizontallyCommand { get; }
 
-        public VisualNodeEditorViewModel(ILogger<VisualNodeEditorViewModel>? logger = null)
+        public VisualNodeEditorViewModel(ILogger<VisualNodeEditorViewModel>? logger = null, IVisualSimulationService? visualSimulationService = null)
         {
             _logger = logger ?? NullLogger<VisualNodeEditorViewModel>.Instance;
+            _visualSimulationService = visualSimulationService;
 
             AlignLeftCommand = new RelayCommand(AlignLeft);
             AlignTopCommand = new RelayCommand(AlignTop);
@@ -963,18 +963,17 @@ namespace ModbusForge.ViewModels
         partial void OnShowLiveValuesChanged(bool value)
         {
             UpdateNodeValues(value);
-            
+
             // Start or stop the visual simulation service based on the toggle
-            var visualSimulationService = App.ServiceProvider?.GetService<IVisualSimulationService>();
-            if (visualSimulationService != null)
+            if (_visualSimulationService != null)
             {
                 if (value)
                 {
-                    visualSimulationService.Start(this);
+                    _visualSimulationService.Start(this);
                 }
                 else
                 {
-                    visualSimulationService.Stop();
+                    _visualSimulationService.Stop();
                 }
             }
         }
@@ -986,11 +985,7 @@ namespace ModbusForge.ViewModels
                 if (disposing)
                 {
                     // Stop visual simulation service if running
-                    var visualSimulationService = App.ServiceProvider?.GetService<IVisualSimulationService>();
-                    if (visualSimulationService != null)
-                    {
-                        visualSimulationService.Stop();
-                    }
+                    _visualSimulationService?.Stop();
 
                     // Clear collections to prevent memory leaks
                     Nodes.Clear();

@@ -79,7 +79,7 @@ namespace ModbusForge.Services
                         return false;
                     }
                 }
-            });
+            }).ConfigureAwait(false);
         }
 
         private void CleanupResources()
@@ -172,7 +172,7 @@ namespace ModbusForge.Services
                     CleanupResources();
                     _logger.LogInformation("Modbus TCP server stopped");
                 }
-            });
+            }).ConfigureAwait(false);
         }
 
         public virtual Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count) =>
@@ -187,7 +187,7 @@ namespace ModbusForge.Services
                 if (ds == null || registerAddress < 1 || registerAddress >= ds.HoldingRegisters.Count)
                     throw new ArgumentOutOfRangeException(nameof(registerAddress));
                 ds.HoldingRegisters[(ushort)registerAddress] = value;
-            });
+            }).ConfigureAwait(false);
         }
 
         public virtual async Task WriteRegistersAsync(byte unitId, int startAddress, ushort[] values)
@@ -203,7 +203,7 @@ namespace ModbusForge.Services
                 {
                     ds.HoldingRegisters[(ushort)(startAddress + i)] = values[i];
                 }
-            });
+            }).ConfigureAwait(false);
         }
 
         public virtual Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count) =>
@@ -226,7 +226,7 @@ namespace ModbusForge.Services
                 for (int i = 0; i < count; i++)
                     result[i] = collection[(ushort)(startAddress + i)];
                 return result;
-            });
+            }).ConfigureAwait(false);
         }
 
         public virtual Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)

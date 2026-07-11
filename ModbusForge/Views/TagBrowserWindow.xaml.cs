@@ -194,25 +194,25 @@ namespace ModbusForge.Views
             }
         }
 
-        private void NewGroup_Click(object sender, RoutedEventArgs e)
+        private async void NewGroup_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new InputDialog("New Group", "Enter group name:", "NewGroup");
             if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputText))
             {
                 var parentGroup = _selectedGroup?.Name;
-                _tagService.CreateGroup(dialog.InputText, parentGroup);
+                await _tagService.CreateGroup(dialog.InputText, parentGroup);
                 LoadTreeView();
                 UpdateStatus();
             }
         }
 
-        private void NewTag_Click(object sender, RoutedEventArgs e)
+        private async void NewTag_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new InputDialog("New Tag", "Enter tag name:", "NewTag");
             if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputText))
             {
                 var group = _selectedGroup?.Name ?? "Default";
-                var tag = _tagService.CreateTag(dialog.InputText, group, PlcArea.HoldingRegister, 1, TagDataType.UInt16);
+                var tag = await _tagService.CreateTag(dialog.InputText, group, PlcArea.HoldingRegister, 1, TagDataType.UInt16);
                 LoadTreeView();
                 UpdateStatus();
 
@@ -221,7 +221,7 @@ namespace ModbusForge.Views
             }
         }
 
-        private void Delete_Click(object sender, RoutedEventArgs e)
+        private async void Delete_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedTag != null)
             {
@@ -230,7 +230,7 @@ namespace ModbusForge.Views
                 
                 if (result == MessageBoxResult.Yes)
                 {
-                    _tagService.DeleteTag(_selectedTag.Id);
+                    await _tagService.DeleteTag(_selectedTag.Id);
                     _selectedTag = null;
                     DetailsPanel.Visibility = Visibility.Collapsed;
                     LoadTreeView();

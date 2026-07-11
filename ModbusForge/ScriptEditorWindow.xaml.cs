@@ -154,7 +154,14 @@ public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow, INotifyP
         }
 
         _cts = new CancellationTokenSource();
-        await _scriptRunner.RunScriptAsync(Script, _modbusService, _unitId, _cts.Token);
+        try
+        {
+            await _scriptRunner.RunScriptAsync(Script, _modbusService, _unitId, _cts.Token);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "Script Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void StopScript_Click(object sender, RoutedEventArgs e)

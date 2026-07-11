@@ -65,7 +65,7 @@ namespace ModbusForge.Services
         /// <summary>
         /// Create a new tag with symbolic name
         /// </summary>
-        public Tag CreateTag(string name, string group, PlcArea area, int address, TagDataType dataType)
+        public async Task<Tag> CreateTag(string name, string group, PlcArea area, int address, TagDataType dataType)
         {
             var tag = new Tag(_tagLogger)
             {
@@ -81,7 +81,7 @@ namespace ModbusForge.Services
             // Ensure group exists
             EnsureGroupExists(group);
             
-            SaveTagsAsync().ConfigureAwait(false);
+            await SaveTagsAsync();
             
             return tag;
         }
@@ -89,7 +89,7 @@ namespace ModbusForge.Services
         /// <summary>
         /// Delete a tag by ID
         /// </summary>
-        public void DeleteTag(string tagId)
+        public async Task DeleteTag(string tagId)
         {
             var tag = Tags.FirstOrDefault(t => t.Id == tagId);
             if (tag != null)
@@ -101,7 +101,7 @@ namespace ModbusForge.Services
                 if (watchEntry != null)
                     WatchEntries.Remove(watchEntry);
                 
-                SaveTagsAsync().ConfigureAwait(false);
+                await SaveTagsAsync();
             }
         }
 
@@ -214,7 +214,7 @@ namespace ModbusForge.Services
         /// <summary>
         /// Create a new tag group
         /// </summary>
-        public TagGroup CreateGroup(string name, string? parentGroup = null)
+        public async Task<TagGroup> CreateGroup(string name, string? parentGroup = null)
         {
             var group = new TagGroup
             {
@@ -235,7 +235,7 @@ namespace ModbusForge.Services
                 Groups.Add(group);
             }
 
-            SaveTagsAsync().ConfigureAwait(false);
+            await SaveTagsAsync();
             return group;
         }
 
@@ -286,8 +286,9 @@ namespace ModbusForge.Services
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _tagLogger.LogError(ex, "Failed to load tags from {TagsFilePath}", _tagsFilePath);
                 // If load fails, start with empty database
             }
         }
@@ -309,8 +310,9 @@ namespace ModbusForge.Services
                 var json = JsonSerializer.Serialize(data, _jsonOptions);
                 await File.WriteAllTextAsync(_tagsFilePath, json);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _tagLogger.LogError(ex, "Failed to save tags to {TagsFilePath}", _tagsFilePath);
                 // Silent fail - will retry on next save
             }
         }

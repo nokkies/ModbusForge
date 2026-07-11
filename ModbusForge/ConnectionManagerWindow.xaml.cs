@@ -104,6 +104,11 @@ public partial class ConnectionManagerWindow : Wpf.Ui.Controls.FluentWindow, INo
                     "Connection Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Connection failed: {ex.Message}", "Connection Error",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
         finally
         {
             ConnectButton.IsEnabled = true;
@@ -115,7 +120,15 @@ public partial class ConnectionManagerWindow : Wpf.Ui.Controls.FluentWindow, INo
     {
         if (SelectedProfile == null) return;
 
-        await _connectionManager.DisconnectProfileAsync(SelectedProfile);
+        try
+        {
+            await _connectionManager.DisconnectProfileAsync(SelectedProfile);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Disconnect failed: {ex.Message}", "Disconnect Error",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void SetActiveButton_Click(object sender, RoutedEventArgs e)
