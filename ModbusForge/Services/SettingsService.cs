@@ -60,6 +60,24 @@ public class SettingsService : ISettingsService
         set { _settings.ApiPort = value; OnSettingsChanged(); }
     }
 
+    public bool EnableApiDocumentation
+    {
+        get => _settings.EnableApiDocumentation;
+        set { _settings.EnableApiDocumentation = value; OnSettingsChanged(); }
+    }
+
+    public bool EnableApiAuthentication
+    {
+        get => _settings.EnableApiAuthentication;
+        set { _settings.EnableApiAuthentication = value; OnSettingsChanged(); }
+    }
+
+    public string ApiKey
+    {
+        get => _settings.ApiKey;
+        set { _settings.ApiKey = value; OnSettingsChanged(); }
+    }
+
     public int MaxConcurrentTrendRequests
     {
         get => _settings.MaxConcurrentTrendRequests;
@@ -138,6 +156,9 @@ public class SettingsService : ISettingsService
         public int MaxConsoleMessages { get; set; } = 1000;
         public bool EnableApi { get; set; } = false;
         public int ApiPort { get; set; } = 5000;
+        public bool EnableApiDocumentation { get; set; } = false;
+        public bool EnableApiAuthentication { get; set; } = false;
+        public string ApiKey { get; set; } = string.Empty;
         public int MaxConcurrentTrendRequests { get; set; } = 8;
     }
 }

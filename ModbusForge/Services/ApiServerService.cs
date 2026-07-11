@@ -1,103 +1,153 @@
 using System;
-using System.ComponentModel;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using ModbusForge.ViewModels;
+using ModbusForge.Services.Api;
+using ModbusForge.Services.Api.Dtos;
 using ModbusForge.Models;
 
 namespace ModbusForge.Services;
 
 public class ApiServerService : IApiServerService
 {
-    private const int ConnectionStateTimeoutMs = 30000;
+    // ─── Constants ────────────────────────────────────────────────────────────
+    private const int ConnectionStateTimeoutMs = 30_000;
+    private const int MaxRequestBodyBytes = 1 * 1024 * 1024; // 1 MB
 
+    // Modbus protocol limits
+    private const int MaxRegisterCount = 125;
+    private const int MaxCoilCount = 2000;
+    private const int MaxAddress = 65535;
+
+    // String-field limits (DTOs carry annotations; endpoints re-validate these)
+    private const int MaxNameLength = 128;
+    private const int MaxKeyLength = 128;
+
+    // Rate-limiting policy name
+    private const string RateLimitPolicy = "ApiPolicy";
+
+    // API key header name (never logged)
+    private const string ApiKeyHeader = "X-ModbusForge-Api-Key";
+
+    // ─── Fields ───────────────────────────────────────────────────────────────
     private readonly ISettingsService _settingsService;
     private readonly ILogger<ApiServerService> _logger;
-    private readonly IServiceProvider _wpfServiceProvider;
-    private readonly IDispatcher _dispatcher;
+    private readonly IApiApplicationService _apiApp;
 
     private WebApplication? _app;
-    private MainViewModel? _mainViewModel;
 
     public bool IsRunning => _app != null;
 
+    // ─── Constructor ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Primary constructor. The WPF <see cref="IServiceProvider"/> is NO LONGER injected;
+    /// all application interactions go through the focused <see cref="IApiApplicationService"/> facade.
+    /// </summary>
     public ApiServerService(
         ISettingsService settingsService,
         ILogger<ApiServerService> logger,
-        IServiceProvider wpfServiceProvider,
-        IDispatcher? dispatcher = null)
+        IApiApplicationService apiApp)
     {
-        _settingsService = settingsService;
-        _logger = logger;
-        _wpfServiceProvider = wpfServiceProvider;
-        _dispatcher = dispatcher ?? new WpfDispatcher();
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _apiApp = apiApp ?? throw new ArgumentNullException(nameof(apiApp));
     }
 
-    private MainViewModel MainViewModel
-    {
-        get
-        {
-            _mainViewModel ??= _wpfServiceProvider.GetRequiredService<MainViewModel>();
-            return _mainViewModel;
-        }
-    }
+    // ─── Start / Stop ─────────────────────────────────────────────────────────
 
     public async Task StartAsync()
     {
         if (IsRunning) return;
 
+        // Validate port before attempting to bind.
+        var port = _settingsService.ApiPort;
+        if (port < 1 || port > 65535)
+        {
+            _logger.LogError("Invalid API port {Port}; must be 1-65535. API server not started.", port);
+            return;
+        }
+
         try
         {
             var builder = WebApplication.CreateBuilder();
 
-            // Configure logging
+            // ── Logging ───────────────────────────────────────────────────────
             builder.Logging.ClearProviders();
             builder.Logging.AddConsole();
             builder.Logging.SetMinimumLevel(LogLevel.Information);
 
-            // Add endpoints api explorer and swagger
-            builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
-
-            // Inject WPF services into the ASP.NET Core DI container
-            builder.Services.AddSingleton(_settingsService);
-            builder.Services.AddSingleton(MainViewModel);
-            builder.Services.AddSingleton(_wpfServiceProvider.GetRequiredService<IConnectionManager>());
-            builder.Services.AddSingleton(_wpfServiceProvider.GetRequiredService<IVisualSimulationService>());
-            builder.Services.AddSingleton(_wpfServiceProvider.GetRequiredService<IScriptRuleService>());
-            builder.Services.AddSingleton(_wpfServiceProvider.GetRequiredService<ICustomEntryService>());
-            builder.Services.AddSingleton(_wpfServiceProvider.GetRequiredService<IConsoleLoggerService>());
-            builder.Services.AddSingleton(_wpfServiceProvider.GetRequiredService<ITrendLogger>());
-            builder.Services.AddSingleton<IModbusService>(sp =>
+            // ── Swagger (opt-in only) ─────────────────────────────────────────
+            if (_settingsService.EnableApiDocumentation)
             {
-                // Resolve the active service at call time based on VM mode
-                var vm = sp.GetRequiredService<MainViewModel>();
-                if (vm.IsServerMode)
-                    return _wpfServiceProvider.GetRequiredService<ModbusServerService>();
-                return _wpfServiceProvider.GetRequiredService<ModbusTcpService>();
+                builder.Services.AddEndpointsApiExplorer();
+                builder.Services.AddSwaggerGen(options =>
+                {
+                    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+                    {
+                        Title = "ModbusForge API",
+                        Version = "v1"
+                    });
+                    // Document the API key header
+                    options.AddSecurityDefinition(ApiKeyHeader, new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+                    {
+                        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+                        Name = ApiKeyHeader,
+                        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey
+                    });
+                });
+            }
+
+            // ── Rate limiting (built-in ASP.NET Core 7+) ─────────────────────
+            builder.Services.AddRateLimiter(options =>
+            {
+                options.AddFixedWindowLimiter(RateLimitPolicy, opt =>
+                {
+                    opt.PermitLimit = 60;
+                    opt.Window = TimeSpan.FromSeconds(60);
+                    opt.QueueLimit = 0;
+                });
+                options.OnRejected = async (ctx, _) =>
+                {
+                    ctx.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                    await ctx.HttpContext.Response.WriteAsJsonAsync(
+                        ApiError.TooManyRequests());
+                };
             });
 
-            var port = _settingsService.ApiPort;
+            // ── Register the facade so endpoints can resolve it ───────────────
+            builder.Services.AddSingleton(_apiApp);
+
+            // ── Bind only to loopback ─────────────────────────────────────────
             builder.WebHost.UseUrls($"http://localhost:{port}");
+
+            // ── Request body size limit ───────────────────────────────────────
+            builder.WebHost.ConfigureKestrel(kestrel =>
+                kestrel.Limits.MaxRequestBodySize = MaxRequestBodyBytes);
 
             _app = builder.Build();
 
-            // Configure the HTTP request pipeline.
-            _app.UseSwagger();
-            _app.UseSwaggerUI();
+            // ── Middleware pipeline ───────────────────────────────────────────
+            _app.UseRateLimiter();
 
-            // Map Endpoints
+            if (_settingsService.EnableApiDocumentation)
+            {
+                _app.UseSwagger();
+                _app.UseSwaggerUI();
+            }
+
             MapEndpoints(_app);
 
             await _app.StartAsync();
-            _logger.LogInformation($"API Server started on port {port}");
+            _logger.LogInformation("API Server started on http://localhost:{Port}", port);
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
@@ -127,253 +177,462 @@ public class ApiServerService : IApiServerService
         }
     }
 
+    // ─── Endpoint mapping ─────────────────────────────────────────────────────
+
     private void MapEndpoints(WebApplication app)
     {
-        app.MapGet("/api/status", () => Results.Ok(new { Status = "Running" }))
-           .WithTags("System");
+        var apiGroup = app.MapGroup("/api").RequireRateLimiting(RateLimitPolicy);
 
-        // --- Application State Endpoints ---
-        app.MapGet("/api/app/status", (MainViewModel vm) => Results.Ok(new { IsConnected = vm.IsConnected }))
-           .WithTags("Application");
+        // ── System ────────────────────────────────────────────────────────────
+        apiGroup.MapGet("/status", () => Results.Ok(new { Status = "Running" }))
+            .WithTags("System");
 
-        app.MapPost("/api/app/connect", async (MainViewModel vm, CancellationToken ct) =>
+        // ── Application state ─────────────────────────────────────────────────
+        var appGroup = apiGroup.MapGroup("/app").WithTags("Application");
+
+        appGroup.MapGet("/status", (IApiApplicationService svc) =>
+            Results.Ok(svc.GetStatus()));
+
+        appGroup.MapPost("/connect", async (
+            IApiApplicationService svc,
+            HttpContext ctx,
+            CancellationToken ct) =>
         {
-            bool initiated = false;
-            await _dispatcher.InvokeAsync(() =>
-            {
-                if (!vm.IsConnected && vm.ConnectCommand.CanExecute(null))
-                {
-                    vm.ConnectCommand.Execute(null);
-                    initiated = true;
-                }
-            });
-
-            if (!initiated)
-                return Results.BadRequest(new { Error = "Already connected or cannot connect." });
-
-            if (vm.IsConnected)
-                return Results.Ok(new { Success = true });
-
-            // Event-driven wait instead of polling
-            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            PropertyChangedEventHandler? handler = null;
-            handler = (_, e) =>
-            {
-                if (e.PropertyName == nameof(MainViewModel.IsConnected) && vm.IsConnected)
-                {
-                    vm.PropertyChanged -= handler;
-                    tcs.TrySetResult(true);
-                }
-            };
-            vm.PropertyChanged += handler;
-
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(ConnectionStateTimeoutMs);
+            if (!RequireApiKey(ctx, out var authResult))
+                return authResult!;
             try
             {
-                await tcs.Task.WaitAsync(timeoutCts.Token);
-                return Results.Ok(new { Success = true });
+                var result = await svc.ConnectAsync(ct);
+                return result.Success
+                    ? Results.Ok(new ApiOperationResult(true))
+                    : Results.BadRequest(ApiError.BadRequest(result.Error ?? "Cannot connect."));
             }
             catch (OperationCanceledException)
             {
-                vm.PropertyChanged -= handler;
-                return Results.BadRequest(new { Error = "Connection attempt timed out." });
+                return Results.StatusCode(499); // Client Closed Request
             }
-        }).WithTags("Application");
+            catch (Exception ex) when (ex is not (OutOfMemoryException))
+            {
+                _logger.LogError(ex, "Unhandled exception in POST /api/app/connect.");
+                return Results.Problem(
+                    title: ApiError.InternalError().Title,
+                    statusCode: 500);
+            }
+        });
 
-        app.MapPost("/api/app/disconnect", async (MainViewModel vm, CancellationToken ct) =>
+        appGroup.MapPost("/disconnect", async (
+            IApiApplicationService svc,
+            HttpContext ctx,
+            CancellationToken ct) =>
         {
-            bool initiated = false;
-            await _dispatcher.InvokeAsync(() =>
-            {
-                if (vm.IsConnected && vm.DisconnectCommand.CanExecute(null))
-                {
-                    vm.DisconnectCommand.Execute(null);
-                    initiated = true;
-                }
-            });
-
-            if (!initiated)
-                return Results.BadRequest(new { Error = "Already disconnected or cannot disconnect." });
-
-            if (!vm.IsConnected)
-                return Results.Ok(new { Success = true });
-
-            // Event-driven wait instead of polling
-            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            PropertyChangedEventHandler? handler = null;
-            handler = (_, e) =>
-            {
-                if (e.PropertyName == nameof(MainViewModel.IsConnected) && !vm.IsConnected)
-                {
-                    vm.PropertyChanged -= handler;
-                    tcs.TrySetResult(true);
-                }
-            };
-            vm.PropertyChanged += handler;
-
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(ConnectionStateTimeoutMs);
+            if (!RequireApiKey(ctx, out var authResult))
+                return authResult!;
             try
             {
-                await tcs.Task.WaitAsync(timeoutCts.Token);
-                return Results.Ok(new { Success = true });
+                var result = await svc.DisconnectAsync(ct);
+                return result.Success
+                    ? Results.Ok(new ApiOperationResult(true))
+                    : Results.BadRequest(ApiError.BadRequest(result.Error ?? "Cannot disconnect."));
             }
             catch (OperationCanceledException)
             {
-                vm.PropertyChanged -= handler;
-                return Results.BadRequest(new { Error = "Disconnect timed out." });
+                return Results.StatusCode(499);
             }
-        }).WithTags("Application");
+            catch (Exception ex) when (ex is not (OutOfMemoryException))
+            {
+                _logger.LogError(ex, "Unhandled exception in POST /api/app/disconnect.");
+                return Results.Problem(
+                    title: ApiError.InternalError().Title,
+                    statusCode: 500);
+            }
+        });
 
-        // --- Modbus Operations ---
-        app.MapGet("/api/modbus/registers/{address}", async (MainViewModel vm, IModbusService modbusService, [FromRoute] ushort address, [FromQuery] int length = 1) =>
+        // ── Modbus ────────────────────────────────────────────────────────────
+        var modbusGroup = apiGroup.MapGroup("/modbus").WithTags("Modbus");
+
+        modbusGroup.MapGet("/registers/{address}", async (
+            IApiApplicationService svc,
+            HttpContext ctx,
+            [FromRoute] ushort address,
+            [FromQuery] int length,
+            CancellationToken ct) =>
         {
-            if (!vm.IsConnected)
-                return Results.BadRequest(new { Error = "Not connected." });
+            if (!RequireApiKey(ctx, out var authResult))
+                return authResult!;
+
+            // Validation
+            if (length < 1 || length > MaxRegisterCount)
+                return Results.BadRequest(ApiError.BadRequest(
+                    $"length must be 1..{MaxRegisterCount}."));
+            if (address + length - 1 > MaxAddress)
+                return Results.BadRequest(ApiError.BadRequest(
+                    "address + length exceeds maximum address 65535."));
+
+            var status = svc.GetStatus();
+            if (!status.IsConnected)
+                return Results.BadRequest(ApiError.BadRequest("Not connected."));
 
             try
             {
-                var values = await modbusService.ReadHoldingRegistersAsync(vm.EffectiveUnitId, address, length);
-                if (values != null)
-                    return Results.Ok(new { Address = address, Length = length, Data = values });
-
-                return Results.BadRequest(new { Error = "Failed to read registers from device." });
+                var unitId = GetUnitIdFromQuery(ctx);
+                var values = await svc.ReadHoldingRegistersAsync(
+                    unitId, address, (ushort)length, ct);
+                if (values is null)
+                    return Results.BadRequest(ApiError.BadRequest(
+                        "Failed to read registers from device."));
+                return Results.Ok(new { Address = address, Length = length, Data = values });
             }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            catch (OperationCanceledException)
             {
-                return Results.BadRequest(new { Error = ex.Message });
+                return Results.StatusCode(499);
             }
-        }).WithTags("Modbus");
+            catch (Exception ex) when (ex is not (OutOfMemoryException))
+            {
+                _logger.LogError(ex, "Unhandled exception reading holding registers at {Address}.", address);
+                return Results.Problem(
+                    title: ApiError.InternalError().Title,
+                    statusCode: 500);
+            }
+        });
 
-        app.MapGet("/api/modbus/coils/{address}", async (MainViewModel vm, IModbusService modbusService, [FromRoute] ushort address, [FromQuery] int length = 1) =>
+        modbusGroup.MapGet("/coils/{address}", async (
+            IApiApplicationService svc,
+            HttpContext ctx,
+            [FromRoute] ushort address,
+            [FromQuery] int length,
+            CancellationToken ct) =>
         {
-            if (!vm.IsConnected)
-                return Results.BadRequest(new { Error = "Not connected." });
+            if (!RequireApiKey(ctx, out var authResult))
+                return authResult!;
+
+            if (length < 1 || length > MaxCoilCount)
+                return Results.BadRequest(ApiError.BadRequest(
+                    $"length must be 1..{MaxCoilCount}."));
+            if (address + length - 1 > MaxAddress)
+                return Results.BadRequest(ApiError.BadRequest(
+                    "address + length exceeds maximum address 65535."));
+
+            var status = svc.GetStatus();
+            if (!status.IsConnected)
+                return Results.BadRequest(ApiError.BadRequest("Not connected."));
 
             try
             {
-                var values = await modbusService.ReadCoilsAsync(vm.EffectiveUnitId, address, length);
-                if (values != null)
-                    return Results.Ok(new { Address = address, Length = length, Data = values });
-
-                return Results.BadRequest(new { Error = "Failed to read coils from device." });
+                var unitId = GetUnitIdFromQuery(ctx);
+                var values = await svc.ReadCoilsAsync(
+                    unitId, address, (ushort)length, ct);
+                if (values is null)
+                    return Results.BadRequest(ApiError.BadRequest(
+                        "Failed to read coils from device."));
+                return Results.Ok(new { Address = address, Length = length, Data = values });
             }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            catch (OperationCanceledException)
             {
-                return Results.BadRequest(new { Error = ex.Message });
+                return Results.StatusCode(499);
             }
-        }).WithTags("Modbus");
-
-        // --- Custom Tags ---
-        app.MapGet("/api/custom-tags", async (MainViewModel vm) =>
-        {
-            var snapshot = await _dispatcher.InvokeAsync(() => vm.CustomEntries.ToList());
-            return Results.Ok(snapshot);
-        }).WithTags("CustomTags");
-
-        app.MapPost("/api/custom-tags", async (MainViewModel vm, [FromBody] CustomEntry entry) =>
-        {
-            await _dispatcher.InvokeAsync(() => vm.CustomEntries.Add(entry));
-            return Results.Ok(entry);
-        }).WithTags("CustomTags");
-
-        app.MapDelete("/api/custom-tags/{address}", async (MainViewModel vm, [FromRoute] int address) =>
-        {
-            var removed = await _dispatcher.InvokeAsync(() =>
+            catch (Exception ex) when (ex is not (OutOfMemoryException))
             {
-                var entry = vm.CustomEntries.FirstOrDefault(e => e.Address == address);
-                if (entry != null)
-                {
-                    vm.CustomEntries.Remove(entry);
-                    return true;
-                }
-                return false;
-            });
+                _logger.LogError(ex, "Unhandled exception reading coils at {Address}.", address);
+                return Results.Problem(
+                    title: ApiError.InternalError().Title,
+                    statusCode: 500);
+            }
+        });
+
+        // ── Custom tags ───────────────────────────────────────────────────────
+        var tagsGroup = apiGroup.MapGroup("/custom-tags").WithTags("CustomTags");
+
+        tagsGroup.MapGet("/", async (IApiApplicationService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetCustomTagsAsync(ct)));
+
+        tagsGroup.MapPost("/", async (
+            IApiApplicationService svc,
+            HttpContext ctx,
+            [FromBody] CreateCustomEntryRequest? req,
+            CancellationToken ct) =>
+        {
+            if (!RequireApiKey(ctx, out var authResult))
+                return authResult!;
+            if (req is null)
+                return Results.BadRequest(ApiError.BadRequest("Request body is required."));
+
+            var validation = ValidateCreateCustomEntryRequest(req);
+            if (validation is not null) return validation;
+
+            var entry = MapToCustomEntry(req);
+            var created = await svc.AddCustomTagAsync(entry, ct);
+            return Results.Ok(created);
+        });
+
+        tagsGroup.MapDelete("/{address}", async (
+            IApiApplicationService svc,
+            HttpContext ctx,
+            [FromRoute] int address,
+            CancellationToken ct) =>
+        {
+            if (!RequireApiKey(ctx, out var authResult))
+                return authResult!;
+            if (address < 0 || address > MaxAddress)
+                return Results.BadRequest(ApiError.BadRequest("address must be 0..65535."));
+
+            var removed = await svc.RemoveCustomTagAsync(address, ct);
             return removed ? Results.Ok() : Results.NotFound();
-        }).WithTags("CustomTags");
+        });
 
-        // --- Simulation Nodes ---
-        app.MapGet("/api/simulation/nodes", async (MainViewModel vm) =>
-        {
-            var snapshot = await _dispatcher.InvokeAsync(() => vm.CurrentConfig.SimulationSettings.VisualNodes.ToList());
-            return Results.Ok(snapshot);
-        }).WithTags("Simulation");
+        // ── Simulation nodes ──────────────────────────────────────────────────
+        var simGroup = apiGroup.MapGroup("/simulation/nodes").WithTags("Simulation");
 
-        app.MapPost("/api/simulation/nodes", async (MainViewModel vm, [FromBody] VisualNode node) =>
-        {
-            await _dispatcher.InvokeAsync(() =>
-            {
-                var existing = vm.CurrentConfig.SimulationSettings.VisualNodes.FirstOrDefault(n => n.Id == node.Id);
-                if (existing != null)
-                    vm.CurrentConfig.SimulationSettings.VisualNodes.Remove(existing);
-                vm.CurrentConfig.SimulationSettings.VisualNodes.Add(node);
-            });
-            return Results.Ok(node);
-        }).WithTags("Simulation");
+        simGroup.MapGet("/", async (IApiApplicationService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetSimulationNodesAsync(ct)));
 
-        app.MapDelete("/api/simulation/nodes/{id}", async (MainViewModel vm, [FromRoute] string id) =>
+        simGroup.MapPost("/", async (
+            IApiApplicationService svc,
+            HttpContext ctx,
+            [FromBody] CreateSimulationNodeRequest? req,
+            CancellationToken ct) =>
         {
-            var removed = await _dispatcher.InvokeAsync(() =>
-            {
-                var existing = vm.CurrentConfig.SimulationSettings.VisualNodes.FirstOrDefault(n => n.Id == id);
-                if (existing != null)
-                {
-                    vm.CurrentConfig.SimulationSettings.VisualNodes.Remove(existing);
-                    return true;
-                }
-                return false;
-            });
+            if (!RequireApiKey(ctx, out var authResult))
+                return authResult!;
+            if (req is null)
+                return Results.BadRequest(ApiError.BadRequest("Request body is required."));
+
+            var validation = ValidateCreateSimulationNodeRequest(req);
+            if (validation is not null) return validation;
+
+            var node = MapToVisualNode(req);
+            var upserted = await svc.UpsertSimulationNodeAsync(node, ct);
+            return Results.Ok(upserted);
+        });
+
+        simGroup.MapDelete("/{id}", async (
+            IApiApplicationService svc,
+            HttpContext ctx,
+            [FromRoute] string id,
+            CancellationToken ct) =>
+        {
+            if (!RequireApiKey(ctx, out var authResult))
+                return authResult!;
+            if (string.IsNullOrWhiteSpace(id) || id.Length > MaxKeyLength)
+                return Results.BadRequest(ApiError.BadRequest("id must be non-empty and ≤128 characters."));
+
+            var removed = await svc.RemoveSimulationNodeAsync(id, ct);
             return removed ? Results.Ok() : Results.NotFound();
-        }).WithTags("Simulation");
+        });
 
-        // --- Scripts ---
-        app.MapGet("/api/scripts", async (IScriptRuleService scriptService) =>
-        {
-            var snapshot = await _dispatcher.InvokeAsync(() => scriptService.Rules.ToList());
-            return Results.Ok(snapshot);
-        }).WithTags("Scripts");
+        // ── Scripts ───────────────────────────────────────────────────────────
+        var scriptsGroup = apiGroup.MapGroup("/scripts").WithTags("Scripts");
 
-        app.MapPost("/api/scripts", async (IScriptRuleService scriptService, [FromBody] ScriptRule rule) =>
-        {
-            await _dispatcher.InvokeAsync(() =>
-            {
-                var existing = scriptService.Rules.FirstOrDefault(r => r.Name == rule.Name);
-                if (existing != null)
-                    scriptService.RemoveRule(existing);
-                scriptService.AddRule(rule);
-            });
-            return Results.Ok(rule);
-        }).WithTags("Scripts");
+        scriptsGroup.MapGet("/", async (IApiApplicationService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetScriptRulesAsync(ct)));
 
-        app.MapDelete("/api/scripts/{name}", async (IScriptRuleService scriptService, [FromRoute] string name) =>
+        scriptsGroup.MapPost("/", async (
+            IApiApplicationService svc,
+            HttpContext ctx,
+            [FromBody] CreateScriptRuleRequest? req,
+            CancellationToken ct) =>
         {
-            var removed = await _dispatcher.InvokeAsync(() =>
-            {
-                var existing = scriptService.Rules.FirstOrDefault(r => r.Name == name);
-                if (existing != null)
-                {
-                    scriptService.RemoveRule(existing);
-                    return true;
-                }
-                return false;
-            });
+            if (!RequireApiKey(ctx, out var authResult))
+                return authResult!;
+            if (req is null)
+                return Results.BadRequest(ApiError.BadRequest("Request body is required."));
+
+            var validation = ValidateCreateScriptRuleRequest(req);
+            if (validation is not null) return validation;
+
+            var rule = MapToScriptRule(req);
+            var upserted = await svc.UpsertScriptRuleAsync(rule, ct);
+            return Results.Ok(upserted);
+        });
+
+        scriptsGroup.MapDelete("/{name}", async (
+            IApiApplicationService svc,
+            HttpContext ctx,
+            [FromRoute] string name,
+            CancellationToken ct) =>
+        {
+            if (!RequireApiKey(ctx, out var authResult))
+                return authResult!;
+            if (string.IsNullOrWhiteSpace(name) || name.Length > MaxNameLength)
+                return Results.BadRequest(ApiError.BadRequest("name must be non-empty and ≤128 characters."));
+
+            var removed = await svc.RemoveScriptRuleAsync(name, ct);
             return removed ? Results.Ok() : Results.NotFound();
-        }).WithTags("Scripts");
+        });
 
-        // --- Logs ---
-        app.MapGet("/api/logs", async (IConsoleLoggerService loggerService) =>
-        {
-            var snapshot = await _dispatcher.InvokeAsync(() => loggerService.LogMessages.ToList());
-            return Results.Ok(snapshot);
-        }).WithTags("Logs");
+        // ── Logs ─────────────────────────────────────────────────────────────
+        apiGroup.MapGet("/logs", async (IApiApplicationService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetLogsAsync(ct)))
+            .WithTags("Logs");
 
-        // --- Trends ---
-        app.MapPost("/api/trends/{key}", async (ITrendLogger trendLogger, [FromRoute] string key, [FromQuery] string displayName) =>
+        // ── Trends ───────────────────────────────────────────────────────────
+        apiGroup.MapPost("/trends/{key}", async (
+            IApiApplicationService svc,
+            HttpContext ctx,
+            [FromRoute] string key,
+            [FromQuery] string? displayName,
+            CancellationToken ct) =>
         {
-            await _dispatcher.InvokeAsync(() =>
-                trendLogger.Add(key, string.IsNullOrEmpty(displayName) ? key : displayName));
-            return Results.Ok(new { Success = true });
+            if (!RequireApiKey(ctx, out var authResult))
+                return authResult!;
+            if (string.IsNullOrWhiteSpace(key) || key.Length > MaxKeyLength)
+                return Results.BadRequest(ApiError.BadRequest("key must be non-empty and ≤128 characters."));
+            if (displayName is not null && displayName.Length > MaxKeyLength)
+                return Results.BadRequest(ApiError.BadRequest("displayName must be ≤128 characters."));
+
+            await svc.AddTrendAsync(key, displayName ?? key, ct);
+            return Results.Ok(new ApiOperationResult(true));
         }).WithTags("Trends");
     }
+
+    // ─── API key authentication ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns <c>true</c> when:
+    /// (a) API key auth is disabled via settings, OR
+    /// (b) the request supplies a key that matches (compared in constant time).
+    /// The key value is NEVER logged.
+    /// </summary>
+    private bool RequireApiKey(HttpContext ctx, out IResult? failureResult)
+    {
+        if (!_settingsService.EnableApiAuthentication)
+        {
+            failureResult = null;
+            return true;
+        }
+
+        var expectedKey = _settingsService.ApiKey;
+        if (string.IsNullOrEmpty(expectedKey))
+        {
+            // Key not configured yet – log a warning (but not the key) and deny.
+            _logger.LogWarning("API key authentication is enabled but no key is configured. Denying request.");
+            failureResult = Results.Json(ApiError.Unauthorized(), statusCode: StatusCodes.Status401Unauthorized);
+            return false;
+        }
+
+        ctx.Request.Headers.TryGetValue(ApiKeyHeader, out var providedKey);
+        var providedKeyStr = providedKey.ToString();
+
+        // Constant-time comparison to resist timing attacks.
+        if (!CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(providedKeyStr),
+                System.Text.Encoding.UTF8.GetBytes(expectedKey)))
+        {
+            _logger.LogWarning("Unauthorized API request from {RemoteIp}.", ctx.Connection.RemoteIpAddress);
+            failureResult = Results.Json(ApiError.Unauthorized(), statusCode: StatusCodes.Status401Unauthorized);
+            return false;
+        }
+
+        failureResult = null;
+        return true;
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    private static byte GetUnitIdFromQuery(HttpContext ctx)
+    {
+        if (ctx.Request.Query.TryGetValue("unitId", out var raw)
+            && byte.TryParse(raw, out var id))
+            return id;
+        return 1;
+    }
+
+    // ─── Input validation helpers ─────────────────────────────────────────────
+
+    private static IResult? ValidateCreateCustomEntryRequest(CreateCustomEntryRequest req)
+    {
+        if (string.IsNullOrWhiteSpace(req.Name) || req.Name.Length > MaxNameLength)
+            return Results.BadRequest(ApiError.BadRequest("Name must be non-empty and ≤128 characters."));
+        if (req.Address < 0 || req.Address > MaxAddress)
+            return Results.BadRequest(ApiError.BadRequest("Address must be 0..65535."));
+        if (req.Value.Length > 64)
+            return Results.BadRequest(ApiError.BadRequest("Value must be ≤64 characters."));
+        if (req.PeriodMs < 100)
+            return Results.BadRequest(ApiError.BadRequest("PeriodMs must be ≥100."));
+        if (req.ReadPeriodMs < 100)
+            return Results.BadRequest(ApiError.BadRequest("ReadPeriodMs must be ≥100."));
+        return null;
+    }
+
+    private static IResult? ValidateCreateSimulationNodeRequest(CreateSimulationNodeRequest req)
+    {
+        if (string.IsNullOrWhiteSpace(req.Name) || req.Name.Length > MaxNameLength)
+            return Results.BadRequest(ApiError.BadRequest("Name must be non-empty and ≤128 characters."));
+        if (req.PeriodMs < 10)
+            return Results.BadRequest(ApiError.BadRequest("PeriodMs must be ≥10."));
+        if (req.Width < 50 || req.Height < 50)
+            return Results.BadRequest(ApiError.BadRequest("Width and Height must be ≥50."));
+        return null;
+    }
+
+    private static IResult? ValidateCreateScriptRuleRequest(CreateScriptRuleRequest req)
+    {
+        if (string.IsNullOrWhiteSpace(req.Name) || req.Name.Length > MaxNameLength)
+            return Results.BadRequest(ApiError.BadRequest("Name must be non-empty and ≤128 characters."));
+        if (req.TriggerAddress < 0 || req.TriggerAddress > MaxAddress)
+            return Results.BadRequest(ApiError.BadRequest("TriggerAddress must be 0..65535."));
+        if (req.ActionAddress < 0 || req.ActionAddress > MaxAddress)
+            return Results.BadRequest(ApiError.BadRequest("ActionAddress must be 0..65535."));
+        if (req.TriggerValue.Length > 64)
+            return Results.BadRequest(ApiError.BadRequest("TriggerValue must be ≤64 characters."));
+        if (req.ActionValue.Length > 64)
+            return Results.BadRequest(ApiError.BadRequest("ActionValue must be ≤64 characters."));
+        if (req.LogMessage.Length > 256)
+            return Results.BadRequest(ApiError.BadRequest("LogMessage must be ≤256 characters."));
+        if (req.DelayMs < 0 || req.DelayMs > 3_600_000)
+            return Results.BadRequest(ApiError.BadRequest("DelayMs must be 0..3600000."));
+        return null;
+    }
+
+    // ─── DTO → domain mapping ─────────────────────────────────────────────────
+
+    private static CustomEntry MapToCustomEntry(CreateCustomEntryRequest req) => new()
+    {
+        Name = req.Name,
+        Address = req.Address,
+        Type = req.Type,
+        Value = req.Value,
+        Continuous = req.Continuous,
+        PeriodMs = req.PeriodMs,
+        Monitor = req.Monitor,
+        ReadPeriodMs = req.ReadPeriodMs,
+        Area = req.Area,
+        Trend = req.Trend
+    };
+
+    private static VisualNode MapToVisualNode(CreateSimulationNodeRequest req) => new()
+    {
+        Id = string.IsNullOrEmpty(req.Id) ? Guid.NewGuid().ToString() : req.Id,
+        Name = req.Name,
+        ElementType = req.ElementType,
+        X = req.X,
+        Y = req.Y,
+        Width = req.Width,
+        Height = req.Height,
+        IsEnabled = req.IsEnabled,
+        Waveform = req.Waveform,
+        PeriodMs = req.PeriodMs,
+        Amplitude = req.Amplitude,
+        Offset = req.Offset
+    };
+
+    private static ScriptRule MapToScriptRule(CreateScriptRuleRequest req) => new()
+    {
+        Name = req.Name,
+        Enabled = req.Enabled,
+        ConditionType = req.ConditionType,
+        TriggerAddress = req.TriggerAddress,
+        TriggerArea = req.TriggerArea,
+        TriggerOperator = req.TriggerOperator,
+        TriggerValue = req.TriggerValue,
+        ActionType = req.ActionType,
+        ActionAddress = req.ActionAddress,
+        ActionArea = req.ActionArea,
+        ActionValue = req.ActionValue,
+        DelayMs = req.DelayMs,
+        LogMessage = req.LogMessage,
+        OneTime = req.OneTime
+    };
 }
+
+/// <summary>Generic success envelope returned by mutating endpoints.</summary>
+internal record ApiOperationResult(bool Success);

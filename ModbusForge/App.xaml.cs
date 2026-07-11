@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ModbusForge.Configuration;
 using ModbusForge.Services;
+using ModbusForge.Services.Api;
 using ModbusForge.ViewModels;
 using ModbusForge.ViewModels.Coordinators;
 
@@ -154,7 +155,22 @@ namespace ModbusForge
             services.AddSingleton<IScriptRunner, ScriptRunner>();
             services.AddSingleton<IScriptRuleService, ScriptRuleService>();
             services.AddSingleton<IVisualSimulationService, VisualSimulationService>();
+
+            // API server: wire the focused facade (no WPF IServiceProvider passed in).
+            // IAppStateAccessor is resolved lazily after MainViewModel is created.
+            services.AddSingleton<IAppStateAccessor>(provider =>
+                new MainViewModelAppStateAccessor(provider.GetRequiredService<MainViewModel>()));
+            services.AddSingleton<IApiApplicationService>(provider =>
+                new WpfApiApplicationService(
+                    provider.GetRequiredService<IAppStateAccessor>(),
+                    provider.GetRequiredService<IModbusService>(),
+                    provider.GetRequiredService<IScriptRuleService>(),
+                    provider.GetRequiredService<IConsoleLoggerService>(),
+                    provider.GetRequiredService<ITrendLogger>(),
+                    provider.GetRequiredService<IDispatcher>(),
+                    provider.GetRequiredService<ILogger<WpfApiApplicationService>>()));
             services.AddSingleton<IApiServerService, ApiServerService>();
+
             services.AddSingleton<TagService>();
             services.AddSingleton<IRetryPolicyService, RetryPolicyService>();
             services.AddSingleton<IValidationService, ValidationService>();
