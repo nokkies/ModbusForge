@@ -43,6 +43,12 @@ namespace ModbusForge.Tests.ViewModels
             var customEntryCoordinator = new CustomEntryCoordinator(registerCoordinator, mockCustomEntryService.Object, mockTcpService.Object, mockServerService.Object, new Mock<ILogger<CustomEntryCoordinator>>().Object);
             var trendCoordinator = new TrendCoordinator(mockTcpService.Object, mockServerService.Object, mockTrendLogger.Object, new Mock<ILogger<TrendCoordinator>>().Object, new Mock<ISettingsService>().Object);
             var configurationCoordinator = new ConfigurationCoordinator(new Mock<ILogger<ConfigurationCoordinator>>().Object);
+            var monitoringCoordinator = new MonitoringCoordinator(
+                Mock.Of<IMonitoringCallbacks>(),
+                Mock.Of<IPeriodicScheduler>(),
+                Mock.Of<IPeriodicScheduler>(),
+                Mock.Of<IPeriodicScheduler>(),
+                new Mock<ILogger<MonitoringCoordinator>>().Object);
 
             return new MainViewModel(
                 mockTcpService.Object,
@@ -57,6 +63,7 @@ namespace ModbusForge.Tests.ViewModels
                 customEntryCoordinator,
                 trendCoordinator,
                 configurationCoordinator,
+                monitoringCoordinator,
                 null,
                 new VisualNodeEditorViewModel());
         }

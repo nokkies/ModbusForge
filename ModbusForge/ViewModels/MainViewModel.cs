@@ -15,7 +15,7 @@ using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Options;
 using ModbusForge.Configuration;
 using System.Collections.ObjectModel;
-using System.Windows.Threading;
+
 using System.Text;
 using System.Linq;
 using System.Text.Json;
@@ -32,7 +32,7 @@ using ModbusForge.ViewModels.Coordinators;
 
 namespace ModbusForge.ViewModels
 {
-    public partial class MainViewModel : ViewModelBase, IDisposable
+    public partial class MainViewModel : ViewModelBase, IDisposable, IMonitoringCallbacks
     {
         // Partial method declarations for delegated properties (required by CommunityToolkit.Mvvm)
         partial void OnRegistersGlobalTypeChanged(string value);
@@ -69,7 +69,7 @@ namespace ModbusForge.ViewModels
 
         public VisualNodeEditorViewModel VisualNodeEditorViewModel => _visualNodeEditorViewModel;
 
-        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, IDialogService? dialogService = null, VisualNodeEditorViewModel? visualNodeEditorViewModel = null, IDispatcher? dispatcher = null)
+        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, MonitoringCoordinator monitoringCoordinator, IDialogService? dialogService = null, VisualNodeEditorViewModel? visualNodeEditorViewModel = null, IDispatcher? dispatcher = null)
         {
             // Store dependencies
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
@@ -83,6 +83,7 @@ namespace ModbusForge.ViewModels
             _customEntryCoordinator = customEntryCoordinator ?? throw new ArgumentNullException(nameof(customEntryCoordinator));
             _trendCoordinator = trendCoordinator ?? throw new ArgumentNullException(nameof(trendCoordinator));
             _configurationCoordinator = configurationCoordinator ?? throw new ArgumentNullException(nameof(configurationCoordinator));
+            _monitoringCoordinator = monitoringCoordinator ?? throw new ArgumentNullException(nameof(monitoringCoordinator));
             _dialogService = dialogService ?? new NullDialogService();
             _dispatcher = dispatcher ?? new WpfDispatcher();
             // Initialize visual node editor
@@ -97,7 +98,8 @@ namespace ModbusForge.ViewModels
             InitializeCommands();
             InitializeServiceState();
             InitializeWindowTitle();
-            InitializeTimersAndServices();
+            InitializeMonitoringServices();
+            _monitoringCoordinator.Start();
 
             // Initialize collection views for filtering
             HoldingRegistersView = CollectionViewSource.GetDefaultView(HoldingRegisters);
@@ -303,27 +305,13 @@ namespace ModbusForge.ViewModels
         }
 
         /// <summary>
-        /// Initializes and starts all timers and background services.
+        /// Initializes monitoring services and subscriptions. The coordinator timers are
+        /// started separately by the constructor after this method completes.
         /// </summary>
-        private void InitializeTimersAndServices()
+        private void InitializeMonitoringServices()
         {
             // Subscribe to console log events
             _consoleLoggerService.LogMessageReceived += ConsoleLoggerService_LogMessageReceived;
-
-            // Custom writer timer
-            _customTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
-            _customTimer.Tick += CustomTimer_Tick;
-            _customTimer.Start();
-
-            // Monitor timer for continuous reads
-            _monitorTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
-            _monitorTimer.Tick += MonitorTimer_Tick;
-            _monitorTimer.Start();
-
-            // Trend sampling timer
-            _trendTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Math.Max(50, _trendLogger.SampleRateMs)) };
-            _trendTimer.Tick += TrendTimer_Tick;
-            _trendTimer.Start();
 
             // Start services
             try { _trendLogger.Start(); } catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException)) { _logger.LogWarning(ex, "Failed to start trend logger"); }
@@ -425,23 +413,9 @@ namespace ModbusForge.ViewModels
 
         private IRelayCommand? _disconnectCommand;
         private readonly ILogger<MainViewModel> _logger;
-        // Timers initialized in InitializeTimersAndServices called from constructor
-        private DispatcherTimer _customTimer = null!;
-        // Timers initialized in InitializeTimersAndServices called from constructor
-        private DispatcherTimer _monitorTimer = null!;
-        // Timers initialized in InitializeTimersAndServices called from constructor
-        private DispatcherTimer _trendTimer = null!;
+        private readonly MonitoringCoordinator _monitoringCoordinator;
         private readonly ITrendLogger _trendLogger;
         private readonly ICustomEntryService _customEntryService;
-        private bool _isMonitoring;
-        private bool _isCustomTimerRunning;
-        private bool _isTrendTimerRunning;
-        private DateTime _lastHoldingReadUtc = DateTime.MinValue;
-        private DateTime _lastInputRegReadUtc = DateTime.MinValue;
-        private DateTime _lastCoilsReadUtc = DateTime.MinValue;
-        private DateTime _lastDiscreteReadUtc = DateTime.MinValue;
-        private bool _hasConnectionError = false;
-        private DateTime _lastErrorTime = DateTime.MinValue;
         private bool _isConnecting = false;
 
         public IRelayCommand DisconnectCommand { get; private set; } = null!;
@@ -561,6 +535,14 @@ namespace ModbusForge.ViewModels
 
         // Helper to get the correct Unit ID based on mode
         public byte EffectiveUnitId => IsServerMode ? SelectedUnitId : UnitId;
+
+        // IMonitoringCallbacks state used by MonitoringCoordinator
+        public DateTime LastHoldingReadUtc { get; set; } = DateTime.MinValue;
+        public DateTime LastInputRegReadUtc { get; set; } = DateTime.MinValue;
+        public DateTime LastCoilsReadUtc { get; set; } = DateTime.MinValue;
+        public DateTime LastDiscreteReadUtc { get; set; } = DateTime.MinValue;
+        public bool HasConnectionError { get; set; }
+        public DateTime LastErrorTime { get; set; } = DateTime.MinValue;
 
         /// <summary>
         /// Returns the list of visible tab content IDs for saving with the project.
@@ -841,7 +823,7 @@ namespace ModbusForge.ViewModels
                                 if (wasDiscreteMon) DiscreteInputsMonitorEnabled = true;
                             }
 
-                            _hasConnectionError = false;
+                            HasConnectionError = false;
                         }
                     },
                     ServerUnitId);
@@ -885,18 +867,18 @@ namespace ModbusForge.ViewModels
                 msg => StatusMessage = msg);
         }
 
-        private async Task ReadRegistersAsync()
+        public async Task ReadRegistersAsync()
         {
             await _registerCoordinator.ReadRegistersAsync(EffectiveUnitId, RegisterStart, RegisterCount,
                 RegistersGlobalType, HoldingRegisters, msg => StatusMessage = msg,
-                hasError => _hasConnectionError = hasError, HoldingMonitorEnabled, IsServerMode);
+                hasError => HasConnectionError = hasError, HoldingMonitorEnabled, IsServerMode);
         }
 
-        private async Task ReadInputRegistersAsync()
+        public async Task ReadInputRegistersAsync()
         {
             await _registerCoordinator.ReadInputRegistersAsync(EffectiveUnitId, InputRegisterStart, InputRegisterCount,
                 InputRegistersGlobalType, InputRegisters, msg => StatusMessage = msg,
-                hasError => _hasConnectionError = hasError, InputRegistersMonitorEnabled, IsServerMode);
+                hasError => HasConnectionError = hasError, InputRegistersMonitorEnabled, IsServerMode);
         }
 
         private async Task WriteRegisterAsync()
@@ -905,24 +887,50 @@ namespace ModbusForge.ViewModels
                 msg => StatusMessage = msg, async () => await ReadRegistersAsync(), IsServerMode);
         }
 
-        private async Task ReadCoilsAsync()
+        public async Task ReadCoilsAsync()
         {
             await _registerCoordinator.ReadCoilsAsync(EffectiveUnitId, CoilStart, CoilCount,
                 Coils, msg => StatusMessage = msg,
-                hasError => _hasConnectionError = hasError, CoilsMonitorEnabled, IsServerMode);
+                hasError => HasConnectionError = hasError, CoilsMonitorEnabled, IsServerMode);
         }
 
-        private async Task ReadDiscreteInputsAsync()
+        public async Task ReadDiscreteInputsAsync()
         {
             await _registerCoordinator.ReadDiscreteInputsAsync(EffectiveUnitId, DiscreteInputStart, DiscreteInputCount,
                 DiscreteInputs, msg => StatusMessage = msg,
-                hasError => _hasConnectionError = hasError, DiscreteInputsMonitorEnabled, IsServerMode);
+                hasError => HasConnectionError = hasError, DiscreteInputsMonitorEnabled, IsServerMode);
         }
 
         private async Task WriteCoilAsync()
         {
             await _registerCoordinator.WriteCoilAsync(EffectiveUnitId, WriteCoilAddress, WriteCoilState,
                 msg => StatusMessage = msg, async () => await ReadCoilsAsync(), IsServerMode);
+        }
+
+        public async Task HeartbeatAsync()
+        {
+            if (!IsConnected) return;
+
+            try
+            {
+                var heartbeat = await _modbusService.ReadHoldingRegistersAsync(UnitId, 1, 1);
+                if (heartbeat == null)
+                {
+                    _logger.LogWarning("Heartbeat check failed - connection lost");
+                    await _modbusService.DisconnectAsync();
+                    IsConnected = false;
+                    _dialogService.Show("Connection to server lost.\n\nPlease reconnect when the server is available.",
+                        "Connection Lost", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogWarning(ex, "Heartbeat check failed");
+                await _modbusService.DisconnectAsync();
+                IsConnected = false;
+                _dialogService.Show("Connection to server lost.\n\nPlease reconnect when the server is available.",
+                    "Connection Lost", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         public override void Dispose()
@@ -961,12 +969,7 @@ namespace ModbusForge.ViewModels
                     try
                     {
                         _consoleLoggerService.LogMessageReceived -= ConsoleLoggerService_LogMessageReceived;
-                        _customTimer.Stop();
-                        _customTimer.Tick -= CustomTimer_Tick;
-                        _monitorTimer.Stop();
-                        _monitorTimer.Tick -= MonitorTimer_Tick;
-                        _trendTimer.Stop();
-                        _trendTimer.Tick -= TrendTimer_Tick;
+                        _monitoringCoordinator.Dispose();
                         try { _trendLogger.Stop(); } catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException)) { _logger.LogWarning(ex, "Failed to stop trend logger"); }
                         try
                         {
@@ -981,7 +984,7 @@ namespace ModbusForge.ViewModels
                         // Dispose VisualNodeEditorViewModel
                         _visualNodeEditorViewModel?.Dispose();
                     }
-                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException)) { _logger.LogDebug(ex, "Error during timer cleanup in Dispose"); }
+                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException)) { _logger.LogDebug(ex, "Error during coordinator cleanup in Dispose"); }
                     try
                     {
                         // Attempt a graceful disconnect with timeout to avoid freezing
@@ -1039,157 +1042,22 @@ namespace ModbusForge.ViewModels
             _customEntryCoordinator.AddCustomEntry(CustomEntries);
         }
 
-        private async Task WriteCustomNowAsync(CustomEntry entry)
+        public async Task WriteCustomNowAsync(CustomEntry entry)
         {
             var result = await _customEntryCoordinator.WriteCustomNowAsync(entry, EffectiveUnitId, IsServerMode);
             StatusMessage = result.Message;
         }
 
-        private async void CustomTimer_Tick(object? sender, EventArgs e)
+        public IEnumerable<CustomEntry> GetCustomEntriesSnapshot() => CustomEntries.ToList();
+
+        public async Task ProcessTrendSamplingAsync()
         {
-            if (_isCustomTimerRunning) return;
-            _isCustomTimerRunning = true;
-            try
-            {
-                if (!IsConnected) return;
-                var now = DateTime.UtcNow;
-                var snapshot = CustomEntries.ToList();
-                foreach (var entry in snapshot)
-                {
-                    if (!entry.Continuous) continue;
-                    int period = entry.PeriodMs <= 0 ? 1000 : entry.PeriodMs;
-                    if ((now - entry._lastWriteUtc).TotalMilliseconds >= period)
-                    {
-                        try
-                        {
-                            await WriteCustomNowAsync(entry);
-                            entry._lastWriteUtc = now;
-                        }
-                        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-                        {
-                            _logger.LogError(ex, "Continuous write failed for {Area} {Address}", entry.Area, entry.Address);
-                            entry.Continuous = false;
-                            _dialogService.Show($"Continuous write failed for {entry.Area} {entry.Address}: {ex.Message}\n\nContinuous write has been paused for this entry. Fix the issue and re-enable if needed.", "Write Error",
-                                MessageBoxButton.OK, MessageBoxImage.Error);
-                        }
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogDebug("Custom timer operation was canceled");
-            }
-            catch (Exception ex) when (ex is not OutOfMemoryException)
-            {
-                _logger.LogError(ex, "Error in CustomTimer_Tick");
-            }
-            finally
-            {
-                _isCustomTimerRunning = false;
-            }
-        }
-
-        private async void MonitorTimer_Tick(object? sender, EventArgs e)
-        {
-            if (_isMonitoring) return;
-            if (!IsConnected) return;
-
-            if (_hasConnectionError && (DateTime.UtcNow - _lastErrorTime).TotalSeconds < 5)
-            {
-                return;
-            }
-
-            _isMonitoring = true;
-            try
-            {
-                var now = DateTime.UtcNow;
-
-                // Simple heartbeat: try a minimal read to verify connection is alive
-                // Only do this if no monitoring is active
-                if (!HoldingMonitorEnabled && !InputRegistersMonitorEnabled &&
-                    !CoilsMonitorEnabled && !DiscreteInputsMonitorEnabled)
-                {
-                    try
-                    {
-                        // Quick connectivity check - read 1 register
-                        var heartbeat = await _modbusService.ReadHoldingRegistersAsync(UnitId, 1, 1);
-                        if (heartbeat == null)
-                        {
-                            // Connection lost
-                            _logger.LogWarning("Heartbeat check failed - connection lost");
-                            await _modbusService.DisconnectAsync();
-                            IsConnected = false;
-                            _dialogService.Show("Connection to server lost.\n\nPlease reconnect when the server is available.",
-                                "Connection Lost", MessageBoxButton.OK, MessageBoxImage.Warning);
-                            return;
-                        }
-                    }
-                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-                    {
-                        _logger.LogWarning(ex, "Heartbeat check failed");
-                        await _modbusService.DisconnectAsync();
-                        IsConnected = false;
-                        _dialogService.Show("Connection to server lost.\n\nPlease reconnect when the server is available.",
-                            "Connection Lost", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        return;
-                    }
-                }
-
-                if (HoldingMonitorEnabled)
-                {
-                    int p = HoldingMonitorPeriodMs <= 0 ? 1000 : HoldingMonitorPeriodMs;
-                    if ((now - _lastHoldingReadUtc).TotalMilliseconds >= p)
-                    {
-                        await ReadRegistersAsync();
-                        _lastHoldingReadUtc = now;
-                    }
-                }
-
-                if (InputRegistersMonitorEnabled)
-                {
-                    int p = InputRegistersMonitorPeriodMs <= 0 ? 1000 : InputRegistersMonitorPeriodMs;
-                    if ((now - _lastInputRegReadUtc).TotalMilliseconds >= p)
-                    {
-                        await ReadInputRegistersAsync();
-                        _lastInputRegReadUtc = now;
-                    }
-                }
-
-                if (CoilsMonitorEnabled)
-                {
-                    int p = CoilsMonitorPeriodMs <= 0 ? 1000 : CoilsMonitorPeriodMs;
-                    if ((now - _lastCoilsReadUtc).TotalMilliseconds >= p)
-                    {
-                        await ReadCoilsAsync();
-                        _lastCoilsReadUtc = now;
-                    }
-                }
-
-                if (DiscreteInputsMonitorEnabled)
-                {
-                    int p = DiscreteInputsMonitorPeriodMs <= 0 ? 1000 : DiscreteInputsMonitorPeriodMs;
-                    if ((now - _lastDiscreteReadUtc).TotalMilliseconds >= p)
-                    {
-                        await ReadDiscreteInputsAsync();
-                        _lastDiscreteReadUtc = now;
-                    }
-                }
-                // Custom tab: per-row continuous READs are disabled.
-                // Continuous reads for Custom entries are handled exclusively by TrendTimer_Tick
-                // for rows where ce.Trend == true, gated by GlobalMonitorEnabled.
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogDebug("Monitor timer operation was canceled");
-            }
-            catch (Exception ex) when (ex is not OutOfMemoryException)
-            {
-                _logger.LogError(ex, "Error in MonitorTimer_Tick");
-            }
-            finally
-            {
-                _isMonitoring = false;
-            }
+            var trendEntries = CustomEntries.Where(c => c.Trend);
+            await _trendCoordinator.ProcessTrendSamplingAsync(
+                trendEntries,
+                UnitId,
+                IsServerMode,
+                enabled => SetGlobalMonitorEnabled(enabled));
         }
 
         private void SubscribeCustomEntries()
@@ -1260,8 +1128,7 @@ namespace ModbusForge.ViewModels
                 {
                     _trendLogger.Add(key, GetTrendDisplayName(ce));
 
-                    // Automatically enable GlobalMonitorEnabled so TrendTimer_Tick processes entries.
-                    // This is the master gate checked by TrendTimer_Tick at line ~1382.
+                    // Automatically enable GlobalMonitorEnabled so the trend timer processes entries.
                     if (!GlobalMonitorEnabled)
                     {
                         GlobalMonitorEnabled = true;
@@ -1300,7 +1167,7 @@ namespace ModbusForge.ViewModels
             {
                 if (ce.Continuous)
                 {
-                    // Auto-enable GlobalMonitorEnabled so MonitorTimer_Tick processes the entry.
+                    // Auto-enable GlobalMonitorEnabled so the monitor timer processes the entry.
                     if (!GlobalMonitorEnabled)
                     {
                         GlobalMonitorEnabled = true;
@@ -1334,37 +1201,6 @@ namespace ModbusForge.ViewModels
             if (!string.IsNullOrEmpty(name)) return name;
             return $"{(ce.Area ?? "HR")} {ce.Address} ({ce.Type})";
         }
-
-        private async void TrendTimer_Tick(object? sender, EventArgs e)
-        {
-            if (_isTrendTimerRunning) return;
-            _isTrendTimerRunning = true;
-            try
-            {
-                if (!IsConnected) return;
-                if (!GlobalMonitorEnabled) return;
-
-                var trendEntries = CustomEntries.Where(c => c.Trend);
-                await _trendCoordinator.ProcessTrendSamplingAsync(
-                    trendEntries,
-                    UnitId,
-                    IsServerMode,
-                    enabled => SetGlobalMonitorEnabled(enabled));
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogDebug("Trend timer operation was canceled");
-            }
-            catch (Exception ex) when (ex is not OutOfMemoryException)
-            {
-                _logger.LogError(ex, "Error in TrendTimer_Tick");
-            }
-            finally
-            {
-                _isTrendTimerRunning = false;
-            }
-        }
-
 
         private async Task SaveCustomAsync()
         {

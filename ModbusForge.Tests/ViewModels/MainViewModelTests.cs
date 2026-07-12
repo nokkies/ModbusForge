@@ -54,7 +54,7 @@ namespace ModbusForge.Tests.ViewModels
             public string? ShowOpenFileDialog(string title, string filter) => OpenResult;
         }
 
-        private MainViewModel CreateViewModel(ConfigurationCoordinator? configurationCoordinator = null)
+        private MainViewModel CreateViewModel(ConfigurationCoordinator? configurationCoordinator = null, MonitoringCoordinator? monitoringCoordinator = null)
         {
             var mockTcpService = new Mock<ModbusTcpService>(new Mock<ILogger<ModbusTcpService>>().Object);
             var mockServerService = new Mock<ModbusServerService>(new Mock<ILogger<ModbusServerService>>().Object);
@@ -106,6 +106,13 @@ namespace ModbusForge.Tests.ViewModels
                 new Mock<ILogger<TrendCoordinator>>().Object,
                 new Mock<ISettingsService>().Object);
 
+            var monitoringCoordinatorInstance = monitoringCoordinator ?? new MonitoringCoordinator(
+                Mock.Of<IMonitoringCallbacks>(),
+                Mock.Of<IPeriodicScheduler>(),
+                Mock.Of<IPeriodicScheduler>(),
+                Mock.Of<IPeriodicScheduler>(),
+                new Mock<ILogger<MonitoringCoordinator>>().Object);
+
             return new MainViewModel(
                 mockTcpService.Object,
                 mockServerService.Object,
@@ -119,6 +126,7 @@ namespace ModbusForge.Tests.ViewModels
                 customEntryCoordinator,
                 trendCoordinator,
                 configurationCoordinator ?? new ConfigurationCoordinator(new Mock<ILogger<ConfigurationCoordinator>>().Object),
+                monitoringCoordinatorInstance,
                 null,
                 new VisualNodeEditorViewModel(),
                 new TestDispatcher());
