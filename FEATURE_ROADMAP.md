@@ -1,11 +1,11 @@
 # ModbusForge Feature Roadmap
 
 ## Current Version
-**v5.8.6** - Tag hierarchy stable, service-locator globals removed, local API hardened, MainViewModel slimmed
+**v5.8.11** - Tag hierarchy stable, service-locator globals removed, local API hardened, MainViewModel slimmed, dependencies reviewed
 
 ---
 
-## Recently Completed (v5.8.1 - v5.8.6)
+## Recently Completed (v5.8.1 - v5.8.11)
 
 - **v5.8.1** - Stabilized tag hierarchy with stable GroupId/ParentGroupId, versioned persistence schema, and atomic saves.
 - **v5.8.2** - Refactored local API: removed WPF service-provider resolution, added facade/DTOs, validation, rate limiting, and optional API-key auth.
@@ -13,8 +13,12 @@
 - **v5.8.4** - Implemented transactional tag-group deletion with preview dialog and rollback on save failure.
 - **v5.8.5** - Replaced MainWindow service locator with IShellWindowService and IApplicationLifetime.
 - **v5.8.6** - Reduced MainViewModel by extracting project persistence and custom-entry operations into coordinators.
+- **v5.8.8** - Extracted monitoring lifecycle from MainViewModel into MonitoringCoordinator.
+- **v5.8.9** - Extracted Unit ID configuration into IUnitConfigurationStore.
+- **v5.8.10** - Added API-key UI in Preferences window.
+- **v5.8.11** - Dependency review: updated CommunityToolkit.Mvvm, MahApps.Metro, LiveCharts, and SkiaSharp; no vulnerable packages.
 
-Test baseline: **338 passed, 0 failed**.
+Test baseline: **358 passed, 0 failed**.
 
 ---
 
