@@ -131,7 +131,8 @@ namespace ModbusForge.Tests.Performance
                 _customEntryCoordinator,
                 _trendCoordinator,
                 _configurationCoordinator,
-                _monitoringCoordinator);
+                _monitoringCoordinator,
+                new UnitConfigurationStore(new ImmediateDispatcher()));
 
             // Set initial state
             viewModel.Mode = "Client";

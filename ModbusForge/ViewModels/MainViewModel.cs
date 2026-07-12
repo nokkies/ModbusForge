@@ -48,6 +48,7 @@ namespace ModbusForge.ViewModels
         private readonly CustomEntryCoordinator _customEntryCoordinator;
         private readonly TrendCoordinator _trendCoordinator;
         private readonly ConfigurationCoordinator _configurationCoordinator;
+        private readonly IUnitConfigurationStore _unitConfigurationStore;
         private readonly IDialogService _dialogService;
         private readonly IDispatcher _dispatcher;
         private readonly VisualNodeEditorViewModel _visualNodeEditorViewModel;
@@ -69,7 +70,7 @@ namespace ModbusForge.ViewModels
 
         public VisualNodeEditorViewModel VisualNodeEditorViewModel => _visualNodeEditorViewModel;
 
-        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, MonitoringCoordinator monitoringCoordinator, IDialogService? dialogService = null, VisualNodeEditorViewModel? visualNodeEditorViewModel = null, IDispatcher? dispatcher = null)
+        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, MonitoringCoordinator monitoringCoordinator, IUnitConfigurationStore unitConfigurationStore, IDialogService? dialogService = null, VisualNodeEditorViewModel? visualNodeEditorViewModel = null, IDispatcher? dispatcher = null)
         {
             // Store dependencies
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
@@ -84,11 +85,14 @@ namespace ModbusForge.ViewModels
             _trendCoordinator = trendCoordinator ?? throw new ArgumentNullException(nameof(trendCoordinator));
             _configurationCoordinator = configurationCoordinator ?? throw new ArgumentNullException(nameof(configurationCoordinator));
             _monitoringCoordinator = monitoringCoordinator ?? throw new ArgumentNullException(nameof(monitoringCoordinator));
+            _unitConfigurationStore = unitConfigurationStore ?? throw new ArgumentNullException(nameof(unitConfigurationStore));
             _dialogService = dialogService ?? new NullDialogService();
             _dispatcher = dispatcher ?? new WpfDispatcher();
             // Initialize visual node editor
             _visualNodeEditorViewModel = visualNodeEditorViewModel ?? new VisualNodeEditorViewModel();
             // VisualSimulationService will be started/stopped by ShowLiveValues toggle
+
+            _unitConfigurationStore.SelectedUnitIdChanged += (s, e) => _dispatcher.Invoke(() => OnSelectedUnitIdChanged(_unitConfigurationStore.SelectedUnitId));
 
             var settings = options?.Value ?? new ServerSettings();
 
@@ -511,27 +515,18 @@ namespace ModbusForge.ViewModels
         public IRelayCommand ConnectCommand { get; private set; } = null!;
 
         // Unit ID configurations for complete isolation
-        [ObservableProperty]
-        private Dictionary<byte, UnitIdConfiguration> _unitConfigurations = new();
+        public Dictionary<byte, UnitIdConfiguration> UnitConfigurations => new Dictionary<byte, UnitIdConfiguration>(_unitConfigurationStore.UnitConfigurations);
 
-        [ObservableProperty]
-        private byte _selectedUnitId = 1;
+        public byte SelectedUnitId
+        {
+            get => _unitConfigurationStore.SelectedUnitId;
+            set => _unitConfigurationStore.SelectedUnitId = value;
+        }
 
-        [ObservableProperty]
-        private ObservableCollection<byte> _availableUnitIds = new ObservableCollection<byte>();
+        public ObservableCollection<byte> AvailableUnitIds => _unitConfigurationStore.AvailableUnitIds;
 
         // Current active configuration (binds to selected Unit ID)
-        public UnitIdConfiguration CurrentConfig
-        {
-            get
-            {
-                if (!UnitConfigurations.ContainsKey(SelectedUnitId))
-                {
-                    UnitConfigurations[SelectedUnitId] = new UnitIdConfiguration(SelectedUnitId);
-                }
-                return UnitConfigurations[SelectedUnitId];
-            }
-        }
+        public UnitIdConfiguration CurrentConfig => _unitConfigurationStore.CurrentConfig;
 
         // Helper to get the correct Unit ID based on mode
         public byte EffectiveUnitId => IsServerMode ? SelectedUnitId : UnitId;
@@ -735,13 +730,12 @@ namespace ModbusForge.ViewModels
             set => SetDiscreteInputCount(value);
         }
 
-        partial void OnSelectedUnitIdChanged(byte value)
+        private void OnSelectedUnitIdChanged(byte value)
         {
+            OnPropertyChanged(nameof(SelectedUnitId));
+
             // Ensure configuration exists for the new Unit ID
-            if (!UnitConfigurations.ContainsKey(value))
-            {
-                UnitConfigurations[value] = new UnitIdConfiguration(value);
-            }
+            _unitConfigurationStore.GetOrCreateConfiguration(value);
 
             // Refresh Custom entries when Unit ID changes in server mode
             if (IsServerMode && IsConnected)
@@ -751,6 +745,7 @@ namespace ModbusForge.ViewModels
 
             // Notify all delegated properties that they may have changed
             OnPropertyChanged(nameof(CustomEntries));
+            OnPropertyChanged(nameof(SimulationEnabled));
             OnPropertyChanged(nameof(GlobalMonitorEnabled));
             OnPropertyChanged(nameof(HoldingMonitorEnabled));
             OnPropertyChanged(nameof(InputRegistersMonitorEnabled));
@@ -837,19 +832,9 @@ namespace ModbusForge.ViewModels
 
         private void PopulateAvailableUnitIds()
         {
-            AvailableUnitIds.Clear();
             if (_serverService is ModbusServerService srv)
             {
-                var unitIds = srv.GetUnitIds();
-                foreach (var id in unitIds.OrderBy(x => x))
-                {
-                    AvailableUnitIds.Add(id);
-                }
-                // Set selected to first available ID if current selection isn't in the list
-                if (!AvailableUnitIds.Contains(SelectedUnitId) && AvailableUnitIds.Count > 0)
-                {
-                    SelectedUnitId = AvailableUnitIds[0];
-                }
+                _unitConfigurationStore.PopulateAvailableUnitIds(srv.GetUnitIds());
             }
         }
 
@@ -1280,9 +1265,8 @@ namespace ModbusForge.ViewModels
             ServerUnitId = snapshot.ServerUnitId;
             UnitId = snapshot.ClientUnitId;
 
-            UnitConfigurations.Clear();
-            foreach (var kvp in snapshot.UnitConfigurations)
-                UnitConfigurations[kvp.Key] = kvp.Value.Clone();
+            _unitConfigurationStore.Clear();
+            _unitConfigurationStore.MergeConfigurations(snapshot.UnitConfigurations);
 
             if (snapshot.UnitConfigurations.Count > 0 && !snapshot.UnitConfigurations.ContainsKey(SelectedUnitId))
             {
@@ -1329,15 +1313,9 @@ namespace ModbusForge.ViewModels
             var result = await _configurationCoordinator.ImportUnitIdsAsync();
             if (result.Success && result.Snapshot != null)
             {
-                var importedCount = 0;
-                foreach (var kvp in result.Snapshot.UnitConfigurations)
-                {
-                    if (!UnitConfigurations.ContainsKey(kvp.Key))
-                    {
-                        UnitConfigurations[kvp.Key] = kvp.Value.Clone();
-                        importedCount++;
-                    }
-                }
+                var beforeCount = _unitConfigurationStore.UnitConfigurations.Count;
+                _unitConfigurationStore.MergeConfigurations(result.Snapshot.UnitConfigurations);
+                var importedCount = _unitConfigurationStore.UnitConfigurations.Count - beforeCount;
 
                 if (IsServerMode)
                     PopulateAvailableUnitIds();
@@ -1375,7 +1353,7 @@ namespace ModbusForge.ViewModels
             var result = await _configurationCoordinator.ImportUnitIdAsAsync();
             if (result.Success && result.ImportedUnitId.HasValue && result.ImportedConfiguration != null)
             {
-                UnitConfigurations[result.ImportedUnitId.Value] = result.ImportedConfiguration.Clone();
+                _unitConfigurationStore.SetConfiguration(result.ImportedUnitId.Value, result.ImportedConfiguration.Clone());
                 SelectedUnitId = result.ImportedUnitId.Value;
                 PopulateAvailableUnitIds();
             }

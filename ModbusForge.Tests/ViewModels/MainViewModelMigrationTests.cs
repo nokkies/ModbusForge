@@ -64,6 +64,7 @@ namespace ModbusForge.Tests.ViewModels
                 trendCoordinator,
                 configurationCoordinator,
                 monitoringCoordinator,
+                new UnitConfigurationStore(new ImmediateDispatcher()),
                 null,
                 new VisualNodeEditorViewModel());
         }

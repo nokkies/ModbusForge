@@ -113,6 +113,8 @@ namespace ModbusForge.Tests.ViewModels
                 Mock.Of<IPeriodicScheduler>(),
                 new Mock<ILogger<MonitoringCoordinator>>().Object);
 
+            var unitConfigurationStore = new UnitConfigurationStore(new TestDispatcher());
+
             return new MainViewModel(
                 mockTcpService.Object,
                 mockServerService.Object,
@@ -127,6 +129,7 @@ namespace ModbusForge.Tests.ViewModels
                 trendCoordinator,
                 configurationCoordinator ?? new ConfigurationCoordinator(new Mock<ILogger<ConfigurationCoordinator>>().Object),
                 monitoringCoordinatorInstance,
+                unitConfigurationStore,
                 null,
                 new VisualNodeEditorViewModel(),
                 new TestDispatcher());

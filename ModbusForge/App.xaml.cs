@@ -184,6 +184,7 @@ namespace ModbusForge
             services.AddSingleton<ITagWindowService, TagWindowService>();
             services.AddSingleton<IShellWindowService, ShellWindowService>();
             services.AddSingleton<IApplicationLifetime, WpfApplicationLifetime>();
+            services.AddSingleton<IUnitConfigurationStore>(provider => new UnitConfigurationStore(provider.GetRequiredService<IDispatcher>()));
             
             // Register Coordinators
             services.AddSingleton<ConnectionCoordinator>(provider => new ConnectionCoordinator(

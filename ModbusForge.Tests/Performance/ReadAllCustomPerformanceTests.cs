@@ -104,7 +104,8 @@ namespace ModbusForge.Tests.Performance
                 customEntryCoordinator,
                 trendCoordinator,
                 configurationCoordinator,
-                monitoringCoordinator);
+                monitoringCoordinator,
+                new UnitConfigurationStore(new ImmediateDispatcher()));
 
             // Add many custom entries with gaps to avoid batching
             for (int i = 1; i <= entryCount; i++)
@@ -180,7 +181,8 @@ namespace ModbusForge.Tests.Performance
                 customEntryCoordinator,
                 trendCoordinator,
                 configurationCoordinator,
-                monitoringCoordinator);
+                monitoringCoordinator,
+                new UnitConfigurationStore(new ImmediateDispatcher()));
 
             // Add contiguous custom entries (Address 1 to 10)
             for (int i = 1; i <= entryCount; i++)
