@@ -98,11 +98,34 @@
                             <TextBlock Text="API (Requires Restart)" Style="{StaticResource FluentSubtitle}"/>
                             <ui:ToggleSwitch x:Name="EnableApiCheckBox" 
                                              Content="Enable REST API / MCP" 
-                                             Margin="0,0,0,12"/>
-                            <StackPanel Orientation="Horizontal">
+                                             Margin="0,0,0,12"
+                                             Checked="EnableApiCheckBox_Changed"
+                                             Unchecked="EnableApiCheckBox_Changed"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                                 <TextBlock Text="API Port:" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}"/>
                                 <TextBox x:Name="ApiPortTextBox" Width="90" Text="5000" Padding="8,4"/>
                             </StackPanel>
+                            <ui:ToggleSwitch x:Name="EnableApiDocumentationCheckBox" 
+                                             Content="Enable API documentation (Swagger)" 
+                                             Margin="0,0,0,12"/>
+                            <ui:ToggleSwitch x:Name="EnableApiAuthenticationCheckBox" 
+                                             Content="Require API key for mutations" 
+                                             Margin="0,0,0,12"
+                                             Checked="EnableApiAuthenticationCheckBox_Changed"
+                                             Unchecked="EnableApiAuthenticationCheckBox_Changed"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="API Key:" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}"/>
+                                <TextBox x:Name="ApiKeyTextBox" Width="280" IsReadOnly="True" Padding="8,4" FontFamily="Consolas"/>
+                                <Button x:Name="CopyApiKeyButton" Content="Copy" Width="60" Margin="8,0,0,0" Click="CopyApiKeyButton_Click" Style="{StaticResource FluentSecondaryButton}"/>
+                                <Button x:Name="RegenerateApiKeyButton" Content="New" Width="60" Margin="8,0,0,0" Click="RegenerateApiKeyButton_Click" Style="{StaticResource FluentSecondaryButton}"/>
+                            </StackPanel>
+                            <TextBlock x:Name="ApiKeyWarningTextBlock" 
+                                       Text="Warning: API is enabled without authentication. Any local process can call state-changing endpoints." 
+                                       Foreground="Red" 
+                                       TextWrapping="Wrap" 
+                                       FontSize="12"
+                                       Visibility="Collapsed"
+                                       Margin="0,4,0,0"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
