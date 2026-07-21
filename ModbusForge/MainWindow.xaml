@@ -12,7 +12,7 @@
         mc:Ignorable="d"
         Title="{Binding Title}" Height="1073" Width="1556"
         WindowState="Maximized"
-        Icon="pack://application:,,,/Resources/ModbusForge.ico"
+        Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png"
         BorderThickness="1"
         ExtendsContentIntoTitleBar="True"
         WindowBackdropType="Mica">
@@ -103,7 +103,7 @@
             <RowDefinition Height="Auto"/> <!-- StatusBar -->
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Title="{Binding Title}" Grid.Row="0" />
+        <ui:TitleBar Title="{Binding Title}" Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png" Grid.Row="0" />
 
         <Menu Grid.Row="1">
             <MenuItem Header="_File">
