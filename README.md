@@ -144,22 +144,25 @@ See [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md) for the full development roadmap.
 
 ## Screenshots
 
-> *Screenshots will be added here in a future update. The following sections describe the main interfaces.*
-
 ### Main Interface
-The main window provides a tabbed interface for registers, coils, custom data, simulation, trends, and console logging.
+![Main Interface](docs/images/main_interface.png)
+*The main window provides a tabbed interface for registers, coils, custom data, simulation, trends, and console logging.*
 
 ### Connection Manager
-Save and manage multiple Modbus connection profiles with quick connect/disconnect.
+![Connection Manager](docs/images/connection_manager.png)
+*Save and manage multiple Modbus connection profiles with quick connect/disconnect capabilities.*
 
 ### Script Editor
-Create and run automated test sequences with a visual command editor.
+![Script Editor](docs/images/script_editor.png)
+*Create and run automated test sequences with a visual command editor.*
 
 ### Visual Node Editor
-Build simulations using nodes and connections for signal generation and data transformation.
+![Visual Node Editor](docs/images/visual_node_editor.png)
+*Build simulations using nodes and connections for signal generation and data transformation.*
 
 ### Trend Charts
-Monitor register values over time with zoom, pan, and export capabilities.
+![Trend Charts](docs/images/trend_charts.png)
+*Monitor register values over time with real-time graphing, zoom, pan, and export capabilities.*
 
 ---
 
