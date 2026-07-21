@@ -27,7 +27,16 @@ public class FlaUiAppHelper : IDisposable
     public static FlaUiAppHelper LaunchFromProject()
     {
         var solutionDir = GetSolutionDirectory();
-        var appPath = Path.Combine(solutionDir, "ModbusForge", "bin", "Debug", "net8.0-windows", "ModbusForge.exe");
+
+        // Smoke tests can run against either Debug or Release builds depending on CI configuration.
+        var possiblePaths = new[]
+        {
+            Path.Combine(solutionDir, "ModbusForge", "bin", "Release", "net8.0-windows", "ModbusForge.exe"),
+            Path.Combine(solutionDir, "ModbusForge", "bin", "Debug", "net8.0-windows", "ModbusForge.exe")
+        };
+
+        var appPath = possiblePaths.FirstOrDefault(File.Exists)
+            ?? possiblePaths[0]; // Throw with the primary checked path below.
 
         if (!File.Exists(appPath))
         {
