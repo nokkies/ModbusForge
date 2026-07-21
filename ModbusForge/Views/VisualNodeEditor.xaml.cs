@@ -14,6 +14,7 @@ using ModbusForge.Models;
 using ModbusForge.ViewModels;
 using ModbusForge.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ModbusForge.Views
 {
@@ -429,7 +430,7 @@ namespace ModbusForge.Views
                 // Live updates should never crash the canvas; log and continue.
                 try
                 {
-                    (App.ServiceProvider?.GetService(typeof(Microsoft.Extensions.Logging.ILogger<VisualNodeEditor>)) as Microsoft.Extensions.Logging.ILogger<VisualNodeEditor>)?.LogError(ex, "Error in LiveUpdateTimer_Tick");
+                    (App.ServiceProvider?.GetService(typeof(ILogger<VisualNodeEditor>)) as ILogger<VisualNodeEditor>)?.LogError(ex, "Error in LiveUpdateTimer_Tick");
                 }
                 catch { /* Avoid any secondary exception from logging. */ }
             }
