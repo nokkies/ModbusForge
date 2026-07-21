@@ -45,7 +45,8 @@ namespace ModbusForge.ViewModels.Coordinators
         /// </summary>
         public async Task ReadRegistersAsync(byte unitId, int start, int count, string globalType,
             ObservableCollection<RegisterEntry> holdingRegisters, Action<string> setStatusMessage,
-            Action<bool> setHasConnectionError, bool isMonitoringEnabled, bool isServerMode)
+            Action<bool> setHasConnectionError, bool isMonitoringEnabled, bool isServerMode,
+            RegisterSettings? registerSettings = null)
         {
             try
             {
@@ -60,11 +61,15 @@ namespace ModbusForge.ViewModels.Coordinators
                     return;
                 }
 
-                // Preserve per-address Type if rows already exist
+                // Preserve per-address Type/Swap if rows already exist
                 var typeByAddress = new System.Collections.Generic.Dictionary<int, string>();
+                var swapBytesByAddress = new System.Collections.Generic.Dictionary<int, bool>();
+                var swapWordsByAddress = new System.Collections.Generic.Dictionary<int, bool>();
                 foreach (var r in holdingRegisters)
                 {
                     typeByAddress[r.Address] = r.Type ?? globalType;
+                    swapBytesByAddress[r.Address] = r.SwapBytes;
+                    swapWordsByAddress[r.Address] = r.SwapWords;
                 }
 
                 // In-place update to minimize UI thread re-layout and CollectionChanged events
@@ -80,6 +85,8 @@ namespace ModbusForge.ViewModels.Coordinators
                         entry.Address = addr;
                         entry.Value = values[i];
                         entry.Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType;
+                        entry.SwapBytes = swapBytesByAddress.TryGetValue(addr, out var sb) ? sb : (registerSettings?.RegistersSwapBytes ?? false);
+                        entry.SwapWords = swapWordsByAddress.TryGetValue(addr, out var sw) ? sw : (registerSettings?.RegistersSwapWords ?? false);
                     }
                     else
                     {
@@ -87,7 +94,9 @@ namespace ModbusForge.ViewModels.Coordinators
                         {
                             Address = addr,
                             Value = values[i],
-                            Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType
+                            Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType,
+                            SwapBytes = registerSettings?.RegistersSwapBytes ?? false,
+                            SwapWords = registerSettings?.RegistersSwapWords ?? false
                         });
                     }
                 }
@@ -114,7 +123,7 @@ namespace ModbusForge.ViewModels.Coordinators
                     {
                         if (idx + 1 < values.Length)
                         {
-                            float f = DataTypeConverter.ToSingle(values[idx], values[idx + 1]);
+                            float f = DataTypeConverter.ToSingle(values[idx], values[idx + 1], entry.SwapBytes, entry.SwapWords);
                             entry.ValueText = f.ToString(CultureInfo.InvariantCulture);
                             holdingRegisters[idx + 1].ValueText = string.Empty;
                         }
@@ -272,10 +281,10 @@ namespace ModbusForge.ViewModels.Coordinators
         /// <summary>
         /// Writes a float (REAL) value across two registers.
         /// </summary>
-        public async Task WriteFloatAtAsync(byte unitId, int address, float value, bool isServerMode)
+        public async Task WriteFloatAtAsync(byte unitId, int address, float value, bool isServerMode, bool swapBytes = false, bool swapWords = false)
         {
             var service = GetService(isServerMode);
-            var registers = DataTypeConverter.ToUInt16(value);
+            var registers = DataTypeConverter.ToUInt16(value, swapBytes, swapWords);
             await service.WriteRegistersAsync(unitId, address, registers);
         }
 

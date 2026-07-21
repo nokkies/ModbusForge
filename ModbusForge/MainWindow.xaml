@@ -20,6 +20,7 @@
 
     <Window.InputBindings>
         <KeyBinding Key="R" Modifiers="Control" Command="{Binding ReadRegistersCommand}"/>
+        <KeyBinding Key="W" Modifiers="Control" Command="{Binding WriteRegisterCommand}"/>
         <KeyBinding Key="T" Modifiers="Control" Command="{Binding TrendCommand}"/>
         <KeyBinding Key="S" Modifiers="Control" Command="{Binding SaveProjectCommand}"/>
         <KeyBinding Key="E" Modifiers="Control" Command="{Binding ShowScriptEditorCommand}"/>
@@ -303,6 +304,8 @@
                         <Button Content="Read" Command="{Binding ReadRegistersCommand}" Width="80" Margin="0,0,10,0"/>
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <ComboBox Width="120" SelectedItem="{Binding RegistersGlobalType}" ItemsSource="{StaticResource TypeOptionsAll}"/>
+                        <CheckBox Content="Swap Bytes" IsChecked="{Binding RegistersSwapBytes, Mode=TwoWay}" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                        <CheckBox Content="Swap Words" IsChecked="{Binding RegistersSwapWords, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <Separator Width="10" Opacity="0"/>
                         <ui:ToggleSwitch IsChecked="{Binding HoldingMonitorEnabled, Mode=TwoWay}" Content="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>

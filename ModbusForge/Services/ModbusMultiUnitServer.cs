@@ -23,14 +23,21 @@ namespace ModbusForge.Services
         private Task? _listenTask;
         private readonly ConcurrentDictionary<byte, DataStore> _dataStores = new();
         private readonly ILogger _logger;
+        private readonly IConsoleLoggerService? _consoleLoggerService;
         private bool _disposed;
 
         private const int DefaultDataStoreSize = 10000;
         private const ushort MbapProtocolId = 0x0000;
 
         public ModbusMultiUnitServer(ILogger logger)
+            : this(logger, null)
+        {
+        }
+
+        public ModbusMultiUnitServer(ILogger logger, IConsoleLoggerService? consoleLoggerService)
         {
             _logger = logger;
+            _consoleLoggerService = consoleLoggerService;
         }
 
         public bool IsRunning => _cts != null && !_cts.IsCancellationRequested;
@@ -106,6 +113,8 @@ namespace ModbusForge.Services
 
         private async Task HandleClientAsync(TcpClient client, CancellationToken ct)
         {
+            var remoteEndpoint = client.Client.RemoteEndPoint?.ToString() ?? "unknown";
+            _consoleLoggerService?.Log($"Client connected from {remoteEndpoint}");
             using (client)
             {
                 client.NoDelay = true;
@@ -135,6 +144,8 @@ namespace ModbusForge.Services
                         // Read PDU (length - 1 because length includes unit ID byte)
                         var pdu = new byte[length - 1];
                         if (!await ReadExactAsync(stream, pdu, pdu.Length, ct)) break;
+
+                        _consoleLoggerService?.Log($"Request from {remoteEndpoint} Unit ID {unitId} FC {pdu[0]}");
 
                         var responseData = ProcessPdu(unitId, pdu);
                         if (responseData == null) continue;

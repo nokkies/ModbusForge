@@ -16,6 +16,7 @@ namespace ModbusForge.Services
         private byte _primaryUnitId = 1;
         private bool _disposed = false;
         private readonly ILogger<ModbusServerService> _logger;
+        private readonly IConsoleLoggerService? _consoleLoggerService;
         private volatile bool _isRunning = false;
         private readonly object _stateLock = new object();
         private const int DefaultPort = 502;
@@ -23,8 +24,14 @@ namespace ModbusForge.Services
         private const int ShutdownTimeoutMs = 5000;
 
         public ModbusServerService(ILogger<ModbusServerService> logger)
+            : this(logger, null)
+        {
+        }
+
+        public ModbusServerService(ILogger<ModbusServerService> logger, IConsoleLoggerService? consoleLoggerService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _consoleLoggerService = consoleLoggerService;
             _logger.LogInformation("Modbus TCP server created");
         }
 
@@ -58,23 +65,29 @@ namespace ModbusForge.Services
                         if (ids.Count == 0) ids.Add(DefaultSlaveId);
                         _primaryUnitId = ids[0];
 
-                        _multiServer = new ModbusMultiUnitServer(_logger);
+                        _multiServer = new ModbusMultiUnitServer(_logger, _consoleLoggerService);
                         _multiServer.Start(endpoint, ids);
 
                         _isRunning = true;
-                        _logger.LogInformation("Modbus TCP server started on {Endpoint} Unit IDs: {Ids}", endpoint, string.Join(",", ids));
+                        var message = $"Modbus TCP server started on {endpoint} Unit IDs: {string.Join(",", ids)}";
+                        _logger.LogInformation(message);
+                        _consoleLoggerService?.Log(message);
                         return true;
                     }
                     catch (SocketException sockEx) when (sockEx.SocketErrorCode == SocketError.AddressAlreadyInUse)
                     {
                         _isRunning = false;
                         int p = port == 0 ? DefaultPort : port;
-                        _logger.LogWarning(sockEx, "Port {Port} is already in use.", p);
+                        var message = $"Port {p} is already in use";
+                        _logger.LogWarning(sockEx, message);
+                        _consoleLoggerService?.Log(message);
                         return false;
                     }
                     catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
-                        _logger.LogError(ex, "Failed to start Modbus TCP server");
+                        var message = $"Failed to start Modbus TCP server: {ex.Message}";
+                        _logger.LogError(ex, message);
+                        _consoleLoggerService?.Log(message);
                         _isRunning = false;
                         return false;
                     }
@@ -170,7 +183,9 @@ namespace ModbusForge.Services
                     if (!_isRunning) return;
                     _isRunning = false;
                     CleanupResources();
-                    _logger.LogInformation("Modbus TCP server stopped");
+                    var stopMessage = "Modbus TCP server stopped";
+                    _logger.LogInformation(stopMessage);
+                    _consoleLoggerService?.Log(stopMessage);
                 }
             }).ConfigureAwait(false);
         }
@@ -187,6 +202,7 @@ namespace ModbusForge.Services
                 if (ds == null || registerAddress < 1 || registerAddress >= ds.HoldingRegisters.Count)
                     throw new ArgumentOutOfRangeException(nameof(registerAddress));
                 ds.HoldingRegisters[(ushort)registerAddress] = value;
+                _consoleLoggerService?.Log($"Server wrote holding register {registerAddress} = {value} (Unit ID: {unitId})");
             }).ConfigureAwait(false);
         }
 
@@ -203,6 +219,7 @@ namespace ModbusForge.Services
                 {
                     ds.HoldingRegisters[(ushort)(startAddress + i)] = values[i];
                 }
+                _consoleLoggerService?.Log($"Server wrote holding registers {startAddress}..{startAddress + values.Length - 1} (Unit ID: {unitId})");
             }).ConfigureAwait(false);
         }
 
@@ -238,6 +255,7 @@ namespace ModbusForge.Services
                 if (ds == null || coilAddress < 1 || coilAddress >= ds.CoilDiscretes.Count)
                     throw new ArgumentOutOfRangeException(nameof(coilAddress));
                 ds.CoilDiscretes[(ushort)coilAddress] = value;
+                _consoleLoggerService?.Log($"Server wrote coil {coilAddress} = {(value ? 1 : 0)} (Unit ID: {unitId})");
             });
         }
 

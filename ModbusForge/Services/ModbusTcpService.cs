@@ -15,13 +15,20 @@ namespace ModbusForge.Services
         private TcpClient? _tcpClient;
         private bool _disposed = false;
         private readonly ILogger<ModbusTcpService> _logger;
+        private readonly IConsoleLoggerService? _consoleLoggerService;
         private readonly SemaphoreSlim _ioLock = new SemaphoreSlim(1, 1);
         private string? _lastIpAddress;
         private int _lastPort;
 
         public ModbusTcpService(ILogger<ModbusTcpService> logger)
+            : this(logger, null)
+        {
+        }
+
+        public ModbusTcpService(ILogger<ModbusTcpService> logger, IConsoleLoggerService? consoleLoggerService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _consoleLoggerService = consoleLoggerService;
             _logger.LogInformation("Modbus TCP client created");
         }
 
@@ -77,12 +84,16 @@ namespace ModbusForge.Services
                         _tcpClient = new TcpClient();
                         _tcpClient.Connect(ipAddress, port);
                         _client = ModbusIpMaster.CreateIp(_tcpClient);
-                        _logger.LogInformation($"Connected to Modbus server at {ipAddress}:{port}");
+                        var message = $"Connected to Modbus server at {ipAddress}:{port}";
+                        _logger.LogInformation(message);
+                        _consoleLoggerService?.Log(message);
                         return true;
                     }
                     catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
-                        _logger.LogError(ex, "Failed to connect to Modbus server");
+                        var message = $"Failed to connect to Modbus server at {ipAddress}:{port}: {ex.Message}";
+                        _logger.LogError(ex, message);
+                        _consoleLoggerService?.Log(message);
                         _client?.Dispose();
                         _client = null;
                         _tcpClient?.Close();
@@ -104,12 +115,16 @@ namespace ModbusForge.Services
             {
                 if (IsConnected)
                 {
-                    _logger.LogInformation("Disconnecting from Modbus server");
+                    var message = $"Disconnecting from Modbus server at {_lastIpAddress}:{_lastPort}";
+                    _logger.LogInformation(message);
+                    _consoleLoggerService?.Log(message);
                     _client?.Dispose();
                     _client = null;
                     _tcpClient?.Close();
                     _tcpClient = null;
-                    _logger.LogInformation("Successfully disconnected from Modbus server");
+                    var disconnectMessage = "Successfully disconnected from Modbus server";
+                    _logger.LogInformation(disconnectMessage);
+                    _consoleLoggerService?.Log(disconnectMessage);
                 }
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
