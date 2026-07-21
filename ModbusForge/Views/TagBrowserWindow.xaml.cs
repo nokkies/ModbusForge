@@ -106,8 +106,7 @@ namespace ModbusForge.Views
         private TreeViewItem CreateTagTreeItem(Tag tag)
         {
             var stack = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
-            stack.Children.Add(new TextBlock { Text = "🏷️ ", Margin = new System.Windows.Thickness(0, 0, 4, 0) });
-            stack.Children.Add(new TextBlock { Text = tag.Name });
+            stack.Children.Add(new TextBlock { Text = tag.Name, Margin = new System.Windows.Thickness(0, 0, 4, 0) });
             stack.Children.Add(new TextBlock { Text = $" ({tag.FullAddress})", Foreground = System.Windows.Media.Brushes.Gray, FontSize = 11 });
 
             var item = new TreeViewItem
@@ -226,51 +225,72 @@ namespace ModbusForge.Views
 
         private async void NewGroup_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new InputDialog("New Group", "Enter group name:", "NewGroup");
-            if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputText))
+            try
             {
-                // Use parent group name for backward compat; CreateGroup resolves to ParentGroupId internally
-                var parentGroup = _selectedGroup?.Name;
-                await _tagService.CreateGroup(dialog.InputText, parentGroup);
-                LoadTreeView();
-                UpdateStatus();
+                var dialog = new InputDialog("New Group", "Enter group name:", "NewGroup");
+                if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputText))
+                {
+                    // Use parent group name for backward compat; CreateGroup resolves to ParentGroupId internally
+                    var parentGroup = _selectedGroup?.Name;
+                    await _tagService.CreateGroup(dialog.InputText, parentGroup);
+                    LoadTreeView();
+                    UpdateStatus();
+                }
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _dialogService.Show($"Failed to create group: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private async void NewTag_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new InputDialog("New Tag", "Enter tag name:", "NewTag");
-            if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputText))
+            try
             {
-                var group = _selectedGroup?.Name ?? "Default";
-                var tag = await _tagService.CreateTag(dialog.InputText, group, PlcArea.HoldingRegister, 1, TagDataType.UInt16);
-                LoadTreeView();
-                UpdateStatus();
+                var dialog = new InputDialog("New Tag", "Enter tag name:", "NewTag");
+                if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputText))
+                {
+                    var group = _selectedGroup?.Name ?? "Default";
+                    var tag = await _tagService.CreateTag(dialog.InputText, group, PlcArea.HoldingRegister, 1, TagDataType.UInt16);
+                    LoadTreeView();
+                    UpdateStatus();
 
-                // Select the new tag
-                SelectTagInTree(tag);
+                    // Select the new tag
+                    SelectTagInTree(tag);
+                }
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _dialogService.Show($"Failed to create tag: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private async void Delete_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedTag != null)
+            try
             {
-                var result = _dialogService.Show($"Delete tag '{_selectedTag.Name}'?", "Confirm Delete",
-                    MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-                if (result == MessageBoxResult.Yes)
+                if (_selectedTag != null)
                 {
-                    await _tagService.DeleteTag(_selectedTag.Id);
-                    _selectedTag = null;
-                    DetailsPanel.Visibility = Visibility.Collapsed;
-                    LoadTreeView();
-                    UpdateStatus();
+                    var result = _dialogService.Show($"Delete tag '{_selectedTag.Name}'?", "Confirm Delete",
+                        MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        await _tagService.DeleteTag(_selectedTag.Id);
+                        _selectedTag = null;
+                        DetailsPanel.Visibility = Visibility.Collapsed;
+                        LoadTreeView();
+                        UpdateStatus();
+                    }
+                }
+                else if (_selectedGroup != null)
+                {
+                    await DeleteSelectedGroupAsync();
                 }
             }
-            else if (_selectedGroup != null)
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
-                await DeleteSelectedGroupAsync();
+                _dialogService.Show($"Failed to delete: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -434,7 +454,7 @@ namespace ModbusForge.Views
         {
             if (_selectedTag == null)
             {
-                MessageBox.Show("Please select a tag first.", "No Tag Selected", MessageBoxButton.OK, MessageBoxImage.Information);
+                _dialogService.Show("Please select a tag first.", "No Tag Selected", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 

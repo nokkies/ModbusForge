@@ -9,6 +9,7 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         xmlns:avalonDock="https://github.com/Dirkster99/AvalonDock"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:behaviors="clr-namespace:ModbusForge.Behaviors"
         mc:Ignorable="d"
         Title="{Binding Title}" Height="1073" Width="1556"
         WindowState="Maximized"
@@ -88,8 +89,8 @@
 
             <!-- StatusBar Style -->
             <Style TargetType="StatusBar">
-                <Setter Property="Background" Value="#FF2D2D30"/>
-                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Background" Value="{StaticResource LightMetallicTextBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource LightMetallicCardBrush}"/>
                 <Setter Property="FontWeight" Value="Medium"/>
             </Style>
         </ResourceDictionary>
@@ -232,12 +233,12 @@
                                  Margin="0,0,16,0"/>
 
                         <TextBlock Text="Port:" Grid.Column="2" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <TextBox Grid.Column="3" Text="{Binding Port}" 
+                        <TextBox Grid.Column="3" Text="{Binding Port}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger" 
                                  IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
                                  Margin="0,0,16,0"/>
 
                         <TextBlock Text="Unit ID:" Grid.Column="4" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
-                        <TextBox Grid.Column="5" Text="{Binding UnitId}" 
+                        <TextBox Grid.Column="5" Text="{Binding UnitId}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger" 
                                  IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" 
                                  Margin="0,0,16,0" Visibility="{Binding ShowClientFields, Converter={StaticResource BoolToVis}}"/>
 
@@ -290,16 +291,16 @@
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
                         <TextBlock Text="Start:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding RegisterStart}" Margin="0,0,10,0"/>
+                        <TextBox Width="80" Text="{Binding RegisterStart}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger" Margin="0,0,10,0"/>
                         <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding RegisterCount}" Margin="0,0,10,0"/>
+                        <TextBox Width="80" Text="{Binding RegisterCount}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadRegistersCommand}" Width="80" Margin="0,0,10,0"/>
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <ComboBox Width="120" SelectedItem="{Binding RegistersGlobalType}" ItemsSource="{StaticResource TypeOptionsAll}"/>
                         <Separator Width="10" Opacity="0"/>
                         <ui:ToggleSwitch IsChecked="{Binding HoldingMonitorEnabled, Mode=TwoWay}" Content="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding HoldingMonitorPeriodMs}"/>
+                        <TextBox Width="80" Text="{Binding HoldingMonitorPeriodMs}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
                         <Separator Width="20" Opacity="0"/>
                         <TextBlock Text="Filter:" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <ui:TextBox Width="150" Text="{Binding HoldingSearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Address, value, type..."/>
@@ -319,7 +320,7 @@
                         </DataGrid.ContextMenu>
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="*"/>
+                            <DataGridTextColumn Header="Value" Binding="{Binding ValueText, ValidatesOnDataErrors=True, NotifyOnValidationError=True}" Width="*"/>
                             <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{StaticResource TypeOptionsAll}" Width="*"/>
                         </DataGrid.Columns>
                     </DataGrid>
@@ -334,16 +335,16 @@
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
                         <TextBlock Text="Start:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding InputRegisterStart}" Margin="0,0,10,0"/>
+                        <TextBox Width="80" Text="{Binding InputRegisterStart}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger" Margin="0,0,10,0"/>
                         <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding InputRegisterCount}" Margin="0,0,10,0"/>
+                        <TextBox Width="80" Text="{Binding InputRegisterCount}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadInputRegistersCommand}" Width="80" Margin="0,0,10,0"/>
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <ComboBox Width="120" SelectedItem="{Binding InputRegistersGlobalType}" ItemsSource="{StaticResource TypeOptionsAll}"/>
                         <Separator Width="10" Opacity="0"/>
                         <ui:ToggleSwitch IsChecked="{Binding InputRegistersMonitorEnabled, Mode=TwoWay}" Content="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding InputRegistersMonitorPeriodMs}"/>
+                        <TextBox Width="80" Text="{Binding InputRegistersMonitorPeriodMs}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
                         <Separator Width="20" Opacity="0"/>
                         <TextBlock Text="Filter:" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <ui:TextBox Width="150" Text="{Binding InputSearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Address, value, type..."/>
@@ -377,14 +378,14 @@
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
                         <TextBlock Text="Start:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding CoilStart}" Margin="0,0,10,0"/>
+                        <TextBox Width="80" Text="{Binding CoilStart}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger" Margin="0,0,10,0"/>
                         <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding CoilCount}" Margin="0,0,10,0"/>
+                        <TextBox Width="80" Text="{Binding CoilCount}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadCoilsCommand}" Width="80"/>
                         <Separator Width="10" Opacity="0"/>
                         <ui:ToggleSwitch IsChecked="{Binding CoilsMonitorEnabled, Mode=TwoWay}" Content="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding CoilsMonitorPeriodMs}"/>
+                        <TextBox Width="80" Text="{Binding CoilsMonitorPeriodMs}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
                         <Separator Width="20" Opacity="0"/>
                         <TextBlock Text="Filter:" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <ui:TextBox Width="150" Text="{Binding CoilsSearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Address, state..."/>
@@ -417,14 +418,14 @@
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
                         <TextBlock Text="Start:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding DiscreteInputStart}" Margin="0,0,10,0"/>
+                        <TextBox Width="80" Text="{Binding DiscreteInputStart}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger" Margin="0,0,10,0"/>
                         <TextBlock Text="Count:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding DiscreteInputCount}" Margin="0,0,10,0"/>
+                        <TextBox Width="80" Text="{Binding DiscreteInputCount}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger" Margin="0,0,10,0"/>
                         <Button Content="Read" Command="{Binding ReadDiscreteInputsCommand}" Width="80"/>
                         <Separator Width="10" Opacity="0"/>
                         <ui:ToggleSwitch IsChecked="{Binding DiscreteInputsMonitorEnabled, Mode=TwoWay}" Content="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                        <TextBox Width="80" Text="{Binding DiscreteInputsMonitorPeriodMs}"/>
+                        <TextBox Width="80" Text="{Binding DiscreteInputsMonitorPeriodMs}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
                         <Separator Width="20" Opacity="0"/>
                         <TextBlock Text="Filter:" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <ui:TextBox Width="150" Text="{Binding DiscreteSearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Address, state..."/>
@@ -464,7 +465,7 @@
                         <Button Content="Load" Command="{Binding LoadCustomCommand}" Width="80" Margin="5,0,0,0"/>
                         <Separator Width="20" Opacity="0"/>
                         <ui:ToggleSwitch IsChecked="{Binding GlobalMonitorEnabled, Mode=TwoWay}" Content="Global Monitor" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                        <TextBlock VerticalAlignment="Center" Foreground="Gray">
+                        <TextBlock VerticalAlignment="Center" Foreground="{StaticResource LightMetallicTextSecondaryBrush}">
                             <Run Text="Note:" FontWeight="SemiBold"/>
                             <Run Text=" Reads Trend-enabled rows."/>
                         </TextBlock>
@@ -473,13 +474,13 @@
                     <!-- Custom entries grid -->
                     <DataGrid Grid.Row="1" ItemsSource="{Binding CustomEntries}" AutoGenerateColumns="False" IsReadOnly="False">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name, ValidatesOnDataErrors=True, NotifyOnValidationError=True}" Width="*"/>
                             <DataGridComboBoxColumn Header="Area" SelectedItemBinding="{Binding Area}" ItemsSource="{StaticResource AreaOptionsAll}" Width="*"/>
-                            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
+                            <DataGridTextColumn Header="Address" Binding="{Binding Address, ValidatesOnDataErrors=True, NotifyOnValidationError=True}" Width="*"/>
                             <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{StaticResource TypeOptionsAll}" Width="*"/>
-                            <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="2*"/>
+                            <DataGridTextColumn Header="Value" Binding="{Binding Value, ValidatesOnDataErrors=True, NotifyOnValidationError=True}" Width="2*"/>
                             <DataGridCheckBoxColumn Header="Cont. Write" Binding="{Binding Continuous}" Width="Auto"/>
-                            <DataGridTextColumn Header="Write Period (ms)" Binding="{Binding PeriodMs}" Width="*"/>
+                            <DataGridTextColumn Header="Write Period (ms)" Binding="{Binding PeriodMs, ValidatesOnDataErrors=True, NotifyOnValidationError=True}" Width="*"/>
                             <DataGridCheckBoxColumn Header="Trend" Binding="{Binding Trend}" Width="Auto"/>
                             <DataGridTemplateColumn Header="Actions" Width="Auto">
                                 <DataGridTemplateColumn.CellTemplate>

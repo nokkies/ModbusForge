@@ -1,9 +1,10 @@
 using System;
 using System.ComponentModel;
+using System.Globalization;
 
 namespace ModbusForge.Models
 {
-    public class CustomEntry : INotifyPropertyChanged
+    public class CustomEntry : INotifyPropertyChanged, IDataErrorInfo
     {
         private string _name = string.Empty;
         private int _address;
@@ -22,7 +23,7 @@ namespace ModbusForge.Models
 
         public string Name { get => _name; set { if (_name != value) { _name = value; OnPropertyChanged(nameof(Name)); } } }
         public int Address { get => _address; set { if (_address != value) { _address = value; OnPropertyChanged(nameof(Address)); } } }
-        public string Type { get => _type; set { if (_type != value) { _type = value; OnPropertyChanged(nameof(Type)); } } }
+        public string Type { get => _type; set { if (_type != value) { _type = value; OnPropertyChanged(nameof(Type)); OnPropertyChanged(nameof(Value)); } } }
         public string Value { get => _value; set { if (_value != value) { _value = value; OnPropertyChanged(nameof(Value)); } } }
         public bool Continuous { get => _continuous; set { if (_continuous != value) { _continuous = value; OnPropertyChanged(nameof(Continuous)); } } }
         public int PeriodMs { get => _periodMs; set { if (_periodMs != value) { _periodMs = value; OnPropertyChanged(nameof(PeriodMs)); } } }
@@ -34,5 +35,51 @@ namespace ModbusForge.Models
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+        // IDataErrorInfo validation
+        public string Error => string.Empty;
+
+        public string this[string columnName]
+        {
+            get
+            {
+                if (columnName == nameof(Name) && string.IsNullOrWhiteSpace(_name))
+                    return "Name is required.";
+
+                if (columnName == nameof(Address) && _address < 0)
+                    return "Address cannot be negative.";
+
+                if (columnName == nameof(PeriodMs) && _periodMs <= 0)
+                    return "Period must be greater than 0 ms.";
+
+                if (columnName == nameof(ReadPeriodMs) && _readPeriodMs <= 0)
+                    return "Read period must be greater than 0 ms.";
+
+                if (columnName == nameof(Value))
+                {
+                    if (string.IsNullOrWhiteSpace(_value))
+                        return "Value is required.";
+
+                    var type = (_type ?? "uint").ToLowerInvariant();
+                    switch (type)
+                    {
+                        case "uint":
+                            if (!ushort.TryParse(_value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                                return "Value must be an unsigned integer (0-65535).";
+                            break;
+                        case "int":
+                            if (!short.TryParse(_value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                                return "Value must be a signed integer (-32768 to 32767).";
+                            break;
+                        case "real":
+                            if (!float.TryParse(_value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                                return "Value must be a number.";
+                            break;
+                    }
+                }
+
+                return string.Empty;
+            }
+        }
     }
 }

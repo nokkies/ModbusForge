@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:models="clr-namespace:ModbusForge.Models"
+        xmlns:behaviors="clr-namespace:ModbusForge.Behaviors"
         Title="Script Editor" 
         Height="720" 
         Width="1000"
@@ -36,18 +37,17 @@
             <!-- Header -->
             <Border Background="{StaticResource FluentPrimary}" Padding="16,12">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="📝" FontSize="24" Margin="0,0,12,0" VerticalAlignment="Center"/>
                     <TextBlock Text="Script Editor" 
                                FontSize="20" 
                                FontWeight="SemiBold" 
-                               Foreground="White"
+                               Foreground="{StaticResource FluentCardBackground}"
                                VerticalAlignment="Center"/>
                 </StackPanel>
             </Border>
 
             <!-- Script Settings -->
             <Border Grid.Row="1" 
-                    Background="White" 
+                    Background="{StaticResource FluentCardBackground}" 
                     BorderBrush="{StaticResource FluentBorder}" 
                     BorderThickness="0,0,0,1"
                     Padding="16,12">
@@ -67,7 +67,7 @@
                     <TextBox Grid.Column="1" 
                              Text="{Binding Script.Name, UpdateSourceTrigger=PropertyChanged}"
                              Padding="8,4"
-                             Background="White"
+                             Background="{StaticResource FluentCardBackground}"
                              BorderBrush="{StaticResource FluentBorder}"
                              BorderThickness="1"/>
 
@@ -75,17 +75,21 @@
                     <TextBox Grid.Column="3" 
                              Text="{Binding Script.RepeatCount, UpdateSourceTrigger=PropertyChanged}"
                              Padding="8,4"
-                             Background="White"
+                             Background="{StaticResource FluentCardBackground}"
                              BorderBrush="{StaticResource FluentBorder}"
-                             BorderThickness="1"/>
+                             BorderThickness="1"
+                             behaviors:NumericTextBoxBehavior.IsNumeric="True"
+                             behaviors:NumericTextBoxBehavior.Format="UInteger"/>
 
                     <TextBlock Grid.Column="4" Text="Delay (ms):" VerticalAlignment="Center" Margin="16,0,8,0" Foreground="{StaticResource FluentText}"/>
                     <TextBox Grid.Column="5" 
                              Text="{Binding Script.DelayBetweenCommandsMs, UpdateSourceTrigger=PropertyChanged}"
                              Padding="8,4"
-                             Background="White"
+                             Background="{StaticResource FluentCardBackground}"
                              BorderBrush="{StaticResource FluentBorder}"
-                             BorderThickness="1"/>
+                             BorderThickness="1"
+                             behaviors:NumericTextBoxBehavior.IsNumeric="True"
+                             behaviors:NumericTextBoxBehavior.Format="UInteger"/>
 
                     <ui:ToggleSwitch Grid.Column="6" 
                                      Content="Stop on Error" 
@@ -96,7 +100,7 @@
             </Border>
 
             <!-- Commands List -->
-            <Border Grid.Row="2" Background="White" Padding="16">
+            <Border Grid.Row="2" Background="{StaticResource FluentCardBackground}" Padding="16">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -117,18 +121,39 @@
                                   GridLinesVisibility="All"
                                   VerticalGridLinesBrush="{StaticResource FluentBorder}"
                                   HorizontalGridLinesBrush="{StaticResource FluentBorder}"
-                                  RowBackground="White"
+                                  RowBackground="{StaticResource FluentCardBackground}"
                                   AlternatingRowBackground="{StaticResource FluentSurface}"
                                   BorderThickness="0"
                                   HeadersVisibility="Column">
                             <DataGrid.Columns>
-                                <DataGridCheckBoxColumn Header="✓" Binding="{Binding IsEnabled}" Width="35"/>
+                                <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding IsEnabled}" Width="55"/>
                                 <DataGridComboBoxColumn Header="Type" Width="160"
                                                         SelectedItemBinding="{Binding CommandType}"
                                                         ItemsSource="{Binding Source={x:Static models:ScriptCommandType.ReadHoldingRegisters}}"/>
-                                <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80"/>
-                                <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="60"/>
-                                <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="80"/>
+                                <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80">
+                                    <DataGridTextColumn.EditingElementStyle>
+                                        <Style TargetType="TextBox">
+                                            <Setter Property="behaviors:NumericTextBoxBehavior.IsNumeric" Value="True"/>
+                                            <Setter Property="behaviors:NumericTextBoxBehavior.Format" Value="UInteger"/>
+                                        </Style>
+                                    </DataGridTextColumn.EditingElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="60">
+                                    <DataGridTextColumn.EditingElementStyle>
+                                        <Style TargetType="TextBox">
+                                            <Setter Property="behaviors:NumericTextBoxBehavior.IsNumeric" Value="True"/>
+                                            <Setter Property="behaviors:NumericTextBoxBehavior.Format" Value="UInteger"/>
+                                        </Style>
+                                    </DataGridTextColumn.EditingElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="80">
+                                    <DataGridTextColumn.EditingElementStyle>
+                                        <Style TargetType="TextBox">
+                                            <Setter Property="behaviors:NumericTextBoxBehavior.IsNumeric" Value="True"/>
+                                            <Setter Property="behaviors:NumericTextBoxBehavior.Format" Value="UInteger"/>
+                                        </Style>
+                                    </DataGridTextColumn.EditingElementStyle>
+                                </DataGridTextColumn>
                                 <DataGridTextColumn Header="Description" Binding="{Binding DisplayText}" Width="*" IsReadOnly="True"/>
                                 <DataGridTextColumn Header="Last Result" Binding="{Binding LastResult}" Width="150" IsReadOnly="True"/>
                             </DataGrid.Columns>
@@ -154,20 +179,20 @@
                     Padding="16,12">
                 <StackPanel Orientation="Horizontal">
                     <Button x:Name="RunButton" 
-                            Content="▶ Run Script" 
+                            Content="Run Script" 
                             Width="120" 
                             Margin="0,0,10,0" 
                             Click="RunScript_Click"
                             Background="{StaticResource FluentPrimary}"
-                            Foreground="White"
+                            Foreground="{StaticResource FluentCardBackground}"
                             Padding="12,8"/>
                     <Button x:Name="StopButton" 
-                            Content="■ Stop" 
+                            Content="Stop" 
                             Width="80" 
                             Margin="0,0,10,0" 
                             Click="StopScript_Click"
-                            Background="#f44336"
-                            Foreground="White"
+                            Background="{StaticResource FluentStatusError}"
+                            Foreground="{StaticResource FluentCardBackground}"
                             IsEnabled="False"
                             Padding="12,8"/>
                     <TextBlock x:Name="StatusText" 
@@ -179,7 +204,7 @@
             </Border>
 
             <!-- Output Log -->
-            <Border Grid.Row="4" Background="White" Padding="16">
+            <Border Grid.Row="4" Background="{StaticResource FluentCardBackground}" Padding="16">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>

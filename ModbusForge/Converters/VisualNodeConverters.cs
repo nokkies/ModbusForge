@@ -48,30 +48,6 @@ namespace ModbusForge.Converters
     }
 
     /// <summary>
-    /// Converts boolean to visibility
-    /// </summary>
-    public class BoolToVisibilityConverter : IValueConverter
-    {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is bool boolValue)
-            {
-                return boolValue ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
-            }
-            return System.Windows.Visibility.Collapsed;
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is System.Windows.Visibility visibility)
-            {
-                return visibility == System.Windows.Visibility.Visible;
-            }
-            return false;
-        }
-    }
-
-    /// <summary>
     /// Converts boolean to inverted visibility
     /// </summary>
     public class BoolToInvertedVisibilityConverter : IValueConverter
@@ -124,18 +100,18 @@ namespace ModbusForge.Converters
             {
                 return elementType switch
                 {
-                    PlcElementType.Input => "📥",
-                    PlcElementType.Output => "📤",
-                    PlcElementType.NOT => "❌",
+                    PlcElementType.Input => "IN",
+                    PlcElementType.Output => "OUT",
+                    PlcElementType.NOT => "NOT",
                     PlcElementType.AND => "∧",
                     PlcElementType.OR => "∨",
-                    PlcElementType.RS => "🔄",
-                    PlcElementType.TON => "⏱️",
-                    PlcElementType.TOF => "⏰",
-                    PlcElementType.TP => "⚡",
-                    PlcElementType.CTU => "🔢",
-                    PlcElementType.CTD => "🔽",
-                    PlcElementType.CTC => "🔀",
+                    PlcElementType.RS => "RS",
+                    PlcElementType.TON => "TON",
+                    PlcElementType.TOF => "TOF",
+                    PlcElementType.TP => "TP",
+                    PlcElementType.CTU => "CTU",
+                    PlcElementType.CTD => "CTD",
+                    PlcElementType.CTC => "CTC",
                     PlcElementType.COMPARE_EQ => "==",
                     PlcElementType.COMPARE_NE => "≠",
                     PlcElementType.COMPARE_GT => ">",
@@ -146,7 +122,7 @@ namespace ModbusForge.Converters
                     PlcElementType.MATH_SUB => "-",
                     PlcElementType.MATH_MUL => "×",
                     PlcElementType.MATH_DIV => "÷",
-                    PlcElementType.SignalGenerator => "📈",
+                    PlcElementType.SignalGenerator => "SIG",
                     _ => "?"
                 };
             }
