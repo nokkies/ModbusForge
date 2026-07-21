@@ -103,7 +103,11 @@
             <RowDefinition Height="Auto"/> <!-- StatusBar -->
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Title="{Binding Title}" Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png" Grid.Row="0" />
+        <ui:TitleBar Title="{Binding Title}" Grid.Row="0">
+            <ui:TitleBar.Icon>
+                <ui:ImageIcon Source="pack://application:,,,/Resources/ModbusForgeLOGO.png"/>
+            </ui:TitleBar.Icon>
+        </ui:TitleBar>
 
         <Menu Grid.Row="1">
             <MenuItem Header="_File">
