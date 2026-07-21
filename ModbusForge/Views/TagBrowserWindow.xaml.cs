@@ -18,12 +18,29 @@ namespace ModbusForge.Views
         private Tag? _selectedTag;
         private TagGroup? _selectedGroup;
         private bool _isDirty = false;
+        private readonly bool _selectionMode;
 
-        public TagBrowserWindow(TagService tagService, IDialogService? dialogService = null)
+        public Tag? SelectedTag => _selectedTag;
+
+        public TagBrowserWindow(TagService tagService, IDialogService? dialogService = null, bool selectionMode = false)
         {
             InitializeComponent();
             _tagService = tagService;
             _dialogService = dialogService ?? new NullDialogService();
+            _selectionMode = selectionMode;
+
+            // Configure UI based on selection mode
+            if (_selectionMode)
+            {
+                Title = "Select Tag";
+                SelectTagButton.Visibility = Visibility.Visible;
+                NewGroupButton.Visibility = Visibility.Collapsed;
+                NewTagButton.Visibility = Visibility.Collapsed;
+                DeleteButton.Visibility = Visibility.Collapsed;
+                ImportButton.Visibility = Visibility.Collapsed;
+                ExportButton.Visibility = Visibility.Collapsed;
+            }
+
             LoadTreeView();
             UpdateStatus();
         }
@@ -410,6 +427,27 @@ namespace ModbusForge.Views
         private void UpdateStatus()
         {
             TagCountText.Text = $"{_tagService.Tags.Count} tags in {_tagService.Groups.Count} groups";
+        }
+
+        private void SelectTag_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedTag == null)
+            {
+                MessageBox.Show("Please select a tag first.", "No Tag Selected", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            DialogResult = true;
+            Close();
+        }
+
+        private void TagTreeView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (_selectionMode && _selectedTag != null)
+            {
+                DialogResult = true;
+                Close();
+            }
         }
     }
 }

@@ -385,4 +385,4 @@ Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$ve
 
 ---
 
-*Built with ❤️ by Reinach van Nieuwenhuizen*
+*Built by Reinach van Nieuwenhuizen*
