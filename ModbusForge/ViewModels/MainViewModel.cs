@@ -126,7 +126,6 @@ namespace ModbusForge.ViewModels
             InputRegistersView = CollectionViewSource.GetDefaultView(InputRegisters);
             CoilsView = CollectionViewSource.GetDefaultView(Coils);
             DiscreteInputsView = CollectionViewSource.GetDefaultView(DiscreteInputs);
-
             HoldingRegistersView.Filter = HoldingRegistersFilter;
             InputRegistersView.Filter = InputRegistersFilter;
             CoilsView.Filter = CoilsFilter;

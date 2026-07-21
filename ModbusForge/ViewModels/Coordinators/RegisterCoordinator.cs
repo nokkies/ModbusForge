@@ -108,42 +108,7 @@ namespace ModbusForge.ViewModels.Coordinators
                 }
 
                 // Compute ValueText based on Type for better display (floats, strings, signed ints)
-                int idx = 0;
-                while (idx < holdingRegisters.Count)
-                {
-                    var entry = holdingRegisters[idx];
-                    var type = (entry.Type ?? "uint").ToLowerInvariant();
-                    if (type == "int")
-                    {
-                        short sv = unchecked((short)values[idx]);
-                        entry.ValueText = sv.ToString(CultureInfo.InvariantCulture);
-                        idx += 1;
-                    }
-                    else if (type == "real")
-                    {
-                        if (idx + 1 < values.Length)
-                        {
-                            float f = DataTypeConverter.ToSingle(values[idx], values[idx + 1], entry.SwapBytes, entry.SwapWords);
-                            entry.ValueText = f.ToString(CultureInfo.InvariantCulture);
-                            holdingRegisters[idx + 1].ValueText = string.Empty;
-                        }
-                        else
-                        {
-                            entry.ValueText = entry.Value.ToString(CultureInfo.InvariantCulture);
-                        }
-                        idx += 2;
-                    }
-                    else if (type == "string")
-                    {
-                        entry.ValueText = DataTypeConverter.ToString(values[idx]);
-                        idx += 1;
-                    }
-                    else
-                    {
-                        entry.ValueText = entry.Value.ToString(CultureInfo.InvariantCulture);
-                        idx += 1;
-                    }
-                }
+                ApplyValueText(holdingRegisters, values);
 
                 setStatusMessage($"Read {values.Length} registers");
                 setHasConnectionError(false);
@@ -163,6 +128,46 @@ namespace ModbusForge.ViewModels.Coordinators
                 {
                     _dialogService.Show($"Failed to read registers: {ex.Message}", "Read Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void ApplyValueText(ObservableCollection<RegisterEntry> holdingRegisters, ushort[] values)
+        {
+            int idx = 0;
+            while (idx < holdingRegisters.Count)
+            {
+                var entry = holdingRegisters[idx];
+                var type = (entry.Type ?? "uint").ToLowerInvariant();
+                if (type == "int")
+                {
+                    short sv = unchecked((short)values[idx]);
+                    entry.ValueText = sv.ToString(CultureInfo.InvariantCulture);
+                    idx += 1;
+                }
+                else if (type == "real")
+                {
+                    if (idx + 1 < values.Length)
+                    {
+                        float f = DataTypeConverter.ToSingle(values[idx], values[idx + 1], entry.SwapBytes, entry.SwapWords);
+                        entry.ValueText = f.ToString(CultureInfo.InvariantCulture);
+                        holdingRegisters[idx + 1].ValueText = string.Empty;
+                    }
+                    else
+                    {
+                        entry.ValueText = entry.Value.ToString(CultureInfo.InvariantCulture);
+                    }
+                    idx += 2;
+                }
+                else if (type == "string")
+                {
+                    entry.ValueText = DataTypeConverter.ToString(values[idx]);
+                    idx += 1;
+                }
+                else
+                {
+                    entry.ValueText = entry.Value.ToString(CultureInfo.InvariantCulture);
+                    idx += 1;
                 }
             }
         }
