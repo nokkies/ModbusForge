@@ -13,6 +13,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using ModbusForge.Models;
 using ModbusForge.ViewModels;
 using ModbusForge.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ModbusForge.Views
 {
