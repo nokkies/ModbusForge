@@ -1,4 +1,4 @@
-# ModbusForge v5.8.0
+# ModbusForge v5.8.7
 
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows)](https://www.microsoft.com/windows)
@@ -75,6 +75,10 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 ---
 
 ## What's New
+
+### v5.8.7 - Current Release
+
+- Updated README screenshots to reflect the current ModbusForge UI
 
 ### v5.6.0 - Documentation & User Experience
 
@@ -158,7 +162,7 @@ See [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md) for the full development roadmap.
 
 ### Visual Node Editor
 ![Visual Node Editor](docs/images/visual_node_editor.png)
-*Build simulations using nodes and connections for signal generation and data transformation.*
+*The Simulation tab provides a visual node editor with a node palette and simulation controls for building signal-generation and Modbus-output simulations.*
 
 ### Trend Charts
 ![Trend Charts](docs/images/trend_charts.png)
@@ -344,21 +348,21 @@ dotnet build ModbusForge.sln -c Release
 ### Publish (framework-dependent, single-file)
 
 ```powershell
-$version = "5.6.0"
+$version = "5.8.7"
 dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishTrimmed=false -o .\publish\win-x64
 ```
 
 ### Publish (self-contained, single-file)
 
 ```powershell
-$version = "5.6.0"
+$version = "5.8.7"
 dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o .\publish\win-x64-sc
 ```
 
 ### Create a ZIP Artifact
 
 ```powershell
-$version = "5.6.0"
+$version = "5.8.7"
 Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
 # or for self-contained
 Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$version-win-x64-sc.zip -Force
