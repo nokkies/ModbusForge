@@ -22,6 +22,8 @@ public class ShellWindowServiceTests
     private readonly Mock<IModbusService> _modbusService = new();
     private readonly Mock<ISettingsService> _settingsService = new();
     private readonly Mock<IConnectionManager> _connectionManager = new();
+    private readonly Mock<IFileDialogService> _fileDialogService = new();
+    private readonly Mock<IDispatcher> _dispatcher = new();
 
     public ShellWindowServiceTests()
     {
@@ -40,7 +42,9 @@ public class ShellWindowServiceTests
             _scriptRunner.Object,
             _modbusService.Object,
             _settingsService.Object,
-            _connectionManager.Object);
+            _connectionManager.Object,
+            _fileDialogService.Object,
+            _dispatcher.Object);
 
     [Fact]
     public void Constructor_WithAllDependencies_Succeeds()
@@ -60,7 +64,9 @@ public class ShellWindowServiceTests
                 _scriptRunner.Object,
                 _modbusService.Object,
                 _settingsService.Object,
-                _connectionManager.Object));
+                _connectionManager.Object,
+                _fileDialogService.Object,
+                _dispatcher.Object));
     }
 
     [Fact]
@@ -74,7 +80,9 @@ public class ShellWindowServiceTests
                 _scriptRunner.Object,
                 _modbusService.Object,
                 _settingsService.Object,
-                _connectionManager.Object));
+                _connectionManager.Object,
+                _fileDialogService.Object,
+                _dispatcher.Object));
     }
 
     [Fact]
@@ -88,7 +96,9 @@ public class ShellWindowServiceTests
                 _scriptRunner.Object,
                 _modbusService.Object,
                 _settingsService.Object,
-                _connectionManager.Object));
+                _connectionManager.Object,
+                _fileDialogService.Object,
+                _dispatcher.Object));
     }
 
     [Fact]
@@ -102,7 +112,9 @@ public class ShellWindowServiceTests
                 null!,
                 _modbusService.Object,
                 _settingsService.Object,
-                _connectionManager.Object));
+                _connectionManager.Object,
+                _fileDialogService.Object,
+                _dispatcher.Object));
     }
 
     [Fact]
@@ -116,7 +128,9 @@ public class ShellWindowServiceTests
                 _scriptRunner.Object,
                 null!,
                 _settingsService.Object,
-                _connectionManager.Object));
+                _connectionManager.Object,
+                _fileDialogService.Object,
+                _dispatcher.Object));
     }
 
     [Fact]
@@ -130,7 +144,9 @@ public class ShellWindowServiceTests
                 _scriptRunner.Object,
                 _modbusService.Object,
                 null!,
-                _connectionManager.Object));
+                _connectionManager.Object,
+                _fileDialogService.Object,
+                _dispatcher.Object));
     }
 
     [Fact]
@@ -144,7 +160,9 @@ public class ShellWindowServiceTests
                 _scriptRunner.Object,
                 _modbusService.Object,
                 _settingsService.Object,
-                null!));
+                null!,
+                _fileDialogService.Object,
+                _dispatcher.Object));
     }
 
     [Fact]

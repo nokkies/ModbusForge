@@ -4,6 +4,7 @@
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:models="clr-namespace:ModbusForge.Models"
         xmlns:behaviors="clr-namespace:ModbusForge.Behaviors"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
         Title="Script Editor" 
         Height="720" 
         Width="1000"
@@ -20,6 +21,11 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Resources/FluentTheme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+            <ObjectDataProvider x:Key="ScriptCommandTypeValues" ObjectType="{x:Type sys:Enum}" MethodName="GetValues">
+                <ObjectDataProvider.MethodParameters>
+                    <x:Type Type="{x:Type models:ScriptCommandType}"/>
+                </ObjectDataProvider.MethodParameters>
+            </ObjectDataProvider>
         </ResourceDictionary>
     </Window.Resources>
 
@@ -112,9 +118,8 @@
                             BorderThickness="1" 
                             CornerRadius="4"
                             MinWidth="300">
-                        <DataGrid x:Name="CommandsGrid"
-                                  ItemsSource="{Binding Script.Commands}"
-                                  SelectedItem="{Binding SelectedCommand}"
+                        <DataGrid ItemsSource="{Binding Script.Commands}"
+                                  SelectedItem="{Binding SelectedCommand, Mode=TwoWay}"
                                   AutoGenerateColumns="False"
                                   CanUserAddRows="False"
                                   SelectionMode="Single"
@@ -129,7 +134,7 @@
                                 <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding IsEnabled}" Width="55"/>
                                 <DataGridComboBoxColumn Header="Type" Width="160"
                                                         SelectedItemBinding="{Binding CommandType}"
-                                                        ItemsSource="{Binding Source={x:Static models:ScriptCommandType.ReadHoldingRegisters}}"/>
+                                                        ItemsSource="{Binding Source={StaticResource ScriptCommandTypeValues}}"/>
                                 <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80">
                                     <DataGridTextColumn.EditingElementStyle>
                                         <Style TargetType="TextBox">
@@ -161,12 +166,12 @@
                     </Border>
 
                     <StackPanel Grid.Column="1" Margin="12,0,0,0">
-                        <Button Content="Add" Width="90" Margin="0,0,0,6" Click="AddCommand_Click" Style="{StaticResource FluentSecondaryButton}"/>
-                        <Button Content="Remove" Width="90" Margin="0,0,0,6" Click="RemoveCommand_Click" Style="{StaticResource FluentSecondaryButton}"/>
-                        <Button Content="Move Up" Width="90" Margin="0,0,0,6" Click="MoveUp_Click" Style="{StaticResource FluentSecondaryButton}"/>
-                        <Button Content="Move Down" Width="90" Margin="0,0,0,6" Click="MoveDown_Click" Style="{StaticResource FluentSecondaryButton}"/>
+                        <Button Content="Add" Width="90" Margin="0,0,0,6" Command="{Binding AddCommand}" Style="{StaticResource FluentSecondaryButton}"/>
+                        <Button Content="Remove" Width="90" Margin="0,0,0,6" Command="{Binding RemoveCommand}" IsEnabled="{Binding CanRemoveSelected}" Style="{StaticResource FluentSecondaryButton}"/>
+                        <Button Content="Move Up" Width="90" Margin="0,0,0,6" Command="{Binding MoveUpCommand}" IsEnabled="{Binding CanMoveUp}" Style="{StaticResource FluentSecondaryButton}"/>
+                        <Button Content="Move Down" Width="90" Margin="0,0,0,6" Command="{Binding MoveDownCommand}" IsEnabled="{Binding CanMoveDown}" Style="{StaticResource FluentSecondaryButton}"/>
                         <Separator Margin="0,10"/>
-                        <Button Content="Clone" Width="90" Margin="0,0,0,6" Click="CloneCommand_Click" Style="{StaticResource FluentSecondaryButton}"/>
+                        <Button Content="Clone" Width="90" Margin="0,0,0,6" Command="{Binding CloneCommand}" IsEnabled="{Binding CanCloneSelected}" Style="{StaticResource FluentSecondaryButton}"/>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -178,27 +183,26 @@
                     BorderThickness="0,1,0,1"
                     Padding="16,12">
                 <StackPanel Orientation="Horizontal">
-                    <Button x:Name="RunButton" 
-                            Content="Run Script" 
+                    <Button Content="Run Script" 
                             Width="120" 
                             Margin="0,0,10,0" 
-                            Click="RunScript_Click"
+                            Command="{Binding RunScriptCommand}"
+                            IsEnabled="{Binding CanRun}"
                             Background="{StaticResource FluentPrimary}"
                             Foreground="{StaticResource FluentCardBackground}"
                             Padding="12,8"/>
-                    <Button x:Name="StopButton" 
-                            Content="Stop" 
+                    <Button Content="Stop" 
                             Width="80" 
                             Margin="0,0,10,0" 
-                            Click="StopScript_Click"
+                            Command="{Binding StopScriptCommand}"
+                            IsEnabled="{Binding CanStop}"
                             Background="{StaticResource FluentStatusError}"
                             Foreground="{StaticResource FluentCardBackground}"
-                            IsEnabled="False"
                             Padding="12,8"/>
-                    <TextBlock x:Name="StatusText" 
-                               VerticalAlignment="Center" 
+                    <TextBlock VerticalAlignment="Center" 
                                Margin="10,0,0,0" 
                                FontWeight="SemiBold"
+                               Text="{Binding StatusText}"
                                Foreground="{StaticResource FluentText}"/>
                 </StackPanel>
             </Border>
@@ -224,8 +228,9 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <ListBox x:Name="OutputLog" 
-                                     Grid.Column="0" 
+                            <ListBox Grid.Column="0" 
+                                     ItemsSource="{Binding OutputLog}"
+                                     behaviors:ListBoxAutoScrollBehavior.AutoScrollToBottom="True"
                                      FontFamily="Consolas" 
                                      FontSize="11"
                                      Background="Transparent"
@@ -236,7 +241,7 @@
                                     Width="70" 
                                     VerticalAlignment="Top" 
                                     Margin="0,8,8,0" 
-                                    Click="ClearLog_Click"
+                                    Command="{Binding ClearLogCommand}"
                                     Style="{StaticResource FluentSecondaryButton}"/>
                         </Grid>
                     </Border>
@@ -250,9 +255,9 @@
                     BorderThickness="0,1,0,0"
                     Padding="16,12">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="Save Script..." Width="110" Margin="0,0,10,0" Click="SaveScript_Click" Style="{StaticResource FluentSecondaryButton}"/>
-                    <Button Content="Load Script..." Width="110" Margin="0,0,10,0" Click="LoadScript_Click" Style="{StaticResource FluentSecondaryButton}"/>
-                    <Button Content="Close" Width="90" Click="Close_Click" Style="{StaticResource FluentPrimaryButton}"/>
+                    <Button Content="Save Script..." Width="110" Margin="0,0,10,0" Command="{Binding SaveScriptCommand}" Style="{StaticResource FluentSecondaryButton}"/>
+                    <Button Content="Load Script..." Width="110" Margin="0,0,10,0" Command="{Binding LoadScriptCommand}" Style="{StaticResource FluentSecondaryButton}"/>
+                    <Button Content="Close" Width="90" Command="{Binding CloseCommand}" Style="{StaticResource FluentPrimaryButton}"/>
                 </StackPanel>
             </Border>
         </Grid>

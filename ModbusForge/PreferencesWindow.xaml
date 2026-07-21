@@ -45,12 +45,13 @@
                     <Border Style="{StaticResource FluentCard}">
                         <StackPanel>
                             <TextBlock Text="Connection" Style="{StaticResource FluentSubtitle}"/>
-                            <ui:ToggleSwitch x:Name="AutoReconnectCheckBox" 
-                                             Content="Auto-reconnect on connection loss" 
-                                             Margin="0,0,0,12"/>
+                            <ui:ToggleSwitch Content="Auto-reconnect on connection loss" 
+                                             Margin="0,0,0,12"
+                                             IsChecked="{Binding AutoReconnect, Mode=TwoWay}"/>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Reconnect interval (ms):" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}"/>
-                                <TextBox x:Name="ReconnectIntervalTextBox" Width="90" Text="5000" Padding="8,4"
+                                <TextBox Width="90" Padding="8,4"
+                                         Text="{Binding AutoReconnectIntervalMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
                             </StackPanel>
                         </StackPanel>
@@ -59,20 +60,21 @@
                     <Border Style="{StaticResource FluentCard}">
                         <StackPanel>
                             <TextBlock Text="Diagnostics" Style="{StaticResource FluentSubtitle}"/>
-                            <ui:ToggleSwitch x:Name="ShowDiagnosticsOnErrorCheckBox" 
-                                             Content="Show diagnostics dialog on connection error"/>
+                            <ui:ToggleSwitch Content="Show diagnostics dialog on connection error"
+                                             IsChecked="{Binding ShowConnectionDiagnosticsOnError, Mode=TwoWay}"/>
                         </StackPanel>
                     </Border>
                     
                     <Border Style="{StaticResource FluentCard}">
                         <StackPanel>
                             <TextBlock Text="Console" Style="{StaticResource FluentSubtitle}"/>
-                            <ui:ToggleSwitch x:Name="EnableConsoleLoggingCheckBox" 
-                                             Content="Enable console logging" 
-                                             Margin="0,0,0,12"/>
+                            <ui:ToggleSwitch Content="Enable console logging" 
+                                             Margin="0,0,0,12"
+                                             IsChecked="{Binding EnableConsoleLogging, Mode=TwoWay}"/>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Max console messages:" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}"/>
-                                <TextBox x:Name="MaxConsoleMessagesTextBox" Width="90" Text="1000" Padding="8,4"
+                                <TextBox Width="90" Padding="8,4"
+                                         Text="{Binding MaxConsoleMessages, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
                             </StackPanel>
                         </StackPanel>
@@ -83,7 +85,8 @@
                             <TextBlock Text="Performance" Style="{StaticResource FluentSubtitle}"/>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Max concurrent trend requests:" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}"/>
-                                <TextBox x:Name="MaxConcurrentTrendRequestsTextBox" Width="90" Text="8" Padding="8,4"
+                                <TextBox Width="90" Padding="8,4"
+                                         Text="{Binding MaxConcurrentTrendRequests, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
                             </StackPanel>
                         </StackPanel>
@@ -92,7 +95,8 @@
                     <Border Style="{StaticResource FluentCard}">
                         <StackPanel>
                             <TextBlock Text="Application" Style="{StaticResource FluentSubtitle}"/>
-                            <ui:ToggleSwitch x:Name="ConfirmOnExitCheckBox" Content="Confirm before exiting application"/>
+                            <ui:ToggleSwitch Content="Confirm before exiting application"
+                                             IsChecked="{Binding ConfirmOnExit, Mode=TwoWay}"/>
                         </StackPanel>
                     </Border>
                     
@@ -102,24 +106,29 @@
                             <ui:ToggleSwitch x:Name="EnableApiCheckBox" 
                                              Content="Enable REST API / MCP" 
                                              Margin="0,0,0,12"
+                                             IsChecked="{Binding EnableApi, Mode=TwoWay}"
                                              Checked="EnableApiCheckBox_Changed"
                                              Unchecked="EnableApiCheckBox_Changed"/>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                                 <TextBlock Text="API Port:" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}"/>
-                                <TextBox x:Name="ApiPortTextBox" Width="90" Text="5000" Padding="8,4"
+                                <TextBox Width="90" Padding="8,4"
+                                         Text="{Binding ApiPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
                             </StackPanel>
                             <ui:ToggleSwitch x:Name="EnableApiDocumentationCheckBox" 
                                              Content="Enable API documentation (Swagger)" 
-                                             Margin="0,0,0,12"/>
+                                             Margin="0,0,0,12"
+                                             IsChecked="{Binding EnableApiDocumentation, Mode=TwoWay}"/>
                             <ui:ToggleSwitch x:Name="EnableApiAuthenticationCheckBox" 
                                              Content="Require API key for mutations" 
                                              Margin="0,0,0,12"
+                                             IsChecked="{Binding EnableApiAuthentication, Mode=TwoWay}"
                                              Checked="EnableApiAuthenticationCheckBox_Changed"
                                              Unchecked="EnableApiAuthenticationCheckBox_Changed"/>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <TextBlock Text="API Key:" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}"/>
-                                <TextBox x:Name="ApiKeyTextBox" Width="280" IsReadOnly="True" Padding="8,4" FontFamily="Consolas"/>
+                                <TextBox x:Name="ApiKeyTextBox" Width="280" IsReadOnly="True" Padding="8,4" FontFamily="Consolas"
+                                         Text="{Binding ApiKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                                 <Button x:Name="CopyApiKeyButton" Content="Copy" Width="60" Margin="8,0,0,0" Click="CopyApiKeyButton_Click" Style="{StaticResource FluentSecondaryButton}"/>
                                 <Button x:Name="RegenerateApiKeyButton" Content="New" Width="60" Margin="8,0,0,0" Click="RegenerateApiKeyButton_Click" Style="{StaticResource FluentSecondaryButton}"/>
                             </StackPanel>
@@ -142,8 +151,8 @@
                     BorderThickness="0,1,0,0"
                     Padding="16,12">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="Save" Width="90" Margin="0,0,10,0" Click="SaveButton_Click" Style="{StaticResource FluentPrimaryButton}"/>
-                    <Button Content="Cancel" Width="90" Click="CancelButton_Click" Style="{StaticResource FluentSecondaryButton}"/>
+                    <Button Content="Save" Width="90" Margin="0,0,10,0" Command="{Binding SaveCommand}" Style="{StaticResource FluentPrimaryButton}"/>
+                    <Button Content="Cancel" Width="90" Command="{Binding CancelCommand}" Style="{StaticResource FluentSecondaryButton}"/>
                 </StackPanel>
             </Border>
         </Grid>
