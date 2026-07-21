@@ -195,7 +195,7 @@
                             Width="80" 
                             Margin="0,0,10,0" 
                             Command="{Binding StopScriptCommand}"
-                            IsEnabled="{Binding CanStop}"
+                            IsEnabled="{Binding IsRunning}"
                             Background="{StaticResource FluentStatusError}"
                             Foreground="{StaticResource FluentCardBackground}"
                             Padding="12,8"/>

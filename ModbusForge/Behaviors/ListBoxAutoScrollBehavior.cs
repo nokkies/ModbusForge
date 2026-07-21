@@ -1,8 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 
 namespace ModbusForge.Behaviors
 {
@@ -11,7 +12,7 @@ namespace ModbusForge.Behaviors
     /// </summary>
     public static class ListBoxAutoScrollBehavior
     {
-        private static readonly Dictionary<ListBox, NotifyCollectionChangedEventHandler> _subscriptions = new();
+        private static readonly ConditionalWeakTable<ListBox, NotifyCollectionChangedEventHandler> _subscriptions = new();
 
         public static readonly DependencyProperty AutoScrollToBottomProperty =
             DependencyProperty.RegisterAttached(
@@ -59,25 +60,20 @@ namespace ModbusForge.Behaviors
             if (listBox.Items is not INotifyCollectionChanged source) return;
 
             NotifyCollectionChangedEventHandler handler = (s, args) => ScrollToBottom(listBox);
-            lock (_subscriptions)
-            {
-                _subscriptions[listBox] = handler;
-            }
+            _subscriptions.AddOrUpdate(listBox, handler);
             source.CollectionChanged += handler;
         }
 
         private static void Unsubscribe(ListBox listBox)
         {
-            NotifyCollectionChangedEventHandler? handler;
-            lock (_subscriptions)
+            if (_subscriptions.TryGetValue(listBox, out var handler))
             {
-                if (!_subscriptions.TryGetValue(listBox, out handler)) return;
                 _subscriptions.Remove(listBox);
-            }
 
-            if (listBox.Items is INotifyCollectionChanged source)
-            {
-                source.CollectionChanged -= handler;
+                if (listBox.Items is INotifyCollectionChanged source)
+                {
+                    source.CollectionChanged -= handler;
+                }
             }
         }
 
@@ -86,7 +82,7 @@ namespace ModbusForge.Behaviors
             if (listBox.Items.Count == 0) return;
 
             var lastItem = listBox.Items[listBox.Items.Count - 1];
-            listBox.Dispatcher.BeginInvoke(new Action(() => listBox.ScrollIntoView(lastItem)), System.Windows.Threading.DispatcherPriority.Background);
+            listBox.Dispatcher.BeginInvoke(new Action(() => listBox.ScrollIntoView(lastItem)), DispatcherPriority.Background);
         }
     }
 }

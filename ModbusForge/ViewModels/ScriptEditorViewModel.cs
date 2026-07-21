@@ -51,7 +51,7 @@ namespace ModbusForge.ViewModels
             MoveUpCommand = new RelayCommand(MoveUp, () => CanMoveUp);
             MoveDownCommand = new RelayCommand(MoveDown, () => CanMoveDown);
             CloneCommand = new RelayCommand(CloneCommandInternal, () => CanCloneSelected);
-            RunScriptCommand = new AsyncRelayCommand(RunScriptAsync);
+            RunScriptCommand = new AsyncRelayCommand(RunScriptAsync, () => CanRun);
             StopScriptCommand = new RelayCommand(StopScript, () => IsRunning);
             ClearLogCommand = new RelayCommand(() => OutputLog.Clear(), () => OutputLog.Count > 0);
             SaveScriptCommand = new AsyncRelayCommand(SaveScriptAsync);
@@ -93,6 +93,7 @@ namespace ModbusForge.ViewModels
                 if (SetProperty(ref _isRunning, value))
                 {
                     OnPropertyChanged(nameof(CanRun));
+                    RunScriptCommand.NotifyCanExecuteChanged();
                     StopScriptCommand.NotifyCanExecuteChanged();
                 }
             }
@@ -127,6 +128,7 @@ namespace ModbusForge.ViewModels
         private void Commands_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             OnPropertyChanged(nameof(CanRun));
+            RunScriptCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(CanMoveUp));
             OnPropertyChanged(nameof(CanMoveDown));
         }
@@ -311,7 +313,7 @@ namespace ModbusForge.ViewModels
                     Script.DelayBetweenCommandsMs = data.DelayBetweenCommandsMs;
                     Script.Commands.Clear();
 
-                    foreach (var cmdData in data.Commands)
+                    foreach (var cmdData in data.Commands ?? new List<CommandData>())
                     {
                         if (Enum.TryParse<ScriptCommandType>(cmdData.CommandType, out var cmdType))
                         {
