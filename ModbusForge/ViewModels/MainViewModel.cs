@@ -122,7 +122,15 @@ namespace ModbusForge.ViewModels
             _monitoringCoordinator.Start();
 
             // Initialize collection views for filtering
-            InitializeCollectionViewFilters();
+            HoldingRegistersView = CollectionViewSource.GetDefaultView(HoldingRegisters);
+            InputRegistersView = CollectionViewSource.GetDefaultView(InputRegisters);
+            CoilsView = CollectionViewSource.GetDefaultView(Coils);
+            DiscreteInputsView = CollectionViewSource.GetDefaultView(DiscreteInputs);
+
+            HoldingRegistersView.Filter = HoldingRegistersFilter;
+            InputRegistersView.Filter = InputRegistersFilter;
+            CoilsView.Filter = CoilsFilter;
+            DiscreteInputsView.Filter = DiscreteInputsFilter;
 
             _logger.LogInformation("MainViewModel initialized");
         }
@@ -133,19 +141,6 @@ namespace ModbusForge.ViewModels
             {
                 _themeService.ThemeChanged += (s, e) => OnPropertyChanged(nameof(IsDarkMode));
             }
-        }
-
-        private void InitializeCollectionViewFilters()
-        {
-            HoldingRegistersView = CollectionViewSource.GetDefaultView(HoldingRegisters);
-            InputRegistersView = CollectionViewSource.GetDefaultView(InputRegisters);
-            CoilsView = CollectionViewSource.GetDefaultView(Coils);
-            DiscreteInputsView = CollectionViewSource.GetDefaultView(DiscreteInputs);
-
-            HoldingRegistersView.Filter = HoldingRegistersFilter;
-            InputRegistersView.Filter = InputRegistersFilter;
-            CoilsView.Filter = CoilsFilter;
-            DiscreteInputsView.Filter = DiscreteInputsFilter;
         }
 
         private bool HoldingRegistersFilter(object item)
