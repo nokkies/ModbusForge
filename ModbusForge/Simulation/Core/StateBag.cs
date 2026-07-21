@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 
 namespace ModbusForge.Simulation.Core

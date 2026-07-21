@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using ModbusForge.Simulation.Core;
 
 namespace ModbusForge.Simulation.Blocks
@@ -98,7 +96,6 @@ namespace ModbusForge.Simulation.Blocks
 
             context.WriteOutput("Output", SimulationValue.Bool(state.Value));
         }
-
     }
 
     internal sealed class RsLatchState
