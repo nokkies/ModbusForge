@@ -105,7 +105,6 @@ namespace ModbusForge.ViewModels
         }
 
         public bool CanRun => !IsRunning && Script.Commands.Count > 0;
-        public bool CanStop => IsRunning;
         public bool CanRemoveSelected => SelectedCommand != null;
         public bool CanCloneSelected => SelectedCommand != null;
         public bool CanMoveUp => SelectedCommand != null && Script.Commands.IndexOf(SelectedCommand) > 0;

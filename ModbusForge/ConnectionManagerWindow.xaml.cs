@@ -11,7 +11,7 @@ public partial class ConnectionManagerWindow : Wpf.Ui.Controls.FluentWindow
 
     public ConnectionManagerWindow(ConnectionManagerViewModel viewModel)
     {
-        if (viewModel == null) throw new ArgumentNullException(nameof(viewModel));
+        ArgumentNullException.ThrowIfNull(viewModel);
 
         _viewModel = viewModel;
         InitializeComponent();

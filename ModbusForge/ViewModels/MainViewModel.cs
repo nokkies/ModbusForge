@@ -103,10 +103,7 @@ namespace ModbusForge.ViewModels
             _dialogService = dialogService ?? new NullDialogService();
             _dispatcher = dispatcher ?? new WpfDispatcher();
             _themeService = themeService;
-            if (_themeService != null)
-            {
-                _themeService.ThemeChanged += (s, e) => OnPropertyChanged(nameof(IsDarkMode));
-            }
+            AttachThemeChangedHandler();
             // Initialize visual node editor
             _visualNodeEditorViewModel = visualNodeEditorViewModel ?? new VisualNodeEditorViewModel();
             // VisualSimulationService will be started/stopped by ShowLiveValues toggle
@@ -125,58 +122,76 @@ namespace ModbusForge.ViewModels
             _monitoringCoordinator.Start();
 
             // Initialize collection views for filtering
+            InitializeCollectionViewFilters();
+
+            _logger.LogInformation("MainViewModel initialized");
+        }
+
+        private void AttachThemeChangedHandler()
+        {
+            if (_themeService != null)
+            {
+                _themeService.ThemeChanged += (s, e) => OnPropertyChanged(nameof(IsDarkMode));
+            }
+        }
+
+        private void InitializeCollectionViewFilters()
+        {
             HoldingRegistersView = CollectionViewSource.GetDefaultView(HoldingRegisters);
             InputRegistersView = CollectionViewSource.GetDefaultView(InputRegisters);
             CoilsView = CollectionViewSource.GetDefaultView(Coils);
             DiscreteInputsView = CollectionViewSource.GetDefaultView(DiscreteInputs);
 
-            HoldingRegistersView.Filter = item =>
-            {
-                if (string.IsNullOrWhiteSpace(HoldingSearchText)) return true;
-                if (item is RegisterEntry reg)
-                {
-                    return reg.Address.ToString().Contains(HoldingSearchText, StringComparison.OrdinalIgnoreCase)
-                        || (reg.ValueText != null && reg.ValueText.Contains(HoldingSearchText, StringComparison.OrdinalIgnoreCase))
-                        || (reg.Type != null && reg.Type.Contains(HoldingSearchText, StringComparison.OrdinalIgnoreCase));
-                }
-                return true;
-            };
+            HoldingRegistersView.Filter = HoldingRegistersFilter;
+            InputRegistersView.Filter = InputRegistersFilter;
+            CoilsView.Filter = CoilsFilter;
+            DiscreteInputsView.Filter = DiscreteInputsFilter;
+        }
 
-            InputRegistersView.Filter = item =>
+        private bool HoldingRegistersFilter(object item)
+        {
+            if (string.IsNullOrWhiteSpace(HoldingSearchText)) return true;
+            if (item is RegisterEntry reg)
             {
-                if (string.IsNullOrWhiteSpace(InputSearchText)) return true;
-                if (item is RegisterEntry reg)
-                {
-                    return reg.Address.ToString().Contains(InputSearchText, StringComparison.OrdinalIgnoreCase)
-                        || reg.Value.ToString().Contains(InputSearchText, StringComparison.OrdinalIgnoreCase)
-                        || (reg.Type != null && reg.Type.Contains(InputSearchText, StringComparison.OrdinalIgnoreCase));
-                }
-                return true;
-            };
+                return reg.Address.ToString().Contains(HoldingSearchText, StringComparison.OrdinalIgnoreCase)
+                    || (reg.ValueText != null && reg.ValueText.Contains(HoldingSearchText, StringComparison.OrdinalIgnoreCase))
+                    || (reg.Type != null && reg.Type.Contains(HoldingSearchText, StringComparison.OrdinalIgnoreCase));
+            }
+            return true;
+        }
 
-            CoilsView.Filter = item =>
+        private bool InputRegistersFilter(object item)
+        {
+            if (string.IsNullOrWhiteSpace(InputSearchText)) return true;
+            if (item is RegisterEntry reg)
             {
-                if (string.IsNullOrWhiteSpace(CoilsSearchText)) return true;
-                if (item is CoilEntry coil)
-                {
-                    return coil.Address.ToString().Contains(CoilsSearchText, StringComparison.OrdinalIgnoreCase)
-                        || coil.State.ToString().Contains(CoilsSearchText, StringComparison.OrdinalIgnoreCase);
-                }
-                return true;
-            };
+                return reg.Address.ToString().Contains(InputSearchText, StringComparison.OrdinalIgnoreCase)
+                    || reg.Value.ToString().Contains(InputSearchText, StringComparison.OrdinalIgnoreCase)
+                    || (reg.Type != null && reg.Type.Contains(InputSearchText, StringComparison.OrdinalIgnoreCase));
+            }
+            return true;
+        }
 
-            DiscreteInputsView.Filter = item =>
+        private bool CoilsFilter(object item)
+        {
+            if (string.IsNullOrWhiteSpace(CoilsSearchText)) return true;
+            if (item is CoilEntry coil)
             {
-                if (string.IsNullOrWhiteSpace(DiscreteSearchText)) return true;
-                if (item is CoilEntry coil)
-                {
-                    return coil.Address.ToString().Contains(DiscreteSearchText, StringComparison.OrdinalIgnoreCase)
-                        || coil.State.ToString().Contains(DiscreteSearchText, StringComparison.OrdinalIgnoreCase);
-                }
-                return true;
-            };
+                return coil.Address.ToString().Contains(CoilsSearchText, StringComparison.OrdinalIgnoreCase)
+                    || coil.State.ToString().Contains(CoilsSearchText, StringComparison.OrdinalIgnoreCase);
+            }
+            return true;
+        }
 
-            _logger.LogInformation("MainViewModel initialized");
+        private bool DiscreteInputsFilter(object item)
+        {
+            if (string.IsNullOrWhiteSpace(DiscreteSearchText)) return true;
+            if (item is CoilEntry coil)
+            {
+                return coil.Address.ToString().Contains(DiscreteSearchText, StringComparison.OrdinalIgnoreCase)
+                    || coil.State.ToString().Contains(DiscreteSearchText, StringComparison.OrdinalIgnoreCase);
+            }
+            return true;
         }
 
         /// <summary>

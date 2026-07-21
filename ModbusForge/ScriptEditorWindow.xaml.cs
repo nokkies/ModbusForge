@@ -11,7 +11,7 @@ public partial class ScriptEditorWindow : Wpf.Ui.Controls.FluentWindow
 
     public ScriptEditorWindow(ScriptEditorViewModel viewModel)
     {
-        if (viewModel == null) throw new ArgumentNullException(nameof(viewModel));
+        ArgumentNullException.ThrowIfNull(viewModel);
 
         _viewModel = viewModel;
         InitializeComponent();

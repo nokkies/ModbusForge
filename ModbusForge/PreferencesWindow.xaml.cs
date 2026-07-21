@@ -12,7 +12,7 @@ public partial class PreferencesWindow : Wpf.Ui.Controls.FluentWindow
 
     public PreferencesWindow(PreferencesViewModel viewModel)
     {
-        if (viewModel == null) throw new ArgumentNullException(nameof(viewModel));
+        ArgumentNullException.ThrowIfNull(viewModel);
 
         _viewModel = viewModel;
         InitializeComponent();
