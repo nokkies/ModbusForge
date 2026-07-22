@@ -1,0 +1,123 @@
+<UserControl x:Class="ModbusForge.Views.DashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             mc:Ignorable="d"
+             d:DesignHeight="450"
+             d:DesignWidth="800">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Resources/FluentTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="Dashboard"
+                   Style="{StaticResource ModernTitleStyle}"
+                   FontSize="24"
+                   Margin="0,0,0,16"/>
+
+        <!-- Status card -->
+        <Border Grid.Row="1"
+                Style="{StaticResource FluentCard}"
+                Padding="16"
+                Margin="0,0,0,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse Style="{StaticResource FluentStatusIndicator}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource ModernBodyStyle}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding ActiveProfileName, StringFormat='Active profile: {0}'}"
+                           Style="{StaticResource ModernBodyStyle}"
+                           VerticalAlignment="Center"
+                           Margin="16,0"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Content="Connect"
+                            Command="{Binding ConnectCommand}"
+                            IsEnabled="{Binding CanConnect}"
+                            Style="{StaticResource FluentPrimaryButton}"
+                            Margin="0,0,8,0"/>
+                    <Button Content="Disconnect"
+                            Command="{Binding DisconnectCommand}"
+                            IsEnabled="{Binding CanDisconnect}"
+                            Style="{StaticResource FluentSecondaryButton}"
+                            Margin="0,0,8,0"/>
+                    <Button Content="Connection Manager"
+                            Command="{Binding OpenConnectionManagerCommand}"
+                            Style="{StaticResource FluentSecondaryButton}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Quick actions -->
+        <Border Grid.Row="2"
+                Style="{StaticResource FluentCard}"
+                Padding="16"
+                Margin="0,0,0,16">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Quick actions:" Style="{StaticResource ModernBodyStyle}" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                <Button Content="Read Holding Registers"
+                        Command="{Binding ReadRegistersCommand}"
+                        IsEnabled="{Binding CanRead}"
+                        Style="{StaticResource FluentSecondaryButton}"
+                        Margin="0,0,8,0"/>
+                <Button Content="Open Script Editor"
+                        Command="{Binding OpenScriptEditorCommand}"
+                        IsEnabled="{Binding CanOpenScriptEditor}"
+                        Style="{StaticResource FluentSecondaryButton}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Recent profiles -->
+        <Border Grid.Row="3" Style="{StaticResource FluentCard}" Padding="16">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="Recent connection profiles" Style="{StaticResource ModernTitleStyle}" FontSize="18" Margin="0,0,0,8"/>
+                <ListBox Grid.Row="1"
+                         ItemsSource="{Binding RecentProfiles}"
+                         SelectedItem="{Binding SelectedProfile, Mode=TwoWay}"
+                         DisplayMemberPath="Name"
+                         BorderBrush="{StaticResource FluentBorder}"
+                         BorderThickness="1"
+                         Background="{StaticResource FluentCardBackground}"
+                         Visibility="{Binding HasRecentProfiles, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock Grid.Row="1"
+                           Text="No recent connection profiles. Open Connection Manager to add a profile."
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           TextWrapping="Wrap">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource ModernBodyStyle}">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasRecentProfiles}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>
