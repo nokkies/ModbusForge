@@ -247,6 +247,7 @@ namespace ModbusForge
             services.AddTransient<DecodeViewModel>();
             services.AddTransient<VisualNodeEditorViewModel>();
             services.AddTransient<HelpViewModel>();
+            services.AddTransient<DashboardViewModel>();
 
             // Register Windows
             services.AddTransient<MainWindow>();

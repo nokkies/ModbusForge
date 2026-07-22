@@ -23,6 +23,7 @@ namespace ModbusForge
     public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     {
         private readonly MainViewModel _viewModel;
+        private readonly DashboardViewModel _dashboardViewModel;
         private readonly IDialogService _dialogService;
         private readonly IShellWindowService _shellWindowService;
         private readonly IApplicationLifetime _applicationLifetime;
@@ -30,6 +31,7 @@ namespace ModbusForge
 
         public MainWindow(
             MainViewModel viewModel,
+            DashboardViewModel dashboardViewModel,
             DecodeViewModel decodeViewModel,
             TrendViewModel trendViewModel,
             IDialogService dialogService,
@@ -42,8 +44,10 @@ namespace ModbusForge
             _shellWindowService = shellWindowService ?? throw new ArgumentNullException(nameof(shellWindowService));
             _applicationLifetime = applicationLifetime ?? throw new ArgumentNullException(nameof(applicationLifetime));
             DataContext = _viewModel;
+            _dashboardViewModel = dashboardViewModel ?? throw new ArgumentNullException(nameof(dashboardViewModel));
 
             // Set the data contexts for the view-model-backed user controls
+            if (DashboardViewControl != null) DashboardViewControl.DataContext = _dashboardViewModel;
             if (DecodeViewControl != null) DecodeViewControl.DataContext = decodeViewModel ?? throw new ArgumentNullException(nameof(decodeViewModel));
             if (TrendViewControl != null) TrendViewControl.DataContext = trendViewModel ?? throw new ArgumentNullException(nameof(trendViewModel));
 
@@ -158,6 +162,7 @@ namespace ModbusForge
         private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
             _viewModel?.Dispose();
+            _dashboardViewModel?.Dispose();
         }
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -342,6 +347,11 @@ namespace ModbusForge
                     MenuItem_ScriptEditor_Click(null!, null!);
                     e.Handled = true;
                 }
+                else if (tag == "Dashboard")
+                {
+                    ShowDashboardDocument(item);
+                    e.Handled = true;
+                }
                 else if (int.TryParse(tag, out int index))
                 {
                     NavigateToView(index, item);
@@ -406,6 +416,27 @@ namespace ModbusForge
                             }
                             break;
                         }
+                    }
+                }
+            }
+        }
+
+        private void ShowDashboardDocument(Wpf.Ui.Controls.NavigationViewItem? item = null)
+        {
+            if (DocDashboard.Parent == null)
+            {
+                MainDocumentPane.Children.Insert(0, DocDashboard);
+            }
+            DocDashboard.IsActive = true;
+            DocDashboard.IsSelected = true;
+
+            if (item != null)
+            {
+                foreach (var menuItemObj in RootNavigation.MenuItems)
+                {
+                    if (menuItemObj is Wpf.Ui.Controls.NavigationViewItem navItem)
+                    {
+                        navItem.SetValue(Wpf.Ui.Controls.NavigationViewItem.IsActiveProperty, navItem == item);
                     }
                 }
             }

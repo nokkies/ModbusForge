@@ -182,6 +182,7 @@
                                IsPaneToggleVisible="True"
                                OpenPaneLength="175">
                 <ui:NavigationView.MenuItems>
+                    <ui:NavigationViewItem Content="Dashboard" Icon="{ui:SymbolIcon Symbol=Home24}" Tag="Dashboard" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
                     <ui:NavigationViewItem Content="Registers" Icon="{ui:SymbolIcon Symbol=Database24}" Tag="0" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
                     <ui:NavigationViewItem Content="Input Registers" Icon="{ui:SymbolIcon Symbol=DatabaseSearch24}" Tag="1" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
                     <ui:NavigationViewItem Content="Coils" Icon="{ui:SymbolIcon Symbol=ToggleLeft24}" Tag="2" PreviewMouseLeftButtonDown="NavItem_MouseDown"/>
@@ -288,6 +289,9 @@
                 <avalonDock:LayoutRoot>
                     <avalonDock:LayoutPanel Orientation="Horizontal">
                         <avalonDock:LayoutDocumentPane x:Name="MainDocumentPane">
+                            <avalonDock:LayoutDocument CanClose="False" x:Name="DocDashboard" Title="Dashboard" ContentId="Dashboard">
+                                <views:DashboardView x:Name="DashboardViewControl"/>
+                            </avalonDock:LayoutDocument>
                             <avalonDock:LayoutDocument CanClose="False" x:Name="DocRegisters" Title="Registers" ContentId="Registers">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
