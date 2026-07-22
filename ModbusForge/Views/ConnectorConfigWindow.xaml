@@ -147,8 +147,8 @@
             </ScrollViewer>
             
             <!-- Status -->
-            <TextBlock Grid.Row="3" Text="{Binding StatusMessage}" Foreground="#107C10" Margin="0,10,0,10" FontWeight="SemiBold"
-                       Visibility="{Binding HasStatusMessage, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            <TextBlock Grid.Row="3" Text="{Binding StatusMessage}" Foreground="{StaticResource FluentStatusSuccess}" Margin="0,10,0,10" FontWeight="SemiBold"
+                       Visibility="{Binding HasStatusMessage, Converter={StaticResource BoolToVis}}"/>
             
             <!-- Buttons -->
             <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">

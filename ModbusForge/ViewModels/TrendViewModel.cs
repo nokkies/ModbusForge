@@ -27,18 +27,21 @@ namespace ModbusForge.ViewModels
         private readonly Dictionary<string, List<(DateTime ts, double v)>> _samplesByKey = new();
         private readonly Dictionary<string, SKColor> _colorByKey = new();
         private readonly HashSet<SKColor> _usedColors = new();
+        // Color-blind-safe palette (Paul Tol "vibrant" / Okabe-Ito inspired).
+        // These colors are distinguishable for deuteranopia/protanopia users and
+        // should be combined with line dash/shape variants for best accessibility.
         private readonly List<SKColor> _palette = new()
         {
-            new SKColor(33,150,243),   // blue
-            new SKColor(76,175,80),    // green
-            new SKColor(244,67,54),    // red
-            new SKColor(255,193,7),    // amber
-            new SKColor(156,39,176),   // purple
-            new SKColor(0,188,212),    // cyan
-            new SKColor(121,85,72),    // brown
-            new SKColor(63,81,181),    // indigo
-            new SKColor(255,87,34),    // deep orange
-            new SKColor(139,195,74)    // light green
+            new SKColor(0, 114, 178),    // blue
+            new SKColor(230, 159, 0),    // orange
+            new SKColor(86, 180, 233),   // sky blue
+            new SKColor(213, 94, 0),     // vermilion
+            new SKColor(0, 158, 115),    // bluish green
+            new SKColor(204, 121, 167),  // pink
+            new SKColor(240, 228, 66),   // yellow
+            new SKColor(51, 34, 136),    // dark blue
+            new SKColor(170, 68, 153),   // purple
+            new SKColor(153, 153, 153)   // grey
         };
         private int _paletteCursor = 0;
         private bool _followLive;

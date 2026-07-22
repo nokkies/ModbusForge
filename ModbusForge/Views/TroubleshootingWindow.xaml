@@ -30,17 +30,16 @@
             <!-- Header -->
             <Border Background="{StaticResource FluentPrimary}" Padding="24,20">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="🔧" FontSize="28" Margin="0,0,12,0" VerticalAlignment="Center"/>
                     <TextBlock Text="Troubleshooting" 
                                FontSize="24" 
                                FontWeight="SemiBold" 
-                               Foreground="White"
+                               Foreground="{StaticResource FluentCardBackground}"
                                VerticalAlignment="Center"/>
                 </StackPanel>
             </Border>
 
             <!-- Content -->
-            <Border Grid.Row="1" Background="White" Padding="24,20">
+            <Border Grid.Row="1" Background="{StaticResource FluentCardBackground}" Padding="24,20">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <!-- Diagnostic Export -->

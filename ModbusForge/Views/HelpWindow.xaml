@@ -37,18 +37,17 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal">
-                        <TextBlock Text="&#128712;" FontSize="24" Margin="0,0,12,0" VerticalAlignment="Center"/>
                         <TextBlock Text="ModbusForge Help" 
                                    FontSize="20" 
                                    FontWeight="SemiBold" 
-                                   Foreground="White"
+                                   Foreground="{StaticResource FluentCardBackground}"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <TextBox Grid.Column="2" 
                              Width="250" 
                              Padding="8,6"
-                             Background="White"
+                             Background="{StaticResource FluentCardBackground}"
                              BorderBrush="{StaticResource FluentBorder}"
                              BorderThickness="1"
                              VerticalAlignment="Center"
@@ -87,7 +86,7 @@
                 </Border>
 
                 <!-- Content Area -->
-                <Border Grid.Column="1" Background="White" Padding="24">
+                <Border Grid.Column="1" Background="{StaticResource FluentCardBackground}" Padding="24">
                     <FlowDocumentScrollViewer Document="{Binding HelpContent}" 
                                             IsToolBarVisible="False"
                                             Zoom="100"

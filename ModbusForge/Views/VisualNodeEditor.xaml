@@ -6,6 +6,7 @@
              xmlns:local="clr-namespace:ModbusForge.Views"
              xmlns:models="clr-namespace:ModbusForge.Models"
              xmlns:converters="clr-namespace:ModbusForge.Converters"
+             xmlns:behaviors="clr-namespace:ModbusForge.Behaviors"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:sys="clr-namespace:System;assembly=mscorlib"
              xmlns:avalonDock="https://github.com/Dirkster99/AvalonDock"
@@ -16,7 +17,7 @@
         <!-- Node Accent Brush -->
         <SolidColorBrush x:Key="NodeAccentBrush" Color="#3B82F6"/>
 
-        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <converters:PlcElementTypeToColorConverter x:Key="PlcElementTypeToColorConverter"/>
         <converters:ConnectorTagConverter x:Key="ConnectorTagConverter"/>
         <converters:BoolToDashArrayConverter x:Key="BoolToDashArrayConverter"/>
@@ -190,9 +191,9 @@
                 </Grid.RowDefinitions>
                 
                 <!-- Toolbar -->
-                <Border Grid.Row="0" Background="#F8F8F8" BorderBrush="#DDD" BorderThickness="0,0,0,1" Padding="10,5">
+                <Border Grid.Row="0" Background="{StaticResource LightMetallicWhiteBrush}" BorderBrush="{StaticResource LightMetallicChromeBrush}" BorderThickness="0,0,0,1" Padding="10,5">
                     <StackPanel Orientation="Horizontal">
-                        <ToggleButton Content="🔴 Live Values" IsChecked="{Binding ShowLiveValues}" Margin="0,0,10,0"/>
+                        <ToggleButton Content="Live Values" IsChecked="{Binding ShowLiveValues}" Margin="0,0,10,0"/>
                         <Button Content="Clear All" Command="{Binding ClearAllCommand}" Margin="0,0,10,0"/>
                         <Button Content="Auto Layout" Command="{Binding AutoLayoutCommand}" Margin="0,0,10,0"/>
                         <Separator Margin="10,0"/>
@@ -201,14 +202,14 @@
                         <Button Content="Align T" Command="{Binding AlignTopCommand}" Margin="0,0,5,0" Padding="8,4"/>
                         <Button Content="Distrib H" Command="{Binding DistributeHorizontallyCommand}" Margin="0,0,10,0" Padding="8,4"/>
                         <Separator Margin="10,0"/>
-                        <Button x:Name="TagBrowserButton" Content="🏷️ Tags" Command="{Binding OpenTagBrowserCommand}" Margin="0,0,10,0" Padding="8,4" AutomationProperties.AutomationId="TagBrowserButton"/>
-                        <Button x:Name="WatchWindowButton" Content="👁️ Watch" Command="{Binding OpenWatchWindowCommand}" Margin="0,0,10,0" Padding="8,4"/>
+                        <Button x:Name="TagBrowserButton" Content="Tags" Command="{Binding OpenTagBrowserCommand}" Margin="0,0,10,0" Padding="8,4" AutomationProperties.AutomationId="TagBrowserButton"/>
+                        <Button x:Name="WatchWindowButton" Content="Watch" Command="{Binding OpenWatchWindowCommand}" Margin="0,0,10,0" Padding="8,4"/>
                         <Separator Margin="10,0"/>
                         <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <Slider Width="100" Minimum="0.5" Maximum="2" Value="{Binding ZoomLevel}" VerticalAlignment="Center" AutomationProperties.AutomationId="ZoomSlider"/>
                         <TextBlock Text="{Binding ZoomLevel, StringFormat={}{0:P0}}" VerticalAlignment="Center" Margin="5,0,0,10"/>
                         <Separator Margin="10,0"/>
-                        <Button Content="❓" ToolTip="Canvas Navigation:&#x0d;&#x0a;• Left Click Hold &amp; Drag (on background) to Pan&#x0d;&#x0a;• Middle Mouse Button Drag to Pan&#x0d;&#x0a;• Ctrl + Scroll to Zoom&#x0d;&#x0a;• Shift + Scroll to Scroll Horizontally" Click="HelpButton_Click" Padding="6,2" Margin="0,0,10,0"/>
+                        <Button Content="Help" ToolTip="Canvas Navigation:&#x0d;&#x0a;• Left Click Hold &amp; Drag (on background) to Pan&#x0d;&#x0a;• Middle Mouse Button Drag to Pan&#x0d;&#x0a;• Ctrl + Scroll to Zoom&#x0d;&#x0a;• Shift + Scroll to Scroll Horizontally" Click="HelpButton_Click" Padding="6,2" Margin="0,0,10,0"/>
                     </StackPanel>
                 </Border>
                 
@@ -316,11 +317,14 @@
                             <ComboBox ItemsSource="{StaticResource WaveformOptionsAll}" SelectedItem="{Binding SelectedWaveform}" 
                                       Margin="0,0,0,5" HorizontalAlignment="Stretch"/>
                             <TextBlock Text="Period (ms):" Margin="0,5,0,2"/>
-                            <TextBox Text="{Binding WaveformPeriodMs}" Margin="0,0,0,5"/>
+                            <TextBox Text="{Binding WaveformPeriodMs}" Margin="0,0,0,5"
+                                     behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
                             <TextBlock Text="Amplitude:" Margin="0,5,0,2"/>
-                            <TextBox Text="{Binding WaveformAmplitude}" Margin="0,0,0,5"/>
+                            <TextBox Text="{Binding WaveformAmplitude}" Margin="0,0,0,5"
+                                     behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
                             <TextBlock Text="Offset:" Margin="0,5,0,2"/>
-                            <TextBox Text="{Binding WaveformOffset}" Margin="0,0,0,5"/>
+                            <TextBox Text="{Binding WaveformOffset}" Margin="0,0,0,5"
+                                     behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
                             <Button Content="Apply to Selected Nodes" Command="{Binding ApplyWaveformCommand}" 
                                     Margin="0,5,0,0" Padding="8,4"/>
                         </StackPanel>
@@ -335,9 +339,9 @@
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="{Binding Name}" FontSize="11" Margin="0,0,5,0"/>
-                                            <TextBlock Text="(" FontSize="11" Foreground="#666"/>
-                                            <TextBlock Text="{Binding AddressDisplay}" FontSize="10" Foreground="#666" Margin="0,0,2,0"/>
-                                            <TextBlock Text=")" FontSize="11" Foreground="#666"/>
+                                            <TextBlock Text="(" FontSize="11" Foreground="{StaticResource LightMetallicTextSecondaryBrush}"/>
+                                            <TextBlock Text="{Binding AddressDisplay}" FontSize="10" Foreground="{StaticResource LightMetallicTextSecondaryBrush}" Margin="0,0,2,0"/>
+                                            <TextBlock Text=")" FontSize="11" Foreground="{StaticResource LightMetallicTextSecondaryBrush}"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
@@ -357,7 +361,7 @@
                             <ItemsControl ItemsSource="{Binding Nodes}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="White" BorderBrush="#DDD" BorderThickness="1" 
+                                        <Border Background="{StaticResource LightMetallicWhiteBrush}" BorderBrush="{StaticResource LightMetallicChromeBrush}" BorderThickness="1" 
                                                 CornerRadius="3" Padding="8" Margin="0,0,0,5">
                                             <Grid>
                                                 <Grid.RowDefinitions>
@@ -370,16 +374,17 @@
                                                 </Grid.ColumnDefinitions>
                                                 
                                                 <!-- Node name and address -->
-                                                <TextBlock Grid.Column="0" Grid.Row="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="11" Foreground="#333"/>
+                                                <TextBlock Grid.Column="0" Grid.Row="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource LightMetallicTextBrush}"/>
                                                 <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding AddressDisplay}" 
-                                                           Foreground="#666" FontSize="10" Margin="5,0,0,0"/>
+                                                           Foreground="{StaticResource LightMetallicTextSecondaryBrush}" FontSize="10" Margin="5,0,0,0"/>
                                                 
                                                 <!-- Value label and editable value -->
                                                 <StackPanel Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1" Orientation="Horizontal" Margin="0,3,0,0">
-                                                    <TextBlock Text="Value:" FontWeight="SemiBold" FontSize="10" Foreground="#666" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                                    <TextBlock Text="Value:" FontWeight="SemiBold" FontSize="10" Foreground="{StaticResource LightMetallicTextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,5,0"/>
                                                     <TextBox Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                             FontWeight="Bold" Foreground="#007ACC" FontSize="11" 
-                                                             Padding="3" MinWidth="60"/>
+                                                             FontWeight="Bold" Foreground="{StaticResource LightMetallicAccentBrush}" FontSize="11" 
+                                                             Padding="3" MinWidth="60"
+                                                             behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>

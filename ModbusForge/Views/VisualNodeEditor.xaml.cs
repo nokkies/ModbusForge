@@ -14,6 +14,7 @@ using ModbusForge.Models;
 using ModbusForge.ViewModels;
 using ModbusForge.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ModbusForge.Views
 {
@@ -405,21 +406,33 @@ namespace ModbusForge.Views
         
         private void LiveUpdateTimer_Tick(object? sender, EventArgs e)
         {
-            if (_viewModel == null || !_viewModel.ShowLiveValues) return;
-            
-            // Update all InputInt and OutputInt nodes with current DataStore values
-            foreach (var node in _viewModel.Nodes)
+            try
             {
-                if (node.ElementType == PlcElementType.InputInt || 
-                    node.ElementType == PlcElementType.OutputInt ||
-                    node.ElementType == PlcElementType.Input ||
-                    node.ElementType == PlcElementType.Output)
+                if (_viewModel == null || !_viewModel.ShowLiveValues) return;
+
+                // Update all InputInt and OutputInt nodes with current DataStore values
+                foreach (var node in _viewModel.Nodes)
                 {
-                    // Toggle ShowLiveValues to force update
-                    var wasShowing = node.ShowLiveValues;
-                    node.ShowLiveValues = false;
-                    node.ShowLiveValues = wasShowing;
+                    if (node.ElementType == PlcElementType.InputInt ||
+                        node.ElementType == PlcElementType.OutputInt ||
+                        node.ElementType == PlcElementType.Input ||
+                        node.ElementType == PlcElementType.Output)
+                    {
+                        // Toggle ShowLiveValues to force update
+                        var wasShowing = node.ShowLiveValues;
+                        node.ShowLiveValues = false;
+                        node.ShowLiveValues = wasShowing;
+                    }
                 }
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                // Live updates should never crash the canvas; log and continue.
+                try
+                {
+                    (App.ServiceProvider?.GetService(typeof(ILogger<VisualNodeEditor>)) as ILogger<VisualNodeEditor>)?.LogError(ex, "Error in LiveUpdateTimer_Tick");
+                }
+                catch { /* Avoid any secondary exception from logging. */ }
             }
         }
         
@@ -1863,7 +1876,7 @@ namespace ModbusForge.Views
             var deleteItem = new MenuItem
             {
                 Header = "Delete",
-                Icon = new TextBlock { Text = "🗑️", FontSize = 12 }
+                Icon = new TextBlock { Text = "×", FontSize = 12 }
             };
             deleteItem.Click += (s, ev) =>
             {
@@ -1879,7 +1892,7 @@ namespace ModbusForge.Views
                 var configItem = new MenuItem
                 {
                     Header = "Configure Waveform...",
-                    Icon = new TextBlock { Text = "⚙️", FontSize = 12 }
+                    Icon = new TextBlock { Text = "…", FontSize = 12 }
                 };
                 configItem.Click += (s, ev) =>
                 {
