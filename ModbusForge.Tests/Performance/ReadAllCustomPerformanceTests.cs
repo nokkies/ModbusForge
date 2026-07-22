@@ -84,6 +84,12 @@ namespace ModbusForge.Tests.Performance
             var customEntryCoordinator = new CustomEntryCoordinator(registerCoordinator, _mockCustomEntryService.Object, _mockClientService.Object, _mockServerService.Object, new Mock<ILogger<CustomEntryCoordinator>>().Object);
             var trendCoordinator = new TrendCoordinator(_mockClientService.Object, _mockServerService.Object, _mockTrendLogger.Object, new Mock<ILogger<TrendCoordinator>>().Object, new Mock<ISettingsService>().Object);
             var configurationCoordinator = new ConfigurationCoordinator(new Mock<ILogger<ConfigurationCoordinator>>().Object);
+            var monitoringCoordinator = new MonitoringCoordinator(
+                Mock.Of<IMonitoringCallbacks>(),
+                Mock.Of<IPeriodicScheduler>(),
+                Mock.Of<IPeriodicScheduler>(),
+                Mock.Of<IPeriodicScheduler>(),
+                new Mock<ILogger<MonitoringCoordinator>>().Object);
 
             var viewModel = new MainViewModel(
                 _mockClientService.Object,
@@ -97,7 +103,9 @@ namespace ModbusForge.Tests.Performance
                 registerCoordinator,
                 customEntryCoordinator,
                 trendCoordinator,
-                configurationCoordinator);
+                configurationCoordinator,
+                monitoringCoordinator,
+                new UnitConfigurationStore(new ImmediateDispatcher()));
 
             // Add many custom entries with gaps to avoid batching
             for (int i = 1; i <= entryCount; i++)
@@ -153,6 +161,12 @@ namespace ModbusForge.Tests.Performance
             var customEntryCoordinator = new CustomEntryCoordinator(registerCoordinator, _mockCustomEntryService.Object, _mockClientService.Object, _mockServerService.Object, new Mock<ILogger<CustomEntryCoordinator>>().Object);
             var trendCoordinator = new TrendCoordinator(_mockClientService.Object, _mockServerService.Object, _mockTrendLogger.Object, new Mock<ILogger<TrendCoordinator>>().Object, new Mock<ISettingsService>().Object);
             var configurationCoordinator = new ConfigurationCoordinator(new Mock<ILogger<ConfigurationCoordinator>>().Object);
+            var monitoringCoordinator = new MonitoringCoordinator(
+                Mock.Of<IMonitoringCallbacks>(),
+                Mock.Of<IPeriodicScheduler>(),
+                Mock.Of<IPeriodicScheduler>(),
+                Mock.Of<IPeriodicScheduler>(),
+                new Mock<ILogger<MonitoringCoordinator>>().Object);
 
             var viewModel = new MainViewModel(
                 _mockClientService.Object,
@@ -166,7 +180,9 @@ namespace ModbusForge.Tests.Performance
                 registerCoordinator,
                 customEntryCoordinator,
                 trendCoordinator,
-                configurationCoordinator);
+                configurationCoordinator,
+                monitoringCoordinator,
+                new UnitConfigurationStore(new ImmediateDispatcher()));
 
             // Add contiguous custom entries (Address 1 to 10)
             for (int i = 1; i <= entryCount; i++)

@@ -63,6 +63,13 @@ namespace ModbusForge.Tests.ViewModels
                 customEntryCoordinator,
                 trendCoordinator,
                 configurationCoordinator,
+                new MonitoringCoordinator(
+                    new Mock<IMonitoringCallbacks>().Object,
+                    new Mock<IPeriodicScheduler>().Object,
+                    new Mock<IPeriodicScheduler>().Object,
+                    new Mock<IPeriodicScheduler>().Object,
+                    new Mock<ILogger<MonitoringCoordinator>>().Object),
+                new UnitConfigurationStore(new ImmediateDispatcher()),
                 new Mock<IDialogService>().Object,
                 new VisualNodeEditorViewModel(),
                 new Mock<IDispatcher>().Object

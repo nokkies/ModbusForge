@@ -27,6 +27,7 @@ namespace ModbusForge.Tests.Performance
         private CustomEntryCoordinator _customEntryCoordinator;
         private TrendCoordinator _trendCoordinator;
         private ConfigurationCoordinator _configurationCoordinator;
+        private MonitoringCoordinator _monitoringCoordinator;
 
         public BlockingModeSwitchTests()
         {
@@ -99,6 +100,12 @@ namespace ModbusForge.Tests.Performance
 
             _configurationCoordinator = new ConfigurationCoordinator(
                 new Mock<ILogger<ConfigurationCoordinator>>().Object);
+            _monitoringCoordinator = new MonitoringCoordinator(
+                Mock.Of<IMonitoringCallbacks>(),
+                Mock.Of<IPeriodicScheduler>(),
+                Mock.Of<IPeriodicScheduler>(),
+                Mock.Of<IPeriodicScheduler>(),
+                new Mock<ILogger<MonitoringCoordinator>>().Object);
         }
 
         [Fact]
@@ -123,7 +130,9 @@ namespace ModbusForge.Tests.Performance
                 _registerCoordinator,
                 _customEntryCoordinator,
                 _trendCoordinator,
-                _configurationCoordinator);
+                _configurationCoordinator,
+                _monitoringCoordinator,
+                new UnitConfigurationStore(new ImmediateDispatcher()));
 
             // Set initial state
             viewModel.Mode = "Client";

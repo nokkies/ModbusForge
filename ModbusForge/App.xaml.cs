@@ -197,6 +197,7 @@ namespace ModbusForge
             services.AddSingleton<ITagWindowService, TagWindowService>();
             services.AddSingleton<IShellWindowService, ShellWindowService>();
             services.AddSingleton<IApplicationLifetime, WpfApplicationLifetime>();
+            services.AddSingleton<IUnitConfigurationStore>(provider => new UnitConfigurationStore(provider.GetRequiredService<IDispatcher>()));
             
             // Register Coordinators
             services.AddSingleton<ConnectionCoordinator>(provider => new ConnectionCoordinator(
@@ -225,6 +226,18 @@ namespace ModbusForge
                 provider.GetRequiredService<IFileSystem>(),
                 provider.GetRequiredService<IInputDialogService>(),
                 provider.GetRequiredService<IDialogService>()
+            ));
+
+            // Monitoring: forward callbacks to MainViewModel and provide distinct scheduler instances.
+            services.AddSingleton<IPeriodicScheduler, WpfPeriodicScheduler>();
+            services.AddSingleton<IMonitoringCallbacks>(provider => new MainViewModelMonitoringCallbacks(provider));
+            services.AddSingleton<MonitoringCoordinator>(provider => new MonitoringCoordinator(
+                provider.GetRequiredService<IMonitoringCallbacks>(),
+                new WpfPeriodicScheduler(),
+                new WpfPeriodicScheduler(),
+                new WpfPeriodicScheduler(),
+                provider.GetRequiredService<ILogger<MonitoringCoordinator>>(),
+                Math.Max(50, provider.GetRequiredService<ITrendLogger>().SampleRateMs)
             ));
             
             // Register ViewModels
