@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Text.Json.Serialization;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -47,6 +48,7 @@ namespace ModbusForge.Models
         /// when it pushes live values into the property so we don't echo writes
         /// back to the DataStore for values the simulation just produced.
         /// </summary>
+        [JsonIgnore]
         public bool SuppressWriteBack { get; set; }
 
         /// <summary>
@@ -54,6 +56,7 @@ namespace ModbusForge.Models
         /// The ViewModel subscribes to this and forwards the value to the
         /// simulation service so it gets written to the DataStore.
         /// </summary>
+        [JsonIgnore]
         public Action<VisualNode, double>? ValueChangedCallback { get; set; }
 
         partial void OnCurrentValueDoubleChanged(double value)
