@@ -31,21 +31,20 @@
             <!-- Header -->
             <Border Background="{StaticResource FluentPrimary}" Padding="24,20">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="⌨️" FontSize="28" Margin="0,0,12,0" VerticalAlignment="Center"/>
                     <TextBlock Text="Keyboard Shortcuts" 
                                FontSize="24" 
                                FontWeight="SemiBold" 
-                               Foreground="White"
+                               Foreground="{StaticResource FluentCardBackground}"
                                VerticalAlignment="Center"/>
                 </StackPanel>
             </Border>
 
             <!-- Content -->
-            <Border Grid.Row="1" Background="White" Padding="24,20">
+            <Border Grid.Row="1" Background="{StaticResource FluentCardBackground}" Padding="24,20">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <!-- Global Shortcuts -->
-                        <TextBlock Text="🌐 Global Shortcuts"
+                        <TextBlock Text="Global Shortcuts"
                                    FontSize="16" 
                                    FontWeight="SemiBold" 
                                    Foreground="{StaticResource FluentText}"
@@ -94,7 +93,7 @@
                         </Border>
 
                         <!-- Script Editor -->
-                        <TextBlock Text="📝 Script Editor"
+                        <TextBlock Text="Script Editor"
                                    FontSize="16" 
                                    FontWeight="SemiBold" 
                                    Foreground="{StaticResource FluentText}"
@@ -131,7 +130,7 @@
                         </Border>
 
                         <!-- Visual Node Editor -->
-                        <TextBlock Text="🎨 Visual Node Editor (Simulation tab)"
+                        <TextBlock Text="Visual Node Editor (Simulation tab)"
                                    FontSize="16" 
                                    FontWeight="SemiBold" 
                                    Foreground="{StaticResource FluentText}"
@@ -192,7 +191,7 @@
                         </Border>
 
                         <!-- Visual Affordances -->
-                        <TextBlock Text="👁️ Visual Affordances"
+                        <TextBlock Text="Visual Affordances"
                                    FontSize="16" 
                                    FontWeight="SemiBold" 
                                    Foreground="{StaticResource FluentText}"
@@ -219,7 +218,7 @@
                         </Border>
 
                         <!-- Palette -->
-                        <TextBlock Text="📋 Palette"
+                        <TextBlock Text="Palette"
                                    FontSize="16" 
                                    FontWeight="SemiBold" 
                                    Foreground="{StaticResource FluentText}"

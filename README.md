@@ -1,4 +1,4 @@
-# ModbusForge v5.8.0
+# ModbusForge v5.8.7
 
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows)](https://www.microsoft.com/windows)
@@ -76,6 +76,10 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### v5.8.7 - Current Release
+
+- Updated README screenshots to reflect the current ModbusForge UI
+
 ### v5.6.0 - Documentation & User Experience
 
 - **Comprehensive Help System**: New searchable help window with F1 support
@@ -144,22 +148,25 @@ See [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md) for the full development roadmap.
 
 ## Screenshots
 
-> *Screenshots will be added here in a future update. The following sections describe the main interfaces.*
-
 ### Main Interface
-The main window provides a tabbed interface for registers, coils, custom data, simulation, trends, and console logging.
+![Main Interface](docs/images/main_interface.png)
+*The main window provides a tabbed interface for registers, coils, custom data, simulation, trends, and console logging.*
 
 ### Connection Manager
-Save and manage multiple Modbus connection profiles with quick connect/disconnect.
+![Connection Manager](docs/images/connection_manager.png)
+*Save and manage multiple Modbus connection profiles with quick connect/disconnect capabilities.*
 
 ### Script Editor
-Create and run automated test sequences with a visual command editor.
+![Script Editor](docs/images/script_editor.png)
+*Create and run automated test sequences with a visual command editor.*
 
 ### Visual Node Editor
-Build simulations using nodes and connections for signal generation and data transformation.
+![Visual Node Editor](docs/images/visual_node_editor.png)
+*The Simulation tab provides a visual node editor with a node palette and simulation controls for building signal-generation and Modbus-output simulations.*
 
 ### Trend Charts
-Monitor register values over time with zoom, pan, and export capabilities.
+![Trend Charts](docs/images/trend_charts.png)
+*Monitor register values over time with real-time graphing, zoom, pan, and export capabilities.*
 
 ---
 
@@ -341,21 +348,21 @@ dotnet build ModbusForge.sln -c Release
 ### Publish (framework-dependent, single-file)
 
 ```powershell
-$version = "5.6.0"
+$version = "5.8.7"
 dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishTrimmed=false -o .\publish\win-x64
 ```
 
 ### Publish (self-contained, single-file)
 
 ```powershell
-$version = "5.6.0"
+$version = "5.8.7"
 dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o .\publish\win-x64-sc
 ```
 
 ### Create a ZIP Artifact
 
 ```powershell
-$version = "5.6.0"
+$version = "5.8.7"
 Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
 # or for self-contained
 Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$version-win-x64-sc.zip -Force
@@ -385,4 +392,4 @@ Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$ve
 
 ---
 
-*Built with ❤️ by Reinach van Nieuwenhuizen*
+*Built by Reinach van Nieuwenhuizen*

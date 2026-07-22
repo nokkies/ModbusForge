@@ -27,6 +27,10 @@
     <SolidColorBrush x:Key="LightMetallicBorderBrush" Color="{StaticResource LightMetallicBorder}"/>
     <SolidColorBrush x:Key="LightMetallicCardBrush" Color="{StaticResource LightMetallicCard}"/>
 
+    <!-- Semantic status brushes (use instead of raw reds/greens) -->
+    <SolidColorBrush x:Key="LightMetallicStatusSuccessBrush" Color="#107C10"/>
+    <SolidColorBrush x:Key="LightMetallicStatusErrorBrush" Color="#D13438"/>
+
     <!-- Metallic Button Style with Hover Effect -->
     <Style x:Key="MetallicButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource LightMetallicChromeBrush}"/>
@@ -332,10 +336,10 @@
     <Style x:Key="StatusConnectedStyle" TargetType="Ellipse">
         <Setter Property="Width" Value="12"/>
         <Setter Property="Height" Value="12"/>
-        <Setter Property="Fill" Value="#4CAF50"/>
+        <Setter Property="Fill" Value="{StaticResource LightMetallicStatusSuccessBrush}"/>
         <Setter Property="Effect">
             <Setter.Value>
-                <DropShadowEffect Color="#4CAF50" BlurRadius="6" ShadowDepth="0" Opacity="0.6"/>
+                <DropShadowEffect Color="#107C10" BlurRadius="6" ShadowDepth="0" Opacity="0.6"/>
             </Setter.Value>
         </Setter>
     </Style>
@@ -343,7 +347,7 @@
     <Style x:Key="StatusDisconnectedStyle" TargetType="Ellipse">
         <Setter Property="Width" Value="12"/>
         <Setter Property="Height" Value="12"/>
-        <Setter Property="Fill" Value="#9E9E9E"/>
+        <Setter Property="Fill" Value="{StaticResource LightMetallicSteelBrush}"/>
     </Style>
 
     <!-- Card-like panel style -->
@@ -409,10 +413,10 @@
         <Setter Property="Fill" Value="{StaticResource LightMetallicSteelBrush}"/>
         <Style.Triggers>
             <DataTrigger Binding="{Binding IsConnected}" Value="True">
-                <Setter Property="Fill" Value="#107C10"/>
+                <Setter Property="Fill" Value="{StaticResource LightMetallicStatusSuccessBrush}"/>
             </DataTrigger>
             <DataTrigger Binding="{Binding IsConnected}" Value="False">
-                <Setter Property="Fill" Value="#D13438"/>
+                <Setter Property="Fill" Value="{StaticResource LightMetallicStatusErrorBrush}"/>
             </DataTrigger>
         </Style.Triggers>
     </Style>

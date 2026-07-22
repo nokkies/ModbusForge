@@ -1,8 +1,9 @@
 using System.ComponentModel;
+using System.Globalization;
 
 namespace ModbusForge.Models
 {
-    public class RegisterEntry : INotifyPropertyChanged
+    public class RegisterEntry : INotifyPropertyChanged, IDataErrorInfo
     {
         private int _address;
         private ushort _value;
@@ -38,7 +39,15 @@ namespace ModbusForge.Models
         public string Type
         {
             get => _type;
-            set { if (_type != value) { _type = value; OnPropertyChanged(nameof(Type)); } }
+            set
+            {
+                if (_type != value)
+                {
+                    _type = value;
+                    OnPropertyChanged(nameof(Type));
+                    OnPropertyChanged(nameof(ValueText)); // re-validate value against new type
+                }
+            }
         }
 
         // String representation shown/edited in the grid to avoid ConvertBack to ushort for 'real'/'string'
@@ -57,5 +66,42 @@ namespace ModbusForge.Models
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+        // IDataErrorInfo validation
+        public string Error => string.Empty;
+
+        public string this[string columnName]
+        {
+            get
+            {
+                if (columnName == nameof(Address) && Address < 0)
+                    return "Address cannot be negative.";
+
+                if (columnName == nameof(ValueText))
+                {
+                    if (string.IsNullOrWhiteSpace(_valueText))
+                        return "Value is required.";
+
+                    var type = (_type ?? "uint").ToLowerInvariant();
+                    switch (type)
+                    {
+                        case "uint":
+                            if (!ushort.TryParse(_valueText, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                                return "Value must be an unsigned integer (0-65535).";
+                            break;
+                        case "int":
+                            if (!short.TryParse(_valueText, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                                return "Value must be a signed integer (-32768 to 32767).";
+                            break;
+                        case "real":
+                            if (!float.TryParse(_valueText, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                                return "Value must be a number.";
+                            break;
+                    }
+                }
+
+                return string.Empty;
+            }
+        }
     }
 }

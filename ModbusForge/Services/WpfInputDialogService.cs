@@ -1,4 +1,4 @@
-using ModbusForge.Controls;
+using ModbusForge.Views;
 
 namespace ModbusForge.Services
 {

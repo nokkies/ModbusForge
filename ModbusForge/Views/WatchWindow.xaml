@@ -15,7 +15,7 @@
         </Grid.RowDefinitions>
 
         <!-- Toolbar -->
-        <ToolBarTray Grid.Row="0" Background="#F0F0F0">
+        <ToolBarTray Grid.Row="0" Background="{StaticResource LightMetallicSilverBrush}">
             <ToolBar>
                 <Button Content="Add Tag" Click="AddTag_Click" Padding="8,4" Margin="2"/>
                 <Button Content="Remove" Click="Remove_Click" Padding="8,4" Margin="2"/>
@@ -42,7 +42,7 @@
                   CanUserDeleteRows="False"
                   SelectionMode="Single"
                   GridLinesVisibility="All"
-                  AlternatingRowBackground="#F5F5F5">
+                  AlternatingRowBackground="{StaticResource LightMetallicWhiteBrush}">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Group" Binding="{Binding TagGroup}" Width="120" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Tag Name" Binding="{Binding TagName}" Width="150" IsReadOnly="True"/>
@@ -50,7 +50,7 @@
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">
                             <Setter Property="FontWeight" Value="Bold"/>
-                            <Setter Property="Foreground" Value="#007ACC"/>
+                            <Setter Property="Foreground" Value="{StaticResource LightMetallicAccentBrush}"/>
                         </Style>
                     </DataGridTextColumn.ElementStyle>
                 </DataGridTextColumn>
@@ -59,7 +59,7 @@
                 <DataGridTextColumn Header="Alarm" Binding="{Binding AlarmMessage}" Width="*" IsReadOnly="True">
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">
-                            <Setter Property="Foreground" Value="Red"/>
+                            <Setter Property="Foreground" Value="{StaticResource LightMetallicStatusErrorBrush}"/>
                             <Setter Property="FontWeight" Value="Bold"/>
                         </Style>
                     </DataGridTextColumn.ElementStyle>

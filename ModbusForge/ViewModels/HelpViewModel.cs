@@ -47,15 +47,15 @@ namespace ModbusForge.ViewModels
         {
             HelpTopics = new ObservableCollection<HelpTopic>
             {
-                new HelpTopic { TopicId = "getting-started", Title = "Getting Started", Icon = "🚀" },
-                new HelpTopic { TopicId = "connection-manager", Title = "Connection Manager", Icon = "🔗" },
-                new HelpTopic { TopicId = "script-editor", Title = "Script Editor", Icon = "📝" },
-                new HelpTopic { TopicId = "custom-data", Title = "Custom Data Tab", Icon = "📊" },
-                new HelpTopic { TopicId = "trends", Title = "Trend & Logging", Icon = "📈" },
-                new HelpTopic { TopicId = "visual-editor", Title = "Visual Node Editor", Icon = "🎨" },
-                new HelpTopic { TopicId = "preferences", Title = "Preferences", Icon = "⚙️" },
-                new HelpTopic { TopicId = "keyboard-shortcuts", Title = "Keyboard Shortcuts", Icon = "⌨️" },
-                new HelpTopic { TopicId = "troubleshooting", Title = "Troubleshooting", Icon = "🔧" }
+                new HelpTopic { TopicId = "getting-started", Title = "Getting Started" },
+                new HelpTopic { TopicId = "connection-manager", Title = "Connection Manager" },
+                new HelpTopic { TopicId = "script-editor", Title = "Script Editor" },
+                new HelpTopic { TopicId = "custom-data", Title = "Custom Data Tab" },
+                new HelpTopic { TopicId = "trends", Title = "Trend & Logging" },
+                new HelpTopic { TopicId = "visual-editor", Title = "Visual Node Editor" },
+                new HelpTopic { TopicId = "preferences", Title = "Preferences" },
+                new HelpTopic { TopicId = "keyboard-shortcuts", Title = "Keyboard Shortcuts" },
+                new HelpTopic { TopicId = "troubleshooting", Title = "Troubleshooting" }
             };
         }
 
@@ -113,15 +113,15 @@ namespace ModbusForge.ViewModels
 
                 var allTopics = new List<HelpTopic>
                 {
-                    new HelpTopic { TopicId = "getting-started", Title = "Getting Started", Icon = "🚀" },
-                    new HelpTopic { TopicId = "connection-manager", Title = "Connection Manager", Icon = "🔗" },
-                    new HelpTopic { TopicId = "script-editor", Title = "Script Editor", Icon = "📝" },
-                    new HelpTopic { TopicId = "custom-data", Title = "Custom Data Tab", Icon = "📊" },
-                    new HelpTopic { TopicId = "trends", Title = "Trend & Logging", Icon = "📈" },
-                    new HelpTopic { TopicId = "visual-editor", Title = "Visual Node Editor", Icon = "🎨" },
-                    new HelpTopic { TopicId = "preferences", Title = "Preferences", Icon = "⚙️" },
-                    new HelpTopic { TopicId = "keyboard-shortcuts", Title = "Keyboard Shortcuts", Icon = "⌨️" },
-                    new HelpTopic { TopicId = "troubleshooting", Title = "Troubleshooting", Icon = "🔧" }
+                    new HelpTopic { TopicId = "getting-started", Title = "Getting Started" },
+                    new HelpTopic { TopicId = "connection-manager", Title = "Connection Manager" },
+                    new HelpTopic { TopicId = "script-editor", Title = "Script Editor" },
+                    new HelpTopic { TopicId = "custom-data", Title = "Custom Data Tab" },
+                    new HelpTopic { TopicId = "trends", Title = "Trend & Logging" },
+                    new HelpTopic { TopicId = "visual-editor", Title = "Visual Node Editor" },
+                    new HelpTopic { TopicId = "preferences", Title = "Preferences" },
+                    new HelpTopic { TopicId = "keyboard-shortcuts", Title = "Keyboard Shortcuts" },
+                    new HelpTopic { TopicId = "troubleshooting", Title = "Troubleshooting" }
                 };
 
                 var filtered = allTopics.Where(t =>

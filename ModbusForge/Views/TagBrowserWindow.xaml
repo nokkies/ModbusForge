@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:behaviors="clr-namespace:ModbusForge.Behaviors"
         mc:Ignorable="d"
         Title="Tag Browser - Symbolic Addressing" 
         Height="600" Width="900"
@@ -15,15 +16,15 @@
         </Grid.RowDefinitions>
 
         <!-- Toolbar -->
-        <ToolBarTray Grid.Row="0" Background="#F0F0F0">
+        <ToolBarTray Grid.Row="0" Background="{StaticResource LightMetallicSilverBrush}">
             <ToolBar>
-                <Button Content="New Group" Click="NewGroup_Click" Padding="8,4" Margin="2"/>
-                <Button Content="New Tag" Click="NewTag_Click" Padding="8,4" Margin="2"/>
+                <Button x:Name="NewGroupButton" Content="New Group" Click="NewGroup_Click" Padding="8,4" Margin="2"/>
+                <Button x:Name="NewTagButton" Content="New Tag" Click="NewTag_Click" Padding="8,4" Margin="2"/>
                 <Separator/>
-                <Button Content="Delete" Click="Delete_Click" Padding="8,4" Margin="2"/>
+                <Button x:Name="DeleteButton" Content="Delete" Click="Delete_Click" Padding="8,4" Margin="2"/>
                 <Separator/>
-                <Button Content="Import" Click="Import_Click" Padding="8,4" Margin="2"/>
-                <Button Content="Export" Click="Export_Click" Padding="8,4" Margin="2"/>
+                <Button x:Name="ImportButton" Content="Import" Click="Import_Click" Padding="8,4" Margin="2"/>
+                <Button x:Name="ExportButton" Content="Export" Click="Export_Click" Padding="8,4" Margin="2"/>
                 <Separator/>
                 <Button Content="Add to Watch" Click="AddToWatch_Click" Padding="8,4" Margin="2"/>
             </ToolBar>
@@ -38,17 +39,16 @@
             </Grid.ColumnDefinitions>
 
             <!-- Tree View -->
-            <Border Grid.Column="0" BorderBrush="#DDD" BorderThickness="0,0,1,0">
+            <Border Grid.Column="0" BorderBrush="{StaticResource LightMetallicChromeBrush}" BorderThickness="0,0,1,0">
                 <ScrollViewer>
-                    <TreeView x:Name="TagTreeView" SelectedItemChanged="TagTreeView_SelectedItemChanged">
+                    <TreeView x:Name="TagTreeView" SelectedItemChanged="TagTreeView_SelectedItemChanged" MouseDoubleClick="TagTreeView_MouseDoubleClick">
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding SubGroups}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="📁" Margin="0,0,4,0" FontSize="14"/>
                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
-                                    <TextBlock Text=" (" Foreground="#666"/>
-                                    <TextBlock Text="{Binding TotalTagCount}" Foreground="#666"/>
-                                    <TextBlock Text=")" Foreground="#666"/>
+                                    <TextBlock Text=" (" Foreground="{StaticResource LightMetallicTextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding TotalTagCount}" Foreground="{StaticResource LightMetallicTextSecondaryBrush}"/>
+                                    <TextBlock Text=")" Foreground="{StaticResource LightMetallicTextSecondaryBrush}"/>
                                 </StackPanel>
                             </HierarchicalDataTemplate>
                         </TreeView.ItemTemplate>
@@ -57,7 +57,7 @@
             </Border>
 
             <!-- Grid Splitter -->
-            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="#DDD"/>
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="{StaticResource LightMetallicChromeBrush}"/>
 
             <!-- Details Panel -->
             <ScrollViewer Grid.Column="2" Margin="10">
@@ -99,7 +99,8 @@
                             </ComboBox>
 
                             <TextBlock Grid.Row="4" Grid.Column="0" Text="Address:" Margin="0,4" VerticalAlignment="Center"/>
-                            <TextBox x:Name="TagAddressBox" Grid.Row="4" Grid.Column="1" Margin="5,2" TextChanged="TagProperty_Changed"/>
+                            <TextBox x:Name="TagAddressBox" Grid.Row="4" Grid.Column="1" Margin="5,2" TextChanged="TagProperty_Changed"
+                                     behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
 
                             <TextBlock Grid.Row="5" Grid.Column="0" Text="Data Type:" Margin="0,4" VerticalAlignment="Center"/>
                             <ComboBox x:Name="TagDataTypeCombo" Grid.Row="5" Grid.Column="1" Margin="5,2" SelectionChanged="TagProperty_Changed">
@@ -114,10 +115,12 @@
                             </ComboBox>
 
                             <TextBlock Grid.Row="6" Grid.Column="0" Text="Scale:" Margin="0,4" VerticalAlignment="Center"/>
-                            <TextBox x:Name="TagScaleBox" Grid.Row="6" Grid.Column="1" Margin="5,2" TextChanged="TagProperty_Changed"/>
+                            <TextBox x:Name="TagScaleBox" Grid.Row="6" Grid.Column="1" Margin="5,2" TextChanged="TagProperty_Changed"
+                                     behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
 
                             <TextBlock Grid.Row="7" Grid.Column="0" Text="Offset:" Margin="0,4" VerticalAlignment="Center"/>
-                            <TextBox x:Name="TagOffsetBox" Grid.Row="7" Grid.Column="1" Margin="5,2" TextChanged="TagProperty_Changed"/>
+                            <TextBox x:Name="TagOffsetBox" Grid.Row="7" Grid.Column="1" Margin="5,2" TextChanged="TagProperty_Changed"
+                                     behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
 
                             <TextBlock Grid.Row="8" Grid.Column="0" Text="Units:" Margin="0,4" VerticalAlignment="Center"/>
                             <TextBox x:Name="TagUnitsBox" Grid.Row="8" Grid.Column="1" Margin="5,2" TextChanged="TagProperty_Changed"/>
@@ -140,7 +143,7 @@
                             <TextBlock x:Name="CurrentRawValue" Grid.Row="0" Grid.Column="1" Margin="5,2" FontWeight="Bold"/>
 
                             <TextBlock Grid.Row="1" Grid.Column="0" Text="Scaled Value:" Margin="0,4" VerticalAlignment="Center"/>
-                            <TextBlock x:Name="CurrentScaledValue" Grid.Row="1" Grid.Column="1" Margin="5,2" FontWeight="Bold" Foreground="#007ACC"/>
+                            <TextBlock x:Name="CurrentScaledValue" Grid.Row="1" Grid.Column="1" Margin="5,2" FontWeight="Bold" Foreground="{StaticResource LightMetallicAccentBrush}"/>
                         </Grid>
                     </GroupBox>
 
@@ -160,14 +163,19 @@
                             <CheckBox x:Name="AlarmEnabledCheck" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Content="Enable Alarms" Margin="0,4" Checked="AlarmSetting_Changed" Unchecked="AlarmSetting_Changed"/>
 
                             <TextBlock Grid.Row="1" Grid.Column="0" Text="High Limit:" Margin="0,4" VerticalAlignment="Center"/>
-                            <TextBox x:Name="AlarmHighBox" Grid.Row="1" Grid.Column="1" Margin="5,2" TextChanged="AlarmSetting_Changed"/>
+                            <TextBox x:Name="AlarmHighBox" Grid.Row="1" Grid.Column="1" Margin="5,2" TextChanged="AlarmSetting_Changed"
+                                     behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
 
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Low Limit:" Margin="0,4" VerticalAlignment="Center"/>
-                            <TextBox x:Name="AlarmLowBox" Grid.Row="2" Grid.Column="1" Margin="5,2" TextChanged="AlarmSetting_Changed"/>
+                            <TextBox x:Name="AlarmLowBox" Grid.Row="2" Grid.Column="1" Margin="5,2" TextChanged="AlarmSetting_Changed"
+                                     behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
                         </Grid>
                     </GroupBox>
 
-                    <Button Content="Save Changes" Click="SaveChanges_Click" Padding="10,5" HorizontalAlignment="Right" Margin="0,10,0,0"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                        <Button x:Name="SelectTagButton" Content="Select Tag" Click="SelectTag_Click" Padding="10,5" Margin="0,0,10,0" Visibility="Collapsed"/>
+                        <Button Content="Save Changes" Click="SaveChanges_Click" Padding="10,5"/>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

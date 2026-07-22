@@ -13,6 +13,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using ModbusForge.Models;
 using ModbusForge.ViewModels;
 using ModbusForge.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ModbusForge.Views
 {
@@ -404,21 +406,33 @@ namespace ModbusForge.Views
         
         private void LiveUpdateTimer_Tick(object? sender, EventArgs e)
         {
-            if (_viewModel == null || !_viewModel.ShowLiveValues) return;
-            
-            // Update all InputInt and OutputInt nodes with current DataStore values
-            foreach (var node in _viewModel.Nodes)
+            try
             {
-                if (node.ElementType == PlcElementType.InputInt || 
-                    node.ElementType == PlcElementType.OutputInt ||
-                    node.ElementType == PlcElementType.Input ||
-                    node.ElementType == PlcElementType.Output)
+                if (_viewModel == null || !_viewModel.ShowLiveValues) return;
+
+                // Update all InputInt and OutputInt nodes with current DataStore values
+                foreach (var node in _viewModel.Nodes)
                 {
-                    // Toggle ShowLiveValues to force update
-                    var wasShowing = node.ShowLiveValues;
-                    node.ShowLiveValues = false;
-                    node.ShowLiveValues = wasShowing;
+                    if (node.ElementType == PlcElementType.InputInt ||
+                        node.ElementType == PlcElementType.OutputInt ||
+                        node.ElementType == PlcElementType.Input ||
+                        node.ElementType == PlcElementType.Output)
+                    {
+                        // Toggle ShowLiveValues to force update
+                        var wasShowing = node.ShowLiveValues;
+                        node.ShowLiveValues = false;
+                        node.ShowLiveValues = wasShowing;
+                    }
                 }
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                // Live updates should never crash the canvas; log and continue.
+                try
+                {
+                    (App.ServiceProvider?.GetService(typeof(ILogger<VisualNodeEditor>)) as ILogger<VisualNodeEditor>)?.LogError(ex, "Error in LiveUpdateTimer_Tick");
+                }
+                catch { /* Avoid any secondary exception from logging. */ }
             }
         }
         
@@ -1305,24 +1319,58 @@ namespace ModbusForge.Views
             // Pre-populate dialog with current address
             var addrRef = isInputType ? node.Input1Address : node.OutputAddress;
             
-            // Create dialog with initial values from the address reference
+            // Show options: select a tag or use numeric addressing
+            var result = MessageBox.Show("Would you like to select a symbolic tag?\n\nClick Yes to browse tags.\nClick No for numeric addressing only.",
+                dialogTitle, MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Cancel)
+                return;
+
+            if (result == MessageBoxResult.Yes)
+            {
+                // Open Tag Browser in selection mode
+                var tagService = App.ServiceProvider.GetRequiredService<TagService>();
+                var tagBrowser = new TagBrowserWindow(tagService, selectionMode: true)
+                {
+                    Owner = Window.GetWindow(this),
+                    Title = "Select a Tag"
+                };
+
+                if (tagBrowser.ShowDialog() == true && tagBrowser.SelectedTag != null && addrRef != null)
+                {
+                    var selectedTag = tagBrowser.SelectedTag;
+
+                    // Update address reference with symbolic tag
+                    addrRef.SymbolicName = selectedTag.Name;
+                    addrRef.Area = selectedTag.Area;
+                    addrRef.Address = selectedTag.Address;
+
+                    // Refresh canvas to show the updated tag name
+                    RefreshCanvas();
+                    return;
+                }
+                // If user cancels tag selection, continue to numeric dialog
+            }
+
+            // Use numeric addressing dialog
             var initialArea = addrRef?.Area ?? PlcArea.HoldingRegister;
             var initialAddress = addrRef?.Address ?? 0;
-            
+
             var testDialog = new TestDialog(initialArea, initialAddress)
             {
                 Owner = Window.GetWindow(this),
                 Title = dialogTitle
             };
-            
+
             testDialog.ShowDialog();
             if (testDialog.DialogResult == true && addrRef != null)
             {
                 // Update with test dialog results
+                addrRef.SymbolicName = null; // Clear symbolic name when using numeric
                 addrRef.Area = testDialog.SelectedArea;
                 addrRef.Address = testDialog.SelectedAddress;
                 addrRef.Not = testDialog.SelectedAddress < 0; // Simplified
-                
+
                 // Refresh canvas to show the updated address
                 RefreshCanvas();
             }
@@ -1828,7 +1876,7 @@ namespace ModbusForge.Views
             var deleteItem = new MenuItem
             {
                 Header = "Delete",
-                Icon = new TextBlock { Text = "🗑️", FontSize = 12 }
+                Icon = new TextBlock { Text = "×", FontSize = 12 }
             };
             deleteItem.Click += (s, ev) =>
             {
@@ -1844,7 +1892,7 @@ namespace ModbusForge.Views
                 var configItem = new MenuItem
                 {
                     Header = "Configure Waveform...",
-                    Icon = new TextBlock { Text = "⚙️", FontSize = 12 }
+                    Icon = new TextBlock { Text = "…", FontSize = 12 }
                 };
                 configItem.Click += (s, ev) =>
                 {

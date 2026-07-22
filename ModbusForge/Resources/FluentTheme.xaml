@@ -14,6 +14,12 @@
     <SolidColorBrush x:Key="FluentBorder" Color="#E1DFDD"/>
     <SolidColorBrush x:Key="FluentDivider" Color="#EDEBE9"/>
 
+    <!-- Semantic status brushes (use these instead of hard-coded reds/greens) -->
+    <SolidColorBrush x:Key="FluentStatusInfo" Color="#0078D4"/>
+    <SolidColorBrush x:Key="FluentStatusError" Color="#D13438"/>
+    <SolidColorBrush x:Key="FluentStatusWarning" Color="#FF8C00"/>
+    <SolidColorBrush x:Key="FluentStatusSuccess" Color="#107C10"/>
+
     <!-- Modern Fluent Typography -->
     <Style x:Key="FluentTitle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="24"/>
@@ -348,13 +354,13 @@
     <Style x:Key="FluentStatusIndicator" TargetType="Ellipse">
         <Setter Property="Width" Value="8"/>
         <Setter Property="Height" Value="8"/>
-        <Setter Property="Fill" Value="#605E5C"/>
+        <Setter Property="Fill" Value="{StaticResource FluentTextSecondary}"/>
         <Style.Triggers>
             <DataTrigger Binding="{Binding IsConnected}" Value="True">
-                <Setter Property="Fill" Value="#107C10"/>
+                <Setter Property="Fill" Value="{StaticResource FluentStatusSuccess}"/>
             </DataTrigger>
             <DataTrigger Binding="{Binding IsConnected}" Value="False">
-                <Setter Property="Fill" Value="#D13438"/>
+                <Setter Property="Fill" Value="{StaticResource FluentStatusError}"/>
             </DataTrigger>
         </Style.Triggers>
     </Style>

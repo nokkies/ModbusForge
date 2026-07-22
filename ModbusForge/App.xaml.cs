@@ -35,50 +35,63 @@ namespace ModbusForge
             this.DispatcherUnhandledException += App_DispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 
-            // Validate configuration on startup
-            var configValidator = ServiceProvider.GetRequiredService<IConfigurationValidator>();
-            var serverSettings = ServiceProvider.GetRequiredService<IOptions<ServerSettings>>().Value;
-            var loggingSettings = ServiceProvider.GetRequiredService<IOptions<LoggingSettings>>().Value;
-            
-            var validationResult = configValidator.ValidateConfiguration(serverSettings, loggingSettings);
-            if (!validationResult.IsValid)
+            try
             {
+                // Validate configuration on startup
+                var configValidator = ServiceProvider.GetRequiredService<IConfigurationValidator>();
+                var serverSettings = ServiceProvider.GetRequiredService<IOptions<ServerSettings>>().Value;
+                var loggingSettings = ServiceProvider.GetRequiredService<IOptions<LoggingSettings>>().Value;
+
+                var validationResult = configValidator.ValidateConfiguration(serverSettings, loggingSettings);
+                if (!validationResult.IsValid)
+                {
+                    MessageBox.Show(
+                        $"Configuration validation failed:\n{validationResult.ErrorMessage}\n\nApplication will exit.",
+                        "Configuration Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    Shutdown();
+                    return;
+                }
+
+                // Log any configuration warnings
+                var warnings = configValidator.GetValidationWarnings();
+                if (warnings.Count > 0)
+                {
+                    var logger = ServiceProvider.GetRequiredService<ILogger<App>>();
+                    foreach (var warning in warnings)
+                    {
+                        logger.LogWarning("Configuration warning: {Warning}", warning);
+                    }
+                }
+
+                // Initialize TagService (loads persisted data)
+                var tagService = ServiceProvider.GetRequiredService<TagService>();
+                await tagService.InitializeAsync();
+
+                // Start API Service if enabled
+                var settingsService = ServiceProvider.GetRequiredService<ISettingsService>();
+                var apiServerService = ServiceProvider.GetRequiredService<IApiServerService>();
+                if (settingsService.EnableApi)
+                {
+                    await apiServerService.StartAsync();
+                }
+
+                // Create and show the main window
+                var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
+                Wpf.Ui.Appearance.SystemThemeWatcher.Watch(mainWindow);
+                mainWindow.Show();
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                LogFatalException(ex, "Application_Startup");
                 MessageBox.Show(
-                    $"Configuration validation failed:\n{validationResult.ErrorMessage}\n\nApplication will exit.",
-                    "Configuration Error",
+                    $"A fatal error occurred during startup:\n{ex.Message}\n\nDetails have been logged.",
+                    "Startup Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
                 Shutdown();
-                return;
             }
-
-            // Log any configuration warnings
-            var warnings = configValidator.GetValidationWarnings();
-            if (warnings.Count > 0)
-            {
-                var logger = ServiceProvider.GetRequiredService<ILogger<App>>();
-                foreach (var warning in warnings)
-                {
-                    logger.LogWarning("Configuration warning: {Warning}", warning);
-                }
-            }
-
-            // Initialize TagService (loads persisted data)
-            var tagService = ServiceProvider.GetRequiredService<TagService>();
-            await tagService.InitializeAsync();
-
-            // Start API Service if enabled
-            var settingsService = ServiceProvider.GetRequiredService<ISettingsService>();
-            var apiServerService = ServiceProvider.GetRequiredService<IApiServerService>();
-            if (settingsService.EnableApi)
-            {
-                await apiServerService.StartAsync();
-            }
-
-            // Create and show the main window
-            var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
-            Wpf.Ui.Appearance.SystemThemeWatcher.Watch(mainWindow);
-            mainWindow.Show();
         }
 
         private void App_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
