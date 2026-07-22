@@ -137,6 +137,14 @@ namespace ModbusForge.ViewModels
             OpenTagBrowserCommand = new RelayCommand(OpenTagBrowser);
             OpenWatchWindowCommand = new RelayCommand(OpenWatchWindow);
 
+            // Subscribe to node value changes so manual edits in the Live Values
+            // panel are written back to the DataStore via the simulation service.
+            Nodes.CollectionChanged += OnNodesCollectionChanged;
+            foreach (var existing in Nodes)
+            {
+                AttachValueChangedCallback(existing);
+            }
+
             // Initialize with a default program
             var defaultProgram = new ProgramModel { Name = "Main", ExecutionOrder = 0 };
             ProgramTree.Programs.Add(defaultProgram);
@@ -155,6 +163,39 @@ namespace ModbusForge.ViewModels
                     Nodes = new ObservableCollection<PaletteNode>(
                         group.Select(d => new PaletteNode { Name = d.PaletteName, Tag = d.TypeId }))
                 });
+            }
+        }
+
+        private void OnNodesCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            if (e.NewItems != null)
+            {
+                foreach (VisualNode node in e.NewItems)
+                {
+                    AttachValueChangedCallback(node);
+                }
+            }
+        }
+
+        private void AttachValueChangedCallback(VisualNode node)
+        {
+            node.ValueChangedCallback = OnNodeValueEditedByUser;
+        }
+
+        /// <summary>
+        /// Called when the user manually edits a value in the Live Values panel.
+        /// Forwards the new value to the simulation service so it gets written
+        /// to the DataStore at the node's configured address.
+        /// </summary>
+        private void OnNodeValueEditedByUser(VisualNode node, double value)
+        {
+            try
+            {
+                _visualSimulationService?.WriteNodeValue(node.Id, value);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to write node {NodeId} value {Value} to DataStore", node.Id, value);
             }
         }
 

@@ -40,6 +40,29 @@ namespace ModbusForge.Models
         
         [ObservableProperty]
         private double _currentValueDouble = 0;
+
+        /// <summary>
+        /// When true, changes to <see cref="CurrentValueDouble"/> do NOT trigger
+        /// the <see cref="ValueChangedCallback"/>. Used by the simulation service
+        /// when it pushes live values into the property so we don't echo writes
+        /// back to the DataStore for values the simulation just produced.
+        /// </summary>
+        public bool SuppressWriteBack { get; set; }
+
+        /// <summary>
+        /// Callback invoked when the user manually edits the Live Values TextBox.
+        /// The ViewModel subscribes to this and forwards the value to the
+        /// simulation service so it gets written to the DataStore.
+        /// </summary>
+        public Action<VisualNode, double>? ValueChangedCallback { get; set; }
+
+        partial void OnCurrentValueDoubleChanged(double value)
+        {
+            if (!SuppressWriteBack)
+            {
+                ValueChangedCallback?.Invoke(this, value);
+            }
+        }
         
         [ObservableProperty]
         private bool _showLiveValues = false;
