@@ -342,22 +342,36 @@ namespace ModbusForge.ViewModels
                     case PlcElementType.TP:
                         newNode.TimerPresetMs = 1000;
                         newNode.Width = 190; // wider to avoid text truncation
+                        newNode.Height = 100; // footer needs more vertical space
                         break;
                     case PlcElementType.SignalGenerator:
                         newNode.CompareValue = 100; // default height
                         newNode.TimerPresetMs = 1000; // default sample time
                         newNode.Width = 190;
+                        newNode.Height = 100;
                         break;
                     case PlcElementType.CTU:
                     case PlcElementType.CTD:
                     case PlcElementType.CTC:
                         newNode.CounterPreset = 10;
+                        newNode.Height = 100; // footer needs more vertical space
                         break;
                     case PlcElementType.MATH_ADD:
                     case PlcElementType.MATH_SUB:
                     case PlcElementType.MATH_MUL:
                     case PlcElementType.MATH_DIV:
                         newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = GetNextAvailableAddress(PlcArea.HoldingRegister) };
+                        newNode.Width = 190; // wider to fit "Const:" footer
+                        newNode.Height = 100; // footer needs more vertical space
+                        break;
+                    case PlcElementType.COMPARE_EQ:
+                    case PlcElementType.COMPARE_NE:
+                    case PlcElementType.COMPARE_GT:
+                    case PlcElementType.COMPARE_LT:
+                    case PlcElementType.COMPARE_GE:
+                    case PlcElementType.COMPARE_LE:
+                        newNode.Width = 190; // wider to fit "Value:" footer
+                        newNode.Height = 100; // footer needs more vertical space
                         break;
                 }
                 

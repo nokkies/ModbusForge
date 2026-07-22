@@ -8,8 +8,10 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using System.Windows.Data;
 using MahApps.Metro.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
+using ModbusForge.Behaviors;
 using ModbusForge.Models;
 using ModbusForge.ViewModels;
 using ModbusForge.Services;
@@ -758,7 +760,7 @@ namespace ModbusForge.Views
             grid.Children.Add(header);
             
             // Content row
-            var (contentGrid, contentStack, liveText) = CreateNodeContent(node);
+            var (contentGrid, contentStack, liveValueBox) = CreateNodeContent(node);
             Grid.SetRow(contentGrid, 1);
             grid.Children.Add(contentGrid);
             
@@ -771,9 +773,9 @@ namespace ModbusForge.Views
             
             // Setup event handlers for live value updates
             var capturedHeader = header;
-            var capturedLiveText = liveText;
+            var capturedLiveValueBox = liveValueBox;
             var originalColor = GetElementColor(node.ElementType);
-            SetupNodeEventHandlers(node, border, capturedHeader, capturedLiveText, capturedHeaderText, capturedAddressText, originalColor);
+            SetupNodeEventHandlers(node, border, capturedHeader, capturedLiveValueBox, capturedHeaderText, capturedAddressText, originalColor);
             
             // Footer row (if needed)
             var footer = CreateNodeFooter(node);
@@ -967,7 +969,7 @@ namespace ModbusForge.Views
             return true;
         }
 
-        private (Grid contentGrid, StackPanel contentStack, TextBlock liveText) CreateNodeContent(VisualNode node)
+        private (Grid contentGrid, StackPanel contentStack, TextBox liveValueBox) CreateNodeContent(VisualNode node)
         {
             var contentGrid = new Grid { MinHeight = 32 };
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) }); // input connectors
@@ -1017,18 +1019,50 @@ namespace ModbusForge.Views
                 });
             }
 
-            // Live value indicator — compact badge
-            var liveText = new TextBlock
+            // Live value editor — editable TextBox bound to CurrentValueDouble.
+            // Visible only when ShowLiveValues is true. Write-back to the DataStore
+            // happens via the CurrentValueDouble callback wired in the ViewModel.
+            var liveValueBox = new TextBox
             {
-                Text = "",
-                FontSize = 9,
+                Width = 60,
+                Height = 20,
+                FontSize = 10,
                 FontWeight = FontWeights.Bold,
                 Foreground = new SolidColorBrush(Color.FromRgb(0, 122, 204)),
+                Background = new SolidColorBrush(Color.FromRgb(240, 248, 255)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0, 122, 204)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(2, 0, 2, 0),
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Margin = new Thickness(0, 2, 0, 0),
-                Visibility = Visibility.Collapsed
+                Visibility = Visibility.Collapsed,
+                ToolTip = "Editable live value (0=OFF/False, 1=ON/True for boolean nodes)"
             };
-            contentStack.Children.Add(liveText);
+
+            liveValueBox.SetBinding(TextBox.TextProperty, new Binding(nameof(VisualNode.CurrentValueDouble))
+            {
+                Source = node,
+                Mode = BindingMode.TwoWay,
+                UpdateSourceTrigger = UpdateSourceTrigger.LostFocus
+            });
+
+            NumericTextBoxBehavior.SetIsNumeric(liveValueBox, true);
+            NumericTextBoxBehavior.SetFormat(liveValueBox, NumericTextBoxBehavior.NumericFormat.Decimal);
+
+            liveValueBox.GotFocus += (s, e) => node.IsEditingLiveValue = true;
+            liveValueBox.LostFocus += (s, e) => node.IsEditingLiveValue = false;
+            liveValueBox.KeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Enter)
+                {
+                    BindingOperations.GetBindingExpression(liveValueBox, TextBox.TextProperty)?.UpdateSource();
+                    System.Windows.Input.Keyboard.ClearFocus();
+                }
+            };
+
+            contentStack.Children.Add(liveValueBox);
 
             Grid.SetColumn(contentStack, 1);
             contentGrid.Children.Add(contentStack);
@@ -1045,10 +1079,10 @@ namespace ModbusForge.Views
             Grid.SetColumn(outputStack, 2);
             contentGrid.Children.Add(outputStack);
 
-            return (contentGrid, contentStack, liveText);
+            return (contentGrid, contentStack, liveValueBox);
         }
 
-        private void SetupNodeEventHandlers(VisualNode node, Border border, Border header, TextBlock liveText, 
+        private void SetupNodeEventHandlers(VisualNode node, Border border, Border header, TextBox liveValueBox, 
             TextBlock headerText, TextBlock addressText, Color originalColor)
         {
             _nodeEventHandlers[node.Id] = new List<(object, PropertyChangedEventHandler)>();
@@ -1077,7 +1111,7 @@ namespace ModbusForge.Views
                 if (e.PropertyName == nameof(VisualNode.CurrentValue) ||
                     e.PropertyName == nameof(VisualNode.ShowLiveValues))
                 {
-                    UpdateLiveValueDisplay(node, liveText, header, originalColor);
+                    UpdateLiveValueDisplay(node, liveValueBox, header, originalColor);
                 }
                 
                 if (e.PropertyName == nameof(VisualNode.Input1Address) ||
@@ -1116,94 +1150,19 @@ namespace ModbusForge.Views
             }
         }
 
-        private void UpdateLiveValueDisplay(VisualNode node, TextBlock liveText, Border header, Color originalColor)
+        private void UpdateLiveValueDisplay(VisualNode node, TextBox liveValueBox, Border header, Color originalColor)
         {
             if (node.ShowLiveValues)
             {
-                UpdateLiveTextForElementType(node, liveText);
-                liveText.Visibility = Visibility.Visible;
+                liveValueBox.Visibility = Visibility.Visible;
                 header.Background = new SolidColorBrush(node.CurrentValue
                     ? Color.FromRgb(40, 160, 40)
                     : Color.FromRgb(160, 40, 40));
             }
             else
             {
-                liveText.Visibility = Visibility.Collapsed;
+                liveValueBox.Visibility = Visibility.Collapsed;
                 header.Background = new SolidColorBrush(originalColor);
-            }
-        }
-
-        private void UpdateLiveTextForElementType(VisualNode node, TextBlock liveText)
-        {
-            if (_viewModel == null) return;
-
-            var mainViewModel = Window.GetWindow(this)?.DataContext as MainViewModel;
-            var selectedUnitId = mainViewModel?.SelectedUnitId ?? 1;
-
-            switch (node.ElementType)
-            {
-                case PlcElementType.InputBool:
-                case PlcElementType.OutputBool:
-                    liveText.Text = node.CurrentValue ? "● ON" : "● OFF";
-                    liveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
-                    break;
-
-                case PlcElementType.InputInt:
-                    var actualValue = _viewModel.GetActualRegisterValue(node, selectedUnitId);
-                    liveText.Text = $"● VAL:{actualValue}";
-                    liveText.Foreground = Brushes.Cyan;
-                    break;
-
-                case PlcElementType.OutputInt:
-                    var outputValue = _viewModel.GetOutputRegisterValue(node, selectedUnitId);
-                    liveText.Text = $"● VAL:{outputValue}";
-                    liveText.Foreground = Brushes.Cyan;
-                    break;
-
-                case PlcElementType.SignalGenerator:
-                    liveText.Text = $"● VAL:{node.IntValue}";
-                    liveText.Foreground = Brushes.Cyan;
-                    break;
-
-                case PlcElementType.Input:
-                case PlcElementType.Output:
-                    if (node.Input1Address?.Area == PlcArea.HoldingRegister ||
-                        node.Input1Address?.Area == PlcArea.InputRegister)
-                    {
-                        var actualLegacyValue = _viewModel.GetActualRegisterValue(node, selectedUnitId);
-                        liveText.Text = $"● VAL:{actualLegacyValue}";
-                        liveText.Foreground = Brushes.Cyan;
-                    }
-                    else
-                    {
-                        liveText.Text = node.CurrentValue ? "● ON" : "● OFF";
-                        liveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
-                    }
-                    break;
-
-                case PlcElementType.MATH_ADD:
-                case PlcElementType.MATH_SUB:
-                case PlcElementType.MATH_MUL:
-                case PlcElementType.MATH_DIV:
-                    var mathResult = _viewModel.GetOutputRegisterValue(node, selectedUnitId);
-                    liveText.Text = $"● VAL:{mathResult}";
-                    liveText.Foreground = Brushes.Orange;
-                    break;
-                    
-                case PlcElementType.COMPARE_EQ:
-                case PlcElementType.COMPARE_NE:
-                case PlcElementType.COMPARE_GT:
-                case PlcElementType.COMPARE_LT:
-                case PlcElementType.COMPARE_GE:
-                case PlcElementType.COMPARE_LE:
-                    liveText.Text = node.CurrentValue ? "● TRUE" : "● FALSE";
-                    liveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
-                    break;
-                    
-                default:
-                    liveText.Text = node.CurrentValue ? "● ON" : "● OFF";
-                    liveText.Foreground = node.CurrentValue ? Brushes.LimeGreen : Brushes.Red;
-                    break;
             }
         }
 
@@ -1224,7 +1183,7 @@ namespace ModbusForge.Views
             {
                 Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
                 CornerRadius = new CornerRadius(0, 0, 6, 6),
-                Padding = new Thickness(4, 2, 4, 2),
+                Padding = new Thickness(4, 3, 4, 3),
                 Child = footerPanel
             };
             
@@ -1305,8 +1264,10 @@ namespace ModbusForge.Views
                 case PlcElementType.MATH_SUB:
                 case PlcElementType.MATH_MUL:
                 case PlcElementType.MATH_DIV:
-                    footerPanel.Children.Add(new TextBlock { Text = "Const:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
-                    var mathBox = new TextBox { Width = 50, Height = 18, FontSize = 10, Text = node.CompareValue.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                    var mathLabel = new TextBlock { Text = "Const:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,1) };
+                    mathLabel.SetValue(ToolTipService.ToolTipProperty, "Constant value used when Input2 is not connected");
+                    footerPanel.Children.Add(mathLabel);
+                    var mathBox = new TextBox { Width = 52, Height = 20, FontSize = 10, Padding = new Thickness(1, 0, 1, 1), Text = node.CompareValue.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
                     int oldMathCompareValue = node.CompareValue;
                     mathBox.GotFocus += (s, ev) => oldMathCompareValue = node.CompareValue;
                     mathBox.LostFocus += (s, ev) => {

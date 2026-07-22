@@ -59,6 +59,13 @@ namespace ModbusForge.Models
         [JsonIgnore]
         public Action<VisualNode, double>? ValueChangedCallback { get; set; }
 
+        /// <summary>
+        /// When true, the user is actively editing the live value on the node canvas,
+        /// so the simulation service should not overwrite <see cref="CurrentValueDouble"/>.
+        /// </summary>
+        [JsonIgnore]
+        public bool IsEditingLiveValue { get; set; }
+
         partial void OnCurrentValueDoubleChanged(double value)
         {
             if (!SuppressWriteBack)

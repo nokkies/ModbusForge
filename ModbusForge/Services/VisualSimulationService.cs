@@ -235,14 +235,18 @@ namespace ModbusForge.Services
                     // Mirror the live value into the property bound by the Live Values panel.
                     // Use the suppress flag so we don't trigger a write-back to the DataStore
                     // for values the simulation itself just produced.
-                    node.SuppressWriteBack = true;
-                    try
+                    // Skip if the user is actively editing the value on the node canvas.
+                    if (!node.IsEditingLiveValue)
                     {
-                        node.CurrentValueDouble = liveDouble ?? result.IntValue;
-                    }
-                    finally
-                    {
-                        node.SuppressWriteBack = false;
+                        node.SuppressWriteBack = true;
+                        try
+                        {
+                            node.CurrentValueDouble = liveDouble ?? result.IntValue;
+                        }
+                        finally
+                        {
+                            node.SuppressWriteBack = false;
+                        }
                     }
                     _nodeValueCache[node.Id] = result.BoolValue;
                     _lastNodeUpdate[node.Id] = now;
