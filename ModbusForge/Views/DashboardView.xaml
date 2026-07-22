@@ -109,9 +109,11 @@
                     <TextBlock.Style>
                         <Style TargetType="TextBlock" BasedOn="{StaticResource ModernBodyStyle}">
                             <Setter Property="Visibility" Value="Visible"/>
-                            <DataTrigger Binding="{Binding HasRecentProfiles}" Value="True">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasRecentProfiles}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
