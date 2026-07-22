@@ -37,6 +37,8 @@ namespace ModbusForge.ViewModels
         // Partial method declarations for delegated properties (required by CommunityToolkit.Mvvm)
         partial void OnRegistersGlobalTypeChanged(string value);
         partial void OnInputRegistersGlobalTypeChanged(string value);
+        partial void OnRegistersSwapBytesChanged(bool value);
+        partial void OnRegistersSwapWordsChanged(bool value);
 
         // Initialized in InitializeServiceState called from constructor
         private IModbusService _modbusService = null!;
@@ -1087,6 +1089,25 @@ namespace ModbusForge.ViewModels
             {
                 r.Type = value;
             }
+        }
+
+        // propagate global swap selection to each row and refresh displayed values
+        partial void OnRegistersSwapBytesChanged(bool value)
+        {
+            foreach (var r in HoldingRegisters)
+            {
+                r.SwapBytes = value;
+            }
+            _registerCoordinator.RefreshHoldingRegisterValueText(HoldingRegisters);
+        }
+
+        partial void OnRegistersSwapWordsChanged(bool value)
+        {
+            foreach (var r in HoldingRegisters)
+            {
+                r.SwapWords = value;
+            }
+            _registerCoordinator.RefreshHoldingRegisterValueText(HoldingRegisters);
         }
 
         partial void OnInputRegistersGlobalTypeChanged(string value)

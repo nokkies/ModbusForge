@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Extensions.Logging;
@@ -130,6 +131,12 @@ namespace ModbusForge.ViewModels.Coordinators
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
+        }
+
+        public void RefreshHoldingRegisterValueText(ObservableCollection<RegisterEntry> holdingRegisters)
+        {
+            var values = holdingRegisters.Select(e => e.Value).ToArray();
+            ApplyValueText(holdingRegisters, values);
         }
 
         private void ApplyValueText(ObservableCollection<RegisterEntry> holdingRegisters, ushort[] values)

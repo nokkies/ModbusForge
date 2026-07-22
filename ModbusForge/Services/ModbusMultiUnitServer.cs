@@ -145,7 +145,7 @@ namespace ModbusForge.Services
                         var pdu = new byte[length - 1];
                         if (!await ReadExactAsync(stream, pdu, pdu.Length, ct)) break;
 
-                        _consoleLoggerService?.Log($"Request from {remoteEndpoint} Unit ID {unitId} FC {pdu[0]}");
+                        _consoleLoggerService?.Log($"Request from {remoteEndpoint} Unit ID {unitId} FC {(pdu.Length > 0 ? pdu[0] : 0)}");
 
                         var responseData = ProcessPdu(unitId, pdu);
                         if (responseData == null) continue;
