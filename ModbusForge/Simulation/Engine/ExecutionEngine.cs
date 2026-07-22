@@ -56,6 +56,8 @@ namespace ModbusForge.Simulation.Engine
 
             RebuildExecutionOrder();
 
+            _lastExecutionTime = DateTimeOffset.UtcNow;
+
             _logger.LogInformation("Loaded simulation graph with {NodeCount} nodes and {ConnectionCount} connections",
                 _nodes.Count, _connections.Count);
         }
@@ -237,7 +239,8 @@ namespace ModbusForge.Simulation.Engine
             if (raw == null)
                 return null;
 
-            return SimulationValue.FromObject(targetType, raw);
+            var value = SimulationValue.FromObject(targetType, raw);
+            return address.Not ? Invert(value) : value;
         }
 
         private static void WriteDataStore(DataStore dataStore, PlcAddressReference address, ISimulationValue value)

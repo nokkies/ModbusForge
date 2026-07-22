@@ -126,6 +126,89 @@ namespace ModbusForge.Tests.Simulation
             Assert.True(dataStore.CoilDiscretes[10]);
         }
 
+        [Fact]
+        public void Execute_InvertedInput_ReadsInvertedValue()
+        {
+            var engine = new ExecutionEngine(_catalog);
+
+            var input = CreateNode("in", new InputBoolBlock());
+            input.InputBindings["Input1"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1, Not = true };
+
+            var output = CreateNode("out", new OutputBoolBlock());
+            output.OutputBindings["Output"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 };
+
+            engine.LoadGraph(
+                new[] { input, output },
+                new[] { new SimulationConnection("in", "Output", "out", "Input1") });
+
+            var dataStore = CreateDataStore();
+            dataStore.CoilDiscretes[1] = true;
+
+            engine.Execute(dataStore);
+
+            Assert.False(dataStore.CoilDiscretes[10]);
+        }
+
+        [Fact]
+        public void Execute_LoadGraph_ResetsElapsedTime()
+        {
+            var catalog = new FunctionBlockCatalog();
+            catalog.Register(new InputBoolBlock());
+            catalog.Register(new TonBlock());
+            catalog.Register(new OutputBoolBlock());
+
+            var engine = new ExecutionEngine(catalog);
+
+            var input = CreateNode("in", new InputBoolBlock());
+            input.InputBindings["Input1"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 };
+
+            var ton = CreateNode("ton", new TonBlock());
+            ton.Parameters["TimerPresetMs"] = 10000;
+
+            var output = CreateNode("out", new OutputBoolBlock());
+            output.OutputBindings["Output"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 };
+
+            engine.LoadGraph(
+                new[] { input, ton, output },
+                new[]
+                {
+                    new SimulationConnection("in", "Output", "ton", "Input1"),
+                    new SimulationConnection("ton", "Output", "out", "Input1")
+                });
+
+            var dataStore = CreateDataStore();
+            dataStore.CoilDiscretes[1] = true;
+
+            engine.Execute(dataStore);
+
+            Assert.False(dataStore.CoilDiscretes[10]);
+        }
+
+        [Fact]
+        public void Execute_MathBlock_UsesInputBindingWhenNotConnected()
+        {
+            var engine = new ExecutionEngine(_catalog);
+
+            var math = CreateNode("math", new MathBlock(MathOperation.Add));
+            math.InputBindings["Input1"] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 1 };
+            math.InputBindings["Input2"] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 2 };
+
+            var output = CreateNode("out", new OutputIntBlock());
+            output.OutputBindings["Output"] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 20 };
+
+            engine.LoadGraph(
+                new[] { math, output },
+                new[] { new SimulationConnection("math", "Output", "out", "Input1") });
+
+            var dataStore = CreateDataStore();
+            dataStore.HoldingRegisters[1] = 10;
+            dataStore.HoldingRegisters[2] = 3;
+
+            engine.Execute(dataStore);
+
+            Assert.Equal(13, dataStore.HoldingRegisters[20]);
+        }
+
         private static SimulationNode CreateNode(string id, IFunctionBlock block)
         {
             return new SimulationNode(id, id, block);

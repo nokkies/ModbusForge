@@ -223,8 +223,7 @@ namespace ModbusForge.Services
             var nodeCount = _viewModel.Nodes.Count;
             var connCount = _viewModel.Connections.Count;
 
-            if (_engine.ExecutionOrder.Count == _viewModel.Nodes.Count &&
-                _lastNodeCount == nodeCount &&
+            if (_lastNodeCount == nodeCount &&
                 _lastConnectionCount == connCount)
             {
                 return;
@@ -249,6 +248,14 @@ namespace ModbusForge.Services
             // Bind DataStore addresses only to the ports that the element type actually uses.
             if (IsInputSource(visualNode.ElementType) && visualNode.Input1Address?.Address >= 0)
                 node.InputBindings["Input1"] = visualNode.Input1Address;
+
+            if (IsCompareOrMath(visualNode.ElementType))
+            {
+                if (visualNode.Input1Address?.Address >= 0)
+                    node.InputBindings["Input1"] = visualNode.Input1Address;
+                if (visualNode.Input2Address?.Address >= 0)
+                    node.InputBindings["Input2"] = visualNode.Input2Address;
+            }
 
             if (IsOutputSink(visualNode.ElementType) && visualNode.OutputAddress?.Address >= 0)
                 node.OutputBindings["Output"] = visualNode.OutputAddress;
@@ -284,6 +291,20 @@ namespace ModbusForge.Services
         private static bool IsOutputSink(PlcElementType elementType)
         {
             return elementType is PlcElementType.Output or PlcElementType.OutputBool or PlcElementType.OutputInt;
+        }
+
+        private static bool IsCompareOrMath(PlcElementType elementType)
+        {
+            return elementType is PlcElementType.COMPARE_EQ
+                or PlcElementType.COMPARE_NE
+                or PlcElementType.COMPARE_GT
+                or PlcElementType.COMPARE_LT
+                or PlcElementType.COMPARE_GE
+                or PlcElementType.COMPARE_LE
+                or PlcElementType.MATH_ADD
+                or PlcElementType.MATH_SUB
+                or PlcElementType.MATH_MUL
+                or PlcElementType.MATH_DIV;
         }
 
         private SimulationConnection MapToSimulationConnection(NodeConnection connection)
