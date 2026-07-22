@@ -722,16 +722,12 @@ namespace ModbusForge.Views
             return (header, headerText, addressText);
         }
 
-        private bool IsIoNode(PlcElementType elementType) =>
-            elementType == PlcElementType.Input || elementType == PlcElementType.Output ||
-            elementType == PlcElementType.InputBool || elementType == PlcElementType.InputInt ||
-            elementType == PlcElementType.OutputBool || elementType == PlcElementType.OutputInt;
+        private bool IsIoNode(PlcElementType elementType) => NodeDescriptors.Get(elementType).IsIo;
 
         private (StackPanel inlinePanel, bool isInputType) CreateInlineAddressEditor(VisualNode node, TextBlock capturedAddressText)
         {
-            var isInputType = node.ElementType == PlcElementType.Input ||
-                              node.ElementType == PlcElementType.InputBool ||
-                              node.ElementType == PlcElementType.InputInt;
+            var descriptor = NodeDescriptors.Get(node.ElementType);
+            var isInputType = descriptor.IsInput;
             var addrRef = isInputType ? node.Input1Address : node.OutputAddress;
 
             var inlinePanel = new StackPanel
@@ -1082,7 +1078,7 @@ namespace ModbusForge.Views
 
         private Border? CreateNodeFooter(VisualNode node)
         {
-            if (!node.HasParameters && node.ElementType != PlcElementType.RS)
+            if (!NodeDescriptors.Get(node.ElementType).HasFooter)
                 return null;
             
             var footerPanel = new StackPanel
@@ -1288,9 +1284,7 @@ namespace ModbusForge.Views
             }
 
             // Only I/O blocks should have configure buttons
-            if (node.ElementType != PlcElementType.Input && node.ElementType != PlcElementType.Output &&
-                node.ElementType != PlcElementType.InputBool && node.ElementType != PlcElementType.InputInt &&
-                node.ElementType != PlcElementType.OutputBool && node.ElementType != PlcElementType.OutputInt)
+            if (!NodeDescriptors.Get(node.ElementType).IsIo)
             {
                 return;
             }
@@ -1371,20 +1365,7 @@ namespace ModbusForge.Views
 
         private Color GetElementColor(PlcElementType elementType)
         {
-            return elementType switch
-            {
-                PlcElementType.Input => Color.FromRgb(76, 175, 80),
-                PlcElementType.Output => Color.FromRgb(255, 87, 34),
-                PlcElementType.RS => Color.FromRgb(244, 67, 54),
-                PlcElementType.AND => Color.FromRgb(33, 150, 243),
-                PlcElementType.OR => Color.FromRgb(255, 152, 0),
-                PlcElementType.NOT => Color.FromRgb(156, 39, 176),
-                PlcElementType.TON or PlcElementType.TOF or PlcElementType.TP => Color.FromRgb(255, 193, 7),
-                PlcElementType.CTU or PlcElementType.CTD or PlcElementType.CTC => Color.FromRgb(96, 125, 139),
-                var compare when compare.ToString().StartsWith("COMPARE_") => Color.FromRgb(0, 188, 212),
-                var math when math.ToString().StartsWith("MATH_") => Color.FromRgb(121, 85, 72),
-                _ => Color.FromRgb(158, 158, 158)
-            };
+            return NodeDescriptors.Get(elementType).HeaderColor;
         }
         
         private void Canvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

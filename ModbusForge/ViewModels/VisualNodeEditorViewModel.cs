@@ -147,86 +147,15 @@ namespace ModbusForge.ViewModels
 
         private void InitializePalette()
         {
-            PaletteCategories.Add(new PaletteCategory
+            foreach (var group in NodeDescriptors.All.Where(d => d.ShowInPalette).GroupBy(d => d.Category))
             {
-                Name = "I/O",
-                Nodes = new ObservableCollection<PaletteNode>
+                PaletteCategories.Add(new PaletteCategory
                 {
-                    new PaletteNode { Name = "Input BOOL", Tag = "InputBool" },
-                    new PaletteNode { Name = "Input INT", Tag = "InputInt" },
-                    new PaletteNode { Name = "Output BOOL", Tag = "OutputBool" },
-                    new PaletteNode { Name = "Output INT", Tag = "OutputInt" }
-                }
-            });
-
-            PaletteCategories.Add(new PaletteCategory
-            {
-                Name = "Sources",
-                Nodes = new ObservableCollection<PaletteNode>
-                {
-                    new PaletteNode { Name = "Signal Generator", Tag = "SignalGenerator" }
-                }
-            });
-
-            PaletteCategories.Add(new PaletteCategory
-            {
-                Name = "Logic Gates",
-                Nodes = new ObservableCollection<PaletteNode>
-                {
-                    new PaletteNode { Name = "AND Gate", Tag = "AND" },
-                    new PaletteNode { Name = "OR Gate", Tag = "OR" },
-                    new PaletteNode { Name = "NOT Gate", Tag = "NOT" },
-                    new PaletteNode { Name = "RS Latch", Tag = "RS" }
-                }
-            });
-
-            PaletteCategories.Add(new PaletteCategory
-            {
-                Name = "Timers",
-                Nodes = new ObservableCollection<PaletteNode>
-                {
-                    new PaletteNode { Name = "TON Timer", Tag = "TON" },
-                    new PaletteNode { Name = "TOF Timer", Tag = "TOF" },
-                    new PaletteNode { Name = "TP Timer", Tag = "TP" }
-                }
-            });
-
-            PaletteCategories.Add(new PaletteCategory
-            {
-                Name = "Counters",
-                Nodes = new ObservableCollection<PaletteNode>
-                {
-                    new PaletteNode { Name = "CTU Counter", Tag = "CTU" },
-                    new PaletteNode { Name = "CTD Counter", Tag = "CTD" },
-                    new PaletteNode { Name = "CTC Counter", Tag = "CTC" }
-                }
-            });
-
-            PaletteCategories.Add(new PaletteCategory
-            {
-                Name = "Comparators",
-                Nodes = new ObservableCollection<PaletteNode>
-                {
-                    new PaletteNode { Name = "Equal (==)", Tag = "COMPARE_EQ" },
-                    new PaletteNode { Name = "Not Equal (!=)", Tag = "COMPARE_NE" },
-                    new PaletteNode { Name = "Greater Than (>)", Tag = "COMPARE_GT" },
-                    new PaletteNode { Name = "Less Than (<)", Tag = "COMPARE_LT" },
-                    new PaletteNode { Name = "Greater Equal (>=)", Tag = "COMPARE_GE" },
-                    new PaletteNode { Name = "Less Equal (<=)", Tag = "COMPARE_LE" }
-                }
-            });
-
-            PaletteCategories.Add(new PaletteCategory
-            {
-                Name = "Math Operations",
-                Nodes = new ObservableCollection<PaletteNode>
-                {
-                    new PaletteNode { Name = "Add (+)", Tag = "MATH_ADD" },
-                    new PaletteNode { Name = "Subtract (-)", Tag = "MATH_SUB" },
-                    new PaletteNode { Name = "Multiply (*)", Tag = "MATH_MUL" },
-                    new PaletteNode { Name = "Divide (/)", Tag = "MATH_DIV" }
-                }
-            });
+                    Name = group.Key,
+                    Nodes = new ObservableCollection<PaletteNode>(
+                        group.Select(d => new PaletteNode { Name = d.PaletteName, Tag = d.TypeId }))
+                });
+            }
         }
 
         [RelayCommand]

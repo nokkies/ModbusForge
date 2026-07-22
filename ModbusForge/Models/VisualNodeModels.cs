@@ -94,124 +94,130 @@ namespace ModbusForge.Models
         /// </summary>
         public int IntValue { get; set; } = 0;
         
-        public string DisplayName
-        {
-            get
-            {
-                return ElementType switch
-                {
-                    PlcElementType.Input => "IN",
-                    PlcElementType.Output => "OUT",
-                    PlcElementType.InputBool => "IN BOOL",
-                    PlcElementType.InputInt => "IN INT",
-                    PlcElementType.OutputBool => "OUT BOOL",
-                    PlcElementType.OutputInt => "OUT INT",
-                    PlcElementType.NOT => "NOT",
-                    PlcElementType.AND => "AND",
-                    PlcElementType.OR => "OR",
-                    PlcElementType.RS => "RS Latch",
-                    PlcElementType.TON => $"TON ({TimerPresetMs}ms)",
-                    PlcElementType.TOF => $"TOF ({TimerPresetMs}ms)",
-                    PlcElementType.TP => $"TP ({TimerPresetMs}ms)",
-                    PlcElementType.CTU => $"CTU ({CounterPreset})",
-                    PlcElementType.CTD => $"CTD ({CounterPreset})",
-                    PlcElementType.CTC => $"CTC ({CounterPreset})",
-                    PlcElementType.COMPARE_EQ => "EQ",
-                    PlcElementType.COMPARE_NE => "NE",
-                    PlcElementType.COMPARE_GT => "GT",
-                    PlcElementType.COMPARE_LT => "LT",
-                    PlcElementType.COMPARE_GE => "GE",
-                    PlcElementType.COMPARE_LE => "LE",
-                    PlcElementType.MATH_ADD => "ADD",
-                    PlcElementType.MATH_SUB => "SUB",
-                    PlcElementType.MATH_MUL => "MUL",
-                    PlcElementType.MATH_DIV => "DIV",
-                    PlcElementType.SignalGenerator => $"SignalGen ({Waveform}, {PeriodMs}ms)",
-                    _ => "Unknown"
-                };
-            }
-        }
-        
+        public string DisplayName => NodeDescriptors.Get(ElementType).GetDisplayName(this);
+
         public string AddressDisplay
         {
             get
             {
-                return ElementType switch
+                var descriptor = NodeDescriptors.Get(ElementType);
+                if (descriptor.IsInput && Input1Address != null)
                 {
-                    PlcElementType.Input => Input1Address.Address >= 0 ? $"{Input1Address.Area}:{Input1Address.Address}" : "[Not Configured]",
-                    PlcElementType.Output => OutputAddress.Address >= 0 ? $"{OutputAddress.Area}:{OutputAddress.Address}" : "[Not Configured]",
-                    PlcElementType.InputBool => Input1Address.Address >= 0 ? $"{Input1Address.Area}:{Input1Address.Address}" : "[Not Configured]",
-                    PlcElementType.InputInt => Input1Address.Address >= 0 ? $"{Input1Address.Area}:{Input1Address.Address}" : "[Not Configured]",
-                    PlcElementType.OutputBool => OutputAddress.Address >= 0 ? $"{OutputAddress.Area}:{OutputAddress.Address}" : "[Not Configured]",
-                    PlcElementType.OutputInt => OutputAddress.Address >= 0 ? $"{OutputAddress.Area}:{OutputAddress.Address}" : "[Not Configured]",
-                    _ => ""
-                };
-            }
-        }
-        
-        public bool HasSecondInput
-        {
-            get
-            {
-                return ElementType == PlcElementType.AND || 
-                       ElementType == PlcElementType.OR || 
-                       ElementType == PlcElementType.RS ||
-                       ElementType == PlcElementType.CTC ||
-                       ElementType == PlcElementType.COMPARE_EQ ||
-                       ElementType == PlcElementType.COMPARE_NE ||
-                       ElementType == PlcElementType.COMPARE_GT ||
-                       ElementType == PlcElementType.COMPARE_LT ||
-                       ElementType == PlcElementType.COMPARE_GE ||
-                       ElementType == PlcElementType.COMPARE_LE ||
-                       ElementType == PlcElementType.MATH_ADD ||
-                       ElementType == PlcElementType.MATH_SUB ||
-                       ElementType == PlcElementType.MATH_MUL ||
-                       ElementType == PlcElementType.MATH_DIV ||
-                       ElementType == PlcElementType.SignalGenerator;
-            }
-        }
-        
-        public bool HasParameters
-        {
-            get
-            {
-                return ElementType == PlcElementType.TON ||
-                       ElementType == PlcElementType.TOF ||
-                       ElementType == PlcElementType.TP ||
-                       ElementType == PlcElementType.CTU ||
-                       ElementType == PlcElementType.CTD ||
-                       ElementType == PlcElementType.CTC ||
-                       ElementType == PlcElementType.COMPARE_EQ ||
-                       ElementType == PlcElementType.COMPARE_NE ||
-                       ElementType == PlcElementType.COMPARE_GT ||
-                       ElementType == PlcElementType.COMPARE_LT ||
-                       ElementType == PlcElementType.COMPARE_GE ||
-                       ElementType == PlcElementType.COMPARE_LE ||
-                       ElementType == PlcElementType.MATH_ADD ||
-                       ElementType == PlcElementType.MATH_SUB ||
-                       ElementType == PlcElementType.MATH_MUL ||
-                       ElementType == PlcElementType.MATH_DIV;
-            }
-        }
-        
-        public string ParameterDisplay
-        {
-            get
-            {
-                return ElementType switch
+                    return Input1Address.Address >= 0
+                        ? $"{Input1Address.Area}:{Input1Address.Address}"
+                        : "[Not Configured]";
+                }
+
+                if (descriptor.IsOutput && OutputAddress != null)
                 {
-                    PlcElementType.TON or PlcElementType.TOF or PlcElementType.TP => $"{TimerPresetMs}ms",
-                    PlcElementType.CTU or PlcElementType.CTD or PlcElementType.CTC => $"Preset: {CounterPreset}",
-                    PlcElementType.COMPARE_EQ or PlcElementType.COMPARE_NE or PlcElementType.COMPARE_GT or 
-                    PlcElementType.COMPARE_LT or PlcElementType.COMPARE_GE or PlcElementType.COMPARE_LE => $"Value: {CompareValue}",
-                    PlcElementType.MATH_ADD or PlcElementType.MATH_SUB or PlcElementType.MATH_MUL or PlcElementType.MATH_DIV => $"Const: {CompareValue}",
-                    PlcElementType.SignalGenerator => $"{Waveform}: H={Amplitude}, T={PeriodMs}ms",
-                    _ => ""
-                };
+                    return OutputAddress.Address >= 0
+                        ? $"{OutputAddress.Area}:{OutputAddress.Address}"
+                        : "[Not Configured]";
+                }
+
+                return string.Empty;
             }
         }
-        
+
+        public bool HasSecondInput => NodeDescriptors.Get(ElementType).HasSecondInput;
+
+        public bool HasParameters => NodeDescriptors.Get(ElementType).HasParameters;
+
+        public string ParameterDisplay => NodeDescriptors.Get(ElementType).GetParameterDisplay(this);
+
         public bool HasOutput => ElementType != PlcElementType.Input;
+
+        // Cached handler so we can unsubscribe from the previous PlcAddressReference instance.
+        private PropertyChangedEventHandler? _addressPropertyChangedHandler;
+        private PlcAddressReference? _subscribedInput1Address;
+        private PlcAddressReference? _subscribedOutputAddress;
+
+        partial void OnElementTypeChanged(PlcElementType value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(AddressDisplay));
+            OnPropertyChanged(nameof(HasSecondInput));
+            OnPropertyChanged(nameof(HasParameters));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnInput1AddressChanged(PlcAddressReference value)
+        {
+            if (_subscribedInput1Address != null && _addressPropertyChangedHandler != null)
+                _subscribedInput1Address.PropertyChanged -= _addressPropertyChangedHandler;
+
+            _subscribedInput1Address = value;
+            if (value is null)
+                return;
+
+            _addressPropertyChangedHandler ??= OnAddressPropertyChanged;
+            value.PropertyChanged += _addressPropertyChangedHandler;
+
+            OnPropertyChanged(nameof(AddressDisplay));
+        }
+
+        partial void OnOutputAddressChanged(PlcAddressReference value)
+        {
+            if (_subscribedOutputAddress != null && _addressPropertyChangedHandler != null)
+                _subscribedOutputAddress.PropertyChanged -= _addressPropertyChangedHandler;
+
+            _subscribedOutputAddress = value;
+            if (value is null)
+                return;
+
+            _addressPropertyChangedHandler ??= OnAddressPropertyChanged;
+            value.PropertyChanged += _addressPropertyChangedHandler;
+
+            OnPropertyChanged(nameof(AddressDisplay));
+        }
+
+        partial void OnTimerPresetMsChanged(int value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnCounterPresetChanged(int value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnCompareValueChanged(int value)
+        {
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnWaveformChanged(string? value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnPeriodMsChanged(int value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnAmplitudeChanged(double value)
+        {
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnOffsetChanged(double value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        private void OnAddressPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is nameof(PlcAddressReference.Area) or nameof(PlcAddressReference.Address))
+            {
+                OnPropertyChanged(nameof(AddressDisplay));
+            }
+        }
     }
     
     /// <summary>
