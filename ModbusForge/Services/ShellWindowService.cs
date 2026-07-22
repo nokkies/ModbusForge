@@ -18,6 +18,8 @@ namespace ModbusForge.Services
         private readonly IModbusService _modbusService;
         private readonly ISettingsService _settingsService;
         private readonly IConnectionManager _connectionManager;
+        private readonly IFileDialogService _fileDialogService;
+        private readonly IDispatcher _dispatcher;
 
         public ShellWindowService(
             ILogger<AboutWindow> aboutLogger,
@@ -26,7 +28,9 @@ namespace ModbusForge.Services
             IScriptRunner scriptRunner,
             IModbusService modbusService,
             ISettingsService settingsService,
-            IConnectionManager connectionManager)
+            IConnectionManager connectionManager,
+            IFileDialogService fileDialogService,
+            IDispatcher dispatcher)
         {
             _aboutLogger = aboutLogger ?? throw new ArgumentNullException(nameof(aboutLogger));
             _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
@@ -35,6 +39,8 @@ namespace ModbusForge.Services
             _modbusService = modbusService ?? throw new ArgumentNullException(nameof(modbusService));
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
+            _fileDialogService = fileDialogService ?? throw new ArgumentNullException(nameof(fileDialogService));
+            _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         }
 
         public void ShowAbout(Window owner)
@@ -75,7 +81,8 @@ namespace ModbusForge.Services
 
         public void ShowScriptEditor(Window owner, byte unitId)
         {
-            var scriptEditor = new ScriptEditorWindow(_scriptRunner, _modbusService, unitId, _dialogService)
+            var viewModel = new ScriptEditorViewModel(_scriptRunner, _modbusService, unitId, _dialogService, _fileDialogService, _dispatcher);
+            var scriptEditor = new ScriptEditorWindow(viewModel)
             {
                 Owner = owner
             };
@@ -84,7 +91,8 @@ namespace ModbusForge.Services
 
         public void ShowPreferences(Window owner)
         {
-            var preferencesWindow = new PreferencesWindow(_settingsService, _dialogService)
+            var viewModel = new PreferencesViewModel(_settingsService, _dialogService);
+            var preferencesWindow = new PreferencesWindow(viewModel)
             {
                 Owner = owner
             };
@@ -93,7 +101,8 @@ namespace ModbusForge.Services
 
         public void ShowConnectionManager(Window owner)
         {
-            var connectionManagerWindow = new ConnectionManagerWindow(_connectionManager, _dialogService)
+            var viewModel = new ConnectionManagerViewModel(_connectionManager, _dialogService);
+            var connectionManagerWindow = new ConnectionManagerWindow(viewModel)
             {
                 Owner = owner
             };

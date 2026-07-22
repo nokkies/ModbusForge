@@ -72,7 +72,8 @@ namespace ModbusForge.Tests.ViewModels
                 new UnitConfigurationStore(new ImmediateDispatcher()),
                 new Mock<IDialogService>().Object,
                 new VisualNodeEditorViewModel(),
-                new Mock<IDispatcher>().Object
+                new Mock<IDispatcher>().Object,
+                new Mock<IThemeService>().Object
             );
 
             // Important: Call CallBase so we don't null-ref on PropertyChanged, etc.

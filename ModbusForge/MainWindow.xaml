@@ -140,6 +140,8 @@
                 <MenuItem Header="_Script Editor..." Click="MenuItem_ScriptEditor_Click" InputGestureText="Ctrl+E" ToolTip="Open the script editor (Ctrl+E)"/>
             </MenuItem>
             <MenuItem Header="_View">
+                <MenuItem Header="_Dark Mode" IsCheckable="True" IsChecked="{Binding IsDarkMode, Mode=TwoWay}" ToolTip="Toggle dark mode"/>
+                <Separator/>
                 <MenuItem Header="Simulation _Palette" Click="MenuItem_ShowSimPalette_Click"/>
                 <MenuItem Header="Simulation _Controls" Click="MenuItem_ShowSimControls_Click"/>
                 <MenuItem Header="Simulation _Programs" Click="MenuItem_ShowSimPrograms_Click"/>

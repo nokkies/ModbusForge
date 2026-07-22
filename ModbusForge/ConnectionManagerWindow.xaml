@@ -60,10 +60,8 @@
                                 BorderBrush="{StaticResource FluentBorder}" 
                                 BorderThickness="1" 
                                 CornerRadius="4">
-                            <ListBox x:Name="ConnectionsList" 
-                                     ItemsSource="{Binding Profiles}"
-                                     SelectedItem="{Binding SelectedProfile}"
-                                     SelectionChanged="ConnectionsList_SelectionChanged"
+                            <ListBox ItemsSource="{Binding Profiles}"
+                                     SelectedItem="{Binding SelectedProfile, Mode=TwoWay}"
                                      BorderThickness="0"
                                      Background="{StaticResource LightMetallicCardBrush}">
                                 <ListBox.ItemTemplate>
@@ -91,16 +89,16 @@
                         </Border>
                         
                         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
-                            <Button Content="Add" Width="70" Margin="0,0,8,0" Click="AddButton_Click" Style="{StaticResource FluentSecondaryButton}"/>
-                            <Button Content="Remove" Width="70" Margin="0,0,8,0" Click="RemoveButton_Click" Style="{StaticResource FluentSecondaryButton}"/>
-                            <Button Content="Clone" Width="70" Click="CloneButton_Click" Style="{StaticResource FluentSecondaryButton}"/>
+                            <Button Content="Add" Width="70" Margin="0,0,8,0" Command="{Binding AddCommand}" Style="{StaticResource FluentSecondaryButton}"/>
+                            <Button Content="Remove" Width="70" Margin="0,0,8,0" Command="{Binding RemoveCommand}" IsEnabled="{Binding CanRemove}" Style="{StaticResource FluentSecondaryButton}"/>
+                            <Button Content="Clone" Width="70" Command="{Binding CloneCommand}" IsEnabled="{Binding CanClone}" Style="{StaticResource FluentSecondaryButton}"/>
                         </StackPanel>
                     </Grid>
                 </Border>
                 
                 <!-- Connection Details -->
                 <Border Grid.Column="1" Style="{StaticResource FluentCard}">
-                    <Grid x:Name="DetailsPanel" IsEnabled="{Binding HasSelection}">
+                    <Grid IsEnabled="{Binding HasSelection}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -117,20 +115,20 @@
                         </Grid.ColumnDefinitions>
                         
                         <TextBlock Text="Name:" Grid.Row="0" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}"/>
-                        <TextBox x:Name="NameTextBox" Grid.Row="0" Grid.Column="1" Padding="8,4"
+                        <TextBox Grid.Row="0" Grid.Column="1" Padding="8,4"
                                  Text="{Binding SelectedProfile.Name, UpdateSourceTrigger=PropertyChanged}"/>
                         
                         <TextBlock Text="IP Address:" Grid.Row="1" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="{StaticResource FluentText}"/>
-                        <TextBox x:Name="IpTextBox" Grid.Row="1" Grid.Column="1" Padding="8,4" Margin="0,8,0,0"
+                        <TextBox Grid.Row="1" Grid.Column="1" Padding="8,4" Margin="0,8,0,0"
                                  Text="{Binding SelectedProfile.IpAddress, UpdateSourceTrigger=PropertyChanged}"/>
                         
                         <TextBlock Text="Port:" Grid.Row="2" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="{StaticResource FluentText}"/>
-                        <TextBox x:Name="PortTextBox" Grid.Row="2" Grid.Column="1" Padding="8,4" Margin="0,8,0,0" Width="100" HorizontalAlignment="Left"
+                        <TextBox Grid.Row="2" Grid.Column="1" Padding="8,4" Margin="0,8,0,0" Width="100" HorizontalAlignment="Left"
                                  Text="{Binding SelectedProfile.Port, UpdateSourceTrigger=PropertyChanged}"
                                  behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
                         
                         <TextBlock Text="Unit ID:" Grid.Row="3" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="{StaticResource FluentText}"/>
-                        <TextBox x:Name="UnitIdTextBox" Grid.Row="3" Grid.Column="1" Padding="8,4" Margin="0,8,0,0" Width="100" HorizontalAlignment="Left"
+                        <TextBox Grid.Row="3" Grid.Column="1" Padding="8,4" Margin="0,8,0,0" Width="100" HorizontalAlignment="Left"
                                  Text="{Binding SelectedProfile.UnitId, UpdateSourceTrigger=PropertyChanged}"
                                  behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
                         
@@ -139,10 +137,10 @@
                                    Text="{Binding SelectedProfile.Status}" FontWeight="SemiBold" Foreground="{StaticResource FluentTextSecondary}"/>
                         
                         <StackPanel Grid.Row="5" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,20,0,0">
-                            <Button x:Name="ConnectButton" Content="Connect" Width="100" Margin="0,0,10,0" Click="ConnectButton_Click" Style="{StaticResource FluentPrimaryButton}"/>
-                            <Button x:Name="DisconnectButton" Content="Disconnect" Width="100" Margin="0,0,10,0" Click="DisconnectButton_Click" Style="{StaticResource FluentSecondaryButton}"/>
-                            <Button x:Name="SetActiveButton" Content="Set as Active" Width="100" Click="SetActiveButton_Click" Style="{StaticResource FluentSecondaryButton}"/>
-                            <ui:ProgressRing x:Name="ConnectProgressRing" Width="24" Height="24" Margin="12,0,0,0" Visibility="Collapsed" IsIndeterminate="True"/>
+                            <Button Content="Connect" Width="100" Margin="0,0,10,0" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}" Style="{StaticResource FluentPrimaryButton}"/>
+                            <Button Content="Disconnect" Width="100" Margin="0,0,10,0" Command="{Binding DisconnectCommand}" IsEnabled="{Binding CanDisconnect}" Style="{StaticResource FluentSecondaryButton}"/>
+                            <Button Content="Set as Active" Width="100" Command="{Binding SetActiveCommand}" IsEnabled="{Binding CanSetActive}" Style="{StaticResource FluentSecondaryButton}"/>
+                            <ui:ProgressRing Width="24" Height="24" Margin="12,0,0,0" Visibility="{Binding IsConnecting, Converter={StaticResource BoolToVis}}" IsIndeterminate="True"/>
                         </StackPanel>
                         
                         <Border Grid.Row="6" Grid.ColumnSpan="2" Background="{StaticResource FluentSurface}" CornerRadius="4" Padding="12" Margin="0,16,0,0" VerticalAlignment="Top">
@@ -153,8 +151,8 @@
                         </Border>
                         
                         <StackPanel Grid.Row="7" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-                            <Button Content="Save &amp; Close" Width="110" Margin="0,0,10,0" Click="SaveCloseButton_Click" Style="{StaticResource FluentPrimaryButton}"/>
-                            <Button Content="Cancel" Width="90" Click="CancelButton_Click" Style="{StaticResource FluentSecondaryButton}"/>
+                            <Button Content="Save &amp; Close" Width="110" Margin="0,0,10,0" Command="{Binding SaveAndCloseCommand}" Style="{StaticResource FluentPrimaryButton}"/>
+                            <Button Content="Cancel" Width="90" Command="{Binding CancelCommand}" Style="{StaticResource FluentSecondaryButton}"/>
                         </StackPanel>
                     </Grid>
                 </Border>
