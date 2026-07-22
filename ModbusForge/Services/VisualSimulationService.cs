@@ -39,6 +39,7 @@ namespace ModbusForge.Services
         private readonly ModbusServerService _serverService;
         private readonly FunctionBlockCatalog _catalog;
         private readonly ExecutionEngine _engine;
+        private readonly IConsoleLoggerService? _consoleLoggerService;
 
         private VisualNodeEditorViewModel? _viewModel;
         private DispatcherTimer? _animationTimer;
@@ -56,12 +57,21 @@ namespace ModbusForge.Services
         public VisualSimulationService(
             ILogger<VisualSimulationService> logger,
             ModbusServerService serverService)
+            : this(logger, serverService, null)
+        {
+        }
+
+        public VisualSimulationService(
+            ILogger<VisualSimulationService> logger,
+            ModbusServerService serverService,
+            IConsoleLoggerService? consoleLoggerService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
+            _consoleLoggerService = consoleLoggerService;
 
             _catalog = CreateCatalog();
-            _engine = new ExecutionEngine(_catalog);
+            _engine = new ExecutionEngine(_catalog, consoleLoggerService: _consoleLoggerService);
         }
 
         private static FunctionBlockCatalog CreateCatalog()

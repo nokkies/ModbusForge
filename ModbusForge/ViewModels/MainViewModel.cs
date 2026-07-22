@@ -37,6 +37,8 @@ namespace ModbusForge.ViewModels
         // Partial method declarations for delegated properties (required by CommunityToolkit.Mvvm)
         partial void OnRegistersGlobalTypeChanged(string value);
         partial void OnInputRegistersGlobalTypeChanged(string value);
+        partial void OnRegistersSwapBytesChanged(bool value);
+        partial void OnRegistersSwapWordsChanged(bool value);
 
         // Initialized in InitializeServiceState called from constructor
         private IModbusService _modbusService = null!;
@@ -126,7 +128,6 @@ namespace ModbusForge.ViewModels
             InputRegistersView = CollectionViewSource.GetDefaultView(InputRegisters);
             CoilsView = CollectionViewSource.GetDefaultView(Coils);
             DiscreteInputsView = CollectionViewSource.GetDefaultView(DiscreteInputs);
-
             HoldingRegistersView.Filter = HoldingRegistersFilter;
             InputRegistersView.Filter = InputRegistersFilter;
             CoilsView.Filter = CoilsFilter;
@@ -641,7 +642,14 @@ namespace ModbusForge.ViewModels
         public bool HoldingMonitorEnabled
         {
             get => CurrentConfig.MonitoringSettings.HoldingMonitorEnabled;
-            set => SetHoldingMonitorEnabled(value);
+            set
+            {
+                if (CurrentConfig.MonitoringSettings.HoldingMonitorEnabled != value)
+                {
+                    SetHoldingMonitorEnabled(value);
+                    OnPropertyChanged(nameof(HoldingMonitorEnabled));
+                }
+            }
         }
         public int HoldingMonitorPeriodMs
         {
@@ -651,7 +659,14 @@ namespace ModbusForge.ViewModels
         public bool InputRegistersMonitorEnabled
         {
             get => CurrentConfig.MonitoringSettings.InputRegistersMonitorEnabled;
-            set => SetInputRegistersMonitorEnabled(value);
+            set
+            {
+                if (CurrentConfig.MonitoringSettings.InputRegistersMonitorEnabled != value)
+                {
+                    SetInputRegistersMonitorEnabled(value);
+                    OnPropertyChanged(nameof(InputRegistersMonitorEnabled));
+                }
+            }
         }
         public int InputRegistersMonitorPeriodMs
         {
@@ -661,7 +676,14 @@ namespace ModbusForge.ViewModels
         public bool CoilsMonitorEnabled
         {
             get => CurrentConfig.MonitoringSettings.CoilsMonitorEnabled;
-            set => SetCoilsMonitorEnabled(value);
+            set
+            {
+                if (CurrentConfig.MonitoringSettings.CoilsMonitorEnabled != value)
+                {
+                    SetCoilsMonitorEnabled(value);
+                    OnPropertyChanged(nameof(CoilsMonitorEnabled));
+                }
+            }
         }
         public int CoilsMonitorPeriodMs
         {
@@ -671,7 +693,14 @@ namespace ModbusForge.ViewModels
         public bool DiscreteInputsMonitorEnabled
         {
             get => CurrentConfig.MonitoringSettings.DiscreteInputsMonitorEnabled;
-            set => SetDiscreteInputsMonitorEnabled(value);
+            set
+            {
+                if (CurrentConfig.MonitoringSettings.DiscreteInputsMonitorEnabled != value)
+                {
+                    SetDiscreteInputsMonitorEnabled(value);
+                    OnPropertyChanged(nameof(DiscreteInputsMonitorEnabled));
+                }
+            }
         }
         public int DiscreteInputsMonitorPeriodMs
         {
@@ -712,6 +741,30 @@ namespace ModbusForge.ViewModels
         {
             get => CurrentConfig.RegisterSettings.RegistersGlobalType;
             set => SetRegistersGlobalType(value);
+        }
+        public bool RegistersSwapBytes
+        {
+            get => CurrentConfig.RegisterSettings.RegistersSwapBytes;
+            set
+            {
+                if (CurrentConfig.RegisterSettings.RegistersSwapBytes != value)
+                {
+                    SetRegistersSwapBytes(value);
+                    OnPropertyChanged(nameof(RegistersSwapBytes));
+                }
+            }
+        }
+        public bool RegistersSwapWords
+        {
+            get => CurrentConfig.RegisterSettings.RegistersSwapWords;
+            set
+            {
+                if (CurrentConfig.RegisterSettings.RegistersSwapWords != value)
+                {
+                    SetRegistersSwapWords(value);
+                    OnPropertyChanged(nameof(RegistersSwapWords));
+                }
+            }
         }
         public int CoilStart
         {
@@ -782,6 +835,9 @@ namespace ModbusForge.ViewModels
             OnPropertyChanged(nameof(DiscreteInputsMonitorEnabled));
             OnPropertyChanged(nameof(CustomMonitorEnabled));
             OnPropertyChanged(nameof(CustomReadMonitorEnabled));
+            OnPropertyChanged(nameof(RegistersGlobalType));
+            OnPropertyChanged(nameof(RegistersSwapBytes));
+            OnPropertyChanged(nameof(RegistersSwapWords));
         }
 
         // Setters for delegated properties (needed for two-way binding)
@@ -802,6 +858,8 @@ namespace ModbusForge.ViewModels
         private void SetWriteRegisterAddress(int value) => CurrentConfig.RegisterSettings.WriteRegisterAddress = value;
         private void SetWriteRegisterValue(ushort value) => CurrentConfig.RegisterSettings.WriteRegisterValue = value;
         private void SetRegistersGlobalType(string value) => CurrentConfig.RegisterSettings.RegistersGlobalType = value;
+        private void SetRegistersSwapBytes(bool value) => CurrentConfig.RegisterSettings.RegistersSwapBytes = value;
+        private void SetRegistersSwapWords(bool value) => CurrentConfig.RegisterSettings.RegistersSwapWords = value;
         private void SetCoilStart(int value) => CurrentConfig.RegisterSettings.CoilStart = value;
         private void SetCoilCount(int value) => CurrentConfig.RegisterSettings.CoilCount = value;
         private void SetWriteCoilAddress(int value) => CurrentConfig.RegisterSettings.WriteCoilAddress = value;
@@ -885,7 +943,8 @@ namespace ModbusForge.ViewModels
         {
             await _registerCoordinator.ReadRegistersAsync(EffectiveUnitId, RegisterStart, RegisterCount,
                 RegistersGlobalType, HoldingRegisters, msg => StatusMessage = msg,
-                hasError => HasConnectionError = hasError, HoldingMonitorEnabled, IsServerMode);
+                hasError => HasConnectionError = hasError, HoldingMonitorEnabled, IsServerMode,
+                CurrentConfig.RegisterSettings);
         }
 
         public async Task ReadInputRegistersAsync()
@@ -961,7 +1020,8 @@ namespace ModbusForge.ViewModels
 
         public async Task WriteFloatAtAsync(int address, float value)
         {
-            await _registerCoordinator.WriteFloatAtAsync(EffectiveUnitId, address, value, IsServerMode);
+            await _registerCoordinator.WriteFloatAtAsync(EffectiveUnitId, address, value, IsServerMode,
+                CurrentConfig.RegisterSettings.RegistersSwapBytes, CurrentConfig.RegisterSettings.RegistersSwapWords);
         }
 
         public async Task WriteStringAtAsync(int address, string text)
@@ -1029,6 +1089,25 @@ namespace ModbusForge.ViewModels
             {
                 r.Type = value;
             }
+        }
+
+        // propagate global swap selection to each row and refresh displayed values
+        partial void OnRegistersSwapBytesChanged(bool value)
+        {
+            foreach (var r in HoldingRegisters)
+            {
+                r.SwapBytes = value;
+            }
+            _registerCoordinator.RefreshHoldingRegisterValueText(HoldingRegisters);
+        }
+
+        partial void OnRegistersSwapWordsChanged(bool value)
+        {
+            foreach (var r in HoldingRegisters)
+            {
+                r.SwapWords = value;
+            }
+            _registerCoordinator.RefreshHoldingRegisterValueText(HoldingRegisters);
         }
 
         partial void OnInputRegistersGlobalTypeChanged(string value)

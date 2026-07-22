@@ -194,6 +194,8 @@ namespace ModbusForge.Models
         public int WriteRegisterAddress { get; set; } = 1;
         public ushort WriteRegisterValue { get; set; } = 0;
         public string RegistersGlobalType { get; set; } = "uint";
+        public bool RegistersSwapBytes { get; set; } = false;
+        public bool RegistersSwapWords { get; set; } = false;
         
         // Coils
         public int CoilStart { get; set; } = 1;
@@ -219,6 +221,8 @@ namespace ModbusForge.Models
                 WriteRegisterAddress = WriteRegisterAddress,
                 WriteRegisterValue = WriteRegisterValue,
                 RegistersGlobalType = RegistersGlobalType,
+                RegistersSwapBytes = RegistersSwapBytes,
+                RegistersSwapWords = RegistersSwapWords,
                 CoilStart = CoilStart,
                 CoilCount = CoilCount,
                 WriteCoilAddress = WriteCoilAddress,

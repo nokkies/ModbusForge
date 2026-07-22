@@ -8,6 +8,8 @@ namespace ModbusForge.Models
         private int _address;
         private ushort _value;
         private string _type = "uint";
+        private bool _swapBytes;
+        private bool _swapWords;
         private string _valueText = "0"; // used for editing/display to avoid WPF ConvertBack to ushort
 
         public int Address
@@ -48,6 +50,18 @@ namespace ModbusForge.Models
                     OnPropertyChanged(nameof(ValueText)); // re-validate value against new type
                 }
             }
+        }
+
+        public bool SwapBytes
+        {
+            get => _swapBytes;
+            set { if (_swapBytes != value) { _swapBytes = value; OnPropertyChanged(nameof(SwapBytes)); } }
+        }
+
+        public bool SwapWords
+        {
+            get => _swapWords;
+            set { if (_swapWords != value) { _swapWords = value; OnPropertyChanged(nameof(SwapWords)); } }
         }
 
         // String representation shown/edited in the grid to avoid ConvertBack to ushort for 'real'/'string'

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Modbus.Data;
 using ModbusForge.Models;
+using ModbusForge.Services;
 using ModbusForge.Simulation.Core;
 
 namespace ModbusForge.Simulation.Engine
@@ -16,6 +17,7 @@ namespace ModbusForge.Simulation.Engine
     {
         private readonly ILogger<ExecutionEngine> _logger;
         private readonly FunctionBlockCatalog _catalog;
+        private readonly IConsoleLoggerService? _consoleLoggerService;
 
         private List<SimulationNode> _nodes = new();
         private List<SimulationConnection> _connections = new();
@@ -24,10 +26,11 @@ namespace ModbusForge.Simulation.Engine
         private Dictionary<string, SimulationNode> _nodeById = new();
         private DateTimeOffset _lastExecutionTime = DateTimeOffset.UtcNow;
 
-        public ExecutionEngine(FunctionBlockCatalog catalog, ILogger<ExecutionEngine>? logger = null)
+        public ExecutionEngine(FunctionBlockCatalog catalog, ILogger<ExecutionEngine>? logger = null, IConsoleLoggerService? consoleLoggerService = null)
         {
             _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
             _logger = logger ?? NullLogger<ExecutionEngine>.Instance;
+            _consoleLoggerService = consoleLoggerService;
         }
 
         public IReadOnlyList<SimulationNode> ExecutionOrder => _executionOrder;
@@ -243,7 +246,7 @@ namespace ModbusForge.Simulation.Engine
             return address.Not ? Invert(value) : value;
         }
 
-        private static void WriteDataStore(DataStore dataStore, PlcAddressReference address, ISimulationValue value)
+        private void WriteDataStore(DataStore dataStore, PlcAddressReference address, ISimulationValue value)
         {
             if (address.Address < 0) return;
 
@@ -253,19 +256,51 @@ namespace ModbusForge.Simulation.Engine
             {
                 case PlcArea.HoldingRegister:
                     if (address.Address < dataStore.HoldingRegisters.Count)
-                        dataStore.HoldingRegisters[address.Address] = ToUInt16(finalValue);
+                    {
+                        var oldValue = dataStore.HoldingRegisters[address.Address];
+                        var newValue = ToUInt16(finalValue);
+                        if (oldValue != newValue)
+                        {
+                            dataStore.HoldingRegisters[address.Address] = newValue;
+                            _consoleLoggerService?.Log($"Simulation wrote holding register {address.Address}: {oldValue} -> {newValue}");
+                        }
+                    }
                     break;
                 case PlcArea.InputRegister:
                     if (address.Address < dataStore.InputRegisters.Count)
-                        dataStore.InputRegisters[address.Address] = ToUInt16(finalValue);
+                    {
+                        var oldValue = dataStore.InputRegisters[address.Address];
+                        var newValue = ToUInt16(finalValue);
+                        if (oldValue != newValue)
+                        {
+                            dataStore.InputRegisters[address.Address] = newValue;
+                            _consoleLoggerService?.Log($"Simulation wrote input register {address.Address}: {oldValue} -> {newValue}");
+                        }
+                    }
                     break;
                 case PlcArea.Coil:
                     if (address.Address < dataStore.CoilDiscretes.Count)
-                        dataStore.CoilDiscretes[address.Address] = finalValue.AsBool();
+                    {
+                        var oldValue = dataStore.CoilDiscretes[address.Address];
+                        var newValue = finalValue.AsBool();
+                        if (oldValue != newValue)
+                        {
+                            dataStore.CoilDiscretes[address.Address] = newValue;
+                            _consoleLoggerService?.Log($"Simulation wrote coil {address.Address}: {(oldValue ? 1 : 0)} -> {(newValue ? 1 : 0)}");
+                        }
+                    }
                     break;
                 case PlcArea.DiscreteInput:
                     if (address.Address < dataStore.InputDiscretes.Count)
-                        dataStore.InputDiscretes[address.Address] = finalValue.AsBool();
+                    {
+                        var oldValue = dataStore.InputDiscretes[address.Address];
+                        var newValue = finalValue.AsBool();
+                        if (oldValue != newValue)
+                        {
+                            dataStore.InputDiscretes[address.Address] = newValue;
+                            _consoleLoggerService?.Log($"Simulation wrote discrete input {address.Address}: {(oldValue ? 1 : 0)} -> {(newValue ? 1 : 0)}");
+                        }
+                    }
                     break;
             }
         }
