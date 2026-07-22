@@ -45,9 +45,12 @@ namespace ModbusForge.Views
         private Point _selectionStartPoint;
         private Rectangle? _selectionRectangle = null;
         
+        // Track visual elements for incremental canvas updates
+        private readonly Dictionary<string, Border> _nodeElements = new();
+
         // Track event handlers for cleanup to prevent memory leaks
         private readonly Dictionary<string, List<(object Target, PropertyChangedEventHandler Handler)>> _nodeEventHandlers = new();
-        
+
         // Track connection lines to avoid recreating them
         private readonly Dictionary<string, Path> _connectionPaths = new();
 
@@ -201,8 +204,8 @@ namespace ModbusForge.Views
                 {
                     _viewModel.UndoRedo.Undo();
                 }
-                RefreshCanvas();
-                RefreshConnections();
+                RefreshAllNodes();
+                RefreshAllConnections();
                 e.Handled = true;
                 return;
             }
@@ -210,8 +213,8 @@ namespace ModbusForge.Views
             if (isCtrl && e.Key == Key.Y)
             {
                 _viewModel.UndoRedo.Redo();
-                RefreshCanvas();
-                RefreshConnections();
+                RefreshAllNodes();
+                RefreshAllConnections();
                 e.Handled = true;
                 return;
             }
@@ -249,13 +252,9 @@ namespace ModbusForge.Views
                 // Clean up event handlers before removing node
                 CleanupNodeEventHandlers(nodeToDelete);
 
-                // Remove the node
+                // Remove the node (collection-change handlers update the canvas incrementally)
                 _viewModel.Nodes.Remove(nodeToDelete);
-                
-                // Refresh canvas
-                RefreshCanvas();
-                RefreshConnections();
-                
+
                 (Window.GetWindow(this)?.DataContext as MainViewModel)?.AddDebugMessage($"Deleted node {nodeToDelete.Id} (type: {nodeToDelete.ElementType})");
             }
         }
@@ -340,6 +339,14 @@ namespace ModbusForge.Views
         
         private void VisualNodeEditor_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
+            // Detach from the previous view-model to avoid duplicate collection-change handlers
+            if (e.OldValue is VisualNodeEditorViewModel oldViewModel)
+            {
+                oldViewModel.Nodes.CollectionChanged -= Nodes_CollectionChanged;
+                oldViewModel.Connections.CollectionChanged -= Connections_CollectionChanged;
+                oldViewModel.PropertyChanged -= ViewModel_PropertyChanged;
+            }
+
             _viewModel = DataContext as VisualNodeEditorViewModel;
             if (_viewModel != null)
             {
@@ -347,8 +354,8 @@ namespace ModbusForge.Views
                 _viewModel.Nodes.CollectionChanged += Nodes_CollectionChanged;
                 _viewModel.Connections.CollectionChanged += Connections_CollectionChanged;
                 // Initial render of existing nodes and connections
-                RefreshCanvas();
-                RefreshConnections();
+                RefreshAllNodes();
+                RefreshAllConnections();
                 
                 // Subscribe to ShowLiveValues changes
                 _viewModel.PropertyChanged += ViewModel_PropertyChanged;
@@ -385,20 +392,20 @@ namespace ModbusForge.Views
             if (_viewModel == null || NodeCanvas == null) return;
 
             var selected = _viewModel.SelectedNode;
-            foreach (var child in NodeCanvas.Children)
+            foreach (var element in _nodeElements.Values)
             {
-                if (child is Border border && border.DataContext is VisualNode node)
+                if (element.DataContext is VisualNode node)
                 {
                     if (node == selected)
                     {
-                        border.BorderBrush = new SolidColorBrush(Color.FromRgb(0x3B, 0x82, 0xF6));
-                        border.BorderThickness = new Thickness(3);
+                        element.BorderBrush = new SolidColorBrush(Color.FromRgb(0x3B, 0x82, 0xF6));
+                        element.BorderThickness = new Thickness(3);
                     }
                     else
                     {
                         // Restore style defaults so the hover/focus triggers still work
-                        border.ClearValue(Border.BorderBrushProperty);
-                        border.ClearValue(Border.BorderThicknessProperty);
+                        element.ClearValue(Border.BorderBrushProperty);
+                        element.ClearValue(Border.BorderThicknessProperty);
                     }
                 }
             }
@@ -438,100 +445,205 @@ namespace ModbusForge.Views
         
         private void Connections_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
-            RefreshConnections();
+            if (_viewModel == null || NodeCanvas == null) return;
+
+            switch (e.Action)
+            {
+                case System.Collections.Specialized.NotifyCollectionChangedAction.Add:
+                    if (e.NewItems != null)
+                    {
+                        foreach (NodeConnection connection in e.NewItems)
+                        {
+                            AddConnectionVisual(connection);
+                        }
+                    }
+                    break;
+
+                case System.Collections.Specialized.NotifyCollectionChangedAction.Remove:
+                    if (e.OldItems != null)
+                    {
+                        foreach (NodeConnection connection in e.OldItems)
+                        {
+                            RemoveConnectionVisual(connection);
+                        }
+                    }
+                    break;
+
+                case System.Collections.Specialized.NotifyCollectionChangedAction.Reset:
+                    RefreshAllConnections();
+                    break;
+
+                case System.Collections.Specialized.NotifyCollectionChangedAction.Replace:
+                case System.Collections.Specialized.NotifyCollectionChangedAction.Move:
+                    RefreshAllConnections();
+                    break;
+            }
         }
-        
+
         private void Nodes_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
-            RefreshCanvas();
-            // Defer connection refresh until after the layout pass so TransformToAncestor works
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded,
-                new Action(RefreshConnections));
+            if (_viewModel == null || NodeCanvas == null) return;
+
+            switch (e.Action)
+            {
+                case System.Collections.Specialized.NotifyCollectionChangedAction.Add:
+                    if (e.NewItems != null)
+                    {
+                        foreach (VisualNode node in e.NewItems)
+                        {
+                            AddNodeVisual(node);
+                        }
+                    }
+                    break;
+
+                case System.Collections.Specialized.NotifyCollectionChangedAction.Remove:
+                    if (e.OldItems != null)
+                    {
+                        foreach (VisualNode node in e.OldItems)
+                        {
+                            RemoveNodeVisual(node);
+                        }
+                    }
+                    break;
+
+                case System.Collections.Specialized.NotifyCollectionChangedAction.Reset:
+                    RefreshAllNodes();
+                    break;
+
+                case System.Collections.Specialized.NotifyCollectionChangedAction.Replace:
+                case System.Collections.Specialized.NotifyCollectionChangedAction.Move:
+                    RefreshAllNodes();
+                    break;
+            }
         }
-        
-        private void RefreshCanvas()
+
+        private void RefreshAllNodes()
         {
             if (_viewModel == null || NodeCanvas == null) return;
-            
-            // Clear existing nodes from canvas (keep connections and temp line)
-            var elementsToRemove = new List<UIElement>();
-            foreach (UIElement child in NodeCanvas.Children)
+
+            foreach (var element in _nodeElements.Values.ToList())
             {
-                if (child is Border border && border.DataContext is VisualNode)
-                {
-                    elementsToRemove.Add(child);
-                }
-            }
-            
-            foreach (var element in elementsToRemove)
-            {
+                DetachNodeElement(element);
                 NodeCanvas.Children.Remove(element);
             }
-            
-            // Add all nodes to canvas
+            _nodeElements.Clear();
+
             foreach (var node in _viewModel.Nodes)
             {
-                var nodeElement = CreateNodeElement(node);
-                NodeCanvas.Children.Add(nodeElement);
-                Canvas.SetLeft(nodeElement, node.X);
-                Canvas.SetTop(nodeElement, node.Y);
+                AddNodeVisual(node);
             }
         }
-        
-        private void RefreshConnections()
+
+        private void RefreshAllConnections()
         {
             if (_viewModel == null || NodeCanvas == null) return;
-            
-            // Clear existing connection lines from canvas
-            var elementsToRemove = new List<UIElement>();
-            foreach (UIElement child in NodeCanvas.Children)
-            {
-                if (child is Path path && path != TempConnectionLine)
-                    elementsToRemove.Add(path);
-            }
-            foreach (var element in elementsToRemove)
-                NodeCanvas.Children.Remove(element);
 
+            foreach (var path in _connectionPaths.Values.ToList())
+            {
+                NodeCanvas.Children.Remove(path);
+            }
             _connectionPaths.Clear();
-            
-            // Draw connections using actual visual-tree positions where available
+
             foreach (var connection in _viewModel.Connections)
             {
-                var startPoint = GetActualConnectorPosition(connection.SourceNodeId, "Output");
-                var endPoint   = GetActualConnectorPosition(connection.TargetNodeId, connection.TargetConnector);
-
-                // Update model so ViewModel stays consistent
-                if (startPoint.X != 0 || startPoint.Y != 0)
-                {
-                    connection.StartX = startPoint.X;
-                    connection.StartY = startPoint.Y;
-                }
-                if (endPoint.X != 0 || endPoint.Y != 0)
-                {
-                    connection.EndX = endPoint.X;
-                    connection.EndY = endPoint.Y;
-                }
-
-                var path = CreateConnectionLine(connection);
-                // Right-click on a wire → delete it
-                var capturedConn = connection;
-                path.MouseRightButtonDown += (s, e) =>
-                {
-                    var menu = new ContextMenu();
-                    var del  = new MenuItem { Header = "Delete Connection" };
-                    del.Click += (_, __) => {
-                        var command = new ModbusForge.Services.EditorCommands.DeleteConnectionCommand(_viewModel, capturedConn);
-                        command.Execute();
-                        _viewModel.UndoRedo.Push(command);
-                    };
-                    menu.Items.Add(del);
-                    ((Path)s).ContextMenu = menu;
-                    menu.IsOpen = true;
-                    e.Handled = true;
-                };
-                NodeCanvas.Children.Add(path);
-                _connectionPaths[connection.Id] = path;
+                AddConnectionVisual(connection);
             }
+        }
+
+        private void AddNodeVisual(VisualNode node)
+        {
+            if (NodeCanvas == null || _nodeElements.ContainsKey(node.Id)) return;
+
+            var nodeElement = CreateNodeElement(node);
+            _nodeElements[node.Id] = nodeElement;
+            NodeCanvas.Children.Add(nodeElement);
+            Canvas.SetLeft(nodeElement, node.X);
+            Canvas.SetTop(nodeElement, node.Y);
+        }
+
+        private void RemoveNodeVisual(VisualNode node)
+        {
+            if (_nodeElements.TryGetValue(node.Id, out var element))
+            {
+                DetachNodeElement(element);
+                NodeCanvas.Children.Remove(element);
+                _nodeElements.Remove(node.Id);
+            }
+        }
+
+        private void DetachNodeElement(Border element)
+        {
+            if (element.DataContext is VisualNode node)
+            {
+                CleanupNodeEventHandlers(node);
+            }
+
+            element.MouseLeftButtonDown -= Node_MouseLeftButtonDown;
+            element.MouseRightButtonDown -= Node_MouseRightButtonDown;
+            element.MouseMove -= Node_MouseMove;
+            element.MouseLeftButtonUp -= Node_MouseLeftButtonUp;
+        }
+
+        private void AddConnectionVisual(NodeConnection connection)
+        {
+            if (NodeCanvas == null || _connectionPaths.ContainsKey(connection.Id)) return;
+
+            var startPoint = GetActualConnectorPosition(connection.SourceNodeId, "Output");
+            var endPoint = GetActualConnectorPosition(connection.TargetNodeId, connection.TargetConnector);
+
+            if (startPoint.X != 0 || startPoint.Y != 0)
+            {
+                connection.StartX = startPoint.X;
+                connection.StartY = startPoint.Y;
+            }
+            if (endPoint.X != 0 || endPoint.Y != 0)
+            {
+                connection.EndX = endPoint.X;
+                connection.EndY = endPoint.Y;
+            }
+
+            var path = CreateConnectionLine(connection);
+            AttachConnectionContextMenu(path, connection);
+
+            _connectionPaths[connection.Id] = path;
+            NodeCanvas.Children.Add(path);
+
+            // Recompute connector positions after the layout pass so new connections render correctly
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded,
+                new Action(() =>
+                {
+                    RefreshConnectionsForNode(connection.SourceNodeId);
+                    RefreshConnectionsForNode(connection.TargetNodeId);
+                }));
+        }
+
+        private void RemoveConnectionVisual(NodeConnection connection)
+        {
+            if (_connectionPaths.TryGetValue(connection.Id, out var path))
+            {
+                NodeCanvas.Children.Remove(path);
+                _connectionPaths.Remove(connection.Id);
+            }
+        }
+
+        private void AttachConnectionContextMenu(Path path, NodeConnection connection)
+        {
+            var capturedConn = connection;
+            path.MouseRightButtonDown += (s, e) =>
+            {
+                var menu = new ContextMenu();
+                var del = new MenuItem { Header = "Delete Connection" };
+                del.Click += (_, __) =>
+                {
+                    var command = new ModbusForge.Services.EditorCommands.DeleteConnectionCommand(_viewModel, capturedConn);
+                    command.Execute();
+                    _viewModel?.UndoRedo.Push(command);
+                };
+                menu.Items.Add(del);
+                ((Path)s).ContextMenu = menu;
+                menu.IsOpen = true;
+                e.Handled = true;
+            };
         }
         
         internal static IEnumerable<NodeConnection> GetConnectionsForNode(IEnumerable<NodeConnection> connections, string nodeId)
@@ -951,6 +1063,12 @@ namespace ModbusForge.Views
                     RefreshConnectionsForNode(node.Id);
                 }
 
+                if (e.PropertyName == nameof(VisualNode.Width))
+                {
+                    border.Width = node.Width;
+                    RefreshConnectionsForNode(node.Id);
+                }
+
                 if (e.PropertyName == nameof(VisualNode.IsSelected))
                 {
                     UpdateNodeSelectionHighlight(node, border);
@@ -1339,8 +1457,7 @@ namespace ModbusForge.Views
                     addrRef.Area = selectedTag.Area;
                     addrRef.Address = selectedTag.Address;
 
-                    // Refresh canvas to show the updated tag name
-                    RefreshCanvas();
+                    // Address handlers will update the node header text; no need to rebuild the canvas.
                     return;
                 }
                 // If user cancels tag selection, continue to numeric dialog
@@ -1365,8 +1482,7 @@ namespace ModbusForge.Views
                 addrRef.Address = testDialog.SelectedAddress;
                 addrRef.Not = testDialog.SelectedAddress < 0; // Simplified
 
-                // Refresh canvas to show the updated address
-                RefreshCanvas();
+                // Address handlers will update the node header text; no need to rebuild the canvas.
             }
         }
 
@@ -1584,16 +1700,9 @@ namespace ModbusForge.Views
             }
         }
         
-        private Border FindNodeBorder(string nodeId)
+        private Border? FindNodeBorder(string nodeId)
         {
-            foreach (UIElement child in NodeCanvas.Children)
-            {
-                if (child is Border border && border.DataContext is VisualNode node && node.Id == nodeId)
-                {
-                    return border;
-                }
-            }
-            return null!;
+            return _nodeElements.TryGetValue(nodeId, out var border) ? border : null;
         }
         
         public static double SnapToGrid(double value, int gridSize)
@@ -1702,7 +1811,7 @@ namespace ModbusForge.Views
                         Canvas.SetTop(nodeBorder, node.Y);
                     }
                 }
-                RefreshConnections();
+                RefreshAllConnections();
             }
 
             // Reset dragging state only - connections persist until user completes or cancels them
