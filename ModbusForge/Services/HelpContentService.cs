@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Media;
 using Microsoft.Extensions.Logging;
+using ModbusForge.Helpers;
 
 namespace ModbusForge.Services
 {
@@ -201,7 +202,7 @@ namespace ModbusForge.Services
                     paragraph.Inlines.Add(new Run(part.Substring(1, part.Length - 2))
                     {
                         FontFamily = new FontFamily("Consolas"),
-                        Background = new SolidColorBrush(Color.FromRgb(240, 240, 240))
+                        Background = BrushCache.GetBrush(Color.FromRgb(240, 240, 240))
                     });
                 }
                 else
