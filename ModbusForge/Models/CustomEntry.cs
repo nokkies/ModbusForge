@@ -12,11 +12,11 @@ namespace ModbusForge.Models
         private string _value = "0";
         private bool _continuous = false;
         private int _periodMs = 1000;
-        internal DateTime _lastWriteUtc = DateTime.MinValue;
+        public DateTime LastWriteUtc { get; set; } = DateTime.MinValue;
         // Read monitoring support
         private bool _monitor = false;
         private int _readPeriodMs = 1000;
-        internal DateTime _lastReadUtc = DateTime.MinValue;
+        public DateTime LastReadUtc { get; set; } = DateTime.MinValue;
         private string _area = "HoldingRegister"; // HoldingRegister, Coil, InputRegister, DiscreteInput
         // Trend selection support
         private bool _trend = false;
