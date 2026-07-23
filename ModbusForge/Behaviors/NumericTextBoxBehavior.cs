@@ -201,14 +201,37 @@ namespace ModbusForge.Behaviors
 
         private static bool TryParseValue(TextBox textBox, string text, out double value)
         {
+            value = 0;
             var format = GetFormat(textBox);
-            return format switch
+            switch (format)
             {
-                NumericFormat.UInteger => uint.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var u) && (value = u) >= 0,
-                NumericFormat.Integer => int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i) && (value = i) == i,
-                NumericFormat.Decimal => double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) && (value = d) == d,
-                _ => double.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out value)
-            };
+                case NumericFormat.UInteger:
+                    if (uint.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var u))
+                    {
+                        value = u;
+                        return true;
+                    }
+                    return false;
+
+                case NumericFormat.Integer:
+                    if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i))
+                    {
+                        value = i;
+                        return true;
+                    }
+                    return false;
+
+                case NumericFormat.Decimal:
+                    if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
+                    {
+                        value = d;
+                        return true;
+                    }
+                    return false;
+
+                default:
+                    return double.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out value);
+            }
         }
 
         private static string FormatClampedValue(double value, NumericFormat format)
