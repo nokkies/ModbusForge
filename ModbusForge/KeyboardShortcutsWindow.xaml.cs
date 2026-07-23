@@ -7,7 +7,7 @@ using ModbusForge.Services;
 
 namespace ModbusForge
 {
-    public partial class KeyboardShortcutsWindow : Window
+    public partial class KeyboardShortcutsWindow : Wpf.Ui.Controls.FluentWindow
     {
         private readonly IDialogService _dialogService;
 

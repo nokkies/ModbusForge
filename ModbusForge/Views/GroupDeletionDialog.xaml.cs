@@ -7,7 +7,7 @@ namespace ModbusForge.Views
     /// Dialog that shows a <see cref="GroupDeletionPreview"/> and lets the user choose
     /// how to handle the group's contents before deletion.
     /// </summary>
-    public partial class GroupDeletionDialog : Window
+    public partial class GroupDeletionDialog : Wpf.Ui.Controls.FluentWindow
     {
         /// <summary>The mode chosen by the user. Valid only when <see cref="DialogResult"/> is true.</summary>
         public GroupDeletionMode ChosenMode { get; private set; } = GroupDeletionMode.MoveToParent;

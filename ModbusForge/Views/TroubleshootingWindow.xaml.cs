@@ -12,7 +12,7 @@ using ModbusForge.Services;
 
 namespace ModbusForge.Views
 {
-    public partial class TroubleshootingWindow : Window
+    public partial class TroubleshootingWindow : Wpf.Ui.Controls.FluentWindow
     {
         private readonly IDialogService _dialogService;
 

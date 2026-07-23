@@ -12,7 +12,7 @@ using System.Windows.Input;
 
 namespace ModbusForge.Views
 {
-    public partial class TagBrowserWindow : Window
+    public partial class TagBrowserWindow : Wpf.Ui.Controls.FluentWindow
     {
         private readonly TagService _tagService;
         private readonly IDialogService _dialogService;

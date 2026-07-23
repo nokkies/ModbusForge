@@ -58,38 +58,38 @@ namespace ModbusForge.Models
                 isOutput: true);
 
             // Logic
-            Add(PlcElementType.NOT, "NOT", "NOT", "NOT Gate", "Logic Gates", Color.FromRgb(156, 39, 176), "❌");
-            Add(PlcElementType.AND, "AND", "AND", "AND Gate", "Logic Gates", Color.FromRgb(33, 150, 243), "∧",
+            Add(PlcElementType.NOT, "NOT", "NOT", "NOT Gate", "Logic Gates", Color.FromRgb(156, 39, 176), "NOT");
+            Add(PlcElementType.AND, "AND", "AND", "AND Gate", "Logic Gates", Color.FromRgb(33, 150, 243), "AND",
                 hasSecondInput: true);
-            Add(PlcElementType.OR, "OR", "OR", "OR Gate", "Logic Gates", Color.FromRgb(255, 152, 0), "∨",
+            Add(PlcElementType.OR, "OR", "OR", "OR Gate", "Logic Gates", Color.FromRgb(255, 152, 0), "OR",
                 hasSecondInput: true);
-            Add(PlcElementType.RS, "RS", "RS Latch", "RS Latch", "Logic Gates", Color.FromRgb(244, 67, 54), "🔄",
+            Add(PlcElementType.RS, "RS", "RS Latch", "RS Latch", "Logic Gates", Color.FromRgb(244, 67, 54), "RS",
                 hasSecondInput: true, hasSetDominant: true);
 
             // Timers
-            Add(PlcElementType.TON, "TON", "TON", "TON Timer", "Timers", Color.FromRgb(255, 193, 7), "⏱️",
+            Add(PlcElementType.TON, "TON", "TON", "TON Timer", "Timers", Color.FromRgb(255, 193, 7), "TON",
                 hasParameters: true,
                 displayNameFormatter: n => $"TON ({n.TimerPresetMs}ms)",
                 parameterDisplayFormatter: n => $"{n.TimerPresetMs}ms");
-            Add(PlcElementType.TOF, "TOF", "TOF", "TOF Timer", "Timers", Color.FromRgb(0, 150, 136), "⏰",
+            Add(PlcElementType.TOF, "TOF", "TOF", "TOF Timer", "Timers", Color.FromRgb(0, 150, 136), "TOF",
                 hasParameters: true,
                 displayNameFormatter: n => $"TOF ({n.TimerPresetMs}ms)",
                 parameterDisplayFormatter: n => $"{n.TimerPresetMs}ms");
-            Add(PlcElementType.TP, "TP", "TP", "TP Timer", "Timers", Color.FromRgb(96, 125, 139), "⚡",
+            Add(PlcElementType.TP, "TP", "TP", "TP Timer", "Timers", Color.FromRgb(96, 125, 139), "TP",
                 hasParameters: true,
                 displayNameFormatter: n => $"TP ({n.TimerPresetMs}ms)",
                 parameterDisplayFormatter: n => $"{n.TimerPresetMs}ms");
 
             // Counters
-            Add(PlcElementType.CTU, "CTU", "CTU", "CTU Counter", "Counters", Color.FromRgb(139, 195, 74), "🔢",
+            Add(PlcElementType.CTU, "CTU", "CTU", "CTU Counter", "Counters", Color.FromRgb(139, 195, 74), "CTU",
                 hasParameters: true,
                 displayNameFormatter: n => $"CTU ({n.CounterPreset})",
                 parameterDisplayFormatter: n => $"Preset: {n.CounterPreset}");
-            Add(PlcElementType.CTD, "CTD", "CTD", "CTD Counter", "Counters", Color.FromRgb(205, 220, 57), "🔽",
+            Add(PlcElementType.CTD, "CTD", "CTD", "CTD Counter", "Counters", Color.FromRgb(205, 220, 57), "CTD",
                 hasParameters: true,
                 displayNameFormatter: n => $"CTD ({n.CounterPreset})",
                 parameterDisplayFormatter: n => $"Preset: {n.CounterPreset}");
-            Add(PlcElementType.CTC, "CTC", "CTC", "CTC Counter", "Counters", Color.FromRgb(255, 235, 59), "🔀",
+            Add(PlcElementType.CTC, "CTC", "CTC", "CTC Counter", "Counters", Color.FromRgb(255, 235, 59), "CTC",
                 hasSecondInput: true, hasParameters: true,
                 displayNameFormatter: n => $"CTC ({n.CounterPreset})",
                 parameterDisplayFormatter: n => $"Preset: {n.CounterPreset}");
@@ -98,7 +98,7 @@ namespace ModbusForge.Models
             Add(PlcElementType.COMPARE_EQ, "COMPARE_EQ", "EQ", "Equal (==)", "Comparators", Color.FromRgb(255, 87, 34), "==",
                 hasSecondInput: true, hasParameters: true,
                 parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
-            Add(PlcElementType.COMPARE_NE, "COMPARE_NE", "NE", "Not Equal (!=)", "Comparators", Color.FromRgb(255, 87, 34), "≠",
+            Add(PlcElementType.COMPARE_NE, "COMPARE_NE", "NE", "Not Equal (!=)", "Comparators", Color.FromRgb(255, 87, 34), "!=",
                 hasSecondInput: true, hasParameters: true,
                 parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
             Add(PlcElementType.COMPARE_GT, "COMPARE_GT", "GT", "Greater Than (>)", "Comparators", Color.FromRgb(233, 30, 99), ">",
@@ -107,10 +107,10 @@ namespace ModbusForge.Models
             Add(PlcElementType.COMPARE_LT, "COMPARE_LT", "LT", "Less Than (<)", "Comparators", Color.FromRgb(233, 30, 99), "<",
                 hasSecondInput: true, hasParameters: true,
                 parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
-            Add(PlcElementType.COMPARE_GE, "COMPARE_GE", "GE", "Greater Equal (>=)", "Comparators", Color.FromRgb(156, 39, 176), "≥",
+            Add(PlcElementType.COMPARE_GE, "COMPARE_GE", "GE", "Greater Equal (>=)", "Comparators", Color.FromRgb(156, 39, 176), ">=",
                 hasSecondInput: true, hasParameters: true,
                 parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
-            Add(PlcElementType.COMPARE_LE, "COMPARE_LE", "LE", "Less Equal (<=)", "Comparators", Color.FromRgb(156, 39, 176), "≤",
+            Add(PlcElementType.COMPARE_LE, "COMPARE_LE", "LE", "Less Equal (<=)", "Comparators", Color.FromRgb(156, 39, 176), "<=",
                 hasSecondInput: true, hasParameters: true,
                 parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
 
@@ -121,15 +121,15 @@ namespace ModbusForge.Models
             Add(PlcElementType.MATH_SUB, "MATH_SUB", "SUB", "Subtract (-)", "Math Operations", Color.FromRgb(63, 81, 181), "-",
                 hasSecondInput: true, hasParameters: true,
                 parameterDisplayFormatter: n => $"Const: {n.CompareValue}");
-            Add(PlcElementType.MATH_MUL, "MATH_MUL", "MUL", "Multiply (*)", "Math Operations", Color.FromRgb(121, 85, 72), "×",
+            Add(PlcElementType.MATH_MUL, "MATH_MUL", "MUL", "Multiply (*)", "Math Operations", Color.FromRgb(121, 85, 72), "x",
                 hasSecondInput: true, hasParameters: true,
                 parameterDisplayFormatter: n => $"Const: {n.CompareValue}");
-            Add(PlcElementType.MATH_DIV, "MATH_DIV", "DIV", "Divide (/)", "Math Operations", Color.FromRgb(121, 85, 72), "÷",
+            Add(PlcElementType.MATH_DIV, "MATH_DIV", "DIV", "Divide (/)", "Math Operations", Color.FromRgb(121, 85, 72), "/",
                 hasSecondInput: true, hasParameters: true,
                 parameterDisplayFormatter: n => $"Const: {n.CompareValue}");
 
             // Sources
-            Add(PlcElementType.SignalGenerator, "SignalGenerator", "SignalGen", "Signal Generator", "Sources", Color.FromRgb(141, 110, 189), "📈",
+            Add(PlcElementType.SignalGenerator, "SignalGenerator", "SignalGen", "Signal Generator", "Sources", Color.FromRgb(141, 110, 189), "SIG",
                 hasSecondInput: true,
                 displayNameFormatter: n => $"SignalGen ({n.Waveform}, {n.PeriodMs}ms)",
                 parameterDisplayFormatter: n => $"{n.Waveform}: H={n.Amplitude}, T={n.PeriodMs}ms");

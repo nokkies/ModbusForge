@@ -33,11 +33,31 @@ namespace ModbusForge.Behaviors
                 typeof(NumericTextBoxBehavior),
                 new PropertyMetadata(NumericFormat.Integer));
 
+        public static readonly DependencyProperty MinimumProperty =
+            DependencyProperty.RegisterAttached(
+                "Minimum",
+                typeof(double),
+                typeof(NumericTextBoxBehavior),
+                new PropertyMetadata(double.MinValue));
+
+        public static readonly DependencyProperty MaximumProperty =
+            DependencyProperty.RegisterAttached(
+                "Maximum",
+                typeof(double),
+                typeof(NumericTextBoxBehavior),
+                new PropertyMetadata(double.MaxValue));
+
         public static bool GetIsNumeric(DependencyObject obj) => (bool)obj.GetValue(IsNumericProperty);
         public static void SetIsNumeric(DependencyObject obj, bool value) => obj.SetValue(IsNumericProperty, value);
 
         public static NumericFormat GetFormat(DependencyObject obj) => (NumericFormat)obj.GetValue(FormatProperty);
         public static void SetFormat(DependencyObject obj, NumericFormat value) => obj.SetValue(FormatProperty, value);
+
+        public static double GetMinimum(DependencyObject obj) => (double)obj.GetValue(MinimumProperty);
+        public static void SetMinimum(DependencyObject obj, double value) => obj.SetValue(MinimumProperty, value);
+
+        public static double GetMaximum(DependencyObject obj) => (double)obj.GetValue(MaximumProperty);
+        public static void SetMaximum(DependencyObject obj, double value) => obj.SetValue(MaximumProperty, value);
 
         private static void OnIsNumericChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
@@ -46,6 +66,7 @@ namespace ModbusForge.Behaviors
             if ((bool)e.NewValue)
             {
                 textBox.PreviewTextInput += OnPreviewTextInput;
+                textBox.LostFocus += OnLostFocus;
                 DataObject.AddPastingHandler(textBox, OnPaste);
                 DataObject.AddCopyingHandler(textBox, OnCopyOrCut);
                 CommandManager.AddPreviewExecutedHandler(textBox, OnPreviewExecuted);
@@ -53,6 +74,7 @@ namespace ModbusForge.Behaviors
             else
             {
                 textBox.PreviewTextInput -= OnPreviewTextInput;
+                textBox.LostFocus -= OnLostFocus;
                 DataObject.RemovePastingHandler(textBox, OnPaste);
                 DataObject.RemoveCopyingHandler(textBox, OnCopyOrCut);
                 CommandManager.RemovePreviewExecutedHandler(textBox, OnPreviewExecuted);
@@ -118,12 +140,107 @@ namespace ModbusForge.Behaviors
 
             // Allow a single leading/trailing negative sign for Integer/Decimal.
             // The caret may be at the beginning or the sign may already be present.
-            return format switch
+            bool valid = format switch
             {
                 NumericFormat.UInteger => candidate.All(char.IsDigit),
                 NumericFormat.Integer => IsInteger(candidate),
                 NumericFormat.Decimal => IsDecimal(candidate),
                 _ => true
+            };
+
+            return valid && IsWithinMaximum(textBox, candidate);
+        }
+
+        private static bool IsWithinMaximum(TextBox textBox, string candidate)
+        {
+            var format = GetFormat(textBox);
+            var maximum = GetMaximum(textBox);
+
+            double value = 0;
+            bool parsed = format switch
+            {
+                NumericFormat.UInteger => uint.TryParse(candidate, NumberStyles.Integer, CultureInfo.InvariantCulture, out var u) && (value = u) >= 0,
+                NumericFormat.Integer => int.TryParse(candidate, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i) && (value = i) == i,
+                NumericFormat.Decimal => double.TryParse(candidate, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) && (value = d) == d,
+                _ => false
+            };
+
+            // If parsing fails the input is still partial/ambiguous; don't block it.
+            if (!parsed)
+            {
+                return true;
+            }
+
+            return value <= maximum;
+        }
+
+        private static void OnLostFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is not TextBox textBox || !GetIsNumeric(textBox))
+            {
+                return;
+            }
+
+            if (!TryParseValue(textBox, textBox.Text, out var value))
+            {
+                return;
+            }
+
+            var minimum = GetMinimum(textBox);
+            var maximum = GetMaximum(textBox);
+
+            if (value >= minimum && value <= maximum)
+            {
+                return;
+            }
+
+            value = Math.Clamp(value, minimum, maximum);
+            textBox.Text = FormatClampedValue(value, GetFormat(textBox));
+            textBox.CaretIndex = textBox.Text.Length;
+        }
+
+        private static bool TryParseValue(TextBox textBox, string text, out double value)
+        {
+            value = 0;
+            var format = GetFormat(textBox);
+            switch (format)
+            {
+                case NumericFormat.UInteger:
+                    if (uint.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var u))
+                    {
+                        value = u;
+                        return true;
+                    }
+                    return false;
+
+                case NumericFormat.Integer:
+                    if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i))
+                    {
+                        value = i;
+                        return true;
+                    }
+                    return false;
+
+                case NumericFormat.Decimal:
+                    if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
+                    {
+                        value = d;
+                        return true;
+                    }
+                    return false;
+
+                default:
+                    return double.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out value);
+            }
+        }
+
+        private static string FormatClampedValue(double value, NumericFormat format)
+        {
+            return format switch
+            {
+                NumericFormat.UInteger => ((uint)value).ToString(CultureInfo.InvariantCulture),
+                NumericFormat.Integer => ((int)value).ToString(CultureInfo.InvariantCulture),
+                _ => value.ToString(CultureInfo.InvariantCulture)
             };
         }
 

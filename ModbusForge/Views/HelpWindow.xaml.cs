@@ -3,7 +3,7 @@ using ModbusForge.ViewModels;
 
 namespace ModbusForge.Views
 {
-    public partial class HelpWindow : Window
+    public partial class HelpWindow : Wpf.Ui.Controls.FluentWindow
     {
         public HelpWindow(HelpViewModel viewModel)
         {
