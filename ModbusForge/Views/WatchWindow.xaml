@@ -7,6 +7,14 @@
         Title="Watch Window - Real-time Monitoring" 
         Height="500" Width="700"
         WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <!-- Match MainWindow status bar styling so text is legible (was white-on-white) -->
+        <Style TargetType="StatusBar">
+            <Setter Property="Background" Value="{StaticResource LightMetallicTextBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource LightMetallicCardBrush}"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+        </Style>
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
