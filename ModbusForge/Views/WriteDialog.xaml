@@ -8,14 +8,6 @@
         ExtendsContentIntoTitleBar="True"
         WindowBackdropType="Mica">
     
-    <Window.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="../Resources/FluentTheme.xaml"/>
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
-    </Window.Resources>
-
     <Border Background="{StaticResource FluentBackground}" Padding="0">
         <Grid Margin="16">
         <Grid.RowDefinitions>

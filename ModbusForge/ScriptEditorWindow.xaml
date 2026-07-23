@@ -18,9 +18,6 @@
     
     <Window.Resources>
         <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="Resources/FluentTheme.xaml"/>
-            </ResourceDictionary.MergedDictionaries>
             <ObjectDataProvider x:Key="ScriptCommandTypeValues" ObjectType="{x:Type sys:Enum}" MethodName="GetValues">
                 <ObjectDataProvider.MethodParameters>
                     <x:Type Type="{x:Type models:ScriptCommandType}"/>
