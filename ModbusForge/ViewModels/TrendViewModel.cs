@@ -5,6 +5,8 @@ using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
 using ModbusForge.Configuration;
 using ModbusForge.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using SkiaSharp;
 using System.Collections.ObjectModel;
@@ -23,6 +25,7 @@ namespace ModbusForge.ViewModels
         private readonly IFileDialogService _fileDialogService;
         private readonly IDialogService _dialogService;
         private readonly IDispatcher _dispatcher;
+        private readonly ILogger<TrendViewModel> _logger;
         private readonly Dictionary<string, ObservableCollection<double>> _valuesByKey = new();
         private readonly Dictionary<string, List<(DateTime ts, double v)>> _samplesByKey = new();
         private readonly Dictionary<string, SKColor> _colorByKey = new();
@@ -53,12 +56,13 @@ namespace ModbusForge.ViewModels
             public string Name { get; init; } = string.Empty;
         }
 
-        public TrendViewModel(ITrendLogger loggerSvc, IOptions<LoggingSettings> options, IFileDialogService fileDialogService, IDialogService? dialogService = null, IDispatcher? dispatcher = null)
+        public TrendViewModel(ITrendLogger loggerSvc, IOptions<LoggingSettings> options, IFileDialogService fileDialogService, IDialogService? dialogService = null, IDispatcher? dispatcher = null, ILogger<TrendViewModel>? logger = null)
         {
             _loggerSvc = loggerSvc;
             _fileDialogService = fileDialogService;
             _dialogService = dialogService ?? new NullDialogService();
             _dispatcher = dispatcher ?? new WpfDispatcher();
+            _logger = logger ?? NullLogger<TrendViewModel>.Instance;
             var s = options?.Value ?? new LoggingSettings();
             s.Clamp();
 
@@ -145,15 +149,29 @@ namespace ModbusForge.ViewModels
 
         public async System.Threading.Tasks.Task ExportCsvAsync(string path, TrendSeriesItem? item)
         {
-            // export selected or all if null
-            var keys = item != null ? new[] { item.Key } : _samplesByKey.Keys.ToArray();
+            // Snapshot on the dispatcher so the background writer does not enumerate
+            // the mutable dictionary/lists while OnSampled mutates them.
+            var data = await _dispatcher.InvokeAsync(() =>
+            {
+                var keys = item != null ? new[] { item.Key } : _samplesByKey.Keys.ToArray();
+                var snapshot = new Dictionary<string, List<(DateTime ts, double v)>>(keys.Length);
+                foreach (var k in keys)
+                {
+                    if (_samplesByKey.TryGetValue(k, out var list))
+                    {
+                        snapshot[k] = new List<(DateTime, double)>(list);
+                    }
+                }
+                return (keys, snapshot);
+            });
+
             await System.Threading.Tasks.Task.Run(() =>
             {
                 using var sw = new StreamWriter(path);
                 sw.WriteLine("series,timestamp_utc,value");
-                foreach (var k in keys)
+                foreach (var k in data.keys)
                 {
-                    if (!_samplesByKey.TryGetValue(k, out var list)) continue;
+                    if (!data.snapshot.TryGetValue(k, out var list)) continue;
                     foreach (var (ts, v) in list)
                     {
                         sw.WriteLine($"{EscapeCsv(k)},{ts.ToString("o", CultureInfo.InvariantCulture)},{v.ToString(CultureInfo.InvariantCulture)}");
@@ -173,6 +191,7 @@ namespace ModbusForge.ViewModels
                 }
                 catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
+                    _logger.LogError(ex, "Export CSV failed for {Path}", path);
                     _dialogService.Show($"Export CSV failed: {ex.Message}", "Trend Export", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
@@ -181,23 +200,45 @@ namespace ModbusForge.ViewModels
         public async System.Threading.Tasks.Task ImportCsvAsync(string path)
         {
             var key = $"Imported:{System.IO.Path.GetFileNameWithoutExtension(path)}";
-            _loggerSvc.Add(key, key);
 
-            bool isHeader = true;
-            await foreach (var line in File.ReadLinesAsync(path))
+            // Parse the entire file on a background thread, then publish in dispatcher batches.
+            var rows = await System.Threading.Tasks.Task.Run(async () =>
             {
-                if (isHeader)
+                var result = new List<(DateTime ts, double v)>();
+                bool isHeader = true;
+                await foreach (var line in File.ReadLinesAsync(path))
                 {
-                    isHeader = false;
-                    continue;
-                }
+                    if (isHeader)
+                    {
+                        isHeader = false;
+                        continue;
+                    }
 
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                var parts = SplitCsv(line);
-                if (parts.Length < 3) continue;
-                if (!DateTime.TryParse(parts[1], null, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var ts)) continue;
-                if (!double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var v)) continue;
-                _loggerSvc.Publish(key, v, ts.ToUniversalTime());
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    var parts = SplitCsv(line);
+                    if (parts.Length < 3) continue;
+                    if (!DateTime.TryParse(parts[1], null, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var ts)) continue;
+                    if (!double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var v)) continue;
+                    result.Add((ts.ToUniversalTime(), v));
+                }
+                return result;
+            });
+
+            await _dispatcher.InvokeAsync(() => _loggerSvc.Add(key, key));
+
+            const int BatchSize = 500;
+            for (int i = 0; i < rows.Count; i += BatchSize)
+            {
+                var start = i;
+                var count = Math.Min(BatchSize, rows.Count - start);
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    for (int j = 0; j < count; j++)
+                    {
+                        var (ts, v) = rows[start + j];
+                        _loggerSvc.Publish(key, v, ts);
+                    }
+                });
             }
         }
 
@@ -212,6 +253,7 @@ namespace ModbusForge.ViewModels
                 }
                 catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
+                    _logger.LogError(ex, "Import CSV failed for {Path}", path);
                     _dialogService.Show($"Import CSV failed: {ex.Message}", "Trend Import", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
