@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using ModbusForge.Helpers;
 using ModbusForge.Models;
 
 namespace ModbusForge.ViewModels.VisualNodeEditor
@@ -34,7 +35,7 @@ namespace ModbusForge.ViewModels.VisualNodeEditor
 
         public string ParameterDisplay => Node.ParameterDisplay;
 
-        public Brush HeaderBrush => new SolidColorBrush(NodeDescriptors.Get(Node.ElementType).HeaderColor);
+        public Brush HeaderBrush => BrushCache.GetBrush(NodeDescriptors.Get(Node.ElementType).HeaderColor);
 
         public bool IsSelected
         {

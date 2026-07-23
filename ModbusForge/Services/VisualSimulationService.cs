@@ -14,7 +14,7 @@ namespace ModbusForge.Services
 {
     public interface IVisualSimulationService
     {
-        void Start(VisualNodeEditorViewModel viewModel);
+        void Start(IList<VisualNode> nodes, IList<NodeConnection> connections, Func<bool> showLiveValuesProvider);
         void Stop();
         void UpdateNodeValues();
         bool GetNodeValue(string nodeId);
@@ -32,10 +32,10 @@ namespace ModbusForge.Services
     /// Carries both boolean and integer results from node evaluation,
     /// preventing bool/int cross-contamination in the data stores.
     /// </summary>
-    public struct NodeResult
+    public readonly record struct NodeResult
     {
-        public bool BoolValue;
-        public int IntValue;
+        public bool BoolValue { get; init; }
+        public int IntValue { get; init; }
 
         public static NodeResult FromBool(bool b) => new NodeResult { BoolValue = b, IntValue = b ? 1 : 0 };
         public static NodeResult FromInt(int i) => new NodeResult { BoolValue = i != 0, IntValue = i };
@@ -49,7 +49,9 @@ namespace ModbusForge.Services
         private readonly ExecutionEngine _engine;
         private readonly IConsoleLoggerService? _consoleLoggerService;
 
-        private VisualNodeEditorViewModel? _viewModel;
+        private IList<VisualNode>? _nodes;
+        private IList<NodeConnection>? _connections;
+        private Func<bool>? _showLiveValuesProvider;
         private DispatcherTimer? _animationTimer;
         private bool _isAnimating;
         private DateTime _lastUpdate;
@@ -130,9 +132,11 @@ namespace ModbusForge.Services
             return catalog;
         }
 
-        public void Start(VisualNodeEditorViewModel viewModel)
+        public void Start(IList<VisualNode> nodes, IList<NodeConnection> connections, Func<bool> showLiveValuesProvider)
         {
-            _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+            _nodes = nodes ?? throw new ArgumentNullException(nameof(nodes));
+            _connections = connections ?? throw new ArgumentNullException(nameof(connections));
+            _showLiveValuesProvider = showLiveValuesProvider ?? throw new ArgumentNullException(nameof(showLiveValuesProvider));
 
             if (_animationTimer == null)
             {
@@ -157,9 +161,9 @@ namespace ModbusForge.Services
             _animationTimer?.Stop();
             _isAnimating = false;
 
-            if (_viewModel != null)
+            if (_nodes != null)
             {
-                foreach (var node in _viewModel.Nodes)
+                foreach (var node in _nodes)
                 {
                     node.CurrentValue = false;
                     node.ShowLiveValues = false;
@@ -176,8 +180,8 @@ namespace ModbusForge.Services
 
         private void AnimationTimer_Tick(object? sender, EventArgs e)
         {
-            if (_viewModel == null || !_isAnimating) return;
-            if (!_viewModel.ShowLiveValues) return;
+            if (_nodes == null || !_isAnimating) return;
+            if (_showLiveValuesProvider == null || !_showLiveValuesProvider()) return;
             if (!_serverService.IsConnected) return;
 
             try
@@ -192,7 +196,7 @@ namespace ModbusForge.Services
 
         public void UpdateNodeValues()
         {
-            if (_viewModel == null) return;
+            if (_nodes == null) return;
 
             var dataStore = _serverService.GetDataStore();
             if (dataStore == null) return;
@@ -204,7 +208,7 @@ namespace ModbusForge.Services
             _engine.Execute(dataStore);
 
             // Update UI-visible properties and internal caches.
-            foreach (var node in _viewModel.Nodes)
+            foreach (var node in _nodes)
             {
                 var simulationNode = _engine.ExecutionOrder.FirstOrDefault(n => n.Id == node.Id);
                 if (simulationNode == null) continue;
@@ -269,12 +273,12 @@ namespace ModbusForge.Services
         /// </summary>
         public void WriteNodeValue(string nodeId, double value)
         {
-            if (_viewModel == null) return;
+            if (_nodes == null) return;
 
             var dataStore = _serverService.GetDataStore();
             if (dataStore == null) return;
 
-            var node = _viewModel.Nodes.FirstOrDefault(n => n.Id == nodeId);
+            var node = _nodes.FirstOrDefault(n => n.Id == nodeId);
             if (node == null) return;
 
             // Input nodes drive the DataStore via their Input1Address; output nodes
@@ -357,10 +361,10 @@ namespace ModbusForge.Services
 
         private void EnsureGraphLoaded()
         {
-            if (_viewModel == null) return;
+            if (_nodes == null || _connections == null) return;
 
-            var nodeCount = _viewModel.Nodes.Count;
-            var connCount = _viewModel.Connections.Count;
+            var nodeCount = _nodes.Count;
+            var connCount = _connections.Count;
 
             if (_lastNodeCount == nodeCount &&
                 _lastConnectionCount == connCount)
@@ -368,8 +372,8 @@ namespace ModbusForge.Services
                 return;
             }
 
-            var simulationNodes = _viewModel.Nodes.Select(MapToSimulationNode).ToList();
-            var simulationConnections = _viewModel.Connections.Select(MapToSimulationConnection).ToList();
+            var simulationNodes = _nodes.Select(MapToSimulationNode).ToList();
+            var simulationConnections = _connections.Select(MapToSimulationConnection).ToList();
 
             _engine.LoadGraph(simulationNodes, simulationConnections);
 
