@@ -66,6 +66,7 @@ namespace ModbusForge.Behaviors
             if ((bool)e.NewValue)
             {
                 textBox.PreviewTextInput += OnPreviewTextInput;
+                textBox.LostFocus += OnLostFocus;
                 DataObject.AddPastingHandler(textBox, OnPaste);
                 DataObject.AddCopyingHandler(textBox, OnCopyOrCut);
                 CommandManager.AddPreviewExecutedHandler(textBox, OnPreviewExecuted);
@@ -73,6 +74,7 @@ namespace ModbusForge.Behaviors
             else
             {
                 textBox.PreviewTextInput -= OnPreviewTextInput;
+                textBox.LostFocus -= OnLostFocus;
                 DataObject.RemovePastingHandler(textBox, OnPaste);
                 DataObject.RemoveCopyingHandler(textBox, OnCopyOrCut);
                 CommandManager.RemovePreviewExecutedHandler(textBox, OnPreviewExecuted);
@@ -146,13 +148,12 @@ namespace ModbusForge.Behaviors
                 _ => true
             };
 
-            return valid && IsWithinRange(textBox, candidate);
+            return valid && IsWithinMaximum(textBox, candidate);
         }
 
-        private static bool IsWithinRange(TextBox textBox, string candidate)
+        private static bool IsWithinMaximum(TextBox textBox, string candidate)
         {
             var format = GetFormat(textBox);
-            var minimum = GetMinimum(textBox);
             var maximum = GetMaximum(textBox);
 
             double value = 0;
@@ -170,7 +171,54 @@ namespace ModbusForge.Behaviors
                 return true;
             }
 
-            return value >= minimum && value <= maximum;
+            return value <= maximum;
+        }
+
+        private static void OnLostFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is not TextBox textBox || !GetIsNumeric(textBox))
+            {
+                return;
+            }
+
+            if (!TryParseValue(textBox, textBox.Text, out var value))
+            {
+                return;
+            }
+
+            var minimum = GetMinimum(textBox);
+            var maximum = GetMaximum(textBox);
+
+            if (value >= minimum && value <= maximum)
+            {
+                return;
+            }
+
+            value = Math.Clamp(value, minimum, maximum);
+            textBox.Text = FormatClampedValue(value, GetFormat(textBox));
+            textBox.CaretIndex = textBox.Text.Length;
+        }
+
+        private static bool TryParseValue(TextBox textBox, string text, out double value)
+        {
+            var format = GetFormat(textBox);
+            return format switch
+            {
+                NumericFormat.UInteger => uint.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var u) && (value = u) >= 0,
+                NumericFormat.Integer => int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i) && (value = i) == i,
+                NumericFormat.Decimal => double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) && (value = d) == d,
+                _ => double.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out value)
+            };
+        }
+
+        private static string FormatClampedValue(double value, NumericFormat format)
+        {
+            return format switch
+            {
+                NumericFormat.UInteger => ((uint)value).ToString(CultureInfo.InvariantCulture),
+                NumericFormat.Integer => ((int)value).ToString(CultureInfo.InvariantCulture),
+                _ => value.ToString(CultureInfo.InvariantCulture)
+            };
         }
 
         private static bool IsInteger(string text)
