@@ -66,6 +66,7 @@ namespace ModbusForge.ViewModels.Coordinators
             _customScheduler.Dispose();
             _monitorScheduler.Dispose();
             _trendScheduler.Dispose();
+            _logger.LogDebug("{Coordinator} disposed", nameof(MonitoringCoordinator));
         }
 
         internal async Task CustomTick(CancellationToken cancellationToken)
@@ -86,13 +87,13 @@ namespace ModbusForge.ViewModels.Coordinators
                     if (!entry.Continuous) continue;
 
                     int period = entry.PeriodMs <= 0 ? 1000 : entry.PeriodMs;
-                    if ((now - entry._lastWriteUtc).TotalMilliseconds >= period)
+                    if ((now - entry.LastWriteUtc).TotalMilliseconds >= period)
                     {
                         try
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            await _callbacks.WriteCustomNowAsync(entry).ConfigureAwait(false);
-                            entry._lastWriteUtc = now;
+                            await _callbacks.WriteCustomNowAsync(entry);
+                            entry.LastWriteUtc = now;
                         }
                         catch (OperationCanceledException)
                         {

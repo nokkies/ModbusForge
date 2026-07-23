@@ -178,7 +178,8 @@ namespace ModbusForge.Tests.Coordinators
             callbacks.SetupAllProperties();
             callbacks.Setup(c => c.IsConnected).Returns(true);
 
-            var entry = new CustomEntry { Address = 1, Area = "HoldingRegister", Continuous = true, PeriodMs = 500, _lastWriteUtc = DateTime.UtcNow.AddSeconds(-1) };
+            var entry = new CustomEntry { Address = 1, Area = "HoldingRegister", Continuous = true, PeriodMs = 500, LastWriteUtc = DateTime.UtcNow.AddSeconds(-1) };
+
             callbacks.Setup(c => c.GetCustomEntriesSnapshot()).Returns(new List<CustomEntry> { entry });
 
             var customScheduler = new FakeScheduler();
@@ -206,7 +207,7 @@ namespace ModbusForge.Tests.Coordinators
             callbacks.SetupAllProperties();
             callbacks.Setup(c => c.IsConnected).Returns(true);
 
-            var entry = new CustomEntry { Address = 1, Area = "HoldingRegister", Continuous = true, PeriodMs = 5000, _lastWriteUtc = DateTime.UtcNow };
+            var entry = new CustomEntry { Address = 1, Area = "HoldingRegister", Continuous = true, PeriodMs = 5000, LastWriteUtc = DateTime.UtcNow };
             callbacks.Setup(c => c.GetCustomEntriesSnapshot()).Returns(new List<CustomEntry> { entry });
 
             var customScheduler = new FakeScheduler();
