@@ -17,7 +17,6 @@ namespace ModbusForge
     /// </summary>
     public partial class App : Application
     {
-        public static IConfiguration? Configuration { get; private set; }
         public static IServiceProvider ServiceProvider { get; private set; } = null!;
 
         public App()
@@ -130,13 +129,13 @@ namespace ModbusForge
                 .SetBasePath(AppContext.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 
-            Configuration = builder.Build();
-            services.AddSingleton(Configuration);
+            var configuration = builder.Build();
+            services.AddSingleton(configuration);
 
             // Options
             services.AddOptions();
-            services.Configure<ServerSettings>(Configuration.GetSection("ServerSettings"));
-            services.Configure<LoggingSettings>(Configuration.GetSection("LoggingSettings"));
+            services.Configure<ServerSettings>(configuration.GetSection("ServerSettings"));
+            services.Configure<LoggingSettings>(configuration.GetSection("LoggingSettings"));
 
             // Configure logging
             services.AddLogging(configure => 

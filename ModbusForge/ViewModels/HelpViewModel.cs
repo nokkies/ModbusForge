@@ -2,7 +2,6 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
-using System.Windows.Documents;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -21,7 +20,7 @@ namespace ModbusForge.ViewModels
     {
         private readonly IHelpContentService _helpContentService;
         private readonly ILogger<HelpViewModel> _logger;
-        private FlowDocument? _helpContent;
+        private string? _helpContent;
 
         [ObservableProperty]
         private string _searchText = string.Empty;
@@ -29,7 +28,7 @@ namespace ModbusForge.ViewModels
         [ObservableProperty]
         private ObservableCollection<HelpTopic> _helpTopics = new();
 
-        public FlowDocument? HelpContent
+        public string? HelpContent
         {
             get => _helpContent;
             private set => SetProperty(ref _helpContent, value);

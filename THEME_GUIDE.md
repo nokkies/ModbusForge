@@ -88,7 +88,7 @@ All buttons automatically use the metallic theme.
 ```
 App.xaml
 ├── Light.Blue.xaml (MahApps light base theme)
-├── LightMetallicTheme.xaml (Custom light metallic styling)
+├── Theme.xaml (Unified application theme styling)
 └── Color Overrides (Light metallic color scheme)
 
 MainWindow.xaml
@@ -119,7 +119,7 @@ MainWindow.xaml
 ## Customization
 
 ### Adding New Colors
-Edit `Resources/LightMetallicTheme.xaml`:
+Edit `Resources/Theme.xaml`:
 ```xml
 <Color x:Key="MyCustomColor">#FFRRGGBB</Color>
 <SolidColorBrush x:Key="MyCustomBrush" Color="{StaticResource MyCustomColor}"/>
