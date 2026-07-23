@@ -308,8 +308,8 @@ namespace ModbusForge
 
         private void HoldingRegistersGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
         {
-            // Placeholder to satisfy XAML event; value processing handled by bindings/VM.
             if (e.EditAction != DataGridEditAction.Commit) return;
+            ((ICommand)_viewModel.UpdateHoldingRegisterCommand).Execute(e);
         }
 
         private void CustomGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)

@@ -232,17 +232,17 @@ namespace ModbusForge.ViewModels
         {
             // Modbus operation commands
             UpdateHoldingRegisterCommand = new AsyncRelayCommand<DataGridCellEditEndingEventArgs>(UpdateHoldingRegister);
-            ConnectCommand = new RelayCommand(async () => await ConnectAsync(), () => CanConnect() && !_isConnecting);
-            _disconnectCommand = new RelayCommand(async () => await DisconnectAsync(), CanDisconnect);
+            ConnectCommand = new AsyncRelayCommand(async () => await ConnectAsync(), CanConnect);
+            _disconnectCommand = new AsyncRelayCommand(async () => await DisconnectAsync(), CanDisconnect);
             DisconnectCommand = _disconnectCommand;
-            RunDiagnosticsCommand = new RelayCommand(async () => await RunDiagnosticsAsync());
+            RunDiagnosticsCommand = new AsyncRelayCommand(async () => await RunDiagnosticsAsync());
 
-            ReadRegistersCommand = new RelayCommand(async () => await ReadRegistersAsync(), () => IsConnected);
-            WriteRegisterCommand = new RelayCommand(async () => await WriteRegisterAsync(), () => IsConnected);
-            ReadCoilsCommand = new RelayCommand(async () => await ReadCoilsAsync(), () => IsConnected);
-            WriteCoilCommand = new RelayCommand(async () => await WriteCoilAsync(), () => IsConnected);
-            ReadInputRegistersCommand = new RelayCommand(async () => await ReadInputRegistersAsync(), () => IsConnected);
-            ReadDiscreteInputsCommand = new RelayCommand(async () => await ReadDiscreteInputsAsync(), () => IsConnected);
+            ReadRegistersCommand = new AsyncRelayCommand(async () => await ReadRegistersAsync(), () => IsConnected);
+            WriteRegisterCommand = new AsyncRelayCommand(async () => await WriteRegisterAsync(), () => IsConnected);
+            ReadCoilsCommand = new AsyncRelayCommand(async () => await ReadCoilsAsync(), () => IsConnected);
+            WriteCoilCommand = new AsyncRelayCommand(async () => await WriteCoilAsync(), () => IsConnected);
+            ReadInputRegistersCommand = new AsyncRelayCommand(async () => await ReadInputRegistersAsync(), () => IsConnected);
+            ReadDiscreteInputsCommand = new AsyncRelayCommand(async () => await ReadDiscreteInputsAsync(), () => IsConnected);
 
             // Custom tab commands
             AddCustomEntryCommand = new RelayCommand(AddCustomEntry);
@@ -259,24 +259,24 @@ namespace ModbusForge.ViewModels
                     StatusMessage = result.Message;
                 }
             });
-            ReadAllCustomNowCommand = new RelayCommand(async () => await ReadAllCustomNowAsync());
+            ReadAllCustomNowCommand = new AsyncRelayCommand(async () => await ReadAllCustomNowAsync());
             // Project commands (replacing Custom save/load)
-            SaveProjectCommand = new RelayCommand(async () => await SaveProjectAsync());
-            LoadProjectCommand = new RelayCommand(async () => await LoadProjectAsync());
-            ImportUnitIdsCommand = new RelayCommand(async () => await ImportUnitIdsAsync());
-            ExportUnitIdsCommand = new RelayCommand(async () => await ExportUnitIdsAsync());
-            ExportUnitIdCommand = new RelayCommand(async () => await ExportUnitIdAsync());
-            ImportUnitIdAsCommand = new RelayCommand(async () => await ImportUnitIdAsAsync());
+            SaveProjectCommand = new AsyncRelayCommand(async () => await SaveProjectAsync());
+            LoadProjectCommand = new AsyncRelayCommand(async () => await LoadProjectAsync());
+            ImportUnitIdsCommand = new AsyncRelayCommand(async () => await ImportUnitIdsAsync());
+            ExportUnitIdsCommand = new AsyncRelayCommand(async () => await ExportUnitIdsAsync());
+            ExportUnitIdCommand = new AsyncRelayCommand(async () => await ExportUnitIdAsync());
+            ImportUnitIdAsCommand = new AsyncRelayCommand(async () => await ImportUnitIdAsAsync());
 
             // Legacy Custom commands (kept for compatibility but will be hidden)
-            SaveCustomCommand = new RelayCommand(async () => await SaveCustomAsync());
-            LoadCustomCommand = new RelayCommand(async () => await LoadCustomAsync());
-            SaveAllConfigCommand = new RelayCommand(async () => await SaveAllConfigAsync());
-            LoadAllConfigCommand = new RelayCommand(async () => await LoadAllConfigAsync());
+            SaveCustomCommand = new AsyncRelayCommand(async () => await SaveCustomAsync());
+            LoadCustomCommand = new AsyncRelayCommand(async () => await LoadCustomAsync());
+            SaveAllConfigCommand = new AsyncRelayCommand(async () => await SaveAllConfigAsync());
+            LoadAllConfigCommand = new AsyncRelayCommand(async () => await LoadAllConfigAsync());
 
             // Keyboard shortcut commands
             TrendCommand = new RelayCommand(ShowTrendView);
-            RefreshCommand = new RelayCommand(async () => await RefreshAsync());
+            RefreshCommand = new AsyncRelayCommand(async () => await RefreshAsync());
             ShowHelpCommand = new RelayCommand(ShowHelp);
             ShowScriptEditorCommand = new RelayCommand(ShowScriptEditor);
         }
@@ -417,6 +417,7 @@ namespace ModbusForge.ViewModels
         }
 
         [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
         [NotifyCanExecuteChangedFor(nameof(DisconnectCommand))]
         [NotifyCanExecuteChangedFor(nameof(ReadRegistersCommand))]
         [NotifyCanExecuteChangedFor(nameof(WriteRegisterCommand))]
@@ -450,6 +451,8 @@ namespace ModbusForge.ViewModels
         private readonly MonitoringCoordinator _monitoringCoordinator;
         private readonly ITrendLogger _trendLogger;
         private readonly ICustomEntryService _customEntryService;
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
         private bool _isConnecting = false;
 
         public IRelayCommand DisconnectCommand { get; private set; } = null!;
@@ -812,32 +815,41 @@ namespace ModbusForge.ViewModels
             set => SetDiscreteInputCount(value);
         }
 
-        private void OnSelectedUnitIdChanged(byte value)
+        private async void OnSelectedUnitIdChanged(byte value)
         {
-            OnPropertyChanged(nameof(SelectedUnitId));
-
-            // Ensure configuration exists for the new Unit ID
-            _unitConfigurationStore.GetOrCreateConfiguration(value);
-
-            // Refresh Custom entries when Unit ID changes in server mode
-            if (IsServerMode && IsConnected)
+            try
             {
-                _ = Task.Run(async () => await ReadAllCustomNowAsync());
-            }
+                OnPropertyChanged(nameof(SelectedUnitId));
 
-            // Notify all delegated properties that they may have changed
-            OnPropertyChanged(nameof(CustomEntries));
-            OnPropertyChanged(nameof(SimulationEnabled));
-            OnPropertyChanged(nameof(GlobalMonitorEnabled));
-            OnPropertyChanged(nameof(HoldingMonitorEnabled));
-            OnPropertyChanged(nameof(InputRegistersMonitorEnabled));
-            OnPropertyChanged(nameof(CoilsMonitorEnabled));
-            OnPropertyChanged(nameof(DiscreteInputsMonitorEnabled));
-            OnPropertyChanged(nameof(CustomMonitorEnabled));
-            OnPropertyChanged(nameof(CustomReadMonitorEnabled));
-            OnPropertyChanged(nameof(RegistersGlobalType));
-            OnPropertyChanged(nameof(RegistersSwapBytes));
-            OnPropertyChanged(nameof(RegistersSwapWords));
+                // Ensure configuration exists for the new Unit ID
+                _unitConfigurationStore.GetOrCreateConfiguration(value);
+
+                // Refresh Custom entries when Unit ID changes in server mode
+                if (IsServerMode && IsConnected)
+                {
+                    await ReadAllCustomNowAsync();
+                }
+
+                // Notify all delegated properties that they may have changed
+                OnPropertyChanged(nameof(CustomEntries));
+                OnPropertyChanged(nameof(SimulationEnabled));
+                OnPropertyChanged(nameof(GlobalMonitorEnabled));
+                OnPropertyChanged(nameof(HoldingMonitorEnabled));
+                OnPropertyChanged(nameof(InputRegistersMonitorEnabled));
+                OnPropertyChanged(nameof(CoilsMonitorEnabled));
+                OnPropertyChanged(nameof(DiscreteInputsMonitorEnabled));
+                OnPropertyChanged(nameof(CustomMonitorEnabled));
+                OnPropertyChanged(nameof(CustomReadMonitorEnabled));
+                OnPropertyChanged(nameof(RegistersGlobalType));
+                OnPropertyChanged(nameof(RegistersSwapBytes));
+                OnPropertyChanged(nameof(RegistersSwapWords));
+
+                SubscribeCustomEntries();
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogError(ex, "Error handling SelectedUnitId change to {Value}", value);
+            }
         }
 
         // Setters for delegated properties (needed for two-way binding)
@@ -870,12 +882,11 @@ namespace ModbusForge.ViewModels
         private void SetDiscreteInputStart(int value) => CurrentConfig.RegisterSettings.DiscreteInputStart = value;
         private void SetDiscreteInputCount(int value) => CurrentConfig.RegisterSettings.DiscreteInputCount = value;
 
-        private bool CanConnect() => _connectionCoordinator.CanConnect(IsConnected) && !_isConnecting;
+        private bool CanConnect() => _connectionCoordinator.CanConnect(IsConnected) && !IsConnecting;
 
         private async Task ConnectAsync()
         {
-            _isConnecting = true;
-            ConnectCommand.NotifyCanExecuteChanged();
+            IsConnecting = true;
             try
             {
                 // Snapshot monitoring state before connect so we can restore on success
@@ -912,8 +923,7 @@ namespace ModbusForge.ViewModels
             }
             finally
             {
-                _isConnecting = false;
-                ConnectCommand.NotifyCanExecuteChanged();
+                IsConnecting = false;
             }
         }
 
@@ -1150,7 +1160,7 @@ namespace ModbusForge.ViewModels
                 trendEntries,
                 UnitId,
                 IsServerMode,
-                enabled => SetGlobalMonitorEnabled(enabled));
+                enabled => GlobalMonitorEnabled = enabled);
         }
 
         private void SubscribeCustomEntries()
