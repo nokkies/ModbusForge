@@ -2045,22 +2045,6 @@ namespace ModbusForge.Views
         }
     }
     
-    // Helper converter for boolean to dash array
-    public class BoolToDashArrayConverter : System.Windows.Data.IValueConverter
-    {
-        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-        {
-            if (value is bool isConnected && isConnected)
-                return new System.Windows.Media.DoubleCollection { 1, 0 };
-            return new System.Windows.Media.DoubleCollection { 5, 5 };
-        }
-        
-        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-        {
-            return System.Windows.Data.Binding.DoNothing;
-        }
-    }
-    
     // Helper methods for connector position detection
     public partial class VisualNodeEditor
     {

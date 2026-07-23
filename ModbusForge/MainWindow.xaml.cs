@@ -172,6 +172,67 @@ namespace ModbusForge
             {
                 e.Handled = true;
                 MenuItem_Help_Click(null!, null!);
+                return;
+            }
+
+            // Do not steal global shortcuts while the user is typing in a text field.
+            if (IsTextInputFocused())
+            {
+                return;
+            }
+
+            var ctrl = (e.KeyboardDevice.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+
+            if (ctrl && e.Key == Key.R)
+            {
+                e.Handled = true;
+                Execute(_viewModel.ReadRegistersCommand);
+            }
+            else if (ctrl && e.Key == Key.W)
+            {
+                e.Handled = true;
+                Execute(_viewModel.WriteRegisterCommand);
+            }
+            else if (ctrl && e.Key == Key.T)
+            {
+                e.Handled = true;
+                Execute(_viewModel.TrendCommand);
+            }
+            else if (ctrl && e.Key == Key.S)
+            {
+                e.Handled = true;
+                Execute(_viewModel.SaveProjectCommand);
+            }
+            else if (ctrl && e.Key == Key.O)
+            {
+                e.Handled = true;
+                Execute(_viewModel.LoadProjectCommand);
+            }
+            else if (ctrl && e.Key == Key.E)
+            {
+                e.Handled = true;
+                Execute(_viewModel.ShowScriptEditorCommand);
+            }
+            else if (e.Key == Key.F5)
+            {
+                e.Handled = true;
+                Execute(_viewModel.RefreshCommand);
+            }
+        }
+
+        private static bool IsTextInputFocused()
+        {
+            var focused = Keyboard.FocusedElement;
+            return focused is TextBoxBase
+                || focused is PasswordBox
+                || (focused is ComboBox combo && combo.IsEditable);
+        }
+
+        private static void Execute(ICommand? command)
+        {
+            if (command?.CanExecute(null) == true)
+            {
+                command.Execute(null);
             }
         }
 

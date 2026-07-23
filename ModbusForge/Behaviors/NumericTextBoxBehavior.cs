@@ -33,11 +33,31 @@ namespace ModbusForge.Behaviors
                 typeof(NumericTextBoxBehavior),
                 new PropertyMetadata(NumericFormat.Integer));
 
+        public static readonly DependencyProperty MinimumProperty =
+            DependencyProperty.RegisterAttached(
+                "Minimum",
+                typeof(double),
+                typeof(NumericTextBoxBehavior),
+                new PropertyMetadata(double.MinValue));
+
+        public static readonly DependencyProperty MaximumProperty =
+            DependencyProperty.RegisterAttached(
+                "Maximum",
+                typeof(double),
+                typeof(NumericTextBoxBehavior),
+                new PropertyMetadata(double.MaxValue));
+
         public static bool GetIsNumeric(DependencyObject obj) => (bool)obj.GetValue(IsNumericProperty);
         public static void SetIsNumeric(DependencyObject obj, bool value) => obj.SetValue(IsNumericProperty, value);
 
         public static NumericFormat GetFormat(DependencyObject obj) => (NumericFormat)obj.GetValue(FormatProperty);
         public static void SetFormat(DependencyObject obj, NumericFormat value) => obj.SetValue(FormatProperty, value);
+
+        public static double GetMinimum(DependencyObject obj) => (double)obj.GetValue(MinimumProperty);
+        public static void SetMinimum(DependencyObject obj, double value) => obj.SetValue(MinimumProperty, value);
+
+        public static double GetMaximum(DependencyObject obj) => (double)obj.GetValue(MaximumProperty);
+        public static void SetMaximum(DependencyObject obj, double value) => obj.SetValue(MaximumProperty, value);
 
         private static void OnIsNumericChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
@@ -118,13 +138,39 @@ namespace ModbusForge.Behaviors
 
             // Allow a single leading/trailing negative sign for Integer/Decimal.
             // The caret may be at the beginning or the sign may already be present.
-            return format switch
+            bool valid = format switch
             {
                 NumericFormat.UInteger => candidate.All(char.IsDigit),
                 NumericFormat.Integer => IsInteger(candidate),
                 NumericFormat.Decimal => IsDecimal(candidate),
                 _ => true
             };
+
+            return valid && IsWithinRange(textBox, candidate);
+        }
+
+        private static bool IsWithinRange(TextBox textBox, string candidate)
+        {
+            var format = GetFormat(textBox);
+            var minimum = GetMinimum(textBox);
+            var maximum = GetMaximum(textBox);
+
+            double value = 0;
+            bool parsed = format switch
+            {
+                NumericFormat.UInteger => uint.TryParse(candidate, NumberStyles.Integer, CultureInfo.InvariantCulture, out var u) && (value = u) >= 0,
+                NumericFormat.Integer => int.TryParse(candidate, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i) && (value = i) == i,
+                NumericFormat.Decimal => double.TryParse(candidate, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) && (value = d) == d,
+                _ => false
+            };
+
+            // If parsing fails the input is still partial/ambiguous; don't block it.
+            if (!parsed)
+            {
+                return true;
+            }
+
+            return value >= minimum && value <= maximum;
         }
 
         private static bool IsInteger(string text)
