@@ -56,7 +56,12 @@ public sealed class WpfApiApplicationService : IApiApplicationService
 
     public ApiStatus GetStatus()
     {
-        return new ApiStatus(_appState.IsConnected, _appState.Mode);
+        // Marshal the read through the dispatcher for consistency with the
+        // write-side calls, so WPF-owned state is never read from the API thread.
+        return _dispatcher
+            .InvokeAsync(() => new ApiStatus(_appState.IsConnected, _appState.Mode))
+            .GetAwaiter()
+            .GetResult();
     }
 
     // ──────────────────────────────────────────────────────────────────────────

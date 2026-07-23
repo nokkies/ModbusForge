@@ -20,6 +20,8 @@ namespace ModbusForge.Services
         private string? _lastIpAddress;
         private int _lastPort;
 
+        private const int DisposeLockTimeoutMs = 5000;
+
         public ModbusTcpService(ILogger<ModbusTcpService> logger)
             : this(logger, null)
         {
@@ -60,7 +62,9 @@ namespace ModbusForge.Services
             {
                 try
                 {
-                    return _client != null && _tcpClient != null && _tcpClient.Connected;
+                    var client = _client;
+                    var tcpClient = _tcpClient;
+                    return client != null && tcpClient != null && tcpClient.Connected;
                 }
                 catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
@@ -70,37 +74,35 @@ namespace ModbusForge.Services
             }
         }
 
-        public virtual async Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1")
+        public virtual async Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1", CancellationToken cancellationToken = default)
         {
-            await _ioLock.WaitAsync().ConfigureAwait(false);
+            await _ioLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                return await Task.Run(() =>
+                _lastIpAddress = ipAddress;
+                _lastPort = port;
+                var tcpClient = new TcpClient();
+                try
                 {
-                    try
-                    {
-                        _lastIpAddress = ipAddress;
-                        _lastPort = port;
-                        _tcpClient = new TcpClient();
-                        _tcpClient.Connect(ipAddress, port);
-                        _client = ModbusIpMaster.CreateIp(_tcpClient);
-                        var message = $"Connected to Modbus server at {ipAddress}:{port}";
-                        _logger.LogInformation(message);
-                        _consoleLoggerService?.Log(message);
-                        return true;
-                    }
-                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-                    {
-                        var message = $"Failed to connect to Modbus server at {ipAddress}:{port}: {ex.Message}";
-                        _logger.LogError(ex, message);
-                        _consoleLoggerService?.Log(message);
-                        _client?.Dispose();
-                        _client = null;
-                        _tcpClient?.Close();
-                        _tcpClient = null;
-                        return false;
-                    }
-                }).ConfigureAwait(false);
+                    await tcpClient.ConnectAsync(ipAddress, port, cancellationToken).ConfigureAwait(false);
+                    _tcpClient = tcpClient;
+                    _client = ModbusIpMaster.CreateIp(_tcpClient);
+                    var message = $"Connected to Modbus server at {ipAddress}:{port}";
+                    _logger.LogInformation(message);
+                    _consoleLoggerService?.Log(message);
+                    return true;
+                }
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                {
+                    var message = $"Failed to connect to Modbus server at {ipAddress}:{port}: {ex.Message}";
+                    _logger.LogError(ex, message);
+                    _consoleLoggerService?.Log(message);
+                    _client?.Dispose();
+                    _client = null;
+                    tcpClient.Dispose();
+                    _tcpClient = null;
+                    return false;
+                }
             }
             finally
             {
@@ -317,47 +319,35 @@ namespace ModbusForge.Services
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!_disposed)
+            if (_disposed)
+                return;
+
+            if (disposing)
             {
-                if (disposing)
+                // Dispose the underlying connection first so any in-flight I/O is
+                // aborted, allowing the operation holding the lock to release it.
+                _client?.Dispose();
+                _client = null;
+                _tcpClient?.Close();
+                _tcpClient = null;
+
+                // Acquire the lock on the calling thread (bounded wait) before
+                // disposing the semaphore. Disposing while still holding it means
+                // no in-flight operation can call Release on a disposed semaphore
+                // (use-after-dispose). If the lock cannot be acquired in time we
+                // deliberately leave the semaphore undisposed for the same reason.
+                if (_ioLock.Wait(DisposeLockTimeoutMs))
                 {
-                    // Try to acquire the lock immediately without blocking to allow fast-path dispose.
-                    bool lockAcquired = _ioLock.Wait(0);
-
-                    // Force clean up underlying resources immediately to abort pending I/O operations
-                    try { _client?.Dispose(); } catch { }
-                    try { _tcpClient?.Close(); } catch { }
-
-                    if (lockAcquired)
-                    {
-                        // Fast path: lock was available, safe to dispose now
-                        try
-                        {
-                            _ioLock.Release();
-                            _ioLock.Dispose();
-                        }
-                        catch { }
-                    }
-                    else
-                    {
-                        // Lock is held by an active I/O operation.
-                        // We must not block the calling thread, but we also can't dispose the lock yet,
-                        // otherwise the active operation will throw ObjectDisposedException when it releases.
-                        // We schedule a background task to await and clean up the lock safely.
-                        _ = Task.Run(async () =>
-                        {
-                            try
-                            {
-                                await _ioLock.WaitAsync().ConfigureAwait(false);
-                                _ioLock.Release();
-                                _ioLock.Dispose();
-                            }
-                            catch { }
-                        });
-                    }
+                    _ioLock.Dispose();
                 }
-                _disposed = true;
+                else
+                {
+                    _logger.LogWarning(
+                        "Timed out waiting for I/O lock during Dispose; leaving semaphore undisposed to avoid use-after-dispose.");
+                }
             }
+
+            _disposed = true;
         }
 
         ~ModbusTcpService()

@@ -89,6 +89,21 @@ namespace ModbusForge.Models
         /// Returns true if this reference uses symbolic addressing
         /// </summary>
         public bool IsSymbolic => !string.IsNullOrEmpty(SymbolicName);
+
+        /// <summary>
+        /// Creates a deep copy of this address reference so cloned owners do not
+        /// share mutable address state.
+        /// </summary>
+        public PlcAddressReference Clone()
+        {
+            return new PlcAddressReference
+            {
+                Area = Area,
+                Address = Address,
+                Not = Not,
+                SymbolicName = SymbolicName
+            };
+        }
     }
 
     /// <summary>
