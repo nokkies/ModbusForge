@@ -89,7 +89,7 @@
 
                 <!-- Content Area -->
                 <Border Grid.Column="1" Background="{StaticResource FluentCardBackground}" Padding="24">
-                    <FlowDocumentScrollViewer Document="{Binding HelpContent}" 
+                    <FlowDocumentScrollViewer Document="{Binding HelpContent, Converter={StaticResource MarkdownToFlowDocumentConverter}}" 
                                             IsToolBarVisible="False"
                                             Zoom="100"
                                             VerticalScrollBarVisibility="Auto"/>
