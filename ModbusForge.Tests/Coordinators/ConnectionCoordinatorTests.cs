@@ -1,3 +1,4 @@
+using System.Threading;
 using Moq;
 using Xunit;
 using ModbusForge.ViewModels.Coordinators;
@@ -118,7 +119,7 @@ namespace ModbusForge.Tests.Coordinators
             string? statusMessage = null;
             bool? connectedState = null;
 
-            _mockClientService.Setup(s => s.ConnectAsync(serverAddress, port, It.IsAny<string>()))
+            _mockClientService.Setup(s => s.ConnectAsync(serverAddress, port, It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
 
             // Act
@@ -130,7 +131,7 @@ namespace ModbusForge.Tests.Coordinators
                 connected => connectedState = connected);
 
             // Assert
-            _mockClientService.Verify(s => s.ConnectAsync(serverAddress, port, It.IsAny<string>()), Times.Once);
+            _mockClientService.Verify(s => s.ConnectAsync(serverAddress, port, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
             Assert.NotNull(statusMessage);
             Assert.True(connectedState);
         }

@@ -34,11 +34,24 @@ namespace ModbusForge.Views
             WatchGrid.ItemsSource = _tagService.WatchEntries;
             UpdateStatus();
 
-            // Subscribe to collection changes
-            _tagService.WatchEntries.CollectionChanged += (s, e) =>
-            {
-                UpdateStatus();
-            };
+            // Subscribe to collection changes. Use a named handler so it can be
+            // unsubscribed on Closed; otherwise the singleton TagService keeps
+            // this window alive after it is closed.
+            _tagService.WatchEntries.CollectionChanged += OnWatchEntriesCollectionChanged;
+
+            Closed += OnClosed;
+        }
+
+        private void OnWatchEntriesCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            UpdateStatus();
+        }
+
+        private void OnClosed(object? sender, EventArgs e)
+        {
+            _tagService.WatchEntries.CollectionChanged -= OnWatchEntriesCollectionChanged;
+            _updateTimer.Tick -= UpdateTimer_Tick;
+            Closed -= OnClosed;
         }
 
         private void UpdateTimer_Tick(object? sender, EventArgs e)

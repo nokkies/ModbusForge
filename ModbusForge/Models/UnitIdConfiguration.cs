@@ -110,7 +110,8 @@ namespace ModbusForge.Models
                 });
             }
             
-            // Clone visual nodes (simplified - deep cloning would need more complex logic)
+            // Clone visual nodes, deep-cloning address references so clones do not
+            // share mutable PlcAddressReference instances.
             foreach (var node in VisualNodes)
             {
                 clone.VisualNodes.Add(new VisualNode
@@ -122,9 +123,9 @@ namespace ModbusForge.Models
                     Y = node.Y,
                     Width = node.Width,
                     Height = node.Height,
-                    Input1Address = node.Input1Address,
-                    Input2Address = node.Input2Address,
-                    OutputAddress = node.OutputAddress,
+                    Input1Address = node.Input1Address?.Clone() ?? new PlcAddressReference(),
+                    Input2Address = node.Input2Address?.Clone() ?? new PlcAddressReference(),
+                    OutputAddress = node.OutputAddress?.Clone() ?? new PlcAddressReference(),
                     TimerPresetMs = node.TimerPresetMs,
                     SetDominant = node.SetDominant,
                     CounterPreset = node.CounterPreset,
