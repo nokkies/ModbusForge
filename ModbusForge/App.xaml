@@ -18,8 +18,8 @@
           <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Light.Blue.xaml"/>
           <!-- App-level resources so they are available during control InitializeComponent -->
           <ResourceDictionary Source="Resources/Converters.xaml"/>
-          <!-- Custom Light Metallic Theme -->
-          <ResourceDictionary Source="Resources/LightMetallicTheme.xaml"/>
+          <!-- Custom application theme -->
+          <ResourceDictionary Source="Resources/Theme.xaml"/>
         </ResourceDictionary.MergedDictionaries>
 
         <!-- Override MahApps colors with light metallic scheme -->

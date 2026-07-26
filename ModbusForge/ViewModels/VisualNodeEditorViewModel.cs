@@ -116,6 +116,10 @@ namespace ModbusForge.ViewModels
 
         public IDialogService DialogService => _dialogService;
 
+        public ILogger Logger => _logger;
+
+        public TagService? TagService => _tagService;
+
         public VisualNodeEditorViewModel(
             ILogger<VisualNodeEditorViewModel>? logger = null,
             IVisualSimulationService? visualSimulationService = null,
@@ -1024,7 +1028,7 @@ namespace ModbusForge.ViewModels
             {
                 if (value)
                 {
-                    _visualSimulationService.Start(this);
+                    _visualSimulationService.Start(Nodes, Connections, () => ShowLiveValues);
                 }
                 else
                 {
