@@ -15,6 +15,7 @@ using ModbusForge.Behaviors;
 using ModbusForge.Models;
 using ModbusForge.ViewModels;
 using ModbusForge.Services;
+using ModbusForge.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -400,7 +401,7 @@ namespace ModbusForge.Views
                 {
                     if (node == selected)
                     {
-                        element.BorderBrush = new SolidColorBrush(Color.FromRgb(0x3B, 0x82, 0xF6));
+                        element.BorderBrush = BrushCache.GetBrush(Color.FromRgb(0x3B, 0x82, 0xF6));
                         element.BorderThickness = new Thickness(3);
                     }
                     else
@@ -437,11 +438,7 @@ namespace ModbusForge.Views
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 // Live updates should never crash the canvas; log and continue.
-                try
-                {
-                    (App.ServiceProvider?.GetService(typeof(ILogger<VisualNodeEditor>)) as ILogger<VisualNodeEditor>)?.LogError(ex, "Error in LiveUpdateTimer_Tick");
-                }
-                catch { /* Avoid any secondary exception from logging. */ }
+                _viewModel?.Logger?.LogError(ex, "Error in LiveUpdateTimer_Tick");
             }
         }
         
@@ -712,7 +709,7 @@ namespace ModbusForge.Views
             var path = new Path
             {
                 Data = pathGeometry,
-                Stroke = new SolidColorBrush(Color.FromRgb(102, 102, 102)),
+                Stroke = BrushCache.GetBrush(Color.FromRgb(102, 102, 102)),
                 StrokeThickness = 2
             };
             
@@ -733,7 +730,7 @@ namespace ModbusForge.Views
         {
             var border = new Border
             {
-                Style = (Style)FindResource("NodeStyle"),
+                Style = TryFindResource("NodeStyle") as Style ?? new Style(typeof(Border)),
                 Width = node.Width,
                 // Let height auto-size based on content instead of fixed
                 DataContext = node
@@ -802,7 +799,7 @@ namespace ModbusForge.Views
             // Accent bar
             var accentBar = new Border
             {
-                Background = new SolidColorBrush(color),
+                Background = BrushCache.GetBrush(color),
                 CornerRadius = new CornerRadius(6, 0, 0, 0)
             };
             Grid.SetColumn(accentBar, 0);
@@ -814,7 +811,7 @@ namespace ModbusForge.Views
                 Text = node.DisplayName,
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 11,
-                Foreground = new SolidColorBrush(Color.FromRgb(30, 30, 30)),
+                Foreground = BrushCache.GetBrush(Color.FromRgb(30, 30, 30)),
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(6, 0, 4, 0),
                 TextTrimming = TextTrimming.CharacterEllipsis,
@@ -828,7 +825,7 @@ namespace ModbusForge.Views
             {
                 Text = node.AddressDisplay,
                 FontSize = 9,
-                Foreground = new SolidColorBrush(Color.FromRgb(120, 120, 120)),
+                Foreground = BrushCache.GetBrush(Color.FromRgb(120, 120, 120)),
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 6, 0),
                 Visibility = string.IsNullOrEmpty(node.AddressDisplay) ? Visibility.Collapsed : Visibility.Visible
@@ -839,8 +836,8 @@ namespace ModbusForge.Views
             // Wrap in a border with bottom divider line
             var header = new Border
             {
-                Background = new SolidColorBrush(Color.FromRgb(245, 245, 248)),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)),
+                Background = BrushCache.GetBrush(Color.FromRgb(245, 245, 248)),
+                BorderBrush = BrushCache.GetBrush(Color.FromArgb(40, 0, 0, 0)),
                 BorderThickness = new Thickness(0, 0, 0, 1),
                 CornerRadius = new CornerRadius(6, 6, 0, 0),
                 Child = headerGrid
@@ -1012,7 +1009,7 @@ namespace ModbusForge.Views
                     Text = node.Name,
                     FontSize = 10,
                     FontWeight = FontWeights.Medium,
-                    Foreground = new SolidColorBrush(Color.FromRgb(50, 50, 50)),
+                    Foreground = BrushCache.GetBrush(Color.FromRgb(50, 50, 50)),
                     HorizontalAlignment = HorizontalAlignment.Center,
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     ToolTip = node.Name
@@ -1028,9 +1025,9 @@ namespace ModbusForge.Views
                 Height = 20,
                 FontSize = 10,
                 FontWeight = FontWeights.Bold,
-                Foreground = new SolidColorBrush(Color.FromRgb(0, 122, 204)),
-                Background = new SolidColorBrush(Color.FromRgb(240, 248, 255)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0, 122, 204)),
+                Foreground = BrushCache.GetBrush(Color.FromRgb(0, 122, 204)),
+                Background = BrushCache.GetBrush(Color.FromRgb(240, 248, 255)),
+                BorderBrush = BrushCache.GetBrush(Color.FromRgb(0, 122, 204)),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(2, 0, 2, 0),
                 HorizontalContentAlignment = HorizontalAlignment.Center,
@@ -1140,7 +1137,7 @@ namespace ModbusForge.Views
         {
             if (node.IsSelected)
             {
-                border.BorderBrush = new SolidColorBrush(Color.FromRgb(0, 122, 204));
+                border.BorderBrush = BrushCache.GetBrush(Color.FromRgb(0, 122, 204));
                 border.BorderThickness = new Thickness(3);
             }
             else
@@ -1155,14 +1152,14 @@ namespace ModbusForge.Views
             if (node.ShowLiveValues)
             {
                 liveValueBox.Visibility = Visibility.Visible;
-                header.Background = new SolidColorBrush(node.CurrentValue
+                header.Background = BrushCache.GetBrush(node.CurrentValue
                     ? Color.FromRgb(40, 160, 40)
                     : Color.FromRgb(160, 40, 40));
             }
             else
             {
                 liveValueBox.Visibility = Visibility.Collapsed;
-                header.Background = new SolidColorBrush(originalColor);
+                header.Background = BrushCache.GetBrush(originalColor);
             }
         }
 
@@ -1181,7 +1178,7 @@ namespace ModbusForge.Views
 
             var footer = new Border
             {
-                Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
+                Background = BrushCache.GetBrush(Color.FromRgb(245, 245, 245)),
                 CornerRadius = new CornerRadius(0, 0, 6, 6),
                 Padding = new Thickness(4, 3, 4, 3),
                 Child = footerPanel
@@ -1349,7 +1346,7 @@ namespace ModbusForge.Views
             
             var ellipse = new Ellipse
             {
-                Style = (Style)FindResource(isInput ? "InputConnectorStyle" : "OutputConnectorStyle"),
+                Style = TryFindResource(isInput ? "InputConnectorStyle" : "OutputConnectorStyle") as Style ?? new Style(typeof(Ellipse)),
                 Tag = $"{nodeId},{connectorType}",
                 Cursor = System.Windows.Input.Cursors.Hand,
                 ToolTip = toolTipText
@@ -1402,7 +1399,11 @@ namespace ModbusForge.Views
             if (result == MessageBoxResult.Yes)
             {
                 // Open Tag Browser in selection mode
-                var tagService = App.ServiceProvider.GetRequiredService<TagService>();
+                var tagService = _viewModel?.TagService;
+                if (tagService == null)
+                {
+                    return;
+                }
                 var tagBrowser = new TagBrowserWindow(tagService, selectionMode: true)
                 {
                     Owner = Window.GetWindow(this),
@@ -1496,9 +1497,9 @@ namespace ModbusForge.Views
             {
                 _selectionRectangle = new Rectangle
                 {
-                    Stroke = new SolidColorBrush(Color.FromRgb(0, 122, 204)),
+                    Stroke = BrushCache.GetBrush(Color.FromRgb(0, 122, 204)),
                     StrokeThickness = 1,
-                    Fill = new SolidColorBrush(Color.FromArgb(30, 0, 122, 204)),
+                    Fill = BrushCache.GetBrush(Color.FromArgb(30, 0, 122, 204)),
                     Visibility = Visibility.Collapsed
                 };
                 NodeCanvas.Children.Add(_selectionRectangle);

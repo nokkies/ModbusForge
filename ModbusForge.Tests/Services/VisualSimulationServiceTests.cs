@@ -70,7 +70,7 @@ namespace ModbusForge.Tests.Services
         private void SetupAndRun()
         {
             _viewModel.ShowLiveValues = true;
-            _simService.Start(_viewModel);
+            _simService.Start(_viewModel.Nodes, _viewModel.Connections, () => _viewModel.ShowLiveValues);
             // Call UpdateNodeValues directly (bypasses DispatcherTimer)
             _simService.UpdateNodeValues();
         }
