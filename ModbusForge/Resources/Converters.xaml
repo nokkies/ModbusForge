@@ -6,4 +6,5 @@
     <BooleanToVisibilityConverter x:Key="BoolToVis"/>
     <converters:LockToZoomModeConverter x:Key="LockToZoomModeConverter"/>
     <converters:ConnectorTagConverter x:Key="ConnectorTagConverter"/>
+    <converters:MarkdownToFlowDocumentConverter x:Key="MarkdownToFlowDocumentConverter"/>
 </ResourceDictionary>

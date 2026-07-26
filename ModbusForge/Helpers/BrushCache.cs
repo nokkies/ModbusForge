@@ -5,13 +5,13 @@ namespace ModbusForge.Helpers
 {
     /// <summary>
     /// Caches frozen <see cref="SolidColorBrush"/> instances by color to avoid
-    /// creating and disposing brushes repeatedly during node-editor rendering.
+    /// creating and disposing brushes repeatedly during rendering.
     /// </summary>
     public static class BrushCache
     {
-        private static readonly Dictionary<Color, Brush> _brushes = new();
+        private static readonly Dictionary<Color, SolidColorBrush> _brushes = new();
 
-        public static Brush GetBrush(Color color)
+        public static SolidColorBrush GetBrush(Color color)
         {
             if (!_brushes.TryGetValue(color, out var brush))
             {
@@ -25,6 +25,11 @@ namespace ModbusForge.Helpers
             }
 
             return brush;
+        }
+
+        public static void Clear()
+        {
+            _brushes.Clear();
         }
     }
 }
