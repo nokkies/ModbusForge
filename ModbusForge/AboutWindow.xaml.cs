@@ -9,7 +9,7 @@ using ModbusForge.Services;
 
 namespace ModbusForge
 {
-    public partial class AboutWindow : Window
+    public partial class AboutWindow : Wpf.Ui.Controls.FluentWindow
     {
         private readonly IDialogService _dialogService;
 
