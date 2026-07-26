@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Media;
+using ModbusForge.Helpers;
 using ModbusForge.Models;
 
 namespace ModbusForge.Converters
@@ -15,62 +16,14 @@ namespace ModbusForge.Converters
         {
             if (value is PlcElementType elementType)
             {
-                return new SolidColorBrush(NodeDescriptors.Get(elementType).HeaderColor);
+                return BrushCache.GetBrush(NodeDescriptors.Get(elementType).HeaderColor);
             }
-            return new SolidColorBrush(Color.FromRgb(158, 158, 158));
+            return BrushCache.GetBrush(Color.FromRgb(158, 158, 158));
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
             return Binding.DoNothing;
-        }
-    }
-
-    /// <summary>
-    /// Converts boolean to visibility
-    /// </summary>
-    public class BoolToVisibilityConverter : IValueConverter
-    {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is bool boolValue)
-            {
-                return boolValue ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
-            }
-            return System.Windows.Visibility.Collapsed;
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is System.Windows.Visibility visibility)
-            {
-                return visibility == System.Windows.Visibility.Visible;
-            }
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Converts boolean to inverted visibility
-    /// </summary>
-    public class BoolToInvertedVisibilityConverter : IValueConverter
-    {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is bool boolValue)
-            {
-                return boolValue ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
-            }
-            return System.Windows.Visibility.Visible;
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is System.Windows.Visibility visibility)
-            {
-                return visibility != System.Windows.Visibility.Visible;
-            }
-            return true;
         }
     }
 
@@ -89,50 +42,6 @@ namespace ModbusForge.Converters
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
             return Binding.DoNothing;
-        }
-    }
-
-    /// <summary>
-    /// Converts node type to icon/emoji
-    /// </summary>
-    public class PlcElementTypeToIconConverter : IValueConverter
-    {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is PlcElementType elementType)
-            {
-                return NodeDescriptors.Get(elementType).Icon;
-            }
-            return "?";
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            return Binding.DoNothing;
-        }
-    }
-
-    /// <summary>
-    /// Converts zoom level to scale transform
-    /// </summary>
-    public class ZoomToScaleConverter : IValueConverter
-    {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is double zoom)
-            {
-                return new ScaleTransform(zoom, zoom);
-            }
-            return new ScaleTransform(1.0, 1.0);
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is ScaleTransform transform)
-            {
-                return transform.ScaleX;
-            }
-            return 1.0;
         }
     }
 

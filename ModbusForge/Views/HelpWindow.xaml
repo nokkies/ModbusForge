@@ -1,4 +1,4 @@
-<Window x:Class="ModbusForge.Views.HelpWindow"
+<ui:FluentWindow x:Class="ModbusForge.Views.HelpWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -9,16 +9,10 @@
         Width="900" 
         Height="650"
         WindowStartupLocation="CenterOwner"
-        Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png">
+        Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica">
     
-    <Window.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="../Resources/FluentTheme.xaml"/>
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
-    </Window.Resources>
-
     <Border Background="{StaticResource FluentBackground}" Padding="0">
         <Grid>
             <Grid.RowDefinitions>
@@ -87,7 +81,7 @@
 
                 <!-- Content Area -->
                 <Border Grid.Column="1" Background="{StaticResource FluentCardBackground}" Padding="24">
-                    <FlowDocumentScrollViewer Document="{Binding HelpContent}" 
+                    <FlowDocumentScrollViewer Document="{Binding HelpContent, Converter={StaticResource MarkdownToFlowDocumentConverter}}" 
                                             IsToolBarVisible="False"
                                             Zoom="100"
                                             VerticalScrollBarVisibility="Auto"/>
@@ -123,4 +117,4 @@
             </Border>
         </Grid>
     </Border>
-</Window>
+</ui:FluentWindow>

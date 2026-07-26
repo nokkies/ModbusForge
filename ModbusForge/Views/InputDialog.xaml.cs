@@ -2,7 +2,7 @@ using System.Windows;
 
 namespace ModbusForge.Views
 {
-    public partial class InputDialog : Window
+    public partial class InputDialog : Wpf.Ui.Controls.FluentWindow
     {
         public string InputText { get; private set; } = "";
 
