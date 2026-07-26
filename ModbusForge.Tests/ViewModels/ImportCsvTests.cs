@@ -20,7 +20,7 @@ namespace ModbusForge.Tests.ViewModels
             var mockFileDialogService = new Mock<IFileDialogService>();
             var options = Options.Create(new LoggingSettings());
 
-            var viewModel = new TrendViewModel(mockLoggerSvc.Object, options, mockFileDialogService.Object);
+            var viewModel = new TrendViewModel(mockLoggerSvc.Object, options, mockFileDialogService.Object, null, new ImmediateDispatcher());
 
             string tempFile = Path.GetTempFileName() + ".csv";
             try
@@ -56,7 +56,7 @@ namespace ModbusForge.Tests.ViewModels
             var mockFileDialogService = new Mock<IFileDialogService>();
             var options = Options.Create(new LoggingSettings());
 
-            var viewModel = new TrendViewModel(mockLoggerSvc.Object, options, mockFileDialogService.Object);
+            var viewModel = new TrendViewModel(mockLoggerSvc.Object, options, mockFileDialogService.Object, null, new ImmediateDispatcher());
 
             string tempFile = Path.GetTempFileName() + ".csv";
             try
