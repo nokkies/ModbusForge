@@ -1,24 +1,19 @@
-<Window x:Class="ModbusForge.Views.TroubleshootingWindow"
+<ui:FluentWindow x:Class="ModbusForge.Views.TroubleshootingWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
         Title="Troubleshooting" 
         Width="700" 
         Height="580"
         WindowStartupLocation="CenterOwner"
         Icon="pack://application:,,,/Resources/ModbusForgeLOGO.png"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica">
     
-    <Window.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="../Resources/FluentTheme.xaml"/>
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
-    </Window.Resources>
-
     <Border Background="{StaticResource FluentBackground}" Padding="0">
         <Grid>
             <Grid.RowDefinitions>
@@ -190,4 +185,4 @@
             </Border>
         </Grid>
     </Border>
-</Window>
+</ui:FluentWindow>
