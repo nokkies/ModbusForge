@@ -13,14 +13,6 @@
         ExtendsContentIntoTitleBar="True"
         WindowBackdropType="Mica">
     
-    <ui:FluentWindow.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="../Resources/FluentTheme.xaml"/>
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
-    </ui:FluentWindow.Resources>
-
     <Border Background="{StaticResource FluentBackground}" Padding="0">
         <Grid>
             <Grid.RowDefinitions>
@@ -89,7 +81,7 @@
 
                 <!-- Content Area -->
                 <Border Grid.Column="1" Background="{StaticResource FluentCardBackground}" Padding="24">
-                    <FlowDocumentScrollViewer Document="{Binding HelpContent}" 
+                    <FlowDocumentScrollViewer Document="{Binding HelpContent, Converter={StaticResource MarkdownToFlowDocumentConverter}}" 
                                             IsToolBarVisible="False"
                                             Zoom="100"
                                             VerticalScrollBarVisibility="Auto"/>
