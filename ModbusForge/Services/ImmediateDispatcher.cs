@@ -13,8 +13,12 @@ namespace ModbusForge.Services
 
         public T Invoke<T>(Func<T> func) => func();
 
-        public Task InvokeAsync(Action action) => Task.Run(action);
+        public Task InvokeAsync(Action action)
+        {
+            action();
+            return Task.CompletedTask;
+        }
 
-        public Task<T> InvokeAsync<T>(Func<T> func) => Task.Run(func);
+        public Task<T> InvokeAsync<T>(Func<T> func) => Task.FromResult(func());
     }
 }

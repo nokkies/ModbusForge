@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ModbusForge.Services
@@ -38,7 +39,7 @@ namespace ModbusForge.Services
         string BoundEndpoint { get; }
         
         // For client compatibility, but not used in server mode
-        Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1");
+        Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1", CancellationToken cancellationToken = default);
         Task DisconnectAsync();
         
         /// <summary>

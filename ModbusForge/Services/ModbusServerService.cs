@@ -43,10 +43,11 @@ namespace ModbusForge.Services
 
         public virtual bool IsConnected => _isRunning;
 
-        public virtual async Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1")
+        public virtual async Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1", CancellationToken cancellationToken = default)
         {
             return await Task.Run(() =>
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 lock (_stateLock)
                 {
                     try
@@ -92,7 +93,7 @@ namespace ModbusForge.Services
                         return false;
                     }
                 }
-            }).ConfigureAwait(false);
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         private void CleanupResources()

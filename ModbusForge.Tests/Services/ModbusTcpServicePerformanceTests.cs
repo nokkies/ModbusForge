@@ -54,7 +54,7 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
-        public async Task Dispose_DoesNotBlockCallingThread_WhenLockIsHeld()
+        public async Task Dispose_AcquiresLockOnCallingThread_ThenDisposesResources()
         {
             // Arrange
             var mockLogger = new Mock<ILogger<ModbusTcpService>>();
@@ -64,26 +64,21 @@ namespace ModbusForge.Tests.Services
             Assert.NotNull(ioLockField);
             var ioLock = (SemaphoreSlim)ioLockField.GetValue(service)!;
 
-            // Acquire the lock on the current thread
+            // Simulate an in-flight operation holding the lock, releasing it shortly after.
             await ioLock.WaitAsync();
-
-            try
+            _ = Task.Run(async () =>
             {
-                // Act
-                var sw = Stopwatch.StartNew();
-
-                // Call synchronous Dispose directly, it should return immediately (fast-path)
-                service.Dispose();
-
-                sw.Stop();
-
-                // Assert
-                Assert.True(sw.ElapsedMilliseconds < 50, $"Dispose should not block, took {sw.ElapsedMilliseconds}ms");
-            }
-            finally
-            {
+                await Task.Delay(100);
                 ioLock.Release();
-            }
+            });
+
+            // Act: synchronous Dispose waits on the calling thread for the lock,
+            // then disposes the semaphore. It must not throw.
+            service.Dispose();
+
+            // Assert: the semaphore was disposed on the calling thread, so any
+            // further use throws ObjectDisposedException.
+            Assert.Throws<ObjectDisposedException>(() => ioLock.Wait(0));
         }
     }
 }

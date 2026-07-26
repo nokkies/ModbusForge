@@ -11,7 +11,7 @@ namespace ModbusForge.Services
         private int _retentionMinutes;
         private int _sampleRateMs;
         private string _exportFolder;
-        private bool _isRunning;
+        private volatile bool _isRunning;
         private readonly Dictionary<string, string> _keys = new(); // key -> displayName
 
         public TrendLoggingService(IOptions<LoggingSettings> options)
