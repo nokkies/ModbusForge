@@ -1,11 +1,14 @@
-<Window x:Class="ModbusForge.Views.TestDialog"
+<ui:FluentWindow x:Class="ModbusForge.Views.TestDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
         Title="Test Dialog" Height="300" Width="500"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica">
     <Grid Margin="20">
         <StackPanel>
             <TextBlock Text="Test Dialog - Manual Control Setting" FontWeight="Bold" Margin="0,0,0,10"/>
@@ -15,4 +18,4 @@
             <Button Content="OK" Click="OK_Click" Height="30" Width="80" HorizontalAlignment="Right"/>
         </StackPanel>
     </Grid>
-</Window>
+</ui:FluentWindow>

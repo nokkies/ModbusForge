@@ -5,7 +5,7 @@ using ModbusForge.Services;
 
 namespace ModbusForge.Views
 {
-    public partial class SignalGeneratorConfigWindow : Window
+    public partial class SignalGeneratorConfigWindow : Wpf.Ui.Controls.FluentWindow
     {
         private readonly IDialogService _dialogService;
 

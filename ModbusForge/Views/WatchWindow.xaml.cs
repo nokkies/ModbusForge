@@ -10,7 +10,7 @@ using System.Windows.Threading;
 
 namespace ModbusForge.Views
 {
-    public partial class WatchWindow : Window
+    public partial class WatchWindow : Wpf.Ui.Controls.FluentWindow
     {
         private readonly TagService _tagService;
         private readonly IDialogService _dialogService;

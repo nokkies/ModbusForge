@@ -1,6 +1,4 @@
-using System.Windows;
-using System.Windows.Documents;
-using System.Windows.Media;
+using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 
 namespace ModbusForge.Services
@@ -16,52 +14,26 @@ namespace ModbusForge.Services
             _helpContent = InitializeHelpContent();
         }
 
-        public FlowDocument GetHelpContent(string topicId)
+        public string? GetHelpContent(string topicId)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(topicId))
                 {
-                    return CreateSimpleDocument("Invalid topic ID");
+                    return GetErrorContent();
                 }
 
-                var content = _helpContent.GetValueOrDefault(topicId);
-                if (string.IsNullOrWhiteSpace(content))
+                if (!_helpContent.TryGetValue(topicId, out var content) || string.IsNullOrWhiteSpace(content))
                 {
-                    return CreateSimpleDocument(GetNotFoundContent(topicId));
+                    return GetNotFoundContent(topicId);
                 }
 
-                return ParseMarkdownToFlowDocument(content);
+                return content;
             }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            catch (System.Exception ex) when (ex is not (System.OutOfMemoryException or System.OperationCanceledException))
             {
                 _logger.LogError(ex, "Failed to load help content for topic: {TopicId}", topicId);
-                return CreateSimpleDocument(GetErrorContent());
-            }
-        }
-
-        private FlowDocument CreateSimpleDocument(string text)
-        {
-            try
-            {
-                var document = new FlowDocument();
-                document.FontFamily = new FontFamily("Segoe UI");
-                document.FontSize = 14;
-                document.PagePadding = new Thickness(0);
-
-                var paragraph = new Paragraph();
-                paragraph.Inlines.Add(new Run(text));
-                document.Blocks.Add(paragraph);
-
-                return document;
-            }
-            catch
-            {
-                // Ultimate fallback
-                var document = new FlowDocument();
-                var paragraph = new Paragraph(new Run("Help content unavailable"));
-                document.Blocks.Add(paragraph);
-                return document;
+                return GetErrorContent();
             }
         }
 
@@ -84,141 +56,6 @@ namespace ModbusForge.Services
                 ["keyboard-shortcuts"] = GetKeyboardShortcutsContent(),
                 ["troubleshooting"] = GetTroubleshootingContent()
             };
-        }
-
-        private FlowDocument ParseMarkdownToFlowDocument(string markdown)
-        {
-            try
-            {
-                var document = new FlowDocument();
-                document.FontFamily = new FontFamily("Segoe UI");
-                document.FontSize = 14;
-                document.PagePadding = new Thickness(0);
-
-                if (string.IsNullOrWhiteSpace(markdown))
-                {
-                    return document;
-                }
-
-                var lines = markdown.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-                var currentParagraph = new Paragraph();
-
-                foreach (var line in lines)
-                {
-                    var trimmedLine = line.Trim();
-
-                    if (string.IsNullOrWhiteSpace(trimmedLine))
-                    {
-                        AddCurrentParagraph(document, ref currentParagraph);
-                        continue;
-                    }
-
-                    // Headers
-                    if (trimmedLine.StartsWith("# "))
-                    {
-                        AddCurrentParagraph(document, ref currentParagraph);
-                        var header = new Paragraph(new Run(trimmedLine.Substring(2).Trim()))
-                        {
-                            FontSize = 22,
-                            FontWeight = FontWeights.SemiBold,
-                            Margin = new Thickness(0, 16, 0, 8)
-                        };
-                        document.Blocks.Add(header);
-                    }
-                    else if (trimmedLine.StartsWith("## "))
-                    {
-                        AddCurrentParagraph(document, ref currentParagraph);
-                        var header = new Paragraph(new Run(trimmedLine.Substring(3).Trim()))
-                        {
-                            FontSize = 18,
-                            FontWeight = FontWeights.SemiBold,
-                            Margin = new Thickness(0, 12, 0, 6)
-                        };
-                        document.Blocks.Add(header);
-                    }
-                    else if (trimmedLine.StartsWith("### "))
-                    {
-                        AddCurrentParagraph(document, ref currentParagraph);
-                        var header = new Paragraph(new Run(trimmedLine.Substring(4).Trim()))
-                        {
-                            FontSize = 16,
-                            FontWeight = FontWeights.SemiBold,
-                            Margin = new Thickness(0, 8, 0, 4)
-                        };
-                        document.Blocks.Add(header);
-                    }
-                    // List items
-                    else if (trimmedLine.StartsWith("- ") || trimmedLine.StartsWith("* "))
-                    {
-                        AddCurrentParagraph(document, ref currentParagraph);
-                        var list = new List { Margin = new Thickness(24, 8, 0, 8), MarkerStyle = TextMarkerStyle.Disc };
-                        var listItem = new ListItem();
-                        var paragraph = new Paragraph();
-                        AddInlineText(trimmedLine.Substring(2).Trim(), paragraph);
-                        listItem.Blocks.Add(paragraph);
-                        list.ListItems.Add(listItem);
-                        document.Blocks.Add(list);
-                    }
-                    // Regular text
-                    else
-                    {
-                        if (currentParagraph.Inlines.Count > 0)
-                        {
-                            currentParagraph.Inlines.Add(new Run(" "));
-                        }
-                        AddInlineText(trimmedLine, currentParagraph);
-                    }
-                }
-
-                AddCurrentParagraph(document, ref currentParagraph);
-                return document;
-            }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-            {
-                _logger.LogError(ex, "Error parsing markdown");
-                return CreateSimpleDocument("Error displaying help content");
-            }
-        }
-
-        private void AddInlineText(string text, Paragraph paragraph)
-        {
-            // Simple inline formatting for bold and code
-            var parts = System.Text.RegularExpressions.Regex.Split(text, @"(\*\*[^*]+\*\*|`[^`]+`)");
-            
-            foreach (var part in parts)
-            {
-                if (string.IsNullOrEmpty(part)) continue;
-
-                if (part.StartsWith("**") && part.EndsWith("**") && part.Length > 4)
-                {
-                    paragraph.Inlines.Add(new Run(part.Substring(2, part.Length - 4))
-                    {
-                        FontWeight = FontWeights.Bold
-                    });
-                }
-                else if (part.StartsWith("`") && part.EndsWith("`") && part.Length > 2)
-                {
-                    paragraph.Inlines.Add(new Run(part.Substring(1, part.Length - 2))
-                    {
-                        FontFamily = new FontFamily("Consolas"),
-                        Background = new SolidColorBrush(Color.FromRgb(240, 240, 240))
-                    });
-                }
-                else
-                {
-                    paragraph.Inlines.Add(new Run(part));
-                }
-            }
-        }
-
-        private void AddCurrentParagraph(FlowDocument document, ref Paragraph currentParagraph)
-        {
-            if (currentParagraph.Inlines.Count > 0)
-            {
-                currentParagraph.Margin = new Thickness(0, 8, 0, 8);
-                document.Blocks.Add(currentParagraph);
-                currentParagraph = new Paragraph();
-            }
         }
 
         private string GetGettingStartedContent()
