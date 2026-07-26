@@ -6,7 +6,7 @@ using ModbusForge.Models;
 
 namespace ModbusForge.Views
 {
-    public partial class TestDialog : Window
+    public partial class TestDialog : Wpf.Ui.Controls.FluentWindow
     {
         public PlcArea SelectedArea { get; private set; }
         public int SelectedAddress { get; private set; }
