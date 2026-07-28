@@ -68,6 +68,7 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 ### 5. Explore More
 
 - **Options → Connection Manager**: Save and manage multiple connection profiles
+- **Options → Device Scanner**: Discover Modbus TCP devices on your network
 - **Options → Script Editor**: Create automated test sequences
 - **Options → Preferences**: Customize application behavior
 - **Help → Keyboard Shortcuts**: View all available shortcuts
@@ -114,6 +115,12 @@ See [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md) for the full development roadmap.
 - 📝 **Full Register Support**: Read/write holding registers, input registers, coils, and discrete inputs
 - 📊 **Real-time Monitoring**: Continuous polling with configurable intervals
 - 🔍 **Connection Diagnostics**: Test TCP and Modbus connectivity with latency measurements
+
+### Device Discovery
+- 🛰️ **Device Scanner**: Sweep an IP range, a port range and unit IDs 1–247
+- FC43 device identification reports vendor, product code and revision
+- Optional register-range probe on each discovered unit
+- Save discovered devices straight into connection profiles, or export the scan as CSV
 
 ### Multi-Device Support
 - Connect to multiple Modbus servers simultaneously
@@ -194,6 +201,28 @@ Access via **Options → Connection Manager**
 - Connect/disconnect individual profiles
 - Set active connection for main window operations
 - Profiles saved to `%AppData%\ModbusForge\connection-profiles.json`
+
+### Device Scanner
+
+Access via **Options → Device Scanner...**
+
+Scans an inclusive IPv4 range (up to 4096 addresses) across a port range (up to 64 ports)
+and any subset of unit IDs 1–247, using a short-lived connection per endpoint so live
+polling is never disturbed.
+
+**Scan settings**
+- Start/End IP, Port from/to, Unit ID from/to
+- Register type and probe address used for detection
+- Connect and response timeouts, and the number of endpoints probed in parallel
+- **Read device identification (FC43)** for vendor, product code and revision
+- **Scan register range** to list which addresses of a discovered unit are readable
+
+**Results**
+- Status per unit: `Responded`, `RespondedWithException` (device present but the address is
+  unsupported), `NoModbusResponse` (port open, unit silent) or `NoTcpConnection`
+- **Add to Profiles** stores the selected device in `connection-profiles.json`
+- **Export CSV** writes one row per device plus one row per scanned register
+- Scans report progress and can be stopped at any time; results found so far are kept
 
 ### Script Editor
 

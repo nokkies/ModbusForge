@@ -48,6 +48,7 @@ namespace ModbusForge.Services
             {
                 ["getting-started"] = GetGettingStartedContent(),
                 ["connection-manager"] = GetConnectionManagerContent(),
+                ["device-scanner"] = GetDeviceScannerContent(),
                 ["script-editor"] = GetScriptEditorContent(),
                 ["custom-data"] = GetCustomDataContent(),
                 ["trends"] = GetTrendsContent(),
@@ -145,6 +146,45 @@ This means your profiles persist between sessions.
 - Give your profiles descriptive names (e.g., ""PLC Line 1"", ""Test Server"")
 - Use different Unit IDs for different devices
 - Test connections before saving profiles";
+        }
+
+        private string GetDeviceScannerContent()
+        {
+            return @"# Device Scanner
+
+Discover Modbus TCP devices on your network without touching your live connections.
+Open it from **Options > Device Scanner...**.
+
+## Defining the scan
+
+- **Start IP / End IP**: inclusive IPv4 range (maximum 4096 addresses).
+- **Port from / Port to**: single port (502) or a range, up to 64 ports.
+- **Unit ID from / to**: any subset of 1-247.
+- **Register type / Probe address**: the read used to detect a unit; a unit is reported
+  as found when it answers, including when it answers with a Modbus exception.
+- **Connect / Response (ms)**: per-endpoint timeouts. Lower values scan faster but can
+  miss slow gateways.
+- **Parallel hosts**: how many endpoints are probed at the same time.
+- **Read device identification (FC43)**: asks each discovered unit for vendor name,
+  product code and revision.
+- **Scan register range**: additionally reads a block of addresses from each discovered
+  unit and lists which are readable.
+
+## Working with results
+
+- **Add to Profiles** saves the selected device as a connection profile so it appears in
+  the Connection Manager.
+- **Export CSV** writes one row per device plus one row per scanned register.
+- **Stop** cancels a running scan; results already found are kept.
+
+## Tips
+
+- Serial gateways often expose several unit IDs behind one IP; scan the full 1-247 range
+  when you are unsure.
+- A `NoTcpConnection` result means nothing answered on the port; `NoModbusResponse` means
+  the port was open but the unit stayed silent.
+- Scanning is deliberately capped to avoid flooding a production network. Narrow the IP or
+  port range if the scanner reports too many endpoints.";
         }
 
         private string GetScriptEditorContent()
