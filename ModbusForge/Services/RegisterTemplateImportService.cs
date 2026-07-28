@@ -356,30 +356,7 @@ namespace ModbusForge.Services
             if (!TryParseName(name, rowNumber, seenNames, result))
                 return;
 
-            if (!TryParseLookup(GetValue(row, columns, "area"), AreaAliases, PlcArea.HoldingRegister,
-                    rowNumber, "RegisterType", "register area", result, out var area))
-                return;
-
-            var rawAddress = GetValue(row, columns, "address");
-            if (!TryResolveAddress(rawAddress, addressing, rowNumber, result, ref area, out var address))
-                return;
-
-            if (!TryParseLookup(GetValue(row, columns, "datatype"), DataTypeAliases, DefaultDataTypeFor(area),
-                    rowNumber, "DataType", "data type", result, out var dataType))
-                return;
-
-            if (!TryParseLookup(GetValue(row, columns, "wordorder"), WordOrderAliases, WordOrder.BigEndian,
-                    rowNumber, "WordOrder", "word order", result, out var wordOrder))
-                return;
-
-            if (!TryParseLookup(GetValue(row, columns, "access"), AccessAliases, RegisterAccess.ReadWrite,
-                    rowNumber, "Access", "access mode", result, out var access))
-                return;
-
-            if (ParseBool(GetValue(row, columns, "readonly")))
-                access = RegisterAccess.ReadOnly;
-
-            if (!TryParseBit(GetValue(row, columns, "bit"), rowNumber, result, out var bit))
+            if (!TryParseStrictFields(row, columns, rowNumber, addressing, result, out var strict))
                 return;
 
             var (rangeMin, rangeMax) = ParseRange(row, columns, rowNumber, result);
@@ -391,17 +368,17 @@ namespace ModbusForge.Services
                 SourceRow = rowNumber,
                 Description = GetValue(row, columns, "description"),
                 Group = string.IsNullOrWhiteSpace(group) ? "Default" : group,
-                RegisterType = area,
-                Address = address,
-                RawAddress = rawAddress,
-                Bit = bit,
-                DataType = dataType,
-                WordOrder = wordOrder,
-                Length = ParseLength(row, columns, dataType, rowNumber, result),
+                RegisterType = strict.Area,
+                Address = strict.Address,
+                RawAddress = strict.RawAddress,
+                Bit = strict.Bit,
+                DataType = strict.DataType,
+                WordOrder = strict.WordOrder,
+                Length = ParseLength(row, columns, strict.DataType, rowNumber, result),
                 Scale = ParseDouble(row, columns, "scale", 1.0, rowNumber, "Scale", result),
                 Offset = ParseDouble(row, columns, "offset", 0.0, rowNumber, "Offset", result),
                 Unit = GetValue(row, columns, "unit"),
-                Access = access,
+                Access = strict.Access,
                 Enum = ParseEnum(GetValue(row, columns, "enum"), rowNumber, result),
                 Default = ParseOptionalDouble(row, columns, "default", rowNumber, "Default", result),
                 RangeMin = rangeMin,
@@ -409,6 +386,56 @@ namespace ModbusForge.Services
             };
 
             result.Template.Entries.Add(entry);
+        }
+
+        /// <summary>Fields whose values reject the whole row when they cannot be parsed.</summary>
+        private readonly record struct StrictFields(
+            PlcArea Area,
+            int Address,
+            string RawAddress,
+            int? Bit,
+            TagDataType DataType,
+            WordOrder WordOrder,
+            RegisterAccess Access);
+
+        private static bool TryParseStrictFields(
+            IReadOnlyList<string> row,
+            IReadOnlyDictionary<string, int> columns,
+            int rowNumber,
+            AddressingConvention addressing,
+            RegisterTemplateImportResult result,
+            out StrictFields fields)
+        {
+            fields = default;
+
+            if (!TryParseLookup(GetValue(row, columns, "area"), AreaAliases, PlcArea.HoldingRegister,
+                    rowNumber, "RegisterType", "register area", result, out var area))
+                return false;
+
+            var rawAddress = GetValue(row, columns, "address");
+            if (!TryResolveAddress(rawAddress, addressing, rowNumber, result, ref area, out var address))
+                return false;
+
+            if (!TryParseLookup(GetValue(row, columns, "datatype"), DataTypeAliases, DefaultDataTypeFor(area),
+                    rowNumber, "DataType", "data type", result, out var dataType))
+                return false;
+
+            if (!TryParseLookup(GetValue(row, columns, "wordorder"), WordOrderAliases, WordOrder.BigEndian,
+                    rowNumber, "WordOrder", "word order", result, out var wordOrder))
+                return false;
+
+            if (!TryParseLookup(GetValue(row, columns, "access"), AccessAliases, RegisterAccess.ReadWrite,
+                    rowNumber, "Access", "access mode", result, out var access))
+                return false;
+
+            if (ParseBool(GetValue(row, columns, "readonly")))
+                access = RegisterAccess.ReadOnly;
+
+            if (!TryParseBit(GetValue(row, columns, "bit"), rowNumber, result, out var bit))
+                return false;
+
+            fields = new StrictFields(area, address, rawAddress, bit, dataType, wordOrder, access);
+            return true;
         }
 
         private static TagDataType DefaultDataTypeFor(PlcArea area) =>
