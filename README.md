@@ -126,6 +126,7 @@ See [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md) for the full development roadmap.
 ### Device Discovery
 - 🛰️ **Device Scanner**: Sweep an IP range, a port range and unit IDs 1–247
 - FC43 device identification reports vendor, product code and revision
+- Function-code detection lists which of FC01-FC04 each unit implements
 - Optional register-range probe on each discovered unit
 - Save discovered devices straight into connection profiles, or export the scan as CSV
 
@@ -239,12 +240,16 @@ polling is never disturbed.
 - Register type and probe address used for detection
 - Connect and response timeouts, and the number of endpoints probed in parallel
 - **Read device identification (FC43)** for vendor, product code and revision
+- **Detect function codes (FC01-FC04)** reads one item from each register space to work out
+  which read functions a unit implements; a unit that answers *illegal data address* still
+  counts as implementing the function, only *illegal function* excludes it
 - **Scan register range** to list which addresses of a discovered unit are readable
 
 **Results**
 - Status per unit: `Responded`, `RespondedWithException` (device present but the address is
   unsupported), `NoModbusResponse` (port open, unit silent) or `NoTcpConnection`
 - **Add to Profiles** stores the selected device in `connection-profiles.json`
+- **Function codes** column shows the detected read functions, e.g. `FC03, FC04`
 - **Export CSV** writes one row per device plus one row per scanned register
 - Scans report progress and can be stopped at any time; results found so far are kept
 
