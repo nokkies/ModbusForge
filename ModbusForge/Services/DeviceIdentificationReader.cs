@@ -12,7 +12,7 @@ namespace ModbusForge.Services
     /// <summary>
     /// Vendor, product and revision strings reported by FC43 / MEI type 14.
     /// </summary>
-    public class DeviceIdentification
+    public class ScannedDeviceIdentification
     {
         public string VendorName { get; set; } = string.Empty;
         public string ProductCode { get; set; } = string.Empty;
@@ -24,7 +24,7 @@ namespace ModbusForge.Services
     /// </summary>
     public interface IDeviceIdentificationReader
     {
-        Task<DeviceIdentification?> ReadAsync(
+        Task<ScannedDeviceIdentification?> ReadAsync(
             string ipAddress,
             int port,
             byte unitId,
@@ -55,7 +55,7 @@ namespace ModbusForge.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public async Task<DeviceIdentification?> ReadAsync(
+        public async Task<ScannedDeviceIdentification?> ReadAsync(
             string ipAddress,
             int port,
             byte unitId,
@@ -123,7 +123,7 @@ namespace ModbusForge.Services
         /// Parses an FC43 response PDU (function code first). Returns null for exception
         /// responses and for frames that are not well-formed device identification data.
         /// </summary>
-        internal static DeviceIdentification? Parse(byte[] pdu)
+        internal static ScannedDeviceIdentification? Parse(byte[] pdu)
         {
             ArgumentNullException.ThrowIfNull(pdu);
 
@@ -163,7 +163,7 @@ namespace ModbusForge.Services
                 return null;
             }
 
-            return new DeviceIdentification
+            return new ScannedDeviceIdentification
             {
                 VendorName = values.TryGetValue(ObjectIdVendorName, out var vendor) ? vendor : string.Empty,
                 ProductCode = values.TryGetValue(ObjectIdProductCode, out var product) ? product : string.Empty,
