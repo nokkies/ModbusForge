@@ -444,8 +444,8 @@ namespace ModbusForge.Services
             {
                 if (visualNode.Input1Address?.Address >= 0)
                     node.InputBindings["Input1"] = visualNode.Input1Address;
-                if (visualNode.Input2Address?.Address >= 0)
-                    node.InputBindings["Input2"] = visualNode.Input2Address;
+                // Input2 is always supplied by a connection or by the CompareValue parameter;
+                // a default/unconfigured Input2Address must not override CompareValue.
             }
 
             if (IsOutputSink(visualNode.ElementType) && visualNode.OutputAddress?.Address >= 0)

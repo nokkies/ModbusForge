@@ -1,4 +1,4 @@
-# ModbusForge v6.0.1
+# ModbusForge v6.0.2
 
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows)](https://www.microsoft.com/windows)
@@ -78,8 +78,9 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
-### v6.0.1 - Current Release
+### v6.0.2 - Current Release
 
+- **Visual Node Editor (ADD/COMPARE constant)**: `Const` / `Val` values are now used when `Input2` is not connected. Previously the unconnected `Input2` was treated as a default coil address and read as 0.
 - **One-click auto-update**: When an update is found, you can now choose to **download and install** it automatically. The installer runs silently, closes the current application, replaces the files, and relaunches ModbusForge.
 
 ### v6.0.0

@@ -85,7 +85,7 @@ namespace ModbusForge
             {
                 LogFatalException(ex, "Application_Startup");
                 MessageBox.Show(
-                    $"A fatal error occurred during startup:\n{ex.Message}\n\nDetails have been logged.",
+                    $"A fatal error occurred during startup:\n{ex}\n\nDetails have been logged.",
                     "Startup Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);

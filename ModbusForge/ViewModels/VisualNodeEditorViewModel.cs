@@ -365,6 +365,7 @@ namespace ModbusForge.ViewModels
                     case PlcElementType.MATH_MUL:
                     case PlcElementType.MATH_DIV:
                         newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = GetNextAvailableAddress(PlcArea.HoldingRegister) };
+                        newNode.Input2Address = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = -1 };
                         newNode.Width = 190; // wider to fit "Const:" footer
                         newNode.Height = 100; // footer needs more vertical space
                         break;
@@ -374,6 +375,7 @@ namespace ModbusForge.ViewModels
                     case PlcElementType.COMPARE_LT:
                     case PlcElementType.COMPARE_GE:
                     case PlcElementType.COMPARE_LE:
+                        newNode.Input2Address = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = -1 };
                         newNode.Width = 190; // wider to fit "Value:" footer
                         newNode.Height = 100; // footer needs more vertical space
                         break;
