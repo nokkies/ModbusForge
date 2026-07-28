@@ -1,4 +1,4 @@
-# ModbusForge v5.8.7
+# ModbusForge v6.0.0
 
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows)](https://www.microsoft.com/windows)
@@ -78,7 +78,12 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
-### v5.9.0 - Current Release
+### v6.0.0 - Current Release
+
+- **Auto-update**: Check for Updates in the Help menu, plus an optional startup update check
+- **Bug fixes**: Script Editor selection, Visual Node Editor ADD constant input, Trends tab rendering, and POU switching preserving wiring
+
+### v5.9.0
 
 - **Serial Modbus (RTU + ASCII)**: Added COM-port selection, baud/parity/data/stop bits, and RS-485 RTS toggle through the Connection Manager
 
