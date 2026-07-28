@@ -69,6 +69,7 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 ### 5. Explore More
 
 - **Options → Connection Manager**: Save and manage multiple connection profiles
+- **Options → Device Scanner**: Discover Modbus TCP devices on your network
 - **Options → Script Editor**: Create automated test sequences
 - **Options → Preferences**: Customize application behavior
 - **Help → Keyboard Shortcuts**: View all available shortcuts
@@ -120,6 +121,13 @@ See [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md) for the full development roadmap.
 - 📝 **Full Register Support**: Read/write holding registers, input registers, coils, and discrete inputs
 - 📊 **Real-time Monitoring**: Continuous polling with configurable intervals
 - 🔍 **Connection Diagnostics**: Test TCP/serial and Modbus connectivity with latency measurements
+- 🧩 **Advanced Function Codes**: FC22 Mask Write Register, FC23 Read/Write Multiple Registers, FC43 Read Device Identification (client and server)
+
+### Device Discovery
+- 🛰️ **Device Scanner**: Sweep an IP range, a port range and unit IDs 1–247
+- FC43 device identification reports vendor, product code and revision
+- Optional register-range probe on each discovered unit
+- Save discovered devices straight into connection profiles, or export the scan as CSV
 
 ### Multi-Device Support
 - Connect to multiple Modbus servers simultaneously
@@ -218,6 +226,28 @@ When creating an **RTU** or **ASCII** connection:
 
 Serial profiles use the same read/write register and coil operations as TCP profiles, with 1-based addresses converted to the 0-based Modbus protocol addresses automatically.
 
+### Device Scanner
+
+Access via **Options → Device Scanner...**
+
+Scans an inclusive IPv4 range (up to 4096 addresses) across a port range (up to 64 ports)
+and any subset of unit IDs 1–247, using a short-lived connection per endpoint so live
+polling is never disturbed.
+
+**Scan settings**
+- Start/End IP, Port from/to, Unit ID from/to
+- Register type and probe address used for detection
+- Connect and response timeouts, and the number of endpoints probed in parallel
+- **Read device identification (FC43)** for vendor, product code and revision
+- **Scan register range** to list which addresses of a discovered unit are readable
+
+**Results**
+- Status per unit: `Responded`, `RespondedWithException` (device present but the address is
+  unsupported), `NoModbusResponse` (port open, unit silent) or `NoTcpConnection`
+- **Add to Profiles** stores the selected device in `connection-profiles.json`
+- **Export CSV** writes one row per device plus one row per scanned register
+- Scans report progress and can be stopped at any time; results found so far are kept
+
 ### Script Editor
 
 Access via **Options → Script Editor** or press **Ctrl+E**
@@ -256,6 +286,31 @@ Access via **Options → Preferences**
 - Continuous Write mode per row
 - Live reads when Global Continuous Read is enabled
 - Save/Load configurations to JSON
+
+### Advanced Functions
+
+Open **Options → Advanced Functions...** to use the protocol functions that go beyond the
+standard read/write set. All addresses are 1-based, exactly like the rest of the UI.
+
+| Function | What it does | Inputs |
+|----------|--------------|--------|
+| **FC22 - Mask Write Register** | Atomically sets/clears bits of one holding register: `result = (current AND andMask) OR (orMask AND NOT andMask)` | Address, AND mask, OR mask |
+| **FC23 - Read/Write Multiple Registers** | Writes a block of registers and reads a (possibly different) block in a single transaction; the write happens first | Read address/count, write address, comma-separated values (`0x` prefix for hex) |
+| **FC43 / MEI 14 - Read Device Identification** | Queries the device identity strings (vendor, product code, revision, vendor URL, product name, model, application) | Category: Basic, Regular or Extended |
+
+The result of each call, or the Modbus exception returned by the device, is shown in the
+status bar at the bottom of the dialog; FC43 objects are listed in a grid.
+
+In **server mode** ModbusForge answers all three functions as well. The identity served by
+FC43 defaults to the ModbusForge vendor/product strings and the running application version.
+
+The same operations are available programmatically through `IModbusService`:
+
+```csharp
+ushort? result = await modbusService.MaskWriteRegisterAsync(unitId: 1, registerAddress: 5, andMask: 0x00F2, orMask: 0x0025);
+ushort[]? read  = await modbusService.ReadWriteMultipleRegistersAsync(1, readStartAddress: 1, readCount: 4, writeStartAddress: 10, writeValues: new ushort[] { 1, 2 });
+DeviceIdentification? id = await modbusService.ReadDeviceIdentificationAsync(1, DeviceIdObject.VendorName, DeviceIdCategory.Basic);
+```
 
 ### Trend & Logging
 

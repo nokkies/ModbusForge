@@ -48,6 +48,7 @@ namespace ModbusForge.ViewModels
             {
                 new HelpTopic { TopicId = "getting-started", Title = "Getting Started" },
                 new HelpTopic { TopicId = "connection-manager", Title = "Connection Manager" },
+                new HelpTopic { TopicId = "device-scanner", Title = "Device Scanner" },
                 new HelpTopic { TopicId = "script-editor", Title = "Script Editor" },
                 new HelpTopic { TopicId = "custom-data", Title = "Custom Data Tab" },
                 new HelpTopic { TopicId = "trends", Title = "Trend & Logging" },
@@ -114,6 +115,7 @@ namespace ModbusForge.ViewModels
                 {
                     new HelpTopic { TopicId = "getting-started", Title = "Getting Started" },
                     new HelpTopic { TopicId = "connection-manager", Title = "Connection Manager" },
+                    new HelpTopic { TopicId = "device-scanner", Title = "Device Scanner" },
                     new HelpTopic { TopicId = "script-editor", Title = "Script Editor" },
                     new HelpTopic { TopicId = "custom-data", Title = "Custom Data Tab" },
                     new HelpTopic { TopicId = "trends", Title = "Trend & Logging" },

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Modbus.Device;
 using ModbusForge.Models;
+using ModbusForge.Services.Messages;
 
 namespace ModbusForge.Services
 {
@@ -19,6 +20,8 @@ namespace ModbusForge.Services
         private readonly IValidationService? _validationService;
         private readonly SemaphoreSlim _ioLock = new(1, 1);
         private const int DisposeLockTimeoutMs = 5000;
+        private const byte DeviceIdMoreFollows = 0xFF;
+        private const int MaxDeviceIdTransactions = 16;
 
         public TransportType Transport { get; }
 
@@ -218,6 +221,67 @@ namespace ModbusForge.Services
                 (client, protocolAddress) => client.WriteSingleCoil(unitId, protocolAddress, value));
         }
 
+        public virtual async Task<ushort?> MaskWriteRegisterAsync(byte unitId, int registerAddress, ushort andMask, ushort orMask)
+        {
+            return await ExecuteMasterAsync<ushort?>(
+                $"Mask writing register at {registerAddress} (AND 0x{andMask:X4}, OR 0x{orMask:X4})",
+                "Error mask writing register",
+                (master, cast) =>
+                {
+                    ushort protocolAddress = ToProtocolAddress(registerAddress);
+                    cast.ExecuteCustomMessage<MaskWriteRegisterRequestResponse>(
+                        new MaskWriteRegisterRequestResponse(unitId, protocolAddress, andMask, orMask));
+
+                    // FC22 echoes the masks rather than the result, so read the register back.
+                    var readBack = master.ReadHoldingRegisters(unitId, protocolAddress, 1);
+                    return readBack.Length > 0 ? readBack[0] : null;
+                });
+        }
+
+        public virtual async Task<ushort[]?> ReadWriteMultipleRegistersAsync(byte unitId, int readStartAddress, int readCount, int writeStartAddress, ushort[] writeValues)
+        {
+            ArgumentNullException.ThrowIfNull(writeValues);
+
+            return await ExecuteMasterAsync<ushort[]?>(
+                $"Reading {readCount} registers at {readStartAddress} and writing {writeValues.Length} registers at {writeStartAddress}",
+                "Error in read/write multiple registers",
+                (master, _) => master.ReadWriteMultipleRegisters(
+                    unitId,
+                    ToProtocolAddress(readStartAddress),
+                    (ushort)readCount,
+                    ToProtocolAddress(writeStartAddress),
+                    writeValues));
+        }
+
+        public virtual async Task<DeviceIdentification?> ReadDeviceIdentificationAsync(byte unitId, byte objectId = DeviceIdObject.VendorName, DeviceIdCategory category = DeviceIdCategory.Basic)
+        {
+            return await ExecuteMasterAsync<DeviceIdentification?>(
+                $"Reading device identification ({category}) from object 0x{objectId:X2}",
+                "Error reading device identification",
+                (_, cast) =>
+                {
+                    var identification = new DeviceIdentification();
+                    byte nextObjectId = objectId;
+
+                    for (int transaction = 0; transaction < MaxDeviceIdTransactions; transaction++)
+                    {
+                        var response = cast.ExecuteCustomMessage<ReadDeviceIdentificationResponse>(
+                            new ReadDeviceIdentificationRequest(unitId, (byte)category, nextObjectId));
+
+                        identification.ConformityLevel = response.ConformityLevel;
+                        foreach (var pair in response.Objects)
+                            identification.Objects[pair.Key] = pair.Value;
+
+                        if (response.MoreFollows != DeviceIdMoreFollows)
+                            break;
+
+                        nextObjectId = response.NextObjectId;
+                    }
+
+                    return identification;
+                });
+        }
+
         private async Task<T[]?> ExecuteReadAsync<T>(
             byte unitId,
             int startAddress,
@@ -287,6 +351,49 @@ namespace ModbusForge.Services
                     {
                         _logger.LogError(ex, errorLogContext);
                         HandleConnectionLoss();
+                    }
+                }).ConfigureAwait(false);
+            }
+            finally
+            {
+                _ioLock.Release();
+            }
+        }
+
+        private static ushort ToProtocolAddress(int uiAddress)
+            => (ushort)(uiAddress > 0 ? uiAddress - 1 : 0);
+
+        private async Task<T?> ExecuteMasterAsync<T>(
+            string debugLogMessage,
+            string errorLogContext,
+            Func<IModbusMaster, ModbusMaster, T?> operation)
+        {
+            if (!IsConnected)
+                return default;
+
+            await _ioLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                return await Task.Run(() =>
+                {
+                    try
+                    {
+                        _logger.LogDebug(debugLogMessage);
+                        if (_client is not ModbusMaster master)
+                            return default;
+
+                        return operation(_client, master);
+                    }
+                    catch (Modbus.SlaveException ex)
+                    {
+                        _logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
+                        return default;
+                    }
+                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                    {
+                        _logger.LogError(ex, errorLogContext);
+                        HandleConnectionLoss();
+                        return default;
                     }
                 }).ConfigureAwait(false);
             }

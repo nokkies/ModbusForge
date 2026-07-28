@@ -267,6 +267,11 @@ namespace ModbusForge
             _shellWindowService.ShowScriptEditor(this, _viewModel.EffectiveUnitId);
         }
 
+        private void MenuItem_AdvancedFunctions_Click(object sender, RoutedEventArgs e)
+        {
+            _shellWindowService.ShowAdvancedFunctions(this, _viewModel.EffectiveUnitId);
+        }
+
         private void MenuItem_Preferences_Click(object sender, RoutedEventArgs e)
         {
             _shellWindowService.ShowPreferences(this);
@@ -303,6 +308,11 @@ namespace ModbusForge
         private void MenuItem_ConnectionManager_Click(object sender, RoutedEventArgs e)
         {
             _shellWindowService.ShowConnectionManager(this);
+        }
+
+        private void MenuItem_DeviceScanner_Click(object sender, RoutedEventArgs e)
+        {
+            _shellWindowService.ShowDeviceScanner(this);
         }
 
 
