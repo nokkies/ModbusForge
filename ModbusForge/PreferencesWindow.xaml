@@ -87,6 +87,9 @@
                     <Border Style="{StaticResource FluentCard}">
                         <StackPanel>
                             <TextBlock Text="Application" Style="{StaticResource FluentSubtitle}"/>
+                            <ui:ToggleSwitch Content="Check for updates on startup"
+                                             Margin="0,0,0,12"
+                                             IsChecked="{Binding CheckForUpdatesOnStartup, Mode=TwoWay}"/>
                             <ui:ToggleSwitch Content="Confirm before exiting application"
                                              IsChecked="{Binding ConfirmOnExit, Mode=TwoWay}"/>
                         </StackPanel>

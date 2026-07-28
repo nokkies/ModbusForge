@@ -35,6 +35,9 @@ public interface ISettingsService
     // Trend settings
     int MaxConcurrentTrendRequests { get; set; }
 
+    // Update settings
+    bool CheckForUpdatesOnStartup { get; set; }
+
     // Save/Load
     bool Save();
     void Load();

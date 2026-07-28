@@ -84,6 +84,12 @@ public class SettingsService : ISettingsService
         set { _settings.MaxConcurrentTrendRequests = value; OnSettingsChanged(); }
     }
 
+    public bool CheckForUpdatesOnStartup
+    {
+        get => _settings.CheckForUpdatesOnStartup;
+        set { _settings.CheckForUpdatesOnStartup = value; OnSettingsChanged(); }
+    }
+
     public event EventHandler? SettingsChanged;
 
     public SettingsService(ILogger<SettingsService>? logger = null)
@@ -160,5 +166,6 @@ public class SettingsService : ISettingsService
         public bool EnableApiAuthentication { get; set; } = false;
         public string ApiKey { get; set; } = string.Empty;
         public int MaxConcurrentTrendRequests { get; set; } = 8;
+        public bool CheckForUpdatesOnStartup { get; set; } = true;
     }
 }

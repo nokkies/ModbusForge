@@ -165,6 +165,7 @@ namespace ModbusForge
             services.AddSingleton<IDispatcher, WpfDispatcher>();
             services.AddSingleton<IConsoleLoggerService, ConsoleLoggerService>();
             services.AddSingleton<ISettingsService, SettingsService>();
+            services.AddHttpClient<IUpdateCheckService, UpdateCheckService>();
             services.AddSingleton<IThemeService, ThemeService>();
             services.AddSingleton<IConnectionManager, ConnectionManager>();
             services.AddSingleton<IScriptRunner, ScriptRunner>();

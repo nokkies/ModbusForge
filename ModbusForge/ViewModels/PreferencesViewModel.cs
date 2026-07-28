@@ -17,6 +17,7 @@ namespace ModbusForge.ViewModels
         private int _maxConsoleMessages;
         private int _maxConcurrentTrendRequests;
         private bool _confirmOnExit;
+        private bool _checkForUpdatesOnStartup;
         private bool _enableApi;
         private int _apiPort;
         private bool _enableApiDocumentation;
@@ -76,6 +77,12 @@ namespace ModbusForge.ViewModels
             set => SetProperty(ref _confirmOnExit, value);
         }
 
+        public bool CheckForUpdatesOnStartup
+        {
+            get => _checkForUpdatesOnStartup;
+            set => SetProperty(ref _checkForUpdatesOnStartup, value);
+        }
+
         public bool EnableApi
         {
             get => _enableApi;
@@ -120,6 +127,7 @@ namespace ModbusForge.ViewModels
             _maxConsoleMessages = Math.Max(1, _settingsService.MaxConsoleMessages);
             _maxConcurrentTrendRequests = Math.Max(1, _settingsService.MaxConcurrentTrendRequests);
             _confirmOnExit = _settingsService.ConfirmOnExit;
+            _checkForUpdatesOnStartup = _settingsService.CheckForUpdatesOnStartup;
             _enableApi = _settingsService.EnableApi;
             _apiPort = Math.Max(1, Math.Min(_settingsService.ApiPort, 65535));
             _enableApiDocumentation = _settingsService.EnableApiDocumentation;
@@ -136,6 +144,7 @@ namespace ModbusForge.ViewModels
             _settingsService.MaxConsoleMessages = Math.Max(1, MaxConsoleMessages);
             _settingsService.MaxConcurrentTrendRequests = Math.Max(1, MaxConcurrentTrendRequests);
             _settingsService.ConfirmOnExit = ConfirmOnExit;
+            _settingsService.CheckForUpdatesOnStartup = CheckForUpdatesOnStartup;
             _settingsService.EnableApi = EnableApi;
             _settingsService.ApiPort = Math.Max(1, Math.Min(ApiPort, 65535));
             _settingsService.EnableApiDocumentation = EnableApiDocumentation;

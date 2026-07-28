@@ -55,6 +55,8 @@ namespace ModbusForge.ViewModels
         private readonly IDispatcher _dispatcher;
         private readonly IThemeService? _themeService;
         private readonly VisualNodeEditorViewModel _visualNodeEditorViewModel;
+        private readonly IUpdateCheckService? _updateCheckService;
+        private readonly ISettingsService? _settingsService;
         private bool _disposed = false;
         // Mode-aware UI helpers
 
@@ -86,7 +88,7 @@ namespace ModbusForge.ViewModels
 
         public VisualNodeEditorViewModel VisualNodeEditorViewModel => _visualNodeEditorViewModel;
 
-        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, MonitoringCoordinator monitoringCoordinator, IUnitConfigurationStore unitConfigurationStore, IDialogService? dialogService = null, VisualNodeEditorViewModel? visualNodeEditorViewModel = null, IDispatcher? dispatcher = null, IThemeService? themeService = null)
+        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, MonitoringCoordinator monitoringCoordinator, IUnitConfigurationStore unitConfigurationStore, IDialogService? dialogService = null, VisualNodeEditorViewModel? visualNodeEditorViewModel = null, IDispatcher? dispatcher = null, IThemeService? themeService = null, IUpdateCheckService? updateCheckService = null, ISettingsService? settingsService = null)
         {
             // Store dependencies
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
@@ -105,6 +107,8 @@ namespace ModbusForge.ViewModels
             _dialogService = dialogService ?? new NullDialogService();
             _dispatcher = dispatcher ?? new WpfDispatcher();
             _themeService = themeService;
+            _updateCheckService = updateCheckService;
+            _settingsService = settingsService;
             AttachThemeChangedHandler();
             // Initialize visual node editor
             _visualNodeEditorViewModel = visualNodeEditorViewModel ?? new VisualNodeEditorViewModel();
@@ -122,6 +126,13 @@ namespace ModbusForge.ViewModels
             InitializeWindowTitle();
             InitializeMonitoringServices();
             _monitoringCoordinator.Start();
+
+            // Kick off an asynchronous update check on startup if enabled.
+            // This is intentionally fire-and-forget; any UI is marshalled to the dispatcher.
+            if (_settingsService?.CheckForUpdatesOnStartup == true && _updateCheckService != null)
+            {
+                _ = Task.Run(async () => await CheckForUpdatesAsync(showDialogOnlyOnUpdate: true));
+            }
 
             // Initialize collection views for filtering
             HoldingRegistersView = CollectionViewSource.GetDefaultView(HoldingRegisters);
@@ -279,6 +290,7 @@ namespace ModbusForge.ViewModels
             RefreshCommand = new AsyncRelayCommand(async () => await RefreshAsync());
             ShowHelpCommand = new RelayCommand(ShowHelp);
             ShowScriptEditorCommand = new RelayCommand(ShowScriptEditor);
+            CheckForUpdatesCommand = new AsyncRelayCommand(async () => await CheckForUpdatesAsync(showDialogOnlyOnUpdate: false));
         }
 
         /// <summary>
@@ -481,6 +493,7 @@ namespace ModbusForge.ViewModels
         public IRelayCommand RefreshCommand { get; private set; } = null!;
         public IRelayCommand ShowHelpCommand { get; private set; } = null!;
         public IRelayCommand ShowScriptEditorCommand { get; private set; } = null!;
+        public IRelayCommand CheckForUpdatesCommand { get; private set; } = null!;
 
         public ObservableCollection<string> ConsoleMessages { get; } = new();
 
@@ -1495,6 +1508,69 @@ namespace ModbusForge.ViewModels
         {
             // This will be handled by MainWindow via event or direct call
             RequestShowScriptEditor = true;
+        }
+
+        private async Task CheckForUpdatesAsync(bool showDialogOnlyOnUpdate)
+        {
+            if (_updateCheckService == null)
+            {
+                return;
+            }
+
+            var result = await _updateCheckService.CheckForUpdateAsync(Version).ConfigureAwait(false);
+
+            if (!string.IsNullOrEmpty(result.ErrorMessage))
+            {
+                if (!showDialogOnlyOnUpdate)
+                {
+                    await _dispatcher.InvokeAsync(() =>
+                        _dialogService.Show(
+                            $"Update check failed: {result.ErrorMessage}",
+                            "Update Check",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning));
+                }
+                return;
+            }
+
+            if (result.IsUpdateAvailable)
+            {
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    var message = $"A newer version is available: {result.LatestVersion}.{Environment.NewLine}Open the release page in your browser?";
+                    var choice = _dialogService.Show(
+                        message,
+                        "Update Available",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Information);
+
+                    if (choice == MessageBoxResult.Yes)
+                    {
+                        OpenUrl(result.ReleaseUrl);
+                    }
+                });
+            }
+            else if (!showDialogOnlyOnUpdate)
+            {
+                await _dispatcher.InvokeAsync(() =>
+                    _dialogService.Show(
+                        "You are running the latest version.",
+                        "No Update Available",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information));
+            }
+        }
+
+        private static void OpenUrl(string url)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to open URL: {ex.Message}");
+            }
         }
 
         [ObservableProperty]

@@ -158,6 +158,7 @@
                 <MenuItem Header="_Help..." Click="MenuItem_Help_Click" InputGestureText="F1" ToolTip="Open the help window (F1)"/>
                 <MenuItem Header="_Keyboard Shortcuts..." Click="MenuItem_KeyboardShortcuts_Click" ToolTip="View all keyboard shortcuts"/>
                 <MenuItem Header="_Troubleshooting..." Click="MenuItem_Troubleshooting_Click" ToolTip="View troubleshooting guide and export diagnostics"/>
+                <MenuItem Header="Check for _Updates..." Command="{Binding CheckForUpdatesCommand}" ToolTip="Check whether a newer ModbusForge release is available"/>
                 <Separator/>
                 <MenuItem Header="_About" Click="MenuItem_About_Click"/>
             </MenuItem>
