@@ -16,17 +16,20 @@ namespace ModbusForge.Services
         private readonly TagService _tagService;
         private readonly IDialogService _dialogService;
         private readonly IWindowOwnerProvider _ownerProvider;
+        private readonly IRegisterMapImportService _registerMapImportService;
         private readonly ILogger<TagWindowService> _logger;
 
         public TagWindowService(
             TagService tagService,
             IDialogService dialogService,
             IWindowOwnerProvider ownerProvider,
+            IRegisterMapImportService registerMapImportService,
             ILogger<TagWindowService>? logger = null)
         {
             _tagService = tagService;
             _dialogService = dialogService;
             _ownerProvider = ownerProvider;
+            _registerMapImportService = registerMapImportService;
             _logger = logger ?? NullLogger<TagWindowService>.Instance;
         }
 
@@ -34,7 +37,7 @@ namespace ModbusForge.Services
         {
             try
             {
-                var browser = new TagBrowserWindow(_tagService, _dialogService);
+                var browser = new TagBrowserWindow(_tagService, _dialogService, false, _registerMapImportService);
                 if (_ownerProvider.GetMainWindow() is Window owner)
                 {
                     browser.Owner = owner;

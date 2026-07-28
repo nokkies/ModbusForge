@@ -194,6 +194,7 @@ namespace ModbusForge
             services.AddSingleton<ICircuitBreakerService, CircuitBreakerService>();
             services.AddSingleton<IHelpContentService, HelpContentService>();
             services.AddSingleton<IWindowOwnerProvider, MainWindowOwnerProvider>();
+            services.AddSingleton<IRegisterMapImportService, RegisterMapImportService>();
             services.AddSingleton<ITagWindowService, TagWindowService>();
             services.AddSingleton<IShellWindowService, ShellWindowService>();
             services.AddSingleton<IApplicationLifetime, WpfApplicationLifetime>();

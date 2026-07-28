@@ -28,6 +28,8 @@
                 <Separator/>
                 <Button x:Name="ImportButton" Content="Import" Click="Import_Click" Padding="8,4" Margin="2"/>
                 <Button x:Name="ExportButton" Content="Export" Click="Export_Click" Padding="8,4" Margin="2"/>
+                <Button x:Name="TemplateButton" Content="CSV Template" Click="SaveTemplate_Click" Padding="8,4" Margin="2"
+                        ToolTip="Save an example register-map CSV that can be filled in and imported"/>
                 <Separator/>
                 <Button Content="Add to Watch" Click="AddToWatch_Click" Padding="8,4" Margin="2"/>
             </ToolBar>
