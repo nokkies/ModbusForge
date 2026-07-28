@@ -27,7 +27,7 @@ public class ModbusDeviceProbeFunctionCodeTests : IDisposable
         var identificationReader = new Mock<IDeviceIdentificationReader>();
         identificationReader
             .Setup(r => r.ReadAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((DeviceIdentification?)null);
+            .ReturnsAsync((ScannedDeviceIdentification?)null);
 
         _probe = new ModbusDeviceProbe(identificationReader.Object, new Mock<ILogger<ModbusDeviceProbe>>().Object);
     }
