@@ -366,16 +366,16 @@ namespace ModbusForge.Services
                 return ExceptionResponse(23, 2);
 
             for (int i = 0; i < writeCount; i++)
-                ds.HoldingRegisters[writeStart + i] = (ushort)((pdu[10 + i * 2] << 8) | pdu[11 + i * 2]);
+                ds.HoldingRegisters[writeStart + i] = (ushort)((pdu[10 + (i * 2)] << 8) | pdu[11 + (i * 2)]);
 
-            var resp = new byte[2 + readCount * 2];
+            var resp = new byte[2 + (readCount * 2)];
             resp[0] = 23;
             resp[1] = (byte)(readCount * 2);
             for (int i = 0; i < readCount; i++)
             {
                 ushort val = ds.HoldingRegisters[readStart + i];
-                resp[2 + i * 2] = (byte)(val >> 8);
-                resp[3 + i * 2] = (byte)(val & 0xFF);
+                resp[2 + (i * 2)] = (byte)(val >> 8);
+                resp[3 + (i * 2)] = (byte)(val & 0xFF);
             }
             return resp;
         }
