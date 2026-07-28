@@ -17,7 +17,8 @@ namespace ModbusForge.Views
     {
         private readonly TagService _tagService;
         private readonly IDialogService _dialogService;
-        private readonly IRegisterMapImportService _registerMapImportService;
+        private readonly IRegisterTemplateImportService _registerTemplateImportService;
+        private readonly IRegisterTemplateStore _registerTemplateStore;
         private Tag? _selectedTag;
         private TagGroup? _selectedGroup;
         private bool _isDirty = false;
@@ -29,12 +30,14 @@ namespace ModbusForge.Views
             TagService tagService,
             IDialogService? dialogService = null,
             bool selectionMode = false,
-            IRegisterMapImportService? registerMapImportService = null)
+            IRegisterTemplateImportService? registerTemplateImportService = null,
+            IRegisterTemplateStore? registerTemplateStore = null)
         {
             InitializeComponent();
             _tagService = tagService;
             _dialogService = dialogService ?? new NullDialogService();
-            _registerMapImportService = registerMapImportService ?? new RegisterMapImportService();
+            _registerTemplateImportService = registerTemplateImportService ?? new RegisterTemplateImportService();
+            _registerTemplateStore = registerTemplateStore ?? new RegisterTemplateStore();
             _selectionMode = selectionMode;
 
             // Configure UI based on selection mode
@@ -47,6 +50,7 @@ namespace ModbusForge.Views
                 DeleteButton.Visibility = Visibility.Collapsed;
                 ImportButton.Visibility = Visibility.Collapsed;
                 ExportButton.Visibility = Visibility.Collapsed;
+                ImportTemplateButton.Visibility = Visibility.Collapsed;
                 TemplateButton.Visibility = Visibility.Collapsed;
             }
 
@@ -381,7 +385,7 @@ namespace ModbusForge.Views
                 }
                 else
                 {
-                    ImportRegisterMap(dialog.FileName);
+                    ImportRegisterTemplate(dialog.FileName);
                 }
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
@@ -408,60 +412,47 @@ namespace ModbusForge.Views
             StatusText.Text = $"Imported {imported.Count} tags";
         }
 
-        private void ImportRegisterMap(string filePath)
+        private void ImportTemplate_Click(object sender, RoutedEventArgs e) => ImportRegisterTemplate(null);
+
+        /// <summary>
+        /// Shows the register-template preview dialog and merges the accepted rows into the tag database.
+        /// </summary>
+        private void ImportRegisterTemplate(string? filePath)
         {
-            var result = _registerMapImportService.ImportFromFile(filePath);
-
-            if (result.Tags.Count == 0)
+            var dialog = new RegisterTemplateImportDialog(_registerTemplateImportService, _dialogService, filePath)
             {
-                _dialogService.Show(
-                    $"No tags could be imported from '{Path.GetFileName(filePath)}'.\n\n{FormatIssues(result)}",
-                    "Import Failed",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
+                Owner = this
+            };
 
-            var added = _registerMapImportService.Merge(_tagService, result.Tags, out var skipped);
+            if (dialog.ShowDialog() != true || dialog.ImportedTemplate == null)
+                return;
+
+            var template = dialog.ImportedTemplate;
+            var added = _registerTemplateImportService.Merge(_tagService, dialog.Entries, out var skipped);
 
             LoadTreeView();
             UpdateStatus();
-            StatusText.Text = $"Imported {added.Count} of {result.RowsRead} rows";
+            StatusText.Text = $"Imported {added.Count} tags from template '{template.Name}'";
 
             var summary = new StringBuilder();
-            summary.AppendLine($"Imported {added.Count} tags from {result.RowsRead} rows.");
+            summary.AppendLine($"Imported {added.Count} tags from '{template.Name}'.");
             if (skipped.Count > 0)
                 summary.AppendLine($"Skipped {skipped.Count} tags whose names already exist: {string.Join(", ", skipped.Take(10))}");
 
-            var issues = FormatIssues(result);
-            if (!string.IsNullOrEmpty(issues))
+            if (dialog.SaveTemplate)
             {
-                summary.AppendLine();
-                summary.Append(issues);
+                try
+                {
+                    var savedPath = _registerTemplateStore.Save(template);
+                    summary.AppendLine($"Template saved to {savedPath}");
+                }
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                {
+                    summary.AppendLine($"The template could not be saved: {ex.Message}");
+                }
             }
 
             _dialogService.Show(summary.ToString(), "Import Complete", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        private static string FormatIssues(Models.RegisterMapImportResult result)
-        {
-            var builder = new StringBuilder();
-
-            if (result.Errors.Count > 0)
-            {
-                builder.AppendLine($"{result.Errors.Count} row(s) rejected:");
-                foreach (var error in result.Errors.Take(10))
-                    builder.AppendLine($"  {error}");
-            }
-
-            if (result.Warnings.Count > 0)
-            {
-                builder.AppendLine($"{result.Warnings.Count} warning(s):");
-                foreach (var warning in result.Warnings.Take(10))
-                    builder.AppendLine($"  {warning}");
-            }
-
-            return builder.ToString().TrimEnd();
         }
 
         private void SaveTemplate_Click(object sender, RoutedEventArgs e)
@@ -478,7 +469,7 @@ namespace ModbusForge.Views
 
             try
             {
-                File.WriteAllText(dialog.FileName, _registerMapImportService.GetCsvTemplate());
+                File.WriteAllText(dialog.FileName, _registerTemplateImportService.GetCsvTemplate());
                 StatusText.Text = $"Template saved to {Path.GetFileName(dialog.FileName)}";
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ModbusForge.Models
 {
@@ -21,12 +22,12 @@ namespace ModbusForge.Models
     }
 
     /// <summary>
-    /// Outcome of parsing a register-map/template file into tags.
+    /// Outcome of parsing a register-map/template file.
     /// </summary>
-    public class RegisterMapImportResult
+    public class RegisterTemplateImportResult
     {
-        /// <summary>Tags successfully parsed. Rows with errors are omitted.</summary>
-        public List<Tag> Tags { get; } = new();
+        /// <summary>The parsed template. Rows with errors are omitted from <c>Entries</c>.</summary>
+        public RegisterTemplate Template { get; set; } = new();
 
         /// <summary>Rows that could not be imported.</summary>
         public List<RegisterMapImportIssue> Errors { get; } = new();
@@ -37,6 +38,12 @@ namespace ModbusForge.Models
         /// <summary>Number of data rows encountered, excluding the header and blank rows.</summary>
         public int RowsRead { get; set; }
 
+        public IReadOnlyList<RegisterTemplateEntry> Entries => Template.Entries;
+
         public bool HasErrors => Errors.Count > 0;
+
+        /// <summary>Issues affecting a given source row, used by the preview dialog.</summary>
+        public IEnumerable<RegisterMapImportIssue> IssuesForRow(int rowNumber) =>
+            Errors.Concat(Warnings).Where(i => i.RowNumber == rowNumber);
     }
 }

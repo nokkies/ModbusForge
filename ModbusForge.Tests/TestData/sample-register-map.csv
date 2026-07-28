@@ -1,0 +1,6 @@
+Tag Name,Description,Group,Register Type,Address,Bit,Data Type,Word Order,Length,Scale,Offset,Unit,Access,Enum,Default,Range
+VFD_OutputFreq,Output frequency,VFD,Holding,40001,,UInt16,BigEndian,1,0.01,0,Hz,r,,,0..60
+VFD_Current,Motor current,VFD,Holding,40002,,Float,CDAB,2,0.1,0,A,r,,,0..120
+VFD_Command,Command word,VFD,Holding,40010,,UInt16,BigEndian,1,1,0,,rw,0=Stop;1=Run;2=Jog,0,
+VFD_FaultBit,Fault bit of status word,VFD,Holding,40011,5,Bool,BigEndian,1,1,0,,r,0=Ok;1=Fault,,
+VFD_Ready,Drive ready,VFD,Discrete,10001,,Bool,BigEndian,1,1,0,,r,,,
