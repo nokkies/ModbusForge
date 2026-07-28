@@ -164,6 +164,42 @@ namespace ModbusForge.Tests.ViewModels
         }
 
         [Fact]
+        public void SelectProgramCommand_SwitchingPrograms_PreservesConnectionEndpoints()
+        {
+            // Arrange
+            var viewModel = new VisualNodeEditorViewModel();
+            var programA = new ProgramModel { Name = "Program A" };
+            var programB = new ProgramModel { Name = "Program B" };
+            viewModel.ProgramTree.Programs.Add(programA);
+            viewModel.ProgramTree.Programs.Add(programB);
+
+            var nodeA1 = new VisualNode { Name = "Node A1", X = 100, Y = 100, Width = 240, Height = 140 };
+            var nodeA2 = new VisualNode { Name = "Node A2", X = 500, Y = 100, Width = 240, Height = 140 };
+            programA.Nodes.Add(nodeA1);
+            programA.Nodes.Add(nodeA2);
+            programA.Connections.Add(new NodeConnection(nodeA1.Id, nodeA2.Id));
+
+            var nodeB1 = new VisualNode { Name = "Node B1", X = 100, Y = 100, Width = 240, Height = 140 };
+            var nodeB2 = new VisualNode { Name = "Node B2", X = 500, Y = 100, Width = 240, Height = 140 };
+            programB.Nodes.Add(nodeB1);
+            programB.Nodes.Add(nodeB2);
+            programB.Connections.Add(new NodeConnection(nodeB1.Id, nodeB2.Id));
+
+            viewModel.SelectProgramCommand.Execute(programA);
+
+            // Act - switch to program B and back to A
+            viewModel.SelectProgramCommand.Execute(programB);
+            viewModel.SelectProgramCommand.Execute(programA);
+
+            // Assert - program A's connection should still be visible with valid endpoints
+            var connection = viewModel.Connections.Single();
+            Assert.Equal(nodeA1.X + nodeA1.Width - 6, connection.StartX);
+            Assert.Equal(nodeA1.Y + nodeA1.Height / 2, connection.StartY);
+            Assert.Equal(nodeA2.X + 6, connection.EndX);
+            Assert.Equal(nodeA2.Y + nodeA2.Height / 2, connection.EndY);
+        }
+
+        [Fact]
         public void OpenWatchWindowCommand_WhenNoTagWindowServiceRegistered_DoesNotThrow()
         {
             // Arrange — no ITagWindowService injected

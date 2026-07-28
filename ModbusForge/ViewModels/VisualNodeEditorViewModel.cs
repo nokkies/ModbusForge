@@ -634,23 +634,9 @@ namespace ModbusForge.ViewModels
                 }
             }
             
-            // Load selected program's nodes/connections
+            // Switching SelectedProgram triggers OnSelectedProgramChanged, which loads
+            // the new program's nodes/connections and recalculates connection endpoints.
             SelectedProgram = program;
-            Nodes.Clear();
-            foreach (var node in program.Nodes)
-            {
-                Nodes.Add(node);
-            }
-            Connections.Clear();
-            foreach (var conn in program.Connections)
-            {
-                Connections.Add(conn);
-            }
-            ConnectorConfigs.Clear();
-            foreach (var config in program.ConnectorConfigs)
-            {
-                ConnectorConfigs.Add(config);
-            }
         }
         
         private List<VisualNode> GetSelection()
@@ -717,6 +703,10 @@ namespace ModbusForge.ViewModels
                 {
                     ConnectorConfigs.Add(config);
                 }
+
+                // Recalculate connection endpoints now that nodes are loaded.
+                // Without this, connections default to (0,0) and appear to disappear.
+                UpdateAllConnections();
             }
         }
         
