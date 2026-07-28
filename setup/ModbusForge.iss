@@ -30,6 +30,17 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
+[InstallDelete]
+; Remove stale WPF native runtime libraries from old installs. These are part of
+; the shared Microsoft.WindowsDesktop.App runtime and should not be carried in
+; the app folder, or a newer WPF managed assembly can load against an older native
+; DLL and crash on startup (EntryPointNotFoundException in wpfgfx_cor3.dll).
+Type: files; Name: "{app}\wpfgfx_cor3.dll"
+Type: files; Name: "{app}\PresentationNative_cor3.dll"
+Type: files; Name: "{app}\PenImc_cor3.dll"
+Type: files; Name: "{app}\D3DCompiler_47_cor3.dll"
+Type: files; Name: "{app}\vcruntime140_cor3.dll"
+
 [Files]
 ; These files are expected to be in a 'publish' directory relative to the project root.
 ; The Inno Setup compiler should be run from the project root directory.

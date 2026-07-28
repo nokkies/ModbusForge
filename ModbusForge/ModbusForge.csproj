@@ -10,9 +10,9 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <AssemblyName>ModbusForge</AssemblyName>
     <RootNamespace>ModbusForge</RootNamespace>
-    <Version>6.0.3</Version>
-    <AssemblyVersion>6.0.3.0</AssemblyVersion>
-    <FileVersion>6.0.3.0</FileVersion>
+    <Version>6.0.4</Version>
+    <AssemblyVersion>6.0.4.0</AssemblyVersion>
+    <FileVersion>6.0.4.0</FileVersion>
     <LangVersion>12.0</LangVersion>
     <ApplicationIcon>Resources\ModbusForge.ico</ApplicationIcon>
   </PropertyGroup>
@@ -72,6 +72,24 @@
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.1.0" />
   </ItemGroup>
 
-
+  <!--
+    WPF native runtime libraries (wpfgfx_cor3.dll, etc.) are part of the shared
+    Microsoft.WindowsDesktop.App runtime. Publishing them alongside the exe can
+    cause a cross-patch mismatch: the managed WPF assemblies are loaded from the
+    latest installed shared framework while the native DLLs stay at the patch that
+    was used during build, leading to EntryPointNotFoundException on startup.
+    Delete them from the publish output so the runtime loads matching natives
+    from the shared framework.
+  -->
+  <Target Name="RemoveWpfNativeLibrariesFromPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <WpfNativeLibrariesToRemove Include="$(PublishDir)wpfgfx_cor3.dll" />
+      <WpfNativeLibrariesToRemove Include="$(PublishDir)PresentationNative_cor3.dll" />
+      <WpfNativeLibrariesToRemove Include="$(PublishDir)PenImc_cor3.dll" />
+      <WpfNativeLibrariesToRemove Include="$(PublishDir)D3DCompiler_47_cor3.dll" />
+      <WpfNativeLibrariesToRemove Include="$(PublishDir)vcruntime140_cor3.dll" />
+    </ItemGroup>
+    <Delete Files="@(WpfNativeLibrariesToRemove)" ContinueOnError="true" />
+  </Target>
 
 </Project>

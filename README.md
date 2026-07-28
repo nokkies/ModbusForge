@@ -1,4 +1,4 @@
-# ModbusForge v6.0.3
+# ModbusForge v6.0.4
 
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows)](https://www.microsoft.com/windows)
@@ -78,7 +78,11 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
-### v6.0.3 - Current Release
+### v6.0.4 - Current Release
+
+- **Fixed startup crash (wpfgfx_cor3.dll EntryPointNotFoundException)**: Removed WPF native runtime DLLs from the installer. These DLLs are part of the shared `Microsoft.WindowsDesktop.App` runtime; shipping them with the app caused a mismatch when the installed .NET runtime was patched to a newer version, leading to a startup `XamlParseException`.
+
+### v6.0.3
 
 - **Custom Watch separate write value**: Added a new `Write Value` column. `Value` is now read-only and shows the live read value; `Write Value` is used for one-shot writes and continuous writes. This lets trends/global monitoring keep reading while you write a different value.
 
