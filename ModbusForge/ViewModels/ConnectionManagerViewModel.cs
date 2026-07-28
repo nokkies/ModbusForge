@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO.Ports;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
@@ -28,6 +29,7 @@ namespace ModbusForge.ViewModels
             SetActiveCommand = new RelayCommand(SetActiveProfile);
             ConnectCommand = new AsyncRelayCommand(ConnectAsync);
             DisconnectCommand = new AsyncRelayCommand(DisconnectAsync);
+            RefreshSerialPortsCommand = new RelayCommand(RefreshSerialPorts);
             SaveAndCloseCommand = new RelayCommand(SaveAndClose);
             CancelCommand = new RelayCommand(Cancel);
 
@@ -37,9 +39,13 @@ namespace ModbusForge.ViewModels
             }
 
             _connectionManager.Profiles.CollectionChanged += Profiles_CollectionChanged;
+
+            RefreshSerialPorts();
         }
 
         public ObservableCollection<ConnectionProfile> Profiles => _connectionManager.Profiles;
+
+        public ObservableCollection<string> AvailableSerialPorts { get; } = new();
 
         public ConnectionProfile? SelectedProfile
         {
@@ -98,6 +104,7 @@ namespace ModbusForge.ViewModels
         public ICommand SetActiveCommand { get; }
         public IAsyncRelayCommand ConnectCommand { get; }
         public IAsyncRelayCommand DisconnectCommand { get; }
+        public ICommand RefreshSerialPortsCommand { get; }
         public ICommand SaveAndCloseCommand { get; }
         public ICommand CancelCommand { get; }
 
@@ -110,11 +117,25 @@ namespace ModbusForge.ViewModels
                 OnPropertyChanged(nameof(CanConnect));
                 OnPropertyChanged(nameof(CanDisconnect));
             }
+
+            if (e.PropertyName == nameof(ConnectionProfile.Transport))
+            {
+                OnPropertyChanged(nameof(SelectedProfile));
+            }
         }
 
         private void Profiles_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
             OnPropertyChanged(nameof(CanRemove));
+        }
+
+        private void RefreshSerialPorts()
+        {
+            AvailableSerialPorts.Clear();
+            foreach (var port in SerialPort.GetPortNames())
+            {
+                AvailableSerialPorts.Add(port);
+            }
         }
 
         private void AddProfile()
@@ -180,7 +201,7 @@ namespace ModbusForge.ViewModels
                 var success = await _connectionManager.ConnectProfileAsync(SelectedProfile);
                 if (!success)
                 {
-                    _dialogService.Show($"Failed to connect to {SelectedProfile.IpAddress}:{SelectedProfile.Port}",
+                    _dialogService.Show($"Failed to connect to {SelectedProfile.DisplayName}",
                         "Connection Failed", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
                 }
             }

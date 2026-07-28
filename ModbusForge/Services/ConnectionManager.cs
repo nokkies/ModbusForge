@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.IO.Ports;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -20,25 +21,27 @@ public class ConnectionManager : IConnectionManager
 
     private readonly ILogger<ConnectionManager> _logger;
     private readonly ILoggerFactory _loggerFactory;
-    private readonly ConcurrentDictionary<string, ModbusTcpService> _services = new();
+    private readonly IValidationService? _validationService;
+    private readonly ConcurrentDictionary<string, IModbusService> _services = new();
     private ConnectionProfile? _activeProfile;
 
     public ObservableCollection<ConnectionProfile> Profiles { get; } = new();
-    
+
     public ConnectionProfile? ActiveProfile => _activeProfile;
-    
+
     public IModbusService? ActiveService => _activeProfile != null ? GetServiceForProfile(_activeProfile) : null;
 
     public event EventHandler<ConnectionProfile?>? ActiveProfileChanged;
     public event EventHandler<ConnectionProfile>? ProfileConnected;
     public event EventHandler<ConnectionProfile>? ProfileDisconnected;
 
-    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory)
+    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService = null)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
+        _validationService = validationService;
         LoadProfiles();
-        
+
         // Add default profile if none exist
         if (Profiles.Count == 0)
         {
@@ -50,7 +53,7 @@ public class ConnectionManager : IConnectionManager
     {
         Profiles.Add(profile);
         _logger.LogInformation("Added connection profile: {Name}", profile.Name);
-        
+
         if (_activeProfile == null)
         {
             SetActiveProfile(profile);
@@ -86,7 +89,7 @@ public class ConnectionManager : IConnectionManager
         }
 
         _activeProfile = profile;
-        
+
         if (_activeProfile != null)
         {
             _activeProfile.IsActive = true;
@@ -100,16 +103,29 @@ public class ConnectionManager : IConnectionManager
     {
         try
         {
+            // Validate serial settings before attempting to connect.
+            if (profile.Transport != TransportType.Tcp)
+            {
+                var validation = _validationService?.ValidateSerialSettings(profile);
+                if (validation is { IsValid: false })
+                {
+                    profile.IsConnected = false;
+                    profile.Status = $"Invalid settings: {validation.ErrorMessage}";
+                    _logger.LogWarning("Profile {Name} serial validation failed: {Error}", profile.Name, validation.ErrorMessage);
+                    return false;
+                }
+            }
+
             var service = GetOrCreateService(profile);
-            var success = await service.ConnectAsync(profile.IpAddress, profile.Port);
-            
+            var success = await service.ConnectAsync(profile);
+
             if (success)
             {
                 profile.IsConnected = true;
                 profile.Status = "Connected";
                 ProfileConnected?.Invoke(this, profile);
-                _logger.LogInformation("Connected profile: {Name} to {Ip}:{Port}", 
-                    profile.Name, profile.IpAddress, profile.Port);
+                _logger.LogInformation("Connected profile: {Name} to {Endpoint}",
+                    profile.Name, service.BoundEndpoint);
             }
             else
             {
@@ -160,10 +176,47 @@ public class ConnectionManager : IConnectionManager
         return _services.TryGetValue(profile.Id, out var service) ? service : null;
     }
 
-    private ModbusTcpService GetOrCreateService(ConnectionProfile profile)
+    private IModbusService GetOrCreateService(ConnectionProfile profile)
     {
-        return _services.GetOrAdd(profile.Id, _ => 
-            new ModbusTcpService(_loggerFactory.CreateLogger<ModbusTcpService>()));
+        var transport = profile.Transport;
+
+        if (_services.TryGetValue(profile.Id, out var existing))
+        {
+            if (MatchesTransport(existing, transport))
+            {
+                return existing;
+            }
+
+            _services.TryRemove(profile.Id, out _);
+            existing.Dispose();
+        }
+
+        IModbusService service = transport switch
+        {
+            TransportType.Rtu or TransportType.Ascii => new ModbusSerialService(
+                _loggerFactory.CreateLogger<ModbusSerialService>(),
+                null,
+                _validationService,
+                transport),
+            _ => new ModbusTcpService(_loggerFactory.CreateLogger<ModbusTcpService>())
+        };
+
+        return _services.AddOrUpdate(profile.Id, service, (_, old) =>
+        {
+            if (old != service)
+            {
+                old.Dispose();
+            }
+            return service;
+        })!;
+    }
+
+    private static bool MatchesTransport(IModbusService service, TransportType transport)
+    {
+        if (transport == TransportType.Tcp)
+            return service is ModbusTcpService;
+
+        return service is ModbusSerialService serial && serial.Transport == transport;
     }
 
     public void SaveProfiles()
@@ -185,7 +238,14 @@ public class ConnectionManager : IConnectionManager
                     Name = p.Name,
                     IpAddress = p.IpAddress,
                     Port = p.Port,
-                    UnitId = p.UnitId
+                    UnitId = p.UnitId,
+                    Transport = p.Transport,
+                    ComPort = p.ComPort,
+                    BaudRate = p.BaudRate,
+                    Parity = p.Parity,
+                    DataBits = p.DataBits,
+                    StopBits = p.StopBits,
+                    RtsEnable = p.RtsEnable
                 }).ToList()
             };
 
@@ -210,7 +270,7 @@ public class ConnectionManager : IConnectionManager
 
             var json = File.ReadAllText(ProfilesFilePath);
             var data = JsonSerializer.Deserialize<ProfilesData>(json);
-            
+
             if (data?.Profiles != null)
             {
                 Profiles.Clear();
@@ -222,7 +282,14 @@ public class ConnectionManager : IConnectionManager
                         Name = dto.Name,
                         IpAddress = dto.IpAddress,
                         Port = dto.Port,
-                        UnitId = dto.UnitId
+                        UnitId = dto.UnitId,
+                        Transport = dto.Transport,
+                        ComPort = dto.ComPort,
+                        BaudRate = dto.BaudRate,
+                        Parity = dto.Parity,
+                        DataBits = dto.DataBits,
+                        StopBits = dto.StopBits,
+                        RtsEnable = dto.RtsEnable
                     };
                     Profiles.Add(profile);
 
@@ -253,5 +320,12 @@ public class ConnectionManager : IConnectionManager
         public string IpAddress { get; set; } = string.Empty;
         public int Port { get; set; }
         public byte UnitId { get; set; }
+        public TransportType Transport { get; set; } = TransportType.Tcp;
+        public string ComPort { get; set; } = "COM1";
+        public int BaudRate { get; set; } = 9600;
+        public Parity Parity { get; set; } = Parity.None;
+        public int DataBits { get; set; } = 8;
+        public StopBits StopBits { get; set; } = StopBits.One;
+        public bool RtsEnable { get; set; }
     }
 }

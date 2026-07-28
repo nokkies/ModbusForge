@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.IO.Ports;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
+using ModbusForge.Models;
+using TransportType = ModbusForge.Models.TransportType;
 
 namespace ModbusForge.Services
 {
@@ -20,6 +24,12 @@ namespace ModbusForge.Services
         ValidationResult ValidateConnectionString(string connectionString);
         ValidationResult ValidateModbusValue(ushort value);
         ValidationResult ValidateCoilValue(bool value);
+        ValidationResult ValidateSerialPort(string portName);
+        ValidationResult ValidateBaudRate(int baudRate);
+        ValidationResult ValidateDataBits(int dataBits);
+        ValidationResult ValidateStopBits(StopBits stopBits);
+        ValidationResult ValidateParity(Parity parity);
+        ValidationResult ValidateSerialSettings(ConnectionProfile profile);
     }
 
     public class ValidationResult
@@ -29,14 +39,14 @@ namespace ModbusForge.Services
         public string? ErrorDetails { get; set; }
 
         public static ValidationResult Success => new ValidationResult { IsValid = true };
-        
+
         public static ValidationResult Failure(string message, string? details = null)
         {
-            return new ValidationResult 
-            { 
-                IsValid = false, 
-                ErrorMessage = message, 
-                ErrorDetails = details 
+            return new ValidationResult
+            {
+                IsValid = false,
+                ErrorMessage = message,
+                ErrorDetails = details
             };
         }
     }
@@ -44,7 +54,7 @@ namespace ModbusForge.Services
     public class ValidationService : IValidationService
     {
         private readonly ILogger<ValidationService> _logger;
-        
+
         // Constants for validation
         private const int MinPort = 1;
         private const int MaxPort = 65535;
@@ -53,6 +63,17 @@ namespace ModbusForge.Services
         private const int MinRegisterCount = 1;
         private const int MaxRegisterCount = 125; // Modbus standard limit
         private const ushort MaxModbusValue = 65535;
+
+        private const int MinDataBits = 5;
+        private const int MaxDataBits = 8;
+
+        // Common baud rates; also accept any positive integer as a valid custom rate
+        private static readonly HashSet<int> StandardBaudRates = new()
+        {
+            75, 110, 300, 600, 1200, 2400, 4800, 9600,
+            14400, 19200, 38400, 57600, 115200, 128000,
+            230400, 256000, 460800, 921600
+        };
 
         public ValidationService(ILogger<ValidationService> logger)
         {
@@ -82,7 +103,7 @@ namespace ModbusForge.Services
                 }
 
                 // Validate address family
-                if (address.AddressFamily != AddressFamily.InterNetwork && 
+                if (address.AddressFamily != AddressFamily.InterNetwork &&
                     address.AddressFamily != AddressFamily.InterNetworkV6)
                 {
                     return ValidationResult.Failure($"Unsupported address family: {address.AddressFamily}");
@@ -173,7 +194,7 @@ namespace ModbusForge.Services
 
             // Expected format: "ip:port" or "ip:port:unitId"
             var parts = connectionString.Split(':');
-            
+
             if (parts.Length < 2 || parts.Length > 3)
             {
                 return ValidationResult.Failure(
@@ -240,6 +261,114 @@ namespace ModbusForge.Services
         public ValidationResult ValidateCoilValue(bool value)
         {
             // Boolean values are always valid for coils
+            return ValidationResult.Success;
+        }
+
+        public ValidationResult ValidateSerialPort(string portName)
+        {
+            if (string.IsNullOrWhiteSpace(portName))
+            {
+                return ValidationResult.Failure("COM port name cannot be empty");
+            }
+
+            if (!Regex.IsMatch(portName, @"^COM\d+$", RegexOptions.IgnoreCase))
+            {
+                return ValidationResult.Failure(
+                    $"Invalid COM port name: {portName}",
+                    "Expected format: COM1, COM2, ...");
+            }
+
+            return ValidationResult.Success;
+        }
+
+        public ValidationResult ValidateBaudRate(int baudRate)
+        {
+            if (baudRate <= 0)
+            {
+                return ValidationResult.Failure(
+                    "Baud rate must be greater than zero",
+                    $"Provided baud rate: {baudRate}");
+            }
+
+            if (!StandardBaudRates.Contains(baudRate))
+            {
+                _logger.LogWarning("Baud rate {BaudRate} is non-standard but will be accepted", baudRate);
+            }
+
+            return ValidationResult.Success;
+        }
+
+        public ValidationResult ValidateDataBits(int dataBits)
+        {
+            if (dataBits < MinDataBits || dataBits > MaxDataBits)
+            {
+                return ValidationResult.Failure(
+                    $"Data bits must be between {MinDataBits} and {MaxDataBits}",
+                    $"Provided data bits: {dataBits}");
+            }
+
+            return ValidationResult.Success;
+        }
+
+        public ValidationResult ValidateStopBits(StopBits stopBits)
+        {
+            if (stopBits == StopBits.None)
+            {
+                return ValidationResult.Failure(
+                    "Stop bits cannot be None",
+                    "Valid values: One, OnePointFive, Two");
+            }
+
+            if (!Enum.IsDefined(typeof(StopBits), stopBits))
+            {
+                return ValidationResult.Failure($"Invalid stop bits value: {stopBits}");
+            }
+
+            return ValidationResult.Success;
+        }
+
+        public ValidationResult ValidateParity(Parity parity)
+        {
+            if (!Enum.IsDefined(typeof(Parity), parity))
+            {
+                return ValidationResult.Failure($"Invalid parity value: {parity}");
+            }
+
+            return ValidationResult.Success;
+        }
+
+        public ValidationResult ValidateSerialSettings(ConnectionProfile profile)
+        {
+            if (profile == null)
+            {
+                return ValidationResult.Failure("Connection profile cannot be null");
+            }
+
+            if (profile.Transport != TransportType.Rtu && profile.Transport != TransportType.Ascii)
+            {
+                return ValidationResult.Failure(
+                    "Serial settings validation requested for non-serial transport",
+                    $"Transport: {profile.Transport}");
+            }
+
+            var result = ValidateSerialPort(profile.ComPort);
+            if (!result.IsValid) return result;
+
+            result = ValidateBaudRate(profile.BaudRate);
+            if (!result.IsValid) return result;
+
+            result = ValidateDataBits(profile.DataBits);
+            if (!result.IsValid) return result;
+
+            result = ValidateParity(profile.Parity);
+            if (!result.IsValid) return result;
+
+            result = ValidateStopBits(profile.StopBits);
+            if (!result.IsValid) return result;
+
+            result = ValidateUnitId(profile.UnitId);
+            if (!result.IsValid) return result;
+
             return ValidationResult.Success;
         }
     }
