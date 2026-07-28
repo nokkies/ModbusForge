@@ -12,6 +12,7 @@ namespace ModbusForge.Services
     public class ShellWindowService : IShellWindowService
     {
         private readonly ILogger<AboutWindow> _aboutLogger;
+        private readonly ILogger<AdvancedFunctionsViewModel> _advancedFunctionsLogger;
         private readonly IDialogService _dialogService;
         private readonly HelpViewModel _helpViewModel;
         private readonly IScriptRunner _scriptRunner;
@@ -20,9 +21,13 @@ namespace ModbusForge.Services
         private readonly IConnectionManager _connectionManager;
         private readonly IFileDialogService _fileDialogService;
         private readonly IDispatcher _dispatcher;
+        private readonly IDeviceScannerService _deviceScannerService;
+        private readonly IFileSystem _fileSystem;
+        private readonly ILogger<DeviceScannerViewModel> _deviceScannerLogger;
 
         public ShellWindowService(
             ILogger<AboutWindow> aboutLogger,
+            ILogger<AdvancedFunctionsViewModel> advancedFunctionsLogger,
             IDialogService dialogService,
             HelpViewModel helpViewModel,
             IScriptRunner scriptRunner,
@@ -30,9 +35,13 @@ namespace ModbusForge.Services
             ISettingsService settingsService,
             IConnectionManager connectionManager,
             IFileDialogService fileDialogService,
-            IDispatcher dispatcher)
+            IDispatcher dispatcher,
+            IDeviceScannerService deviceScannerService,
+            IFileSystem fileSystem,
+            ILogger<DeviceScannerViewModel> deviceScannerLogger)
         {
             _aboutLogger = aboutLogger ?? throw new ArgumentNullException(nameof(aboutLogger));
+            _advancedFunctionsLogger = advancedFunctionsLogger ?? throw new ArgumentNullException(nameof(advancedFunctionsLogger));
             _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
             _helpViewModel = helpViewModel ?? throw new ArgumentNullException(nameof(helpViewModel));
             _scriptRunner = scriptRunner ?? throw new ArgumentNullException(nameof(scriptRunner));
@@ -41,6 +50,9 @@ namespace ModbusForge.Services
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _fileDialogService = fileDialogService ?? throw new ArgumentNullException(nameof(fileDialogService));
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
+            _deviceScannerService = deviceScannerService ?? throw new ArgumentNullException(nameof(deviceScannerService));
+            _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+            _deviceScannerLogger = deviceScannerLogger ?? throw new ArgumentNullException(nameof(deviceScannerLogger));
         }
 
         public void ShowAbout(Window owner)
@@ -99,6 +111,16 @@ namespace ModbusForge.Services
             preferencesWindow.ShowDialog();
         }
 
+        public void ShowAdvancedFunctions(Window owner, byte unitId)
+        {
+            var viewModel = new AdvancedFunctionsViewModel(_modbusService, unitId, _advancedFunctionsLogger);
+            var window = new AdvancedFunctionsWindow(viewModel)
+            {
+                Owner = owner
+            };
+            window.ShowDialog();
+        }
+
         public void ShowConnectionManager(Window owner)
         {
             var viewModel = new ConnectionManagerViewModel(_connectionManager, _dialogService);
@@ -107,6 +129,23 @@ namespace ModbusForge.Services
                 Owner = owner
             };
             connectionManagerWindow.ShowDialog();
+        }
+
+        public void ShowDeviceScanner(Window owner)
+        {
+            var viewModel = new DeviceScannerViewModel(
+                _deviceScannerService,
+                _connectionManager,
+                _dispatcher,
+                _dialogService,
+                _fileDialogService,
+                _fileSystem,
+                _deviceScannerLogger);
+            var deviceScannerWindow = new DeviceScannerWindow(viewModel)
+            {
+                Owner = owner
+            };
+            deviceScannerWindow.ShowDialog();
         }
     }
 }

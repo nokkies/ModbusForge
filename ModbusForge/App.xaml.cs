@@ -198,6 +198,9 @@ namespace ModbusForge
             services.AddSingleton<IRegisterTemplateStore>(provider =>
                 new RegisterTemplateStore(provider.GetService<ILogger<RegisterTemplateStore>>()));
             services.AddSingleton<ITagWindowService, TagWindowService>();
+            services.AddSingleton<IDeviceIdentificationReader, DeviceIdentificationReader>();
+            services.AddSingleton<IModbusDeviceProbe, ModbusDeviceProbe>();
+            services.AddSingleton<IDeviceScannerService, DeviceScannerService>();
             services.AddSingleton<IShellWindowService, ShellWindowService>();
             services.AddSingleton<IApplicationLifetime, WpfApplicationLifetime>();
             services.AddSingleton<IUnitConfigurationStore>(provider => new UnitConfigurationStore(provider.GetRequiredService<IDispatcher>()));
