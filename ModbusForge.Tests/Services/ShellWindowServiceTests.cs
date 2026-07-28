@@ -25,6 +25,9 @@ public class ShellWindowServiceTests
     private readonly Mock<IConnectionManager> _connectionManager = new();
     private readonly Mock<IFileDialogService> _fileDialogService = new();
     private readonly Mock<IDispatcher> _dispatcher = new();
+    private readonly Mock<IDeviceScannerService> _deviceScannerService = new();
+    private readonly Mock<IFileSystem> _fileSystem = new();
+    private readonly Mock<ILogger<DeviceScannerViewModel>> _deviceScannerLogger = new();
 
     public ShellWindowServiceTests()
     {
@@ -46,7 +49,10 @@ public class ShellWindowServiceTests
             _settingsService.Object,
             _connectionManager.Object,
             _fileDialogService.Object,
-            _dispatcher.Object);
+            _dispatcher.Object,
+            _deviceScannerService.Object,
+            _fileSystem.Object,
+            _deviceScannerLogger.Object);
 
     [Fact]
     public void Constructor_WithAllDependencies_Succeeds()
@@ -69,7 +75,10 @@ public class ShellWindowServiceTests
                 _settingsService.Object,
                 _connectionManager.Object,
                 _fileDialogService.Object,
-                _dispatcher.Object));
+                _dispatcher.Object,
+                _deviceScannerService.Object,
+                _fileSystem.Object,
+                _deviceScannerLogger.Object));
     }
 
     [Fact]
@@ -86,7 +95,10 @@ public class ShellWindowServiceTests
                 _settingsService.Object,
                 _connectionManager.Object,
                 _fileDialogService.Object,
-                _dispatcher.Object));
+                _dispatcher.Object,
+                _deviceScannerService.Object,
+                _fileSystem.Object,
+                _deviceScannerLogger.Object));
     }
 
     [Fact]
@@ -103,7 +115,10 @@ public class ShellWindowServiceTests
                 _settingsService.Object,
                 _connectionManager.Object,
                 _fileDialogService.Object,
-                _dispatcher.Object));
+                _dispatcher.Object,
+                _deviceScannerService.Object,
+                _fileSystem.Object,
+                _deviceScannerLogger.Object));
     }
 
     [Fact]
@@ -120,7 +135,10 @@ public class ShellWindowServiceTests
                 _settingsService.Object,
                 _connectionManager.Object,
                 _fileDialogService.Object,
-                _dispatcher.Object));
+                _dispatcher.Object,
+                _deviceScannerService.Object,
+                _fileSystem.Object,
+                _deviceScannerLogger.Object));
     }
 
     [Fact]
@@ -137,7 +155,10 @@ public class ShellWindowServiceTests
                 _settingsService.Object,
                 _connectionManager.Object,
                 _fileDialogService.Object,
-                _dispatcher.Object));
+                _dispatcher.Object,
+                _deviceScannerService.Object,
+                _fileSystem.Object,
+                _deviceScannerLogger.Object));
     }
 
     [Fact]
@@ -154,7 +175,10 @@ public class ShellWindowServiceTests
                 null!,
                 _connectionManager.Object,
                 _fileDialogService.Object,
-                _dispatcher.Object));
+                _dispatcher.Object,
+                _deviceScannerService.Object,
+                _fileSystem.Object,
+                _deviceScannerLogger.Object));
     }
 
     [Fact]
@@ -171,7 +195,10 @@ public class ShellWindowServiceTests
                 _settingsService.Object,
                 null!,
                 _fileDialogService.Object,
-                _dispatcher.Object));
+                _dispatcher.Object,
+                _deviceScannerService.Object,
+                _fileSystem.Object,
+                _deviceScannerLogger.Object));
     }
 
     [Fact]
@@ -181,3 +208,5 @@ public class ShellWindowServiceTests
         Assert.IsAssignableFrom<IShellWindowService>(service);
     }
 }
+
+

@@ -195,6 +195,9 @@ namespace ModbusForge
             services.AddSingleton<IHelpContentService, HelpContentService>();
             services.AddSingleton<IWindowOwnerProvider, MainWindowOwnerProvider>();
             services.AddSingleton<ITagWindowService, TagWindowService>();
+            services.AddSingleton<IDeviceIdentificationReader, DeviceIdentificationReader>();
+            services.AddSingleton<IModbusDeviceProbe, ModbusDeviceProbe>();
+            services.AddSingleton<IDeviceScannerService, DeviceScannerService>();
             services.AddSingleton<IShellWindowService, ShellWindowService>();
             services.AddSingleton<IApplicationLifetime, WpfApplicationLifetime>();
             services.AddSingleton<IUnitConfigurationStore>(provider => new UnitConfigurationStore(provider.GetRequiredService<IDispatcher>()));

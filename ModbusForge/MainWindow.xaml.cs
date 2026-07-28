@@ -310,6 +310,11 @@ namespace ModbusForge
             _shellWindowService.ShowConnectionManager(this);
         }
 
+        private void MenuItem_DeviceScanner_Click(object sender, RoutedEventArgs e)
+        {
+            _shellWindowService.ShowDeviceScanner(this);
+        }
+
 
         private void Trend_ExportPng_Click(object sender, RoutedEventArgs e)
         {

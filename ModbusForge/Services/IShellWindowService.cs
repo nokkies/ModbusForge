@@ -16,5 +16,6 @@ namespace ModbusForge.Services
         void ShowPreferences(Window owner);
         void ShowAdvancedFunctions(Window owner, byte unitId);
         void ShowConnectionManager(Window owner);
+        void ShowDeviceScanner(Window owner);
     }
 }
