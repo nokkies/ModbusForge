@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Text.Json.Serialization;
 
 namespace ModbusForge.Models
@@ -99,6 +100,12 @@ namespace ModbusForge.Models
         private bool _isReadOnly;
 
         /// <summary>
+        /// Optional raw-value to label map, populated from a register template's enum column.
+        /// </summary>
+        [ObservableProperty]
+        private Dictionary<int, string>? _valueEnum;
+
+        /// <summary>
         /// Full address string (e.g., "HoldingRegister:1" or "HR1")
         /// </summary>
         public string FullAddress => $"{Area}:{Address}";
@@ -157,7 +164,10 @@ namespace ModbusForge.Models
             get
             {
                 if (CurrentValue == null) return "---";
-                
+
+                if (TryGetEnumLabel(out var label))
+                    return label;
+
                 var scaled = ScaledValue;
                 if (scaled.HasValue && !string.IsNullOrEmpty(Units))
                 {
@@ -166,6 +176,53 @@ namespace ModbusForge.Models
                 
                 return CurrentValue.ToString() ?? "---";
             }
+        }
+
+        /// <summary>
+        /// Converts an engineering-unit value (or an enum label) to the raw value to write,
+        /// i.e. the inverse of <see cref="ScaledValue"/>.
+        /// </summary>
+        public double ToRawValue(object engineeringValue)
+        {
+            ArgumentNullException.ThrowIfNull(engineeringValue);
+
+            if (engineeringValue is string text && ValueEnum != null)
+            {
+                var match = ValueEnum.FirstOrDefault(kvp =>
+                    string.Equals(kvp.Value, text, StringComparison.OrdinalIgnoreCase));
+                if (match.Value != null)
+                    return match.Key;
+            }
+
+            var value = Convert.ToDouble(engineeringValue);
+            var scale = Scale == 0 ? 1.0 : Scale;
+            return (value - Offset) / scale;
+        }
+
+        /// <summary>
+        /// Resolves the current raw value against <see cref="ValueEnum"/>.
+        /// </summary>
+        public bool TryGetEnumLabel(out string label)
+        {
+            label = string.Empty;
+            if (ValueEnum == null || ValueEnum.Count == 0 || CurrentValue == null)
+                return false;
+
+            try
+            {
+                var raw = Convert.ToInt32(CurrentValue);
+                if (ValueEnum.TryGetValue(raw, out var found))
+                {
+                    label = found;
+                    return true;
+                }
+            }
+            catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)
+            {
+                _logger.LogDebug(ex, "Tag '{TagName}': cannot resolve '{CurrentValue}' against the enum map", Name, CurrentValue);
+            }
+
+            return false;
         }
     }
 

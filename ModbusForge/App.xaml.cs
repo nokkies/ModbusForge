@@ -194,6 +194,9 @@ namespace ModbusForge
             services.AddSingleton<ICircuitBreakerService, CircuitBreakerService>();
             services.AddSingleton<IHelpContentService, HelpContentService>();
             services.AddSingleton<IWindowOwnerProvider, MainWindowOwnerProvider>();
+            services.AddSingleton<IRegisterTemplateImportService, RegisterTemplateImportService>();
+            services.AddSingleton<IRegisterTemplateStore>(provider =>
+                new RegisterTemplateStore(provider.GetService<ILogger<RegisterTemplateStore>>()));
             services.AddSingleton<ITagWindowService, TagWindowService>();
             services.AddSingleton<IDeviceIdentificationReader, DeviceIdentificationReader>();
             services.AddSingleton<IModbusDeviceProbe, ModbusDeviceProbe>();

@@ -287,6 +287,48 @@ Access via **Options → Preferences**
 - Live reads when Global Continuous Read is enabled
 - Save/Load configurations to JSON
 
+### Register Templates (CSV / Excel Import)
+
+Import a vendor register map from the **Tag Browser → Import Template** button. The preview
+dialog shows every parsed row, highlights rejected rows in red and warning rows in amber, and
+only imports the rows that validated. **CSV Template** writes an example file to fill in.
+
+Supported columns (header names are matched case-insensitively, ignoring spaces, `_` and `-`;
+common vendor synonyms such as `Tag`, `Register`, `Register Type`, `Comment`, `EU` are accepted):
+
+| Column | Meaning |
+| --- | --- |
+| `TagName` *(required)* | Tag name |
+| `Address` *(required)* | Register address, interpreted using the selected addressing convention |
+| `Description`, `Group` | Description and tag group |
+| `RegisterType` | `Holding` / `Input` / `Coil` / `Discrete` (also `HR`, `IR`, `4x`, `3x`, `0x`, `1x`) |
+| `Bit` | Bit index 0–15 within a packed status word |
+| `DataType` | `Bool`, `Int16`, `UInt16`, `Int32`, `UInt32`, `Float`/`Real`, `Double`, `String` |
+| `WordOrder` | `BigEndian`/`ABCD` or `LittleEndian`/`CDAB` (word-swapped) |
+| `Length` | Registers occupied; defaults to the data type width |
+| `Scale`, `Offset`, `Unit` | Engineering-unit conversion applied to polled and written values |
+| `Access` | `r` / `ro` (read-only) or `rw` |
+| `Enum` | `0=Off;1=On` — displayed instead of the raw value |
+| `Default` | Default value |
+| `Range` | `0..100` (or separate `Min`/`Max` columns) — used as the alarm limits |
+
+Addressing conventions: **0-based** (protocol address), **1-based** (address − 1) and
+**Modicon** (`40001` → holding register 0, `30001` → input register 0, `10001` → discrete
+input 0, `000001` → coil 0; 6-digit forms are also supported).
+
+Example:
+
+```csv
+TagName,Description,Group,RegisterType,Address,Bit,DataType,WordOrder,Length,Scale,Offset,Unit,Access,Enum,Default,Range
+VFD_OutputFreq,Output frequency,VFD,Holding,40001,,UInt16,BigEndian,1,0.01,0,Hz,r,,,0..60
+VFD_Current,Motor current,VFD,Holding,40002,,Float,CDAB,2,0.1,0,A,r,,,0..120
+VFD_Command,Command word,VFD,Holding,40010,,UInt16,BigEndian,1,1,0,,rw,0=Stop;1=Run;2=Jog,0,
+VFD_FaultBit,Fault bit of status word,VFD,Holding,40011,5,Bool,BigEndian,1,1,0,,r,0=Ok;1=Fault,,
+```
+
+Imported templates are stored as JSON in `%AppData%\ModbusForge\templates\` so they can be
+reused, edited or shared. Excel (`.xlsx`) files are read from the first worksheet.
+
 ### Advanced Functions
 
 Open **Options → Advanced Functions...** to use the protocol functions that go beyond the
@@ -311,7 +353,6 @@ ushort? result = await modbusService.MaskWriteRegisterAsync(unitId: 1, registerA
 ushort[]? read  = await modbusService.ReadWriteMultipleRegistersAsync(1, readStartAddress: 1, readCount: 4, writeStartAddress: 10, writeValues: new ushort[] { 1, 2 });
 DeviceIdentification? id = await modbusService.ReadDeviceIdentificationAsync(1, DeviceIdObject.VendorName, DeviceIdCategory.Basic);
 ```
-
 ### Trend & Logging
 
 - Real-time trend charts with zoom/pan
