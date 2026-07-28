@@ -486,7 +486,8 @@
                             <DataGridComboBoxColumn Header="Area" SelectedItemBinding="{Binding Area}" ItemsSource="{StaticResource AreaOptionsAll}" Width="*"/>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address, ValidatesOnDataErrors=True, NotifyOnValidationError=True}" Width="*"/>
                             <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{StaticResource TypeOptionsAll}" Width="*"/>
-                            <DataGridTextColumn Header="Value" Binding="{Binding Value, ValidatesOnDataErrors=True, NotifyOnValidationError=True}" Width="2*"/>
+                            <DataGridTextColumn Header="Value" Binding="{Binding Value, Mode=OneWay}" IsReadOnly="True" Width="2*"/>
+                            <DataGridTextColumn Header="Write Value" Binding="{Binding WriteValue, ValidatesOnDataErrors=True, NotifyOnValidationError=True}" Width="2*"/>
                             <DataGridCheckBoxColumn Header="Cont. Write" Binding="{Binding Continuous}" Width="Auto"/>
                             <DataGridTextColumn Header="Write Period (ms)" Binding="{Binding PeriodMs, ValidatesOnDataErrors=True, NotifyOnValidationError=True}" Width="*"/>
                             <DataGridCheckBoxColumn Header="Trend" Binding="{Binding Trend}" Width="Auto"/>

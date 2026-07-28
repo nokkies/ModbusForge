@@ -39,7 +39,7 @@ namespace ModbusForge.Tests.Coordinators
         {
             // Arrange
             var coordinator = CreateCoordinator(out _, out _);
-            var entry = new CustomEntry { Address = 1, Area = "HoldingRegister", Type = "uint", Value = "abc" };
+            var entry = new CustomEntry { Address = 1, Area = "HoldingRegister", Type = "uint", Value = "0", WriteValue = "abc" };
 
             // Act
             var result = await coordinator.WriteCustomNowAsync(entry, 1, false);
@@ -54,7 +54,7 @@ namespace ModbusForge.Tests.Coordinators
         {
             // Arrange
             var coordinator = CreateCoordinator(out _, out _);
-            var entry = new CustomEntry { Address = 2, Area = "HoldingRegister", Type = "real", Value = "not-a-float" };
+            var entry = new CustomEntry { Address = 2, Area = "HoldingRegister", Type = "real", Value = "0", WriteValue = "not-a-float" };
 
             // Act
             var result = await coordinator.WriteCustomNowAsync(entry, 1, false);
@@ -69,7 +69,7 @@ namespace ModbusForge.Tests.Coordinators
         {
             // Arrange
             var coordinator = CreateCoordinator(out var clientService, out _);
-            var entry = new CustomEntry { Address = 3, Area = "HoldingRegister", Type = "uint", Value = "12345" };
+            var entry = new CustomEntry { Address = 3, Area = "HoldingRegister", Type = "uint", Value = "0", WriteValue = "12345" };
 
             // Act
             var result = await coordinator.WriteCustomNowAsync(entry, 1, false);
@@ -85,7 +85,7 @@ namespace ModbusForge.Tests.Coordinators
         {
             // Arrange
             var coordinator = CreateCoordinator(out var clientService, out _);
-            var entry = new CustomEntry { Address = 4, Area = "HoldingRegister", Type = "real", Value = "3.14" };
+            var entry = new CustomEntry { Address = 4, Area = "HoldingRegister", Type = "real", Value = "0", WriteValue = "3.14" };
 
             // Act
             var result = await coordinator.WriteCustomNowAsync(entry, 1, false);
@@ -101,7 +101,7 @@ namespace ModbusForge.Tests.Coordinators
         {
             // Arrange
             var coordinator = CreateCoordinator(out _, out _);
-            var entry = new CustomEntry { Address = 5, Area = "Coil", Type = "bool", Value = "maybe" };
+            var entry = new CustomEntry { Address = 5, Area = "Coil", Type = "bool", Value = "0", WriteValue = "maybe" };
 
             // Act
             var result = await coordinator.WriteCustomNowAsync(entry, 1, false);

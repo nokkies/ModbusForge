@@ -10,6 +10,7 @@ namespace ModbusForge.Models
         private int _address;
         private string _type = "uint"; // uint,int,real
         private string _value = "0";
+        private string _writeValue = "0";
         private bool _continuous = false;
         private int _periodMs = 1000;
         public DateTime LastWriteUtc { get; set; } = DateTime.MinValue;
@@ -23,8 +24,9 @@ namespace ModbusForge.Models
 
         public string Name { get => _name; set { if (_name != value) { _name = value; OnPropertyChanged(nameof(Name)); } } }
         public int Address { get => _address; set { if (_address != value) { _address = value; OnPropertyChanged(nameof(Address)); } } }
-        public string Type { get => _type; set { if (_type != value) { _type = value; OnPropertyChanged(nameof(Type)); OnPropertyChanged(nameof(Value)); } } }
+        public string Type { get => _type; set { if (_type != value) { _type = value; OnPropertyChanged(nameof(Type)); OnPropertyChanged(nameof(Value)); OnPropertyChanged(nameof(WriteValue)); } } }
         public string Value { get => _value; set { if (_value != value) { _value = value; OnPropertyChanged(nameof(Value)); } } }
+        public string WriteValue { get => _writeValue; set { if (_writeValue != value) { _writeValue = value; OnPropertyChanged(nameof(WriteValue)); } } }
         public bool Continuous { get => _continuous; set { if (_continuous != value) { _continuous = value; OnPropertyChanged(nameof(Continuous)); } } }
         public int PeriodMs { get => _periodMs; set { if (_periodMs != value) { _periodMs = value; OnPropertyChanged(nameof(PeriodMs)); } } }
         // Per-row continuous read
@@ -35,6 +37,31 @@ namespace ModbusForge.Models
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+        private string ValidateValueString(string value, string displayName)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return $"{displayName} is required.";
+
+            var type = (_type ?? "uint").ToLowerInvariant();
+            switch (type)
+            {
+                case "uint":
+                    if (!ushort.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                        return $"{displayName} must be an unsigned integer (0-65535).";
+                    break;
+                case "int":
+                    if (!short.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                        return $"{displayName} must be a signed integer (-32768 to 32767).";
+                    break;
+                case "real":
+                    if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                        return $"{displayName} must be a number.";
+                    break;
+            }
+
+            return string.Empty;
+        }
 
         // IDataErrorInfo validation
         public string Error => string.Empty;
@@ -56,27 +83,10 @@ namespace ModbusForge.Models
                     return "Read period must be greater than 0 ms.";
 
                 if (columnName == nameof(Value))
-                {
-                    if (string.IsNullOrWhiteSpace(_value))
-                        return "Value is required.";
+                    return ValidateValueString(_value, "Value");
 
-                    var type = (_type ?? "uint").ToLowerInvariant();
-                    switch (type)
-                    {
-                        case "uint":
-                            if (!ushort.TryParse(_value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
-                                return "Value must be an unsigned integer (0-65535).";
-                            break;
-                        case "int":
-                            if (!short.TryParse(_value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
-                                return "Value must be a signed integer (-32768 to 32767).";
-                            break;
-                        case "real":
-                            if (!float.TryParse(_value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
-                                return "Value must be a number.";
-                            break;
-                    }
-                }
+                if (columnName == nameof(WriteValue))
+                    return ValidateValueString(_writeValue, "Write value");
 
                 return string.Empty;
             }

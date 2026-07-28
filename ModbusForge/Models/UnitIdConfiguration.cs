@@ -48,6 +48,7 @@ namespace ModbusForge.Models
                     Address = entry.Address,
                     Type = entry.Type,
                     Value = entry.Value,
+                    WriteValue = entry.WriteValue,
                     Continuous = entry.Continuous,
                     PeriodMs = entry.PeriodMs,
                     Monitor = entry.Monitor,

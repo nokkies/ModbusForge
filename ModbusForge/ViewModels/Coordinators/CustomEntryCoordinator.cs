@@ -50,16 +50,17 @@ namespace ModbusForge.ViewModels.Coordinators
             {
                 nextAddress = customEntries[^1].Address + 1;
             }
-            customEntries.Add(new CustomEntry 
-            { 
-                Address = nextAddress, 
-                Area = "HoldingRegister", 
-                Type = "uint", 
-                Value = "0", 
-                Continuous = false, 
-                PeriodMs = 1000, 
-                Monitor = false, 
-                ReadPeriodMs = 1000 
+            customEntries.Add(new CustomEntry
+            {
+                Address = nextAddress,
+                Area = "HoldingRegister",
+                Type = "uint",
+                Value = "0",
+                WriteValue = "0",
+                Continuous = false,
+                PeriodMs = 1000,
+                Monitor = false,
+                ReadPeriodMs = 1000
             });
         }
 
@@ -104,45 +105,45 @@ namespace ModbusForge.ViewModels.Coordinators
             switch (type)
             {
                 case "real":
-                    if (float.TryParse(entry.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out float f) ||
-                        float.TryParse(entry.Value, NumberStyles.Float, CultureInfo.CurrentCulture, out f))
+                    if (float.TryParse(entry.WriteValue, NumberStyles.Float, CultureInfo.InvariantCulture, out float f) ||
+                        float.TryParse(entry.WriteValue, NumberStyles.Float, CultureInfo.CurrentCulture, out f))
                     {
                         await _registerCoordinator.WriteFloatAtAsync(unitId, entry.Address, f, isServerMode);
                         return new CustomEntryOperationResult { Success = true, Message = $"Wrote REAL {f} at {entry.Address}" };
                     }
-                    return new CustomEntryOperationResult { Success = false, Message = $"Invalid float: {entry.Value}" };
+                    return new CustomEntryOperationResult { Success = false, Message = $"Invalid float: {entry.WriteValue}" };
 
                 case "string":
-                    await _registerCoordinator.WriteStringAtAsync(unitId, entry.Address, entry.Value ?? string.Empty, isServerMode);
-                    return new CustomEntryOperationResult { Success = true, Message = $"Wrote STRING '{entry.Value}' at {entry.Address}" };
+                    await _registerCoordinator.WriteStringAtAsync(unitId, entry.Address, entry.WriteValue ?? string.Empty, isServerMode);
+                    return new CustomEntryOperationResult { Success = true, Message = $"Wrote STRING '{entry.WriteValue}' at {entry.Address}" };
 
                 case "int":
-                    if (int.TryParse(entry.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int iv))
+                    if (int.TryParse(entry.WriteValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out int iv))
                     {
                         await _registerCoordinator.WriteRegisterAtAsync(unitId, entry.Address, unchecked((ushort)iv), isServerMode);
                         return new CustomEntryOperationResult { Success = true, Message = $"Wrote INT {iv} at {entry.Address}" };
                     }
-                    return new CustomEntryOperationResult { Success = false, Message = $"Invalid int: {entry.Value}" };
+                    return new CustomEntryOperationResult { Success = false, Message = $"Invalid int: {entry.WriteValue}" };
 
                 default: // uint
-                    if (uint.TryParse(entry.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out uint uv))
+                    if (uint.TryParse(entry.WriteValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out uint uv))
                     {
                         if (uv > 0xFFFF) uv = 0xFFFF;
                         await _registerCoordinator.WriteRegisterAtAsync(unitId, entry.Address, (ushort)uv, isServerMode);
                         return new CustomEntryOperationResult { Success = true, Message = $"Wrote UINT {uv} at {entry.Address}" };
                     }
-                    return new CustomEntryOperationResult { Success = false, Message = $"Invalid uint: {entry.Value}" };
+                    return new CustomEntryOperationResult { Success = false, Message = $"Invalid uint: {entry.WriteValue}" };
             }
         }
 
         private async Task<CustomEntryOperationResult> WriteCoilAsync(CustomEntry entry, byte unitId, bool isServerMode)
         {
-            if (TryParseBool(entry.Value, out bool b))
+            if (TryParseBool(entry.WriteValue, out bool b))
             {
                 await _registerCoordinator.WriteCoilAtAsync(unitId, entry.Address, b, isServerMode);
                 return new CustomEntryOperationResult { Success = true, Message = $"Wrote COIL {(b ? 1 : 0)} at {entry.Address}" };
             }
-            return new CustomEntryOperationResult { Success = false, Message = $"Invalid coil value: {entry.Value}. Use true/false or 1/0." };
+            return new CustomEntryOperationResult { Success = false, Message = $"Invalid coil value: {entry.WriteValue}. Use true/false or 1/0." };
         }
 
         /// <summary>

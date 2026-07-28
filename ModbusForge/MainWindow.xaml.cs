@@ -562,13 +562,15 @@ namespace ModbusForge
                 }
             }
 
+            var initialValue = string.IsNullOrEmpty(entry.ValueText) ? entry.Value.ToString() : entry.ValueText;
             var newEntry = new CustomEntry
             {
                 Name = $"{area[0]}R {entry.Address}",
                 Address = entry.Address,
                 Area = area,
                 Type = entry.Type ?? "uint",
-                Value = string.IsNullOrEmpty(entry.ValueText) ? entry.Value.ToString() : entry.ValueText,
+                Value = initialValue,
+                WriteValue = initialValue,
                 Continuous = false,
                 PeriodMs = 1000,
                 Monitor = false,
@@ -598,6 +600,7 @@ namespace ModbusForge
                 Area = area,
                 Type = "uint",
                 Value = entry.State ? "1" : "0",
+                WriteValue = entry.State ? "1" : "0",
                 Continuous = false,
                 PeriodMs = 1000,
                 Monitor = false,
@@ -623,13 +626,15 @@ namespace ModbusForge
 
             if (trendEntry == null)
             {
+                var trendInitialValue = string.IsNullOrEmpty(entry.ValueText) ? entry.Value.ToString() : entry.ValueText;
                 trendEntry = new CustomEntry
                 {
                     Name = $"{area[0]}R {entry.Address}",
                     Address = entry.Address,
                     Area = area,
                     Type = entry.Type ?? "uint",
-                    Value = string.IsNullOrEmpty(entry.ValueText) ? entry.Value.ToString() : entry.ValueText,
+                    Value = trendInitialValue,
+                    WriteValue = trendInitialValue,
                     Continuous = false,
                     PeriodMs = 1000,
                     Monitor = false,
