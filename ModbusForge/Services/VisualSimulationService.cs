@@ -60,9 +60,8 @@ namespace ModbusForge.Services
         private readonly Dictionary<string, bool> _nodeValueCache = new();
         private readonly Dictionary<string, DateTime> _lastNodeUpdate = new();
 
-        // Graph shape cache (rebuilt when the graph changes)
-        private int _lastNodeCount;
-        private int _lastConnectionCount;
+        // Graph shape cache (rebuilt when the graph or its parameters change)
+        private int _lastGraphHash;
 
         public VisualSimulationService(
             ILogger<VisualSimulationService> logger,
@@ -148,8 +147,7 @@ namespace ModbusForge.Services
             }
 
             _lastUpdate = DateTime.UtcNow;
-            _lastNodeCount = -1;
-            _lastConnectionCount = -1;
+            _lastGraphHash = 0;
             _animationTimer.Start();
             _isAnimating = true;
 
@@ -172,8 +170,7 @@ namespace ModbusForge.Services
 
             _nodeValueCache.Clear();
             _lastNodeUpdate.Clear();
-            _lastNodeCount = -1;
-            _lastConnectionCount = -1;
+            _lastGraphHash = 0;
 
             _logger.LogInformation("Visual simulation stopped");
         }
@@ -363,11 +360,9 @@ namespace ModbusForge.Services
         {
             if (_nodes == null || _connections == null) return;
 
-            var nodeCount = _nodes.Count;
-            var connCount = _connections.Count;
+            var currentHash = ComputeGraphHash();
 
-            if (_lastNodeCount == nodeCount &&
-                _lastConnectionCount == connCount)
+            if (_lastGraphHash == currentHash)
             {
                 return;
             }
@@ -377,10 +372,63 @@ namespace ModbusForge.Services
 
             _engine.LoadGraph(simulationNodes, simulationConnections);
 
-            _lastNodeCount = nodeCount;
-            _lastConnectionCount = connCount;
+            _lastGraphHash = currentHash;
 
             _logger.LogDebug("Rebuilt simulation graph: {Count} nodes", _engine.ExecutionOrder.Count);
+        }
+
+        private int ComputeGraphHash()
+        {
+            var hash = new HashCode();
+
+            if (_nodes != null)
+            {
+                foreach (var node in _nodes)
+                {
+                    hash.Add(node.Id);
+                    hash.Add(node.Name);
+                    hash.Add((int)node.ElementType);
+
+                    AddAddressHash(ref hash, node.Input1Address);
+                    AddAddressHash(ref hash, node.Input2Address);
+                    AddAddressHash(ref hash, node.OutputAddress);
+
+                    hash.Add(node.TimerPresetMs);
+                    hash.Add(node.CounterPreset);
+                    hash.Add(node.CompareValue);
+                    hash.Add(node.SetDominant);
+                    hash.Add(node.Waveform);
+                    hash.Add(node.PeriodMs);
+                    hash.Add(node.Amplitude.GetHashCode());
+                    hash.Add(node.Offset.GetHashCode());
+                }
+            }
+
+            if (_connections != null)
+            {
+                foreach (var connection in _connections)
+                {
+                    hash.Add(connection.SourceNodeId);
+                    hash.Add(connection.SourceConnector);
+                    hash.Add(connection.TargetNodeId);
+                    hash.Add(connection.TargetConnector);
+                }
+            }
+
+            return hash.ToHashCode();
+
+            static void AddAddressHash(ref HashCode hash, PlcAddressReference? address)
+            {
+                if (address == null)
+                {
+                    hash.Add(-1);
+                    return;
+                }
+
+                hash.Add(address.Address);
+                hash.Add((int)address.Area);
+                hash.Add(address.Not);
+            }
         }
 
         private SimulationNode MapToSimulationNode(VisualNode visualNode)

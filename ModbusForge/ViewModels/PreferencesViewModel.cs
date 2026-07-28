@@ -22,6 +22,7 @@ namespace ModbusForge.ViewModels
         private bool _enableApiDocumentation;
         private bool _enableApiAuthentication;
         private string _apiKey = string.Empty;
+        private bool _checkForUpdatesOnStartup;
 
         public PreferencesViewModel(ISettingsService settingsService, IDialogService? dialogService = null)
         {
@@ -106,6 +107,12 @@ namespace ModbusForge.ViewModels
             set => SetProperty(ref _apiKey, value);
         }
 
+        public bool CheckForUpdatesOnStartup
+        {
+            get => _checkForUpdatesOnStartup;
+            set => SetProperty(ref _checkForUpdatesOnStartup, value);
+        }
+
         public ICommand SaveCommand { get; }
         public ICommand CancelCommand { get; }
 
@@ -125,6 +132,7 @@ namespace ModbusForge.ViewModels
             _enableApiDocumentation = _settingsService.EnableApiDocumentation;
             _enableApiAuthentication = _settingsService.EnableApiAuthentication;
             _apiKey = _settingsService.ApiKey;
+            _checkForUpdatesOnStartup = _settingsService.CheckForUpdatesOnStartup;
         }
 
         private void Save()
@@ -141,6 +149,7 @@ namespace ModbusForge.ViewModels
             _settingsService.EnableApiDocumentation = EnableApiDocumentation;
             _settingsService.EnableApiAuthentication = EnableApiAuthentication;
             _settingsService.ApiKey = ApiKey?.Trim() ?? string.Empty;
+            _settingsService.CheckForUpdatesOnStartup = CheckForUpdatesOnStartup;
 
             if (_settingsService.Save())
             {

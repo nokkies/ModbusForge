@@ -170,6 +170,7 @@ namespace ModbusForge
             services.AddSingleton<IScriptRunner, ScriptRunner>();
             services.AddSingleton<IScriptRuleService, ScriptRuleService>();
             services.AddSingleton<IVisualSimulationService, VisualSimulationService>();
+            services.AddSingleton<IUpdateService, UpdateService>();
 
             // API server: wire the focused facade (no WPF IServiceProvider passed in).
             // IAppStateAccessor is resolved lazily after MainViewModel is created.

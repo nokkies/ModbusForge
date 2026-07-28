@@ -634,23 +634,8 @@ namespace ModbusForge.ViewModels
                 }
             }
             
-            // Load selected program's nodes/connections
+            // Setting SelectedProgram triggers OnSelectedProgramChanged, which loads the new program's content
             SelectedProgram = program;
-            Nodes.Clear();
-            foreach (var node in program.Nodes)
-            {
-                Nodes.Add(node);
-            }
-            Connections.Clear();
-            foreach (var conn in program.Connections)
-            {
-                Connections.Add(conn);
-            }
-            ConnectorConfigs.Clear();
-            foreach (var config in program.ConnectorConfigs)
-            {
-                ConnectorConfigs.Add(config);
-            }
         }
         
         private List<VisualNode> GetSelection()

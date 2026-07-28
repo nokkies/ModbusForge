@@ -172,7 +172,7 @@ namespace ModbusForge.Views
             {
                 if (DataContext is VisualNodeEditorViewModel vm)
                 {
-                    vm.SelectedProgram = program;
+                    vm.SelectProgramCommand.Execute(program);
                 }
             }
         }

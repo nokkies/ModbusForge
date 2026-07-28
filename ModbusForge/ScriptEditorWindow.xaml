@@ -115,7 +115,8 @@
                             BorderThickness="1" 
                             CornerRadius="4"
                             MinWidth="300">
-                        <DataGrid ItemsSource="{Binding Script.Commands}"
+                        <DataGrid Style="{StaticResource FluentDataGrid}"
+                                  ItemsSource="{Binding Script.Commands}"
                                   SelectedItem="{Binding SelectedCommand, Mode=TwoWay}"
                                   AutoGenerateColumns="False"
                                   CanUserAddRows="False"

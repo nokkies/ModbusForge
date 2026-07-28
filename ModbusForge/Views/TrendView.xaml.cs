@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ModbusForge.Views
 {
@@ -15,7 +16,18 @@ namespace ModbusForge.Views
         public TrendView()
         {
             InitializeComponent();
+            Loaded += TrendView_Loaded;
             Unloaded += TrendView_Unloaded;
+        }
+
+        private void TrendView_Loaded(object sender, RoutedEventArgs e)
+        {
+            // AvalonDock may not create the TrendView at MainWindow construction time,
+            // so ensure the DataContext is a TrendViewModel whenever the view is loaded.
+            if (DataContext is not TrendViewModel)
+            {
+                DataContext = App.ServiceProvider.GetRequiredService<TrendViewModel>();
+            }
         }
 
         private void TrendView_Unloaded(object sender, RoutedEventArgs e)
