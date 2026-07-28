@@ -62,8 +62,7 @@ namespace ModbusForge.Services
         /// </summary>
         Task<bool> ConnectAsync(ConnectionProfile profile, CancellationToken cancellationToken = default)
         {
-            if (profile == null)
-                throw new ArgumentNullException(nameof(profile));
+            ArgumentNullException.ThrowIfNull(profile);
 
             return ConnectAsync(profile.IpAddress, profile.Port, profile.UnitId.ToString(), cancellationToken);
         }

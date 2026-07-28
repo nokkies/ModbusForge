@@ -335,7 +335,6 @@ namespace ModbusForge.Services
                 BaudRate = port > 0 ? port : 9600
             };
 
-            var sw = System.Diagnostics.Stopwatch.StartNew();
             var validation = _validationService?.ValidateSerialSettings(profile);
             if (validation is { IsValid: false })
             {
@@ -343,80 +342,108 @@ namespace ModbusForge.Services
                 return Task.FromResult(result);
             }
 
-            SerialPort? testPort = null;
+            var testPort = TryOpenDiagnosticPort(profile, result);
+            if (testPort == null)
+            {
+                return Task.FromResult(result);
+            }
+
+            try
+            {
+                RunModbusDiagnostic(testPort, unitId, result);
+            }
+            finally
+            {
+                try { testPort.Close(); } catch { }
+                try { testPort.Dispose(); } catch { }
+            }
+
+            return Task.FromResult(result);
+        }
+
+        private SerialPort? TryOpenDiagnosticPort(ConnectionProfile profile, ConnectionDiagnosticResult result)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
             try
             {
                 _logger.LogInformation("Diagnostics: Opening serial port {ComPort} at {BaudRate}", profile.ComPort, profile.BaudRate);
-                testPort = new SerialPort(profile.ComPort, profile.BaudRate, Parity.None, 8, StopBits.One)
+                var port = new SerialPort(profile.ComPort, profile.BaudRate, Parity.None, 8, StopBits.One)
                 {
                     ReadTimeout = 5000,
                     WriteTimeout = 5000
                 };
-                testPort.Open();
+                port.Open();
+
                 result.TcpConnected = true;
                 result.TcpLatencyMs = (int)sw.ElapsedMilliseconds;
                 _logger.LogInformation("Diagnostics: Serial port opened in {Latency}ms", result.TcpLatencyMs);
-
-                // Try a basic Modbus read. RTU may require a valid device on the bus, so failures are expected
-                // without hardware. We still validate that the transport can be created.
-                sw.Restart();
-                try
-                {
-                    var master = Transport == TransportType.Rtu
-                        ? ModbusSerialMaster.CreateRtu(testPort)
-                        : ModbusSerialMaster.CreateAscii(testPort);
-                    master.Transport.ReadTimeout = 1000;
-                    master.Transport.WriteTimeout = 1000;
-
-                    try
-                    {
-                        var registers = master.ReadHoldingRegisters(unitId, 0, 1);
-                        result.ModbusResponding = true;
-                        result.ModbusLatencyMs = (int)sw.ElapsedMilliseconds;
-                        _logger.LogInformation("Diagnostics: Modbus serial responded, read value: {Value}", registers[0]);
-                    }
-                    catch (Modbus.SlaveException slaveEx)
-                    {
-                        result.ModbusResponding = true;
-                        result.ModbusError = $"Device responded with exception code {slaveEx.SlaveExceptionCode}";
-                        _logger.LogInformation("Diagnostics: Modbus serial device responded with exception - {Error}", result.ModbusError);
-                    }
-                    catch (IOException ioEx)
-                    {
-                        result.ModbusResponding = false;
-                        result.ModbusError = $"I/O error: {ioEx.Message}. Ensure the device is connected and powered.";
-                        _logger.LogWarning("Diagnostics: Modbus serial I/O failed - {Error}", result.ModbusError);
-                    }
-                    catch (TimeoutException)
-                    {
-                        result.ModbusResponding = false;
-                        result.ModbusError = "Modbus serial timeout - device did not respond. Check wiring and Unit ID.";
-                        _logger.LogWarning("Diagnostics: Modbus serial timeout");
-                    }
-
-                    master.Dispose();
-                }
-                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-                {
-                    result.ModbusResponding = false;
-                    result.ModbusError = ex.Message;
-                    _logger.LogWarning(ex, "Diagnostics: Modbus serial test failed");
-                }
+                return port;
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 result.TcpConnected = false;
                 result.TcpError = $"Could not open serial port: {ex.Message}";
                 _logger.LogWarning(ex, "Diagnostics: Failed to open serial port {ComPort}", profile.ComPort);
-                return Task.FromResult(result);
+                return null;
             }
-            finally
-            {
-                try { testPort?.Close(); } catch { }
-                try { testPort?.Dispose(); } catch { }
-            }
+        }
 
-            return Task.FromResult(result);
+        private void RunModbusDiagnostic(SerialPort port, byte unitId, ConnectionDiagnosticResult result)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            try
+            {
+                using var master = Transport == TransportType.Rtu
+                    ? ModbusSerialMaster.CreateRtu(port)
+                    : ModbusSerialMaster.CreateAscii(port);
+                master.Transport.ReadTimeout = 1000;
+                master.Transport.WriteTimeout = 1000;
+
+                sw.Restart();
+                EvaluateModbusRead(master.ReadHoldingRegisters(unitId, 0, 1), sw, result);
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                ApplyModbusDiagnosticError(ex, result);
+            }
+        }
+
+        private static void EvaluateModbusRead(ushort[] registers, System.Diagnostics.Stopwatch sw, ConnectionDiagnosticResult result)
+        {
+            result.ModbusResponding = true;
+            result.ModbusLatencyMs = (int)sw.ElapsedMilliseconds;
+        }
+
+        private void ApplyModbusDiagnosticError(Exception ex, ConnectionDiagnosticResult result)
+        {
+            switch (ex)
+            {
+                case Modbus.SlaveException slaveEx:
+                    result.ModbusResponding = true;
+                    result.ModbusError = $"Device responded with exception code {slaveEx.SlaveExceptionCode}";
+                    _logger.LogInformation("Diagnostics: Modbus serial device responded with exception - {Error}", result.ModbusError);
+                    break;
+
+                case IOException ioEx:
+                    result.ModbusResponding = false;
+                    result.ModbusError = $"I/O error: {ioEx.Message}. Ensure the device is connected and powered.";
+                    _logger.LogWarning("Diagnostics: Modbus serial I/O failed - {Error}", result.ModbusError);
+                    break;
+
+                case TimeoutException:
+                    result.ModbusResponding = false;
+                    result.ModbusError = "Modbus serial timeout - device did not respond. Check wiring and Unit ID.";
+                    _logger.LogWarning("Diagnostics: Modbus serial timeout");
+                    break;
+
+                default:
+                    result.ModbusResponding = false;
+                    result.ModbusError = ex.Message;
+                    _logger.LogWarning(ex, "Diagnostics: Modbus serial test failed");
+                    break;
+            }
         }
 
         public void Dispose()
