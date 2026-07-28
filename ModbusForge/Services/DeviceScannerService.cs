@@ -33,6 +33,17 @@ namespace ModbusForge.Services
         {
             ArgumentNullException.ThrowIfNull(options);
 
+            return ValidateAddressRange(options, out var addressCount)
+                ?? ValidatePortRange(options, addressCount)
+                ?? ValidateUnitIds(options)
+                ?? ValidateProbe(options)
+                ?? ValidateRegisterRange(options);
+        }
+
+        private static string? ValidateAddressRange(DeviceScanOptions options, out long addressCount)
+        {
+            addressCount = 0;
+
             if (!IpRangeHelper.TryParseIPv4(options.StartIpAddress, out var start))
             {
                 return $"'{options.StartIpAddress}' is not a valid IPv4 address.";
@@ -48,11 +59,14 @@ namespace ModbusForge.Services
                 return "The end IP address must not be lower than the start IP address.";
             }
 
-            if (end - start + 1 > IpRangeHelper.MaxAddresses)
-            {
-                return $"The IP range covers {end - start + 1} addresses; at most {IpRangeHelper.MaxAddresses} are allowed.";
-            }
+            addressCount = end - start + 1L;
+            return addressCount > IpRangeHelper.MaxAddresses
+                ? $"The IP range covers {addressCount} addresses; at most {IpRangeHelper.MaxAddresses} are allowed."
+                : null;
+        }
 
+        private static string? ValidatePortRange(DeviceScanOptions options, long addressCount)
+        {
             if (options.StartPort is < 1 or > 65535 || options.EndPort is < 1 or > 65535)
             {
                 return "Ports must be between 1 and 65535.";
@@ -69,50 +83,55 @@ namespace ModbusForge.Services
                 return $"The port range covers {portCount} ports; at most {MaxPorts} are allowed.";
             }
 
-            if ((end - start + 1) * portCount > MaxTargets)
-            {
-                return $"The scan would probe more than {MaxTargets} endpoints; narrow the IP or port range.";
-            }
+            return addressCount * portCount > MaxTargets
+                ? $"The scan would probe more than {MaxTargets} endpoints; narrow the IP or port range."
+                : null;
+        }
 
+        private static string? ValidateUnitIds(DeviceScanOptions options)
+        {
             if (options.StartUnitId < DeviceScanOptions.MinUnitId || options.EndUnitId > DeviceScanOptions.MaxUnitId)
             {
                 return $"Unit IDs must be between {DeviceScanOptions.MinUnitId} and {DeviceScanOptions.MaxUnitId}.";
             }
 
-            if (options.EndUnitId < options.StartUnitId)
-            {
-                return "The end unit ID must not be lower than the start unit ID.";
-            }
+            return options.EndUnitId < options.StartUnitId
+                ? "The end unit ID must not be lower than the start unit ID."
+                : null;
+        }
 
+        private static string? ValidateProbe(DeviceScanOptions options)
+        {
             if (options.ConnectTimeoutMs < 1 || options.ResponseTimeoutMs < 1)
             {
                 return "Timeouts must be at least 1 ms.";
             }
 
-            if (options.ProbeAddress is < 0 or > ushort.MaxValue)
+            return options.ProbeAddress is < 0 or > ushort.MaxValue
+                ? $"The probe address must be between 0 and {ushort.MaxValue}."
+                : null;
+        }
+
+        private static string? ValidateRegisterRange(DeviceScanOptions options)
+        {
+            if (!options.ScanRegisterRange)
             {
-                return $"The probe address must be between 0 and {ushort.MaxValue}.";
+                return null;
             }
 
-            if (options.ScanRegisterRange)
+            if (options.RegisterScanStartAddress is < 0 or > ushort.MaxValue)
             {
-                if (options.RegisterScanStartAddress is < 0 or > ushort.MaxValue)
-                {
-                    return $"The register scan start address must be between 0 and {ushort.MaxValue}.";
-                }
-
-                if (options.RegisterScanCount is < 1 or > MaxRegisterScanCount)
-                {
-                    return $"The register scan count must be between 1 and {MaxRegisterScanCount}.";
-                }
-
-                if (options.RegisterScanStartAddress + options.RegisterScanCount - 1 > ushort.MaxValue)
-                {
-                    return "The register scan range extends past address 65535.";
-                }
+                return $"The register scan start address must be between 0 and {ushort.MaxValue}.";
             }
 
-            return null;
+            if (options.RegisterScanCount is < 1 or > MaxRegisterScanCount)
+            {
+                return $"The register scan count must be between 1 and {MaxRegisterScanCount}.";
+            }
+
+            return options.RegisterScanStartAddress + options.RegisterScanCount - 1 > ushort.MaxValue
+                ? "The register scan range extends past address 65535."
+                : null;
         }
 
         public async Task<IReadOnlyList<DeviceScanResult>> ScanAsync(
