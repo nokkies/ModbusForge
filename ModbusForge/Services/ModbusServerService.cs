@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Modbus.Data;
 using System.Net.Sockets;
 using ModbusForge.Helpers;
+using ModbusForge.Models;
 
 namespace ModbusForge.Services
 {
@@ -258,6 +259,70 @@ namespace ModbusForge.Services
                 ds.CoilDiscretes[(ushort)coilAddress] = value;
                 _consoleLoggerService?.Log($"Server wrote coil {coilAddress} = {(value ? 1 : 0)} (Unit ID: {unitId})");
             });
+        }
+
+        public virtual async Task<ushort?> MaskWriteRegisterAsync(byte unitId, int registerAddress, ushort andMask, ushort orMask)
+        {
+            if (!_isRunning) throw new InvalidOperationException("Modbus server is not running");
+            return await Task.Run<ushort?>(() =>
+            {
+                var ds = GetDataStore(unitId);
+                if (ds == null || registerAddress < 1 || registerAddress >= ds.HoldingRegisters.Count)
+                    throw new ArgumentOutOfRangeException(nameof(registerAddress));
+
+                ushort current = ds.HoldingRegisters[(ushort)registerAddress];
+                ushort result = (ushort)((current & andMask) | (orMask & ~andMask));
+                ds.HoldingRegisters[(ushort)registerAddress] = result;
+                _consoleLoggerService?.Log($"Server mask wrote holding register {registerAddress} = {result} (Unit ID: {unitId})");
+                return result;
+            }).ConfigureAwait(false);
+        }
+
+        public virtual async Task<ushort[]?> ReadWriteMultipleRegistersAsync(byte unitId, int readStartAddress, int readCount, int writeStartAddress, ushort[] writeValues)
+        {
+            ArgumentNullException.ThrowIfNull(writeValues);
+            if (!_isRunning) throw new InvalidOperationException("Modbus server is not running");
+
+            return await Task.Run(() =>
+            {
+                var ds = GetDataStore(unitId);
+                if (ds == null) throw new InvalidOperationException("Data store not initialized");
+                if (writeStartAddress < 1 || writeStartAddress + writeValues.Length - 1 >= ds.HoldingRegisters.Count)
+                    throw new ArgumentOutOfRangeException(nameof(writeStartAddress));
+                if (readStartAddress < 1 || readCount < 1 || readStartAddress + readCount - 1 >= ds.HoldingRegisters.Count)
+                    throw new ArgumentOutOfRangeException(nameof(readStartAddress));
+
+                // Per the specification the write is performed before the read.
+                for (int i = 0; i < writeValues.Length; i++)
+                    ds.HoldingRegisters[(ushort)(writeStartAddress + i)] = writeValues[i];
+
+                var result = new ushort[readCount];
+                for (int i = 0; i < readCount; i++)
+                    result[i] = ds.HoldingRegisters[(ushort)(readStartAddress + i)];
+
+                _consoleLoggerService?.Log(
+                    $"Server read/write registers: wrote {writeValues.Length} at {writeStartAddress}, read {readCount} at {readStartAddress} (Unit ID: {unitId})");
+                return result;
+            }).ConfigureAwait(false);
+        }
+
+        public virtual Task<DeviceIdentification?> ReadDeviceIdentificationAsync(byte unitId, byte objectId = DeviceIdObject.VendorName, DeviceIdCategory category = DeviceIdCategory.Basic)
+        {
+            if (!_isRunning) throw new InvalidOperationException("Modbus server is not running");
+
+            lock (_stateLock)
+            {
+                var source = _multiServer?.DeviceIdentification;
+                if (source == null) return Task.FromResult<DeviceIdentification?>(null);
+
+                var identification = new DeviceIdentification { ConformityLevel = source.ConformityLevel };
+                var ids = category == DeviceIdCategory.Individual
+                    ? new[] { objectId }.Where(source.Objects.ContainsKey)
+                    : source.ObjectIdsFor(category).Where(id => id >= objectId);
+                foreach (var id in ids)
+                    identification.Objects[id] = source.GetObject(id);
+                return Task.FromResult<DeviceIdentification?>(identification);
+            }
         }
 
         public void Dispose()

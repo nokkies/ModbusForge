@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using ModbusForge.Models;
 
 namespace ModbusForge.Services
 {
@@ -57,5 +58,25 @@ namespace ModbusForge.Services
         Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count);
         Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count);
         Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value);
+
+        // Advanced function codes
+        /// <summary>
+        /// FC22 (0x16) Mask Write Register: result = (current AND andMask) OR (orMask AND NOT andMask).
+        /// Returns the resulting register value, or null when the operation could not be performed.
+        /// </summary>
+        Task<ushort?> MaskWriteRegisterAsync(byte unitId, int registerAddress, ushort andMask, ushort orMask);
+
+        /// <summary>
+        /// FC23 (0x17) Read/Write Multiple Registers: performs the write first, then the read,
+        /// in a single transaction. Returns the registers read, or null on failure.
+        /// </summary>
+        Task<ushort[]?> ReadWriteMultipleRegistersAsync(byte unitId, int readStartAddress, int readCount, int writeStartAddress, ushort[] writeValues);
+
+        /// <summary>
+        /// FC43/MEI 14 (0x2B) Read Device Identification, starting at <paramref name="objectId"/>.
+        /// Returns the device identity objects, or null when the device does not answer /
+        /// does not support the function.
+        /// </summary>
+        Task<DeviceIdentification?> ReadDeviceIdentificationAsync(byte unitId, byte objectId = DeviceIdObject.VendorName, DeviceIdCategory category = DeviceIdCategory.Basic);
     }
 }

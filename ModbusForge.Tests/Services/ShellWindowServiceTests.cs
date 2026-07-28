@@ -16,6 +16,7 @@ namespace ModbusForge.Tests.Services;
 public class ShellWindowServiceTests
 {
     private readonly Mock<ILogger<AboutWindow>> _aboutLogger = new();
+    private readonly Mock<ILogger<AdvancedFunctionsViewModel>> _advancedFunctionsLogger = new();
     private readonly Mock<IDialogService> _dialogService = new();
     private readonly HelpViewModel _helpViewModel;
     private readonly Mock<IScriptRunner> _scriptRunner = new();
@@ -37,6 +38,7 @@ public class ShellWindowServiceTests
     private ShellWindowService CreateService() =>
         new ShellWindowService(
             _aboutLogger.Object,
+            _advancedFunctionsLogger.Object,
             _dialogService.Object,
             _helpViewModel,
             _scriptRunner.Object,
@@ -59,6 +61,7 @@ public class ShellWindowServiceTests
         Assert.Throws<ArgumentNullException>(() =>
             new ShellWindowService(
                 null!,
+                _advancedFunctionsLogger.Object,
                 _dialogService.Object,
                 _helpViewModel,
                 _scriptRunner.Object,
@@ -75,6 +78,7 @@ public class ShellWindowServiceTests
         Assert.Throws<ArgumentNullException>(() =>
             new ShellWindowService(
                 _aboutLogger.Object,
+                _advancedFunctionsLogger.Object,
                 null!,
                 _helpViewModel,
                 _scriptRunner.Object,
@@ -91,6 +95,7 @@ public class ShellWindowServiceTests
         Assert.Throws<ArgumentNullException>(() =>
             new ShellWindowService(
                 _aboutLogger.Object,
+                _advancedFunctionsLogger.Object,
                 _dialogService.Object,
                 null!,
                 _scriptRunner.Object,
@@ -107,6 +112,7 @@ public class ShellWindowServiceTests
         Assert.Throws<ArgumentNullException>(() =>
             new ShellWindowService(
                 _aboutLogger.Object,
+                _advancedFunctionsLogger.Object,
                 _dialogService.Object,
                 _helpViewModel,
                 null!,
@@ -123,6 +129,7 @@ public class ShellWindowServiceTests
         Assert.Throws<ArgumentNullException>(() =>
             new ShellWindowService(
                 _aboutLogger.Object,
+                _advancedFunctionsLogger.Object,
                 _dialogService.Object,
                 _helpViewModel,
                 _scriptRunner.Object,
@@ -139,6 +146,7 @@ public class ShellWindowServiceTests
         Assert.Throws<ArgumentNullException>(() =>
             new ShellWindowService(
                 _aboutLogger.Object,
+                _advancedFunctionsLogger.Object,
                 _dialogService.Object,
                 _helpViewModel,
                 _scriptRunner.Object,
@@ -155,6 +163,7 @@ public class ShellWindowServiceTests
         Assert.Throws<ArgumentNullException>(() =>
             new ShellWindowService(
                 _aboutLogger.Object,
+                _advancedFunctionsLogger.Object,
                 _dialogService.Object,
                 _helpViewModel,
                 _scriptRunner.Object,

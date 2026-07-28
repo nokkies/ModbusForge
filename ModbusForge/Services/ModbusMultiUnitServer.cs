@@ -6,15 +6,17 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text;
 using Modbus.Data;
 using Microsoft.Extensions.Logging;
+using ModbusForge.Models;
 
 namespace ModbusForge.Services
 {
     /// <summary>
     /// Custom raw Modbus TCP dispatcher that supports multiple Unit IDs on the same port.
     /// Each Unit ID gets its own independent DataStore.
-    /// Implements FC01-FC06, FC15, FC16.
+    /// Implements FC01-FC06, FC15, FC16, FC22, FC23 and FC43/MEI 14.
     /// </summary>
     public class ModbusMultiUnitServer : IDisposable
     {
@@ -28,6 +30,17 @@ namespace ModbusForge.Services
 
         private const int DefaultDataStoreSize = 10000;
         private const ushort MbapProtocolId = 0x0000;
+        private const byte MeiTypeDeviceIdentification = 0x0E;
+        private const byte DeviceIdMoreFollows = 0xFF;
+        private const byte DeviceIdNoMoreFollows = 0x00;
+        private const int MaxDeviceIdResponseBytes = 250;
+
+        /// <summary>
+        /// Identity reported by FC43 (Read Device Identification).
+        /// </summary>
+        public DeviceIdentification DeviceIdentification { get; set; } =
+            DeviceIdentification.CreateDefault(
+                typeof(ModbusMultiUnitServer).Assembly.GetName().Version?.ToString(3) ?? "1.0.0");
 
         public ModbusMultiUnitServer(ILogger logger)
             : this(logger, null)
@@ -215,6 +228,9 @@ namespace ModbusForge.Services
                     6 => WriteSingleRegister(pdu, ds),
                     15 => WriteMultipleCoils(pdu, ds),
                     16 => WriteMultipleRegisters(pdu, ds),
+                    22 => MaskWriteRegister(pdu, ds),
+                    23 => ReadWriteMultipleRegisters(pdu, ds),
+                    0x2B => ReadDeviceIdentification(pdu),
                     _ => ExceptionResponse(fc, 1) // Illegal function
                 };
             }
@@ -317,6 +333,111 @@ namespace ModbusForge.Services
             for (int i = 0; i < count; i++)
                 ds.HoldingRegisters[start + i] = (ushort)((pdu[6 + i * 2] << 8) | pdu[7 + i * 2]);
             return new byte[] { 16, pdu[1], pdu[2], pdu[3], pdu[4] };
+        }
+
+        // FC22: Mask Write Register — result = (current AND andMask) OR (orMask AND NOT andMask)
+        private static byte[] MaskWriteRegister(byte[] pdu, DataStore ds)
+        {
+            if (pdu.Length < 7) return ExceptionResponse(22, 3);
+            int addr = ((pdu[1] << 8) | pdu[2]) + 1; // +1: PDU→DataStore index
+            ushort andMask = (ushort)((pdu[3] << 8) | pdu[4]);
+            ushort orMask = (ushort)((pdu[5] << 8) | pdu[6]);
+            if (addr >= ds.HoldingRegisters.Count) return ExceptionResponse(22, 2);
+
+            ushort current = ds.HoldingRegisters[addr];
+            ds.HoldingRegisters[addr] = (ushort)((current & andMask) | (orMask & ~andMask));
+            return pdu[..7]; // Echo request
+        }
+
+        // FC23: Read/Write Multiple Registers — the write is performed before the read
+        private static byte[] ReadWriteMultipleRegisters(byte[] pdu, DataStore ds)
+        {
+            if (pdu.Length < 10) return ExceptionResponse(23, 3);
+            int readStart = ((pdu[1] << 8) | pdu[2]) + 1; // +1: PDU→DataStore index
+            int readCount = (pdu[3] << 8) | pdu[4];
+            int writeStart = ((pdu[5] << 8) | pdu[6]) + 1;
+            int writeCount = (pdu[7] << 8) | pdu[8];
+            int writeByteCount = pdu[9];
+
+            if (readCount < 1 || readCount > 125 || writeCount < 1 || writeCount > 121
+                || writeByteCount != writeCount * 2 || pdu.Length < 10 + writeByteCount)
+                return ExceptionResponse(23, 3);
+            if (readStart + readCount > ds.HoldingRegisters.Count || writeStart + writeCount > ds.HoldingRegisters.Count)
+                return ExceptionResponse(23, 2);
+
+            for (int i = 0; i < writeCount; i++)
+                ds.HoldingRegisters[writeStart + i] = (ushort)((pdu[10 + i * 2] << 8) | pdu[11 + i * 2]);
+
+            var resp = new byte[2 + readCount * 2];
+            resp[0] = 23;
+            resp[1] = (byte)(readCount * 2);
+            for (int i = 0; i < readCount; i++)
+            {
+                ushort val = ds.HoldingRegisters[readStart + i];
+                resp[2 + i * 2] = (byte)(val >> 8);
+                resp[3 + i * 2] = (byte)(val & 0xFF);
+            }
+            return resp;
+        }
+
+        // FC43/MEI 14: Read Device Identification
+        private byte[] ReadDeviceIdentification(byte[] pdu)
+        {
+            if (pdu.Length < 4) return ExceptionResponse(0x2B, 3);
+            if (pdu[1] != MeiTypeDeviceIdentification) return ExceptionResponse(0x2B, 1);
+
+            byte readDeviceIdCode = pdu[2];
+            byte startObjectId = pdu[3];
+            if (readDeviceIdCode < 1 || readDeviceIdCode > 4) return ExceptionResponse(0x2B, 3);
+
+            var identification = DeviceIdentification;
+            var category = (DeviceIdCategory)readDeviceIdCode;
+            var objectIds = new List<byte>(identification.ObjectIdsFor(category));
+
+            if (category == DeviceIdCategory.Individual)
+            {
+                if (!identification.Objects.ContainsKey(startObjectId))
+                    return ExceptionResponse(0x2B, 2);
+                objectIds = new List<byte> { startObjectId };
+            }
+            else
+            {
+                objectIds.RemoveAll(id => id < startObjectId);
+                if (objectIds.Count == 0) return ExceptionResponse(0x2B, 2);
+            }
+
+            var body = new List<byte>();
+            byte moreFollows = DeviceIdNoMoreFollows;
+            byte nextObjectId = 0;
+            byte objectCount = 0;
+
+            foreach (var id in objectIds)
+            {
+                var value = Encoding.ASCII.GetBytes(identification.GetObject(id));
+                if (body.Count + value.Length + 2 > MaxDeviceIdResponseBytes)
+                {
+                    moreFollows = DeviceIdMoreFollows;
+                    nextObjectId = id;
+                    break;
+                }
+                body.Add(id);
+                body.Add((byte)value.Length);
+                body.AddRange(value);
+                objectCount++;
+            }
+
+            var resp = new List<byte>
+            {
+                0x2B,
+                MeiTypeDeviceIdentification,
+                readDeviceIdCode,
+                identification.ConformityLevel,
+                moreFollows,
+                nextObjectId,
+                objectCount
+            };
+            resp.AddRange(body);
+            return resp.ToArray();
         }
 
         private static byte[] ExceptionResponse(byte fc, byte exceptionCode)
