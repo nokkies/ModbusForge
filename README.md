@@ -80,8 +80,11 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ### v6.0.0 - Current Release
 
-- **Auto-update**: Check for Updates in the Help menu, plus an optional startup update check
-- **Bug fixes**: Script Editor selection, Visual Node Editor ADD constant input, Trends tab rendering, and POU switching preserving wiring
+- **Auto-update**: New **Help → Check for Updates…** menu item and optional **Check for updates on startup** preference. ModbusForge compares the running version against the latest GitHub release and opens the release page when a newer version is available.
+- **Script Editor**: Selection theming now uses the fluent DataGrid style so selected rows remain readable.
+- **Visual Node Editor (ADD block)**: Constant input (`CompareValue`) is now used when `Input2` is not connected.
+- **Trends tab**: Trend view correctly resolves its view model when loaded, so custom tags with trending enabled render again.
+- **Visual Node Editor (POU switching)**: Switching between programs (POUs) now saves the current nodes and wiring before loading another program, so wiring is no longer lost.
 
 ### v5.9.0
 
@@ -286,7 +289,18 @@ Access via **Options → Preferences**
 - Show diagnostics on connection error
 - Console logging settings
 - Confirm before exit
+- Check for updates on startup
 - Settings saved to `%AppData%\ModbusForge\settings.json`
+
+### Check for Updates
+
+Access via **Help → Check for Updates…**
+
+ModbusForge can check the latest GitHub release against the running version.
+- **Manual check**: open the menu item at any time.
+- **Automatic check**: enable `Check for updates on startup` in Preferences.
+- When a newer version is found, the app offers to open the release page in your default browser so you can download the installer.
+- If the app is already on the latest release or the check cannot reach GitHub, a brief message is shown.
 
 ### Custom Data Tab
 
