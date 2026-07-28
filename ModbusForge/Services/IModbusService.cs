@@ -18,18 +18,31 @@ namespace ModbusForge.Services
         public int ModbusLatencyMs { get; set; }
         public string RemoteEndpoint { get; set; } = string.Empty;
         public string LocalEndpoint { get; set; } = string.Empty;
-        
+        public bool IsSerialConnection { get; set; }
+
         public bool IsFullyConnected => TcpConnected && ModbusResponding;
-        
+
         public string Summary
         {
             get
             {
                 if (IsFullyConnected)
+                {
+                    if (IsSerialConnection)
+                        return $"✓ Serial connected - Modbus: {ModbusLatencyMs}ms";
                     return $"✓ Connected - TCP: {TcpLatencyMs}ms, Modbus: {ModbusLatencyMs}ms";
+                }
+
                 if (!TcpConnected)
+                {
+                    if (IsSerialConnection)
+                        return $"✗ Serial Failed: {TcpError}";
                     return $"✗ TCP Failed: {TcpError}";
-                return $"✓ TCP OK ({TcpLatencyMs}ms) | ✗ Modbus Failed: {ModbusError}";
+                }
+
+                return IsSerialConnection
+                    ? $"✓ Serial OK ({RemoteEndpoint}) | ✗ Modbus Failed: {ModbusError}"
+                    : $"✓ TCP OK ({TcpLatencyMs}ms) | ✗ Modbus Failed: {ModbusError}";
             }
         }
     }
@@ -38,16 +51,27 @@ namespace ModbusForge.Services
     {
         bool IsConnected { get; }
         string BoundEndpoint { get; }
-        
+
         // For client compatibility, but not used in server mode
         Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1", CancellationToken cancellationToken = default);
         Task DisconnectAsync();
-        
+
+        /// <summary>
+        /// Connects using a full connection profile. TCP/serial implementations may override this;
+        /// the default delegates to the IP/port overload for backward compatibility.
+        /// </summary>
+        Task<bool> ConnectAsync(ConnectionProfile profile, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(profile);
+
+            return ConnectAsync(profile.IpAddress, profile.Port, profile.UnitId.ToString(), cancellationToken);
+        }
+
         /// <summary>
         /// Run connection diagnostics to identify where connection fails
         /// </summary>
         Task<ConnectionDiagnosticResult> RunDiagnosticsAsync(string ipAddress, int port, byte unitId);
-        
+
         // Modbus operations
         Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count);
         Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count);

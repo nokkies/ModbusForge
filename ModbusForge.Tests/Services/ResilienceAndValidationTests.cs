@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO.Ports;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ModbusForge.Configuration;
+using ModbusForge.Models;
 using ModbusForge.Services;
 using Moq;
 using Xunit;
@@ -262,6 +264,95 @@ namespace ModbusForge.Tests.Services
             Assert.Contains("Mode must be 'Client' or 'Server'", invalidResult.ErrorMessage);
             Assert.Contains("DefaultPort must be between 1 and 65535", invalidResult.ErrorMessage);
             Assert.Contains("DefaultUnitId must be between 1 and 247", invalidResult.ErrorMessage);
+        }
+
+        [Fact]
+        public void ValidationService_ValidateSerialPort_Formats()
+        {
+            var logger = new Mock<ILogger<ValidationService>>().Object;
+            var service = new ValidationService(logger);
+
+            Assert.True(service.ValidateSerialPort("COM1").IsValid);
+            Assert.True(service.ValidateSerialPort("COM10").IsValid);
+
+            Assert.False(service.ValidateSerialPort("").IsValid);
+            Assert.False(service.ValidateSerialPort("PORT1").IsValid);
+            Assert.False(service.ValidateSerialPort("COM").IsValid);
+        }
+
+        [Fact]
+        public void ValidationService_ValidateBaudRate_Boundaries()
+        {
+            var logger = new Mock<ILogger<ValidationService>>().Object;
+            var service = new ValidationService(logger);
+
+            Assert.True(service.ValidateBaudRate(9600).IsValid);
+            Assert.True(service.ValidateBaudRate(115200).IsValid);
+            Assert.True(service.ValidateBaudRate(1).IsValid); // any positive rate accepted
+
+            Assert.False(service.ValidateBaudRate(0).IsValid);
+            Assert.False(service.ValidateBaudRate(-1).IsValid);
+        }
+
+        [Fact]
+        public void ValidationService_ValidateDataBits_Boundaries()
+        {
+            var logger = new Mock<ILogger<ValidationService>>().Object;
+            var service = new ValidationService(logger);
+
+            Assert.True(service.ValidateDataBits(5).IsValid);
+            Assert.True(service.ValidateDataBits(8).IsValid);
+
+            Assert.False(service.ValidateDataBits(4).IsValid);
+            Assert.False(service.ValidateDataBits(9).IsValid);
+        }
+
+        [Fact]
+        public void ValidationService_ValidateStopBits_Values()
+        {
+            var logger = new Mock<ILogger<ValidationService>>().Object;
+            var service = new ValidationService(logger);
+
+            Assert.True(service.ValidateStopBits(StopBits.One).IsValid);
+            Assert.True(service.ValidateStopBits(StopBits.Two).IsValid);
+            Assert.True(service.ValidateStopBits(StopBits.OnePointFive).IsValid);
+
+            Assert.False(service.ValidateStopBits(StopBits.None).IsValid);
+        }
+
+        [Fact]
+        public void ValidationService_ValidateSerialSettings_Profiles()
+        {
+            var logger = new Mock<ILogger<ValidationService>>().Object;
+            var service = new ValidationService(logger);
+
+            var validSerial = new ConnectionProfile("Serial", "127.0.0.1", 502, 1)
+            {
+                Transport = TransportType.Rtu,
+                ComPort = "COM1",
+                BaudRate = 9600,
+                DataBits = 8,
+                Parity = Parity.None,
+                StopBits = StopBits.One
+            };
+            Assert.True(service.ValidateSerialSettings(validSerial).IsValid);
+
+            var invalidSerial = new ConnectionProfile("Serial", "127.0.0.1", 502, 1)
+            {
+                Transport = TransportType.Ascii,
+                ComPort = "COM1",
+                BaudRate = 0,
+                DataBits = 8,
+                Parity = Parity.None,
+                StopBits = StopBits.One
+            };
+            Assert.False(service.ValidateSerialSettings(invalidSerial).IsValid);
+
+            var tcp = new ConnectionProfile("Tcp", "127.0.0.1", 502, 1)
+            {
+                Transport = TransportType.Tcp
+            };
+            Assert.False(service.ValidateSerialSettings(tcp).IsValid);
         }
     }
 }

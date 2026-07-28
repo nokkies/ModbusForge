@@ -1,4 +1,5 @@
 using System;
+using System.IO.Ports;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ModbusForge.Models;
@@ -29,7 +30,33 @@ public partial class ConnectionProfile : ObservableObject
     [ObservableProperty]
     private bool _isActive;
 
-    public string DisplayName => $"{Name} ({IpAddress}:{Port})";
+    [ObservableProperty]
+    private TransportType _transport = TransportType.Tcp;
+
+    // Serial settings
+    [ObservableProperty]
+    private string _comPort = "COM1";
+
+    [ObservableProperty]
+    private int _baudRate = 9600;
+
+    [ObservableProperty]
+    private Parity _parity = Parity.None;
+
+    [ObservableProperty]
+    private int _dataBits = 8;
+
+    [ObservableProperty]
+    private StopBits _stopBits = StopBits.One;
+
+    [ObservableProperty]
+    private bool _rtsEnable;
+
+    public string DisplayName => Transport switch
+    {
+        TransportType.Tcp => $"{Name} ({IpAddress}:{Port})",
+        _ => $"{Name} ({ComPort} {BaudRate} {Transport})"
+    };
 
     public ConnectionProfile() { }
 
@@ -49,7 +76,14 @@ public partial class ConnectionProfile : ObservableObject
             Name = Name + " (Copy)",
             IpAddress = IpAddress,
             Port = Port,
-            UnitId = UnitId
+            UnitId = UnitId,
+            Transport = Transport,
+            ComPort = ComPort,
+            BaudRate = BaudRate,
+            Parity = Parity,
+            DataBits = DataBits,
+            StopBits = StopBits,
+            RtsEnable = RtsEnable
         };
     }
 }

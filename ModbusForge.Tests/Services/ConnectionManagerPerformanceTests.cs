@@ -35,7 +35,7 @@ public class ConnectionManagerPerformanceTests
 
         // Use reflection to get the private _services dictionary
         var servicesField = typeof(ConnectionManager).GetField("_services", BindingFlags.NonPublic | BindingFlags.Instance);
-        var services = (ConcurrentDictionary<string, ModbusTcpService>)servicesField!.GetValue(manager)!;
+        var services = (ConcurrentDictionary<string, IModbusService>)servicesField!.GetValue(manager)!;
 
         for (int i = 0; i < connectionCount; i++)
         {
@@ -45,9 +45,9 @@ public class ConnectionManagerPerformanceTests
             };
             manager.Profiles.Add(profile);
 
-            var serviceMock = new Mock<ModbusTcpService>(new Mock<ILogger<ModbusTcpService>>().Object);
+            var serviceMock = new Mock<IModbusService>();
             serviceMock.Setup(s => s.DisconnectAsync())
-                .Returns(async () => await Task.Delay(delayMs));
+                .Returns(() => Task.Delay(delayMs));
 
             services[profile.Id] = serviceMock.Object;
         }

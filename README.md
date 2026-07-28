@@ -6,7 +6,7 @@
 [![GitHub release](https://img.shields.io/github/v/release/nokkies/ModbusForge)](https://github.com/nokkies/ModbusForge/releases)
 [![GitHub issues](https://img.shields.io/github/issues/nokkies/ModbusForge)](https://github.com/nokkies/ModbusForge/issues)
 
-A professional Modbus TCP client/server application built with .NET 8.0 and WPF. ModbusForge provides comprehensive tools for testing, monitoring, and automating Modbus communications.
+A professional Modbus TCP/RTU/ASCII client/server application built with .NET 8.0 and WPF. ModbusForge provides comprehensive tools for testing, monitoring, and automating Modbus communications.
 
 ![ModbusForge](ModbusForge/Resources/ModbusForgeLOGO.png)
 
@@ -56,7 +56,8 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 1. Enter the IP address of your Modbus TCP server
 2. Enter the port (default: 502)
 3. Enter the Unit ID (slave ID)
-4. Click **Connect**
+4. For **RTU/ASCII** connections, click the gear icon and set the COM port, baud rate, data/stop bits, parity, and RTS (RS-485)
+5. Click **Connect**
 
 ### 4. Read Data
 
@@ -77,7 +78,11 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
-### v5.8.7 - Current Release
+### v5.9.0 - Current Release
+
+- **Serial Modbus (RTU + ASCII)**: Added COM-port selection, baud/parity/data/stop bits, and RS-485 RTS toggle through the Connection Manager
+
+### v5.8.7
 
 - Updated README screenshots to reflect the current ModbusForge UI
 
@@ -112,9 +117,10 @@ See [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md) for the full development roadmap.
 
 ### Core Functionality
 - 🔌 **Client & Server Modes**: Switch between Modbus TCP client and server
+- 🔗 **Multiple Transports**: Connect over **TCP**, **RTU**, or **ASCII** serial
 - 📝 **Full Register Support**: Read/write holding registers, input registers, coils, and discrete inputs
 - 📊 **Real-time Monitoring**: Continuous polling with configurable intervals
-- 🔍 **Connection Diagnostics**: Test TCP and Modbus connectivity with latency measurements
+- 🔍 **Connection Diagnostics**: Test TCP/serial and Modbus connectivity with latency measurements
 - 🧩 **Advanced Function Codes**: FC22 Mask Write Register, FC23 Read/Write Multiple Registers, FC43 Read Device Identification (client and server)
 
 ### Device Discovery
@@ -198,10 +204,27 @@ To install the application, follow these steps:
 Access via **Options → Connection Manager**
 
 - Create, edit, and delete connection profiles
-- Each profile stores: Name, IP Address, Port, Unit ID
+- Choose transport: **TCP**, **RTU**, or **ASCII**
+- TCP profiles store: Name, IP Address, Port, Unit ID
+- Serial profiles store: Name, COM Port, Baud Rate, Data Bits, Parity, Stop Bits, RTS, Unit ID
 - Connect/disconnect individual profiles
 - Set active connection for main window operations
 - Profiles saved to `%AppData%\ModbusForge\connection-profiles.json`
+
+### Serial Configuration
+
+When creating an **RTU** or **ASCII** connection:
+
+1. Select **RTU** or **ASCII** from the **Transport** dropdown
+2. Enter the **COM Port** your device is attached to (e.g. `COM3`)
+3. Set the **Baud Rate** (commonly `9600` or `115200`)
+4. Set the **Data Bits** (`7` or `8`)
+5. Set the **Parity** (`None`, `Even`, `Odd`, `Mark`, or `Space`)
+6. Set the **Stop Bits** (`One`, `OnePointFive`, or `Two`)
+7. Enable **RTS** if your RS-485 adapter requires Request-to-Send toggle
+8. Enter the **Unit ID** and click **Connect**
+
+Serial profiles use the same read/write register and coil operations as TCP profiles, with 1-based addresses converted to the 0-based Modbus protocol addresses automatically.
 
 ### Device Scanner
 

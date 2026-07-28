@@ -4,6 +4,7 @@
     <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
     <converters:BooleanToConnectedConverter x:Key="BooleanToConnectedConverter"/>
     <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    <converters:TransportTypeToVisibilityConverter x:Key="TransportTypeToVisibilityConverter"/>
     <converters:LockToZoomModeConverter x:Key="LockToZoomModeConverter"/>
     <converters:ConnectorTagConverter x:Key="ConnectorTagConverter"/>
     <converters:MarkdownToFlowDocumentConverter x:Key="MarkdownToFlowDocumentConverter"/>
