@@ -58,6 +58,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="120"/>
@@ -125,17 +126,22 @@
                                       IsChecked="{Binding ReadDeviceIdentification, Mode=TwoWay}"/>
 
                             <CheckBox Grid.Row="13" Grid.ColumnSpan="2" Margin="0,8,0,0"
+                                      Content="Detect function codes (FC01-FC04)"
+                                      ToolTip="Reads one item from each register space to see which read functions a unit implements"
+                                      IsChecked="{Binding DetectFunctionCodes, Mode=TwoWay}"/>
+
+                            <CheckBox Grid.Row="14" Grid.ColumnSpan="2" Margin="0,8,0,0"
                                       Content="Scan register range on found devices"
                                       IsChecked="{Binding ScanRegisterRange, Mode=TwoWay}"/>
 
-                            <TextBlock Grid.Row="14" Text="Range start:" VerticalAlignment="Center" Margin="0,8,0,0" Foreground="{StaticResource FluentText}"/>
-                            <TextBox Grid.Row="14" Grid.Column="1" Padding="8,4" Margin="0,8,0,0"
+                            <TextBlock Grid.Row="15" Text="Range start:" VerticalAlignment="Center" Margin="0,8,0,0" Foreground="{StaticResource FluentText}"/>
+                            <TextBox Grid.Row="15" Grid.Column="1" Padding="8,4" Margin="0,8,0,0"
                                      IsEnabled="{Binding ScanRegisterRange}"
                                      Text="{Binding RegisterScanStartAddress, UpdateSourceTrigger=PropertyChanged}"
                                      behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
 
-                            <TextBlock Grid.Row="15" Text="Range count:" VerticalAlignment="Center" Margin="0,8,0,0" Foreground="{StaticResource FluentText}"/>
-                            <TextBox Grid.Row="15" Grid.Column="1" Padding="8,4" Margin="0,8,0,0"
+                            <TextBlock Grid.Row="16" Text="Range count:" VerticalAlignment="Center" Margin="0,8,0,0" Foreground="{StaticResource FluentText}"/>
+                            <TextBox Grid.Row="16" Grid.Column="1" Padding="8,4" Margin="0,8,0,0"
                                      IsEnabled="{Binding ScanRegisterRange}"
                                      Text="{Binding RegisterScanCount, UpdateSourceTrigger=PropertyChanged}"
                                      behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
@@ -167,6 +173,7 @@
                                 <DataGridTextColumn Header="Unit ID" Binding="{Binding UnitId}" Width="70"/>
                                 <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="160"/>
                                 <DataGridTextColumn Header="Latency (ms)" Binding="{Binding LatencyMs}" Width="90"/>
+                                <DataGridTextColumn Header="Function codes" Binding="{Binding SupportedFunctionCodesText}" Width="150"/>
                                 <DataGridTextColumn Header="Identification" Binding="{Binding Identification}" Width="200"/>
                                 <DataGridTextColumn Header="Details" Binding="{Binding Message}" Width="*"/>
                             </DataGrid.Columns>

@@ -52,6 +52,7 @@ public class DeviceScannerViewModelTests
         viewModel.ScanRegisterRange = true;
         viewModel.RegisterScanStartAddress = 100;
         viewModel.RegisterScanCount = 32;
+        viewModel.DetectFunctionCodes = false;
 
         var options = viewModel.BuildOptions();
 
@@ -65,6 +66,13 @@ public class DeviceScannerViewModelTests
         Assert.True(options.ScanRegisterRange);
         Assert.Equal(100, options.RegisterScanStartAddress);
         Assert.Equal(32, options.RegisterScanCount);
+        Assert.False(options.DetectFunctionCodes);
+    }
+
+    [Fact]
+    public void BuildOptions_DetectsFunctionCodesByDefault()
+    {
+        Assert.True(CreateViewModel().BuildOptions().DetectFunctionCodes);
     }
 
     [Fact]
@@ -146,6 +154,7 @@ public class DeviceScannerViewModelTests
             LatencyMs = 12,
             Message = "ok, responding"
         };
+        device.SupportedFunctionCodes.AddRange(new byte[] { 3, 4 });
         device.Registers.Add(new RegisterScanResult { Address = 0, IsReadable = true, Value = 1234 });
         device.Registers.Add(new RegisterScanResult { Address = 1, IsReadable = false, Error = "illegal address" });
         viewModel.Devices.Add(device);
@@ -153,10 +162,10 @@ public class DeviceScannerViewModelTests
         var csv = viewModel.BuildCsv();
         var lines = csv.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
 
-        Assert.Equal("IpAddress,Port,UnitId,Status,LatencyMs,Message,RegisterAddress,RegisterValue", lines[0]);
-        Assert.Equal("10.1.1.5,502,7,Responded,12,\"ok, responding\",,", lines[1]);
-        Assert.Equal("10.1.1.5,502,7,RegisterRead,,,0,1234", lines[2]);
-        Assert.Equal("10.1.1.5,502,7,RegisterUnreadable,,illegal address,1,", lines[3]);
+        Assert.Equal("IpAddress,Port,UnitId,Status,LatencyMs,FunctionCodes,Message,RegisterAddress,RegisterValue", lines[0]);
+        Assert.Equal("10.1.1.5,502,7,Responded,12,\"FC03, FC04\",\"ok, responding\",,", lines[1]);
+        Assert.Equal("10.1.1.5,502,7,RegisterRead,,,,0,1234", lines[2]);
+        Assert.Equal("10.1.1.5,502,7,RegisterUnreadable,,,illegal address,1,", lines[3]);
     }
 
     [Fact]

@@ -167,11 +167,15 @@ Open it from **Options > Device Scanner...**.
 - **Parallel hosts**: how many endpoints are probed at the same time.
 - **Read device identification (FC43)**: asks each discovered unit for vendor name,
   product code and revision.
+- **Detect function codes (FC01-FC04)**: reads one item from each register space to work
+  out which read functions the unit implements. A unit that replies *illegal data address*
+  still implements the function; only *illegal function* excludes it.
 - **Scan register range**: additionally reads a block of addresses from each discovered
   unit and lists which are readable.
 
 ## Working with results
 
+- The **Function codes** column lists the detected read functions, for example `FC03, FC04`.
 - **Add to Profiles** saves the selected device as a connection profile so it appears in
   the Connection Manager.
 - **Export CSV** writes one row per device plus one row per scanned register.

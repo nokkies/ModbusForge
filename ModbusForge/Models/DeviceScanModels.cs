@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ModbusForge.Models
 {
@@ -65,6 +66,31 @@ namespace ModbusForge.Models
 
         /// <summary>When true, FC43 Read Device Identification is issued against each discovered unit.</summary>
         public bool ReadDeviceIdentification { get; set; } = true;
+
+        /// <summary>
+        /// When true, each discovered unit is read once per register space so the scan can
+        /// report which of FC01/FC02/FC03/FC04 the unit implements.
+        /// </summary>
+        public bool DetectFunctionCodes { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Read function codes the scanner can attribute to a register space.
+    /// </summary>
+    public static class ScanFunctionCode
+    {
+        public const byte ReadCoils = 1;
+        public const byte ReadDiscreteInputs = 2;
+        public const byte ReadHoldingRegisters = 3;
+        public const byte ReadInputRegisters = 4;
+
+        public static byte For(ScanRegisterType registerType) => registerType switch
+        {
+            ScanRegisterType.Coils => ReadCoils,
+            ScanRegisterType.DiscreteInputs => ReadDiscreteInputs,
+            ScanRegisterType.InputRegisters => ReadInputRegisters,
+            _ => ReadHoldingRegisters
+        };
     }
 
     /// <summary>
@@ -95,6 +121,13 @@ namespace ModbusForge.Models
         public string ProductCode { get; set; } = string.Empty;
         public string Revision { get; set; } = string.Empty;
         public List<RegisterScanResult> Registers { get; } = new();
+
+        /// <summary>Read function codes the unit implements, as detected by the scan.</summary>
+        public List<byte> SupportedFunctionCodes { get; } = new();
+
+        public string SupportedFunctionCodesText => SupportedFunctionCodes.Count == 0
+            ? string.Empty
+            : string.Join(", ", SupportedFunctionCodes.Order().Select(fc => $"FC{fc:00}"));
 
         /// <summary>Vendor/product/revision as reported by FC43, or an empty string when unavailable.</summary>
         public string Identification

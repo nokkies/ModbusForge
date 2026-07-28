@@ -19,6 +19,15 @@ namespace ModbusForge.Services
     public class ModbusDeviceProbe : IModbusDeviceProbe
     {
         private const int MaxReconnectAttempts = 1;
+        private const byte IllegalFunctionExceptionCode = 0x01;
+
+        private static readonly ScanRegisterType[] AllRegisterTypes =
+        {
+            ScanRegisterType.Coils,
+            ScanRegisterType.DiscreteInputs,
+            ScanRegisterType.HoldingRegisters,
+            ScanRegisterType.InputRegisters
+        };
 
         private readonly IDeviceIdentificationReader _identificationReader;
         private readonly ILogger<ModbusDeviceProbe> _logger;
@@ -73,6 +82,11 @@ namespace ModbusForge.Services
                         continue;
                     }
 
+                    if (options.DetectFunctionCodes)
+                    {
+                        await DetectFunctionCodesAsync(ipAddress, port, result, options, connection, cancellationToken).ConfigureAwait(false);
+                    }
+
                     if (options.ReadDeviceIdentification)
                     {
                         await ReadIdentificationAsync(result, options, cancellationToken).ConfigureAwait(false);
@@ -108,12 +122,62 @@ namespace ModbusForge.Services
             };
 
             var stopwatch = Stopwatch.StartNew();
-            var read = await ReadAsync(ipAddress, port, unitId, options.ProbeAddress, 1, options, connection, cancellationToken).ConfigureAwait(false);
+            var read = await ReadAsync(ipAddress, port, unitId, options.ProbeAddress, 1, options.RegisterType, options, connection, cancellationToken).ConfigureAwait(false);
             result.LatencyMs = (int)stopwatch.ElapsedMilliseconds;
             result.Status = read.Status;
             result.Message = read.Message;
+
+            if (IsFunctionSupported(read))
+            {
+                result.SupportedFunctionCodes.Add(ScanFunctionCode.For(options.RegisterType));
+            }
+
             return result;
         }
+
+        /// <summary>
+        /// Reads one item from every register space the discovery probe did not already
+        /// cover, so the result lists each read function code the unit implements.
+        /// </summary>
+        private async Task DetectFunctionCodesAsync(
+            string ipAddress,
+            int port,
+            DeviceScanResult device,
+            DeviceScanOptions options,
+            ProbeConnection connection,
+            CancellationToken cancellationToken)
+        {
+            foreach (var registerType in AllRegisterTypes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (registerType == options.RegisterType || connection.Master == null)
+                {
+                    continue;
+                }
+
+                var read = await ReadAsync(ipAddress, port, device.UnitId, options.ProbeAddress, 1, registerType, options, connection, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (IsFunctionSupported(read))
+                {
+                    device.SupportedFunctionCodes.Add(ScanFunctionCode.For(registerType));
+                }
+            }
+
+            device.SupportedFunctionCodes.Sort();
+        }
+
+        /// <summary>
+        /// A function is implemented unless the unit rejects it as illegal; an "illegal data
+        /// address" reply still proves the function itself is understood.
+        /// </summary>
+        private static bool IsFunctionSupported(ReadOutcome read) => read.Status switch
+        {
+            DeviceProbeStatus.Responded => true,
+            DeviceProbeStatus.RespondedWithException => read.ExceptionCode != IllegalFunctionExceptionCode,
+            _ => false
+        };
 
         private async Task ReadIdentificationAsync(DeviceScanResult device, DeviceScanOptions options, CancellationToken cancellationToken)
         {
@@ -152,7 +216,7 @@ namespace ModbusForge.Services
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var count = Math.Min(blockSize, remaining);
-                var read = await ReadAsync(ipAddress, port, device.UnitId, address, count, options, connection, cancellationToken).ConfigureAwait(false);
+                var read = await ReadAsync(ipAddress, port, device.UnitId, address, count, options.RegisterType, options, connection, cancellationToken).ConfigureAwait(false);
 
                 for (int offset = 0; offset < count; offset++)
                 {
@@ -181,6 +245,7 @@ namespace ModbusForge.Services
             byte unitId,
             int startAddress,
             int count,
+            ScanRegisterType registerType,
             DeviceScanOptions options,
             ProbeConnection connection,
             CancellationToken cancellationToken)
@@ -195,7 +260,7 @@ namespace ModbusForge.Services
 
                 try
                 {
-                    var values = await Task.Run(() => ReadValues(master, unitId, startAddress, count, options.RegisterType), cancellationToken)
+                    var values = await Task.Run(() => ReadValues(master, unitId, startAddress, count, registerType), cancellationToken)
                         .ConfigureAwait(false);
                     return new ReadOutcome(DeviceProbeStatus.Responded, string.Empty, values);
                 }
@@ -205,7 +270,8 @@ namespace ModbusForge.Services
                     return new ReadOutcome(
                         DeviceProbeStatus.RespondedWithException,
                         $"Modbus exception {slaveException.SlaveExceptionCode}: {slaveException.Message}",
-                        null);
+                        null,
+                        slaveException.SlaveExceptionCode);
                 }
                 catch (TimeoutException)
                 {
@@ -292,7 +358,7 @@ namespace ModbusForge.Services
             }
         }
 
-        private sealed record ReadOutcome(DeviceProbeStatus Status, string Message, ushort[]? Values);
+        private sealed record ReadOutcome(DeviceProbeStatus Status, string Message, ushort[]? Values, byte ExceptionCode = 0);
 
         private sealed class ProbeConnection : IDisposable
         {

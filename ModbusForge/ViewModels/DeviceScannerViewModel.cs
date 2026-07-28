@@ -46,6 +46,7 @@ namespace ModbusForge.ViewModels
         private int _registerScanStartAddress;
         private int _registerScanCount = 16;
         private bool _readDeviceIdentification = true;
+        private bool _detectFunctionCodes = true;
 
         private bool _isScanning;
         private double _progressPercent;
@@ -186,6 +187,12 @@ namespace ModbusForge.ViewModels
             set => SetProperty(ref _readDeviceIdentification, value);
         }
 
+        public bool DetectFunctionCodes
+        {
+            get => _detectFunctionCodes;
+            set => SetProperty(ref _detectFunctionCodes, value);
+        }
+
         public bool IsScanning
         {
             get => _isScanning;
@@ -238,7 +245,8 @@ namespace ModbusForge.ViewModels
             ScanRegisterRange = ScanRegisterRange,
             RegisterScanStartAddress = RegisterScanStartAddress,
             RegisterScanCount = RegisterScanCount,
-            ReadDeviceIdentification = ReadDeviceIdentification
+            ReadDeviceIdentification = ReadDeviceIdentification,
+            DetectFunctionCodes = DetectFunctionCodes
         };
 
         private async Task StartScanAsync()
@@ -364,7 +372,7 @@ namespace ModbusForge.ViewModels
         internal string BuildCsv()
         {
             var builder = new StringBuilder();
-            builder.AppendLine("IpAddress,Port,UnitId,Status,LatencyMs,Message,RegisterAddress,RegisterValue");
+            builder.AppendLine("IpAddress,Port,UnitId,Status,LatencyMs,FunctionCodes,Message,RegisterAddress,RegisterValue");
 
             foreach (var device in Devices)
             {
@@ -374,6 +382,7 @@ namespace ModbusForge.ViewModels
                     device.UnitId.ToString(CultureInfo.InvariantCulture),
                     device.Status.ToString(),
                     device.LatencyMs.ToString(CultureInfo.InvariantCulture),
+                    Escape(device.SupportedFunctionCodesText),
                     Escape(device.Message),
                     string.Empty,
                     string.Empty));
@@ -385,6 +394,7 @@ namespace ModbusForge.ViewModels
                         device.Port.ToString(CultureInfo.InvariantCulture),
                         device.UnitId.ToString(CultureInfo.InvariantCulture),
                         register.IsReadable ? "RegisterRead" : "RegisterUnreadable",
+                        string.Empty,
                         string.Empty,
                         Escape(register.Error),
                         register.Address.ToString(CultureInfo.InvariantCulture),
