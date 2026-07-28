@@ -114,6 +114,7 @@ See [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md) for the full development roadmap.
 - 📝 **Full Register Support**: Read/write holding registers, input registers, coils, and discrete inputs
 - 📊 **Real-time Monitoring**: Continuous polling with configurable intervals
 - 🔍 **Connection Diagnostics**: Test TCP and Modbus connectivity with latency measurements
+- 🧩 **Advanced Function Codes**: FC22 Mask Write Register, FC23 Read/Write Multiple Registers, FC43 Read Device Identification (client and server)
 
 ### Multi-Device Support
 - Connect to multiple Modbus servers simultaneously
@@ -233,6 +234,31 @@ Access via **Options → Preferences**
 - Continuous Write mode per row
 - Live reads when Global Continuous Read is enabled
 - Save/Load configurations to JSON
+
+### Advanced Functions
+
+Open **Options → Advanced Functions...** to use the protocol functions that go beyond the
+standard read/write set. All addresses are 1-based, exactly like the rest of the UI.
+
+| Function | What it does | Inputs |
+|----------|--------------|--------|
+| **FC22 - Mask Write Register** | Atomically sets/clears bits of one holding register: `result = (current AND andMask) OR (orMask AND NOT andMask)` | Address, AND mask, OR mask |
+| **FC23 - Read/Write Multiple Registers** | Writes a block of registers and reads a (possibly different) block in a single transaction; the write happens first | Read address/count, write address, comma-separated values (`0x` prefix for hex) |
+| **FC43 / MEI 14 - Read Device Identification** | Queries the device identity strings (vendor, product code, revision, vendor URL, product name, model, application) | Category: Basic, Regular or Extended |
+
+The result of each call, or the Modbus exception returned by the device, is shown in the
+status bar at the bottom of the dialog; FC43 objects are listed in a grid.
+
+In **server mode** ModbusForge answers all three functions as well. The identity served by
+FC43 defaults to the ModbusForge vendor/product strings and the running application version.
+
+The same operations are available programmatically through `IModbusService`:
+
+```csharp
+ushort? result = await modbusService.MaskWriteRegisterAsync(unitId: 1, registerAddress: 5, andMask: 0x00F2, orMask: 0x0025);
+ushort[]? read  = await modbusService.ReadWriteMultipleRegistersAsync(1, readStartAddress: 1, readCount: 4, writeStartAddress: 10, writeValues: new ushort[] { 1, 2 });
+DeviceIdentification? id = await modbusService.ReadDeviceIdentificationAsync(1, DeviceIdObject.VendorName, DeviceIdCategory.Basic);
+```
 
 ### Trend & Logging
 

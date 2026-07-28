@@ -267,6 +267,11 @@ namespace ModbusForge
             _shellWindowService.ShowScriptEditor(this, _viewModel.EffectiveUnitId);
         }
 
+        private void MenuItem_AdvancedFunctions_Click(object sender, RoutedEventArgs e)
+        {
+            _shellWindowService.ShowAdvancedFunctions(this, _viewModel.EffectiveUnitId);
+        }
+
         private void MenuItem_Preferences_Click(object sender, RoutedEventArgs e)
         {
             _shellWindowService.ShowPreferences(this);

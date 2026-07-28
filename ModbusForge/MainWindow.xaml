@@ -130,6 +130,7 @@
                 <MenuItem Header="_Preferences..." Click="MenuItem_Preferences_Click"/>
                 <MenuItem Header="_Connection Manager..." Click="MenuItem_ConnectionManager_Click"/>
                 <MenuItem Header="_Script Editor..." Click="MenuItem_ScriptEditor_Click" InputGestureText="Ctrl+E" ToolTip="Open the script editor (Ctrl+E)"/>
+                <MenuItem Header="_Advanced Functions..." Click="MenuItem_AdvancedFunctions_Click" ToolTip="FC22 Mask Write, FC23 Read/Write Multiple, FC43 Device Identification"/>
             </MenuItem>
             <MenuItem Header="_View">
                 <MenuItem Header="_Dark Mode" IsCheckable="True" IsChecked="{Binding IsDarkMode, Mode=TwoWay}" ToolTip="Toggle dark mode"/>

@@ -12,6 +12,7 @@ namespace ModbusForge.Services
     public class ShellWindowService : IShellWindowService
     {
         private readonly ILogger<AboutWindow> _aboutLogger;
+        private readonly ILogger<AdvancedFunctionsViewModel> _advancedFunctionsLogger;
         private readonly IDialogService _dialogService;
         private readonly HelpViewModel _helpViewModel;
         private readonly IScriptRunner _scriptRunner;
@@ -23,6 +24,7 @@ namespace ModbusForge.Services
 
         public ShellWindowService(
             ILogger<AboutWindow> aboutLogger,
+            ILogger<AdvancedFunctionsViewModel> advancedFunctionsLogger,
             IDialogService dialogService,
             HelpViewModel helpViewModel,
             IScriptRunner scriptRunner,
@@ -33,6 +35,7 @@ namespace ModbusForge.Services
             IDispatcher dispatcher)
         {
             _aboutLogger = aboutLogger ?? throw new ArgumentNullException(nameof(aboutLogger));
+            _advancedFunctionsLogger = advancedFunctionsLogger ?? throw new ArgumentNullException(nameof(advancedFunctionsLogger));
             _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
             _helpViewModel = helpViewModel ?? throw new ArgumentNullException(nameof(helpViewModel));
             _scriptRunner = scriptRunner ?? throw new ArgumentNullException(nameof(scriptRunner));
@@ -97,6 +100,16 @@ namespace ModbusForge.Services
                 Owner = owner
             };
             preferencesWindow.ShowDialog();
+        }
+
+        public void ShowAdvancedFunctions(Window owner, byte unitId)
+        {
+            var viewModel = new AdvancedFunctionsViewModel(_modbusService, unitId, _advancedFunctionsLogger);
+            var window = new AdvancedFunctionsWindow(viewModel)
+            {
+                Owner = owner
+            };
+            window.ShowDialog();
         }
 
         public void ShowConnectionManager(Window owner)
