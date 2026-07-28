@@ -1,4 +1,4 @@
-# ModbusForge v6.0.0
+# ModbusForge v6.0.1
 
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows)](https://www.microsoft.com/windows)
@@ -78,9 +78,13 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
-### v6.0.0 - Current Release
+### v6.0.1 - Current Release
 
-- **Auto-update**: New **Help → Check for Updates…** menu item and optional **Check for updates on startup** preference. ModbusForge compares the running version against the latest GitHub release and opens the release page when a newer version is available.
+- **One-click auto-update**: When an update is found, you can now choose to **download and install** it automatically. The installer runs silently, closes the current application, replaces the files, and relaunches ModbusForge.
+
+### v6.0.0
+
+- **Update checking**: New **Help → Check for Updates…** menu item and optional **Check for updates on startup** preference. ModbusForge compares the running version against the latest GitHub release.
 - **Script Editor**: Selection theming now uses the fluent DataGrid style so selected rows remain readable.
 - **Visual Node Editor (ADD block)**: Constant input (`CompareValue`) is now used when `Input2` is not connected.
 - **Trends tab**: Trend view correctly resolves its view model when loaded, so custom tags with trending enabled render again.
@@ -296,10 +300,11 @@ Access via **Options → Preferences**
 
 Access via **Help → Check for Updates…**
 
-ModbusForge can check the latest GitHub release against the running version.
+ModbusForge checks the latest GitHub release against the running version.
 - **Manual check**: open the menu item at any time.
 - **Automatic check**: enable `Check for updates on startup` in Preferences.
-- When a newer version is found, the app offers to open the release page in your default browser so you can download the installer.
+- When a newer version is found, choose **Yes** to download and install it automatically, **No** to open the release page in your browser, or **Cancel** to close the dialog.
+- The installer is downloaded to your temp folder, runs silently, closes the running application, installs the update, and relaunches ModbusForge.
 - If the app is already on the latest release or the check cannot reach GitHub, a brief message is shown.
 
 ### Custom Data Tab

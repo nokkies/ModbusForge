@@ -1517,27 +1517,41 @@ namespace ModbusForge.ViewModels
             {
                 var result = await _updateService.CheckForUpdateAsync();
 
-                await _dispatcher.InvokeAsync(() =>
+                if (!string.IsNullOrEmpty(result.ErrorMessage))
                 {
-                    if (!string.IsNullOrEmpty(result.ErrorMessage))
+                    await _dispatcher.InvokeAsync(() =>
                     {
                         _dialogService.Show(result.ErrorMessage, "Update Check", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        return;
-                    }
+                    });
+                    return;
+                }
 
-                    if (result.IsUpdateAvailable)
+                if (result.IsUpdateAvailable)
+                {
+                    var message = $"A newer version is available: {result.LatestVersion}.\n\n" +
+                                  "Yes = Download & Install now\n" +
+                                  "No = Open release page\n" +
+                                  "Cancel = Close";
+                    var dialogResult = await _dispatcher.InvokeAsync(() =>
+                        _dialogService.Show(message, "Update Available", MessageBoxButton.YesNoCancel, MessageBoxImage.Question));
+
+                    if (dialogResult == MessageBoxResult.Yes)
                     {
-                        var message = $"A newer version is available: {result.LatestVersion}\n\nOpen the release page?";
-                        if (_dialogService.Show(message, "Update Available", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-                        {
-                            _updateService.OpenReleasePage(result.ReleaseUrl);
-                        }
+                        var progress = new Progress<double>(p => StatusMessage = $"Downloading update... {p:P0}");
+                        await DownloadAndInstallUpdateAsync(result, progress);
                     }
-                    else if (showWhenUpToDate)
+                    else if (dialogResult == MessageBoxResult.No)
+                    {
+                        _updateService.OpenReleasePage(result.ReleaseUrl);
+                    }
+                }
+                else if (showWhenUpToDate)
+                {
+                    await _dispatcher.InvokeAsync(() =>
                     {
                         _dialogService.Show("You are running the latest version.", "Up to Date", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                });
+                    });
+                }
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
@@ -1549,6 +1563,51 @@ namespace ModbusForge.ViewModels
                         _dialogService.Show($"Unable to check for updates: {ex.Message}", "Update Check", MessageBoxButton.OK, MessageBoxImage.Warning);
                     });
                 }
+            }
+        }
+
+        private async Task DownloadAndInstallUpdateAsync(UpdateCheckResult result, IProgress<double> progress)
+        {
+            if (_updateService == null || result.AssetDownloadUrl is not string assetUrl || result.LatestVersion == null) return;
+
+            try
+            {
+                var assetName = new Uri(assetUrl).Segments.Last();
+                if (string.IsNullOrWhiteSpace(assetName))
+                {
+                    assetName = $"ModbusForge-{result.LatestVersion}-setup.exe";
+                }
+
+                var installerPath = Path.Combine(Path.GetTempPath(), assetName);
+                StatusMessage = "Downloading update...";
+
+                var success = await _updateService.DownloadInstallerAsync(assetUrl, installerPath, progress);
+                if (!success || !File.Exists(installerPath))
+                {
+                    await _dispatcher.InvokeAsync(() =>
+                    {
+                        _dialogService.Show("Failed to download the update installer.", "Update Download Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                    });
+                    StatusMessage = "Update download failed.";
+                    return;
+                }
+
+                _logger.LogInformation("Installing update from {InstallerPath}", installerPath);
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    _updateService.LaunchInstaller(installerPath, silent: true);
+                    _logger.LogInformation("Shutting down for update");
+                    Application.Current?.Shutdown();
+                });
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogWarning(ex, "Failed to download and install update");
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    _dialogService.Show($"Failed to install update: {ex.Message}", "Update Installation Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                });
+                StatusMessage = "Update installation failed.";
             }
         }
 
