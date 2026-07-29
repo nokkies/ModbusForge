@@ -84,25 +84,51 @@ namespace ModbusForge.ViewModels.Coordinators
 
                 foreach (var entry in snapshot)
                 {
-                    if (!entry.Continuous) continue;
-
-                    int period = entry.PeriodMs <= 0 ? 1000 : entry.PeriodMs;
-                    if ((now - entry.LastWriteUtc).TotalMilliseconds >= period)
+                    // Continuous write
+                    if (entry.Continuous)
                     {
-                        try
+                        int period = entry.PeriodMs <= 0 ? 1000 : entry.PeriodMs;
+                        if ((now - entry.LastWriteUtc).TotalMilliseconds >= period)
                         {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            await _callbacks.WriteCustomNowAsync(entry);
-                            entry.LastWriteUtc = now;
+                            try
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                await _callbacks.WriteCustomNowAsync(entry);
+                                entry.LastWriteUtc = now;
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
+                            catch (Exception ex) when (ex is not OutOfMemoryException)
+                            {
+                                _logger.LogError(ex, "Continuous write failed for {Area} {Address}", entry.Area, entry.Address);
+                                entry.Continuous = false;
+                            }
                         }
-                        catch (OperationCanceledException)
+                    }
+
+                    // Continuous read (Monitor column) - controlled by the custom-read master switch
+                    if (entry.Monitor && _callbacks.CustomReadMonitorEnabled)
+                    {
+                        int readPeriod = entry.ReadPeriodMs <= 0 ? 1000 : entry.ReadPeriodMs;
+                        if ((now - entry.LastReadUtc).TotalMilliseconds >= readPeriod)
                         {
-                            throw;
-                        }
-                        catch (Exception ex) when (ex is not OutOfMemoryException)
-                        {
-                            _logger.LogError(ex, "Continuous write failed for {Area} {Address}", entry.Area, entry.Address);
-                            entry.Continuous = false;
+                            try
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                await _callbacks.ReadCustomNowAsync(entry);
+                                entry.LastReadUtc = now;
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
+                            catch (Exception ex) when (ex is not OutOfMemoryException)
+                            {
+                                _logger.LogError(ex, "Continuous read failed for {Area} {Address}", entry.Area, entry.Address);
+                                entry.Monitor = false;
+                            }
                         }
                     }
                 }

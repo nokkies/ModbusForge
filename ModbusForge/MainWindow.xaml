@@ -475,9 +475,10 @@
                         <Button Content="Load" Command="{Binding LoadCustomCommand}" Width="80" Margin="5,0,0,0"/>
                         <Separator Width="20" Opacity="0"/>
                         <ui:ToggleSwitch IsChecked="{Binding GlobalMonitorEnabled, Mode=TwoWay}" Content="Global Monitor" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <ui:ToggleSwitch IsChecked="{Binding CustomReadMonitorEnabled, Mode=TwoWay}" Content="Custom Read" VerticalAlignment="Center" Margin="0,0,10,0" ToolTip="Enables the 'Read' checkbox on custom rows."/>
                         <TextBlock VerticalAlignment="Center" Foreground="{StaticResource LightMetallicTextSecondaryBrush}">
                             <Run Text="Note:" FontWeight="SemiBold"/>
-                            <Run Text=" Reads Trend-enabled rows."/>
+                            <Run Text=" 'Continuous Write' writes the Write Value; 'Read' reads the live Value continuously; 'Trend' also adds the row to the trend chart."/>
                         </TextBlock>
                     </StackPanel>
 
@@ -490,8 +491,10 @@
                             <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{StaticResource TypeOptionsAll}" Width="*"/>
                             <DataGridTextColumn Header="Value" Binding="{Binding Value, Mode=OneWay}" IsReadOnly="True" Width="2*"/>
                             <DataGridTextColumn Header="Write Value" Binding="{Binding WriteValue, ValidatesOnDataErrors=True, NotifyOnValidationError=True}" Width="2*"/>
-                            <DataGridCheckBoxColumn Header="Cont. Write" Binding="{Binding Continuous}" Width="Auto"/>
+                            <DataGridCheckBoxColumn Header="Continuous Write" Binding="{Binding Continuous}" Width="Auto"/>
                             <DataGridTextColumn Header="Write Period (ms)" Binding="{Binding PeriodMs, ValidatesOnDataErrors=True, NotifyOnValidationError=True}" Width="*"/>
+                            <DataGridCheckBoxColumn Header="Read" Binding="{Binding Monitor}" Width="Auto"/>
+                            <DataGridTextColumn Header="Read Period (ms)" Binding="{Binding ReadPeriodMs, ValidatesOnDataErrors=True, NotifyOnValidationError=True}" Width="*"/>
                             <DataGridCheckBoxColumn Header="Trend" Binding="{Binding Trend}" Width="Auto"/>
                             <DataGridTemplateColumn Header="Actions" Width="Auto">
                                 <DataGridTemplateColumn.CellTemplate>

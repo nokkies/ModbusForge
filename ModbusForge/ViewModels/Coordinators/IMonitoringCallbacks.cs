@@ -47,5 +47,9 @@ namespace ModbusForge.ViewModels.Coordinators
 
         bool HasConnectionError { get; set; }
         DateTime LastErrorTime { get; set; }
+
+        bool CustomReadMonitorEnabled { get; }
+
+        Task ReadCustomNowAsync(CustomEntry entry);
     }
 }

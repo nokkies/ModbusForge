@@ -266,10 +266,7 @@ namespace ModbusForge.ViewModels
             ReadCustomNowCommand = new AsyncRelayCommand<object?>(async param =>
             {
                 if (param is CustomEntry ce)
-                {
-                    var result = await _customEntryCoordinator.ReadCustomNowAsync(ce, EffectiveUnitId, IsServerMode);
-                    StatusMessage = result.Message;
-                }
+                    await ReadCustomNowAsync(ce);
             });
             ReadAllCustomNowCommand = new AsyncRelayCommand(async () => await ReadAllCustomNowAsync());
             // Project commands (replacing Custom save/load)
@@ -1248,6 +1245,13 @@ namespace ModbusForge.ViewModels
             StatusMessage = result.Message;
         }
 
+        public async Task ReadCustomNowAsync(CustomEntry entry)
+        {
+            var result = await _customEntryCoordinator.ReadCustomNowAsync(entry, EffectiveUnitId, IsServerMode);
+            if (!string.IsNullOrEmpty(result.Message))
+                StatusMessage = result.Message;
+        }
+
         public IEnumerable<CustomEntry> GetCustomEntriesSnapshot() => CustomEntries.ToList();
 
         public async Task ProcessTrendSamplingAsync()
@@ -1367,11 +1371,24 @@ namespace ModbusForge.ViewModels
             {
                 if (ce.Continuous)
                 {
-                    // Auto-enable GlobalMonitorEnabled so the monitor timer processes the entry.
-                    if (!GlobalMonitorEnabled)
-                    {
-                        GlobalMonitorEnabled = true;
-                    }
+                    // Enable the per-area monitor for this entry so its value is refreshed.
+                    if (ce.Area == "HoldingRegister" && !HoldingMonitorEnabled)
+                        HoldingMonitorEnabled = true;
+                    else if (ce.Area == "InputRegister" && !InputRegistersMonitorEnabled)
+                        InputRegistersMonitorEnabled = true;
+                    else if (ce.Area == "Coil" && !CoilsMonitorEnabled)
+                        CoilsMonitorEnabled = true;
+                    else if (ce.Area == "DiscreteInput" && !DiscreteInputsMonitorEnabled)
+                        DiscreteInputsMonitorEnabled = true;
+                }
+            }
+            else if (string.Equals(e.PropertyName, nameof(CustomEntry.Monitor), StringComparison.Ordinal))
+            {
+                if (ce.Monitor)
+                {
+                    // Auto-enable custom read monitoring so this row starts reading.
+                    if (!CustomReadMonitorEnabled)
+                        CustomReadMonitorEnabled = true;
 
                     // Enable the per-area monitor for this entry.
                     if (ce.Area == "HoldingRegister" && !HoldingMonitorEnabled)
@@ -1385,10 +1402,10 @@ namespace ModbusForge.ViewModels
                 }
                 else
                 {
-                    // Disable GlobalMonitorEnabled if no more continuous entries remain.
-                    if (!CustomEntries.Any(c => c.Continuous))
+                    // Disable the custom-read master switch if no more monitored entries remain.
+                    if (!CustomEntries.Any(c => c.Monitor))
                     {
-                        GlobalMonitorEnabled = false;
+                        CustomReadMonitorEnabled = false;
                     }
                 }
             }

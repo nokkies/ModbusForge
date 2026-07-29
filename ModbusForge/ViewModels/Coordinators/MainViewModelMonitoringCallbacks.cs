@@ -88,5 +88,9 @@ namespace ModbusForge.ViewModels.Coordinators
             get => ViewModel.LastErrorTime;
             set => ViewModel.LastErrorTime = value;
         }
+
+        public bool CustomReadMonitorEnabled => ViewModel.CustomReadMonitorEnabled;
+
+        public Task ReadCustomNowAsync(CustomEntry entry) => ViewModel.ReadCustomNowAsync(entry);
     }
 }
