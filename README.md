@@ -78,7 +78,12 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
-### v6.0.5 - Current Release
+### v6.0.6 - Current Release
+
+- **32-bit float on holding and input (internal) registers**: Holding and Input Register grids now decode `uint`, `int`, `real` (32-bit float), and `string` values. Input Registers get the same **Swap Bytes** / **Swap Words** controls as holding registers, and per-address **Type** and **Swap** settings are now saved in the `.mfp` project file.
+- **Live register value refresh**: Changing the global **Type** or **Swap** settings immediately re-decodes and re-displays the current register values.
+
+### v6.0.5
 
 - **Trend retention time**: The Trend view **Retention (min)** setting now takes effect immediately when you click **Apply**. Existing trend data is re-trimmed to the new window and the chart values and CSV export samples stay in sync.
 
