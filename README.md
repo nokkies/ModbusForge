@@ -81,6 +81,7 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 ### v6.0.7 - Current Release
 
 - **32/64-bit byte & word swapping endianness matrix**: Added `EndiannessFormat` (`ABCD`, `BADC`, `CDAB`, `DCBA`) and converter methods for `float`, `double`, `int`, `uint`, `long`, and `ulong`. The legacy `Swap Bytes` / `Swap Words` flags now map to the same matrix.
+- **RS-485 RTS toggle & line timing**: Serial connections now support `EnableRtsToggle`, `PreTxDelayMs`, and `PostTxDelayMs` in `ConnectionProfile`, with controls in the Connection Manager.
 
 ### v6.0.6
 
