@@ -1,0 +1,30 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+        x:Class="ModbusForge.Avalonia.Views.InputDialogWindow"
+        x:DataType="vm:InputDialogViewModel"
+        Title="{Binding Title}"
+        Width="420"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+  <Grid Margin="20,16" RowDefinitions="Auto,Auto,Auto">
+    <TextBlock Grid.Row="0"
+               Text="{Binding Prompt}"
+               TextWrapping="Wrap"
+               Margin="0,0,0,12" />
+
+    <TextBox Grid.Row="1"
+             Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}"
+             Margin="0,0,0,20" />
+
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8">
+      <Button Content="OK" Command="{Binding OkCommand}" IsDefault="True" />
+      <Button Content="Cancel" Command="{Binding CancelCommand}" IsCancel="True" />
+    </StackPanel>
+  </Grid>
+</Window>
