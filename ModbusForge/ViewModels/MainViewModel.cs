@@ -34,7 +34,7 @@ using ModbusForge.ViewModels.Coordinators;
 
 namespace ModbusForge.ViewModels
 {
-    public partial class MainViewModel : ViewModelBase, IDisposable, IMonitoringCallbacks
+    public partial class MainViewModel : ViewModelBase, IDisposable
     {
         // Partial method declarations for delegated properties
         partial void OnRegistersGlobalTypeChanged(string value);
@@ -1155,6 +1155,49 @@ namespace ModbusForge.ViewModels
             await _registerCoordinator.ReadDiscreteInputsAsync(EffectiveUnitId, DiscreteInputStart, DiscreteInputCount,
                 DiscreteInputs, msg => StatusMessage = msg,
                 SetHasConnectionError, () => DiscreteInputsMonitorEnabled = false, DiscreteInputsMonitorEnabled, IsServerMode);
+        }
+
+        public void ApplyPollingResult(PollingResult result)
+        {
+            if (result.IsError)
+            {
+                StatusMessage = $"Error reading {result.Area}: {result.ErrorMessage}";
+                SetHasConnectionError(true);
+                return;
+            }
+
+            switch (result.Area)
+            {
+                case PlcArea.HoldingRegister:
+                    if (result.Values is not null)
+                    {
+                        _registerCoordinator.ApplyHoldingRegisterValues(HoldingRegisters, result.StartAddress, result.Values,
+                            RegistersGlobalType, CurrentConfig.RegisterSettings);
+                    }
+                    break;
+
+                case PlcArea.InputRegister:
+                    if (result.Values is not null)
+                    {
+                        _registerCoordinator.ApplyInputRegisterValues(InputRegisters, result.StartAddress, result.Values,
+                            CurrentConfig.RegisterSettings);
+                    }
+                    break;
+
+                case PlcArea.Coil:
+                    if (result.States is not null)
+                    {
+                        _registerCoordinator.ApplyCoilValues(Coils, result.StartAddress, result.States);
+                    }
+                    break;
+
+                case PlcArea.DiscreteInput:
+                    if (result.States is not null)
+                    {
+                        _registerCoordinator.ApplyDiscreteInputValues(DiscreteInputs, result.StartAddress, result.States);
+                    }
+                    break;
+            }
         }
 
         private async Task WriteCoilAsync()

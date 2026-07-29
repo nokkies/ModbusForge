@@ -16,6 +16,13 @@ namespace ModbusForge.ViewModels.Coordinators
     /// </summary>
     public class RegisterCoordinator
     {
+        private sealed class RegisterFormatContext
+        {
+            public required string GlobalType { get; set; }
+            public required bool GlobalSwapBytes { get; set; }
+            public required bool GlobalSwapWords { get; set; }
+            public RegisterSettings? Settings { get; set; }
+        }
         private readonly ModbusTcpService _clientService;
         private readonly ModbusServerService _serverService;
         private readonly IConsoleLoggerService _consoleLoggerService;
@@ -62,67 +69,7 @@ namespace ModbusForge.ViewModels.Coordinators
                     return;
                 }
 
-                // Preserve per-address Type/Swap from current rows and saved project metadata
-                var typeByAddress = new System.Collections.Generic.Dictionary<int, string>();
-                var swapBytesByAddress = new System.Collections.Generic.Dictionary<int, bool>();
-                var swapWordsByAddress = new System.Collections.Generic.Dictionary<int, bool>();
-                foreach (var r in holdingRegisters)
-                {
-                    typeByAddress[r.Address] = r.Type ?? globalType;
-                    swapBytesByAddress[r.Address] = r.SwapBytes;
-                    swapWordsByAddress[r.Address] = r.SwapWords;
-                }
-
-                if (registerSettings?.HoldingRegisterMetadata != null)
-                {
-                    foreach (var m in registerSettings.HoldingRegisterMetadata)
-                    {
-                        if (!typeByAddress.ContainsKey(m.Address))
-                        {
-                            typeByAddress[m.Address] = m.Type ?? globalType;
-                            swapBytesByAddress[m.Address] = m.SwapBytes;
-                            swapWordsByAddress[m.Address] = m.SwapWords;
-                        }
-                    }
-                }
-
-                // In-place update to minimize UI thread re-layout and CollectionChanged events
-                int currentCount = holdingRegisters.Count;
-                int newCount = values.Length;
-
-                for (int i = 0; i < newCount; i++)
-                {
-                    int addr = start + i;
-                    if (i < currentCount)
-                    {
-                        var entry = holdingRegisters[i];
-                        entry.Address = addr;
-                        entry.Value = values[i];
-                        entry.Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType;
-                        entry.SwapBytes = swapBytesByAddress.TryGetValue(addr, out var sb) ? sb : (registerSettings?.RegistersSwapBytes ?? false);
-                        entry.SwapWords = swapWordsByAddress.TryGetValue(addr, out var sw) ? sw : (registerSettings?.RegistersSwapWords ?? false);
-                    }
-                    else
-                    {
-                        holdingRegisters.Add(new RegisterEntry
-                        {
-                            Address = addr,
-                            Value = values[i],
-                            Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType,
-                            SwapBytes = registerSettings?.RegistersSwapBytes ?? false,
-                            SwapWords = registerSettings?.RegistersSwapWords ?? false
-                        });
-                    }
-                }
-
-                // Remove excess if the new count is smaller
-                while (holdingRegisters.Count > newCount)
-                {
-                    holdingRegisters.RemoveAt(holdingRegisters.Count - 1);
-                }
-
-                // Compute ValueText based on Type for better display (floats, strings, signed ints)
-                ApplyValueText(holdingRegisters, values);
+                ApplyHoldingRegisterValues(holdingRegisters, start, values, globalType, registerSettings);
 
                 setStatusMessage($"Read {values.Length} registers");
                 setHasConnectionError(false);
@@ -146,6 +93,70 @@ namespace ModbusForge.ViewModels.Coordinators
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
+        }
+
+        public void ApplyHoldingRegisterValues(ObservableCollection<RegisterEntry> holdingRegisters, int start, ushort[] values, string globalType, RegisterSettings? registerSettings = null)
+        {
+            // Preserve per-address Type/Swap from current rows and saved project metadata
+            var typeByAddress = new System.Collections.Generic.Dictionary<int, string>();
+            var swapBytesByAddress = new System.Collections.Generic.Dictionary<int, bool>();
+            var swapWordsByAddress = new System.Collections.Generic.Dictionary<int, bool>();
+            foreach (var r in holdingRegisters)
+            {
+                typeByAddress[r.Address] = r.Type ?? globalType;
+                swapBytesByAddress[r.Address] = r.SwapBytes;
+                swapWordsByAddress[r.Address] = r.SwapWords;
+            }
+
+            if (registerSettings?.HoldingRegisterMetadata != null)
+            {
+                foreach (var m in registerSettings.HoldingRegisterMetadata)
+                {
+                    if (!typeByAddress.ContainsKey(m.Address))
+                    {
+                        typeByAddress[m.Address] = m.Type ?? globalType;
+                        swapBytesByAddress[m.Address] = m.SwapBytes;
+                        swapWordsByAddress[m.Address] = m.SwapWords;
+                    }
+                }
+            }
+
+            // In-place update to minimize UI thread re-layout and CollectionChanged events
+            int currentCount = holdingRegisters.Count;
+            int newCount = values.Length;
+
+            for (int i = 0; i < newCount; i++)
+            {
+                int addr = start + i;
+                if (i < currentCount)
+                {
+                    var entry = holdingRegisters[i];
+                    entry.Address = addr;
+                    entry.Value = values[i];
+                    entry.Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType;
+                    entry.SwapBytes = swapBytesByAddress.TryGetValue(addr, out var sb) ? sb : (registerSettings?.RegistersSwapBytes ?? false);
+                    entry.SwapWords = swapWordsByAddress.TryGetValue(addr, out var sw) ? sw : (registerSettings?.RegistersSwapWords ?? false);
+                }
+                else
+                {
+                    holdingRegisters.Add(new RegisterEntry
+                    {
+                        Address = addr,
+                        Value = values[i],
+                        Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType,
+                        SwapBytes = registerSettings?.RegistersSwapBytes ?? false,
+                        SwapWords = registerSettings?.RegistersSwapWords ?? false
+                    });
+                }
+            }
+
+            // Remove excess if the new count is smaller
+            while (holdingRegisters.Count > newCount)
+            {
+                holdingRegisters.RemoveAt(holdingRegisters.Count - 1);
+            }
+
+            ApplyValueText(holdingRegisters, values);
         }
 
         public void RefreshHoldingRegisterValueText(ObservableCollection<RegisterEntry> holdingRegisters)
@@ -226,71 +237,7 @@ namespace ModbusForge.ViewModels.Coordinators
                     return;
                 }
 
-                var globalType = registerSettings?.InputRegistersGlobalType ?? "uint";
-                var globalSwapBytes = registerSettings?.InputRegistersSwapBytes ?? false;
-                var globalSwapWords = registerSettings?.InputRegistersSwapWords ?? false;
-
-                // Preserve per-address Type/Swap from current rows and saved project metadata
-                var typeByAddress = new System.Collections.Generic.Dictionary<int, string>();
-                var swapBytesByAddress = new System.Collections.Generic.Dictionary<int, bool>();
-                var swapWordsByAddress = new System.Collections.Generic.Dictionary<int, bool>();
-                foreach (var r in inputRegisters)
-                {
-                    typeByAddress[r.Address] = r.Type ?? globalType;
-                    swapBytesByAddress[r.Address] = r.SwapBytes;
-                    swapWordsByAddress[r.Address] = r.SwapWords;
-                }
-
-                if (registerSettings?.InputRegisterMetadata != null)
-                {
-                    foreach (var m in registerSettings.InputRegisterMetadata)
-                    {
-                        if (!typeByAddress.ContainsKey(m.Address))
-                        {
-                            typeByAddress[m.Address] = m.Type ?? globalType;
-                            swapBytesByAddress[m.Address] = m.SwapBytes;
-                            swapWordsByAddress[m.Address] = m.SwapWords;
-                        }
-                    }
-                }
-
-                // In-place update to minimize UI thread re-layout and CollectionChanged events
-                int currentCount = inputRegisters.Count;
-                int newCount = values.Length;
-
-                for (int i = 0; i < newCount; i++)
-                {
-                    int addr = start + i;
-                    if (i < currentCount)
-                    {
-                        var entry = inputRegisters[i];
-                        entry.Address = addr;
-                        entry.Value = values[i];
-                        entry.Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType;
-                        entry.SwapBytes = swapBytesByAddress.TryGetValue(addr, out var sb) ? sb : globalSwapBytes;
-                        entry.SwapWords = swapWordsByAddress.TryGetValue(addr, out var sw) ? sw : globalSwapWords;
-                    }
-                    else
-                    {
-                        inputRegisters.Add(new RegisterEntry
-                        {
-                            Address = addr,
-                            Value = values[i],
-                            Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType,
-                            SwapBytes = swapBytesByAddress.TryGetValue(addr, out var sb) ? sb : globalSwapBytes,
-                            SwapWords = swapWordsByAddress.TryGetValue(addr, out var sw) ? sw : globalSwapWords
-                        });
-                    }
-                }
-
-                // Remove excess if the new count is smaller
-                while (inputRegisters.Count > newCount)
-                {
-                    inputRegisters.RemoveAt(inputRegisters.Count - 1);
-                }
-
-                // Compute ValueText based on Type for float/signed/string display
-                ApplyValueText(inputRegisters, values);
+                ApplyInputRegisterValues(inputRegisters, start, values, registerSettings);
 
                 setStatusMessage($"Read {values.Length} input registers");
                 setHasConnectionError(false);
@@ -314,6 +261,74 @@ namespace ModbusForge.ViewModels.Coordinators
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
+        }
+
+        public void ApplyInputRegisterValues(ObservableCollection<RegisterEntry> inputRegisters, int start, ushort[] values, RegisterSettings? registerSettings = null)
+        {
+            var globalType = registerSettings?.InputRegistersGlobalType ?? "uint";
+            var globalSwapBytes = registerSettings?.InputRegistersSwapBytes ?? false;
+            var globalSwapWords = registerSettings?.InputRegistersSwapWords ?? false;
+
+            // Preserve per-address Type/Swap from current rows and saved project metadata
+            var typeByAddress = new System.Collections.Generic.Dictionary<int, string>();
+            var swapBytesByAddress = new System.Collections.Generic.Dictionary<int, bool>();
+            var swapWordsByAddress = new System.Collections.Generic.Dictionary<int, bool>();
+            foreach (var r in inputRegisters)
+            {
+                typeByAddress[r.Address] = r.Type ?? globalType;
+                swapBytesByAddress[r.Address] = r.SwapBytes;
+                swapWordsByAddress[r.Address] = r.SwapWords;
+            }
+
+            if (registerSettings?.InputRegisterMetadata != null)
+            {
+                foreach (var m in registerSettings.InputRegisterMetadata)
+                {
+                    if (!typeByAddress.ContainsKey(m.Address))
+                    {
+                        typeByAddress[m.Address] = m.Type ?? globalType;
+                        swapBytesByAddress[m.Address] = m.SwapBytes;
+                        swapWordsByAddress[m.Address] = m.SwapWords;
+                    }
+                }
+            }
+
+            // In-place update to minimize UI thread re-layout and CollectionChanged events
+            int currentCount = inputRegisters.Count;
+            int newCount = values.Length;
+
+            for (int i = 0; i < newCount; i++)
+            {
+                int addr = start + i;
+                if (i < currentCount)
+                {
+                    var entry = inputRegisters[i];
+                    entry.Address = addr;
+                    entry.Value = values[i];
+                    entry.Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType;
+                    entry.SwapBytes = swapBytesByAddress.TryGetValue(addr, out var sb) ? sb : globalSwapBytes;
+                    entry.SwapWords = swapWordsByAddress.TryGetValue(addr, out var sw) ? sw : globalSwapWords;
+                }
+                else
+                {
+                    inputRegisters.Add(new RegisterEntry
+                    {
+                        Address = addr,
+                        Value = values[i],
+                        Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType,
+                        SwapBytes = swapBytesByAddress.TryGetValue(addr, out var sb) ? sb : globalSwapBytes,
+                        SwapWords = swapWordsByAddress.TryGetValue(addr, out var sw) ? sw : globalSwapWords
+                    });
+                }
+            }
+
+            // Remove excess if the new count is smaller
+            while (inputRegisters.Count > newCount)
+            {
+                inputRegisters.RemoveAt(inputRegisters.Count - 1);
+            }
+
+            ApplyValueText(inputRegisters, values);
         }
 
         /// <summary>
@@ -407,34 +422,7 @@ namespace ModbusForge.ViewModels.Coordinators
                     return;
                 }
 
-                // In-place update to minimize UI thread re-layout and CollectionChanged events
-                int currentCount = coils.Count;
-                int newCount = states.Length;
-
-                for (int i = 0; i < newCount; i++)
-                {
-                    int addr = start + i;
-                    if (i < currentCount)
-                    {
-                        var entry = coils[i];
-                        entry.Address = addr;
-                        entry.State = states[i];
-                    }
-                    else
-                    {
-                        coils.Add(new CoilEntry
-                        {
-                            Address = addr,
-                            State = states[i]
-                        });
-                    }
-                }
-
-                // Remove excess if the new count is smaller
-                while (coils.Count > newCount)
-                {
-                    coils.RemoveAt(coils.Count - 1);
-                }
+                ApplyCoilValues(coils, start, states);
 
                 setStatusMessage($"Read {states.Length} coils");
                 setHasConnectionError(false);
@@ -460,6 +448,66 @@ namespace ModbusForge.ViewModels.Coordinators
             }
         }
 
+        public void ApplyCoilValues(ObservableCollection<CoilEntry> coils, int start, bool[] states)
+        {
+            int currentCount = coils.Count;
+            int newCount = states.Length;
+
+            for (int i = 0; i < newCount; i++)
+            {
+                int addr = start + i;
+                if (i < currentCount)
+                {
+                    var entry = coils[i];
+                    entry.Address = addr;
+                    entry.State = states[i];
+                }
+                else
+                {
+                    coils.Add(new CoilEntry
+                    {
+                        Address = addr,
+                        State = states[i]
+                    });
+                }
+            }
+
+            while (coils.Count > newCount)
+            {
+                coils.RemoveAt(coils.Count - 1);
+            }
+        }
+
+        public void ApplyDiscreteInputValues(ObservableCollection<CoilEntry> discreteInputs, int start, bool[] states)
+        {
+            int currentCount = discreteInputs.Count;
+            int newCount = states.Length;
+
+            for (int i = 0; i < newCount; i++)
+            {
+                int addr = start + i;
+                if (i < currentCount)
+                {
+                    var entry = discreteInputs[i];
+                    entry.Address = addr;
+                    entry.State = states[i];
+                }
+                else
+                {
+                    discreteInputs.Add(new CoilEntry
+                    {
+                        Address = addr,
+                        State = states[i]
+                    });
+                }
+            }
+
+            while (discreteInputs.Count > newCount)
+            {
+                discreteInputs.RemoveAt(discreteInputs.Count - 1);
+            }
+        }
+
         /// <summary>
         /// Reads discrete inputs and populates the collection.
         /// </summary>
@@ -480,34 +528,7 @@ namespace ModbusForge.ViewModels.Coordinators
                     return;
                 }
 
-                // In-place update to minimize UI thread re-layout and CollectionChanged events
-                int currentCount = discreteInputs.Count;
-                int newCount = states.Length;
-
-                for (int i = 0; i < newCount; i++)
-                {
-                    int addr = start + i;
-                    if (i < currentCount)
-                    {
-                        var entry = discreteInputs[i];
-                        entry.Address = addr;
-                        entry.State = states[i];
-                    }
-                    else
-                    {
-                        discreteInputs.Add(new CoilEntry
-                        {
-                            Address = addr,
-                            State = states[i]
-                        });
-                    }
-                }
-
-                // Remove excess if the new count is smaller
-                while (discreteInputs.Count > newCount)
-                {
-                    discreteInputs.RemoveAt(discreteInputs.Count - 1);
-                }
+                ApplyDiscreteInputValues(discreteInputs, start, states);
 
                 setStatusMessage($"Read {states.Length} discrete inputs");
                 setHasConnectionError(false);

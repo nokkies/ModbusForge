@@ -78,9 +78,15 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
-### v6.0.8 - Current Release
+### v6.1.0 - Current Release
 
-- Same features as v6.0.7 with package metadata and versioning alignment.
+- **Channels-based background polling engine**: New `PollingEngine` runs Modbus reads off the WPF UI thread using `System.Threading.Channels`. `MonitoringCoordinator` now enqueues `PollingCommand`s, the worker executes the I/O, and results are drained and applied to the UI at 50ms ticks. Area commands coalesce by unit/area so only the latest pending request is processed under back-pressure.
+- **Separated I/O from UI formatting**: `RegisterCoordinator` now has `Apply*` methods for holding/input registers, coils and discrete inputs, letting the polling engine update collections on the UI thread without blocking it during Modbus transactions.
+- **50ms / 20-unit benchmark**: Added `PollingThroughputTests` verifying 20 concurrent unit reads at 50ms intervals complete within one second.
+
+### v6.0.8
+
+- Fixed auto-updater installer asset selection and release workflow so only the versioned installer is uploaded; removed stale tracked `installers/ModbusForge-2.0.2-setup.exe`.
 
 ### v6.0.7
 

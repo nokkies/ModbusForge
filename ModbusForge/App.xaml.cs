@@ -172,6 +172,7 @@ namespace ModbusForge
             services.AddSingleton<IScriptRuleService, ScriptRuleService>();
             services.AddSingleton<IVisualSimulationService, VisualSimulationService>();
             services.AddSingleton<IUpdateService, UpdateService>();
+            services.AddSingleton<IPollingEngine, PollingEngine>();
 
             // API server: wire the focused facade (no WPF IServiceProvider passed in).
             // IAppStateAccessor is resolved lazily after MainViewModel is created.
@@ -245,7 +246,8 @@ namespace ModbusForge
                 new WpfPeriodicScheduler(),
                 new WpfPeriodicScheduler(),
                 provider.GetRequiredService<ILogger<MonitoringCoordinator>>(),
-                Math.Max(50, provider.GetRequiredService<ITrendLogger>().SampleRateMs)
+                Math.Max(50, provider.GetRequiredService<ITrendLogger>().SampleRateMs),
+                provider.GetRequiredService<IPollingEngine>()
             ));
             
             // Register ViewModels

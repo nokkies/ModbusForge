@@ -19,15 +19,17 @@ namespace ModbusForge.ViewModels.Coordinators
         private readonly IPeriodicScheduler _customScheduler;
         private readonly IPeriodicScheduler _monitorScheduler;
         private readonly IPeriodicScheduler _trendScheduler;
+        private readonly IPollingEngine? _pollingEngine;
         private readonly ILogger<MonitoringCoordinator> _logger;
         private readonly int _trendPeriodMs;
 
         private bool _isCustomTimerRunning;
         private bool _isMonitoring;
         private bool _isTrendTimerRunning;
+        private bool _pollingEngineStarted;
 
         private const int CustomTimerIntervalMs = 250;
-        private const int MonitorTimerIntervalMs = 250;
+        private const int MonitorTimerIntervalMs = 50;
         private const int DefaultTrendPeriodMs = 250;
 
         public MonitoringCoordinator(
@@ -36,7 +38,8 @@ namespace ModbusForge.ViewModels.Coordinators
             IPeriodicScheduler monitorScheduler,
             IPeriodicScheduler trendScheduler,
             ILogger<MonitoringCoordinator> logger,
-            int trendPeriodMs = DefaultTrendPeriodMs)
+            int trendPeriodMs = DefaultTrendPeriodMs,
+            IPollingEngine? pollingEngine = null)
         {
             _callbacks = callbacks ?? throw new ArgumentNullException(nameof(callbacks));
             _customScheduler = customScheduler ?? throw new ArgumentNullException(nameof(customScheduler));
@@ -44,10 +47,19 @@ namespace ModbusForge.ViewModels.Coordinators
             _trendScheduler = trendScheduler ?? throw new ArgumentNullException(nameof(trendScheduler));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _trendPeriodMs = trendPeriodMs > 0 ? trendPeriodMs : DefaultTrendPeriodMs;
+            _pollingEngine = pollingEngine;
+
+            if (_pollingEngine is not null)
+            {
+                _pollingEngine.Error += OnPollingError;
+            }
         }
 
         public void Start()
         {
+            _pollingEngine?.Start();
+            _pollingEngineStarted = _pollingEngine is not null;
+
             _customScheduler.Start(TimeSpan.FromMilliseconds(CustomTimerIntervalMs), CustomTick);
             _monitorScheduler.Start(TimeSpan.FromMilliseconds(MonitorTimerIntervalMs), MonitorTick);
             _trendScheduler.Start(TimeSpan.FromMilliseconds(_trendPeriodMs), TrendTick);
@@ -58,15 +70,29 @@ namespace ModbusForge.ViewModels.Coordinators
             _customScheduler.Stop();
             _monitorScheduler.Stop();
             _trendScheduler.Stop();
+            _pollingEngine?.Stop();
+            _pollingEngineStarted = false;
         }
 
         public void Dispose()
         {
             Stop();
+
+            if (_pollingEngine is not null)
+            {
+                _pollingEngine.Error -= OnPollingError;
+            }
+
             _customScheduler.Dispose();
             _monitorScheduler.Dispose();
             _trendScheduler.Dispose();
             _logger.LogDebug("{Coordinator} disposed", nameof(MonitoringCoordinator));
+        }
+
+        private void OnPollingError(object? sender, PollingErrorEventArgs e)
+        {
+            _callbacks.SetStatusMessage($"Error reading {e.Command.Area}: {e.Result.ErrorMessage}");
+            _callbacks.SetHasConnectionError(true);
         }
 
         internal async Task CustomTick(CancellationToken cancellationToken)
@@ -172,44 +198,15 @@ namespace ModbusForge.ViewModels.Coordinators
                     if (!_callbacks.IsConnected) return;
                 }
 
-                if (_callbacks.HoldingMonitorEnabled)
+                if (_pollingEngine is not null)
                 {
-                    int p = _callbacks.HoldingMonitorPeriodMs <= 0 ? 1000 : _callbacks.HoldingMonitorPeriodMs;
-                    if ((now - _callbacks.LastHoldingReadUtc).TotalMilliseconds >= p)
-                    {
-                        await _callbacks.ReadRegistersAsync();
-                        _callbacks.LastHoldingReadUtc = now;
-                    }
+                    EnqueueAreaReads(now);
+                    await DrainResultsAsync(cancellationToken).ConfigureAwait(false);
                 }
-
-                if (_callbacks.InputRegistersMonitorEnabled)
+                else
                 {
-                    int p = _callbacks.InputRegistersMonitorPeriodMs <= 0 ? 1000 : _callbacks.InputRegistersMonitorPeriodMs;
-                    if ((now - _callbacks.LastInputRegReadUtc).TotalMilliseconds >= p)
-                    {
-                        await _callbacks.ReadInputRegistersAsync();
-                        _callbacks.LastInputRegReadUtc = now;
-                    }
-                }
-
-                if (_callbacks.CoilsMonitorEnabled)
-                {
-                    int p = _callbacks.CoilsMonitorPeriodMs <= 0 ? 1000 : _callbacks.CoilsMonitorPeriodMs;
-                    if ((now - _callbacks.LastCoilsReadUtc).TotalMilliseconds >= p)
-                    {
-                        await _callbacks.ReadCoilsAsync();
-                        _callbacks.LastCoilsReadUtc = now;
-                    }
-                }
-
-                if (_callbacks.DiscreteInputsMonitorEnabled)
-                {
-                    int p = _callbacks.DiscreteInputsMonitorPeriodMs <= 0 ? 1000 : _callbacks.DiscreteInputsMonitorPeriodMs;
-                    if ((now - _callbacks.LastDiscreteReadUtc).TotalMilliseconds >= p)
-                    {
-                        await _callbacks.ReadDiscreteInputsAsync();
-                        _callbacks.LastDiscreteReadUtc = now;
-                    }
+                    // Fallback when no polling engine is supplied (legacy / unit tests).
+                    await ReadAreasDirectlyAsync(now, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)
@@ -249,6 +246,138 @@ namespace ModbusForge.ViewModels.Coordinators
             finally
             {
                 _isTrendTimerRunning = false;
+            }
+        }
+
+        private void EnqueueAreaReads(DateTime now)
+        {
+            if (_callbacks.HoldingMonitorEnabled &&
+                (now - _callbacks.LastHoldingReadUtc).TotalMilliseconds >= (_callbacks.HoldingMonitorPeriodMs <= 0 ? 1000 : _callbacks.HoldingMonitorPeriodMs))
+            {
+                _pollingEngine!.Enqueue(new PollingCommand
+                {
+                    Area = PlcArea.HoldingRegister,
+                    UnitId = _callbacks.EffectiveUnitId,
+                    StartAddress = _callbacks.HoldingStartAddress,
+                    Count = _callbacks.HoldingCount,
+                    IsServerMode = _callbacks.IsServerMode,
+                });
+                _callbacks.LastHoldingReadUtc = now;
+            }
+
+            if (_callbacks.InputRegistersMonitorEnabled &&
+                (now - _callbacks.LastInputRegReadUtc).TotalMilliseconds >= (_callbacks.InputRegistersMonitorPeriodMs <= 0 ? 1000 : _callbacks.InputRegistersMonitorPeriodMs))
+            {
+                _pollingEngine!.Enqueue(new PollingCommand
+                {
+                    Area = PlcArea.InputRegister,
+                    UnitId = _callbacks.EffectiveUnitId,
+                    StartAddress = _callbacks.InputRegisterStartAddress,
+                    Count = _callbacks.InputRegisterCount,
+                    IsServerMode = _callbacks.IsServerMode,
+                });
+                _callbacks.LastInputRegReadUtc = now;
+            }
+
+            if (_callbacks.CoilsMonitorEnabled &&
+                (now - _callbacks.LastCoilsReadUtc).TotalMilliseconds >= (_callbacks.CoilsMonitorPeriodMs <= 0 ? 1000 : _callbacks.CoilsMonitorPeriodMs))
+            {
+                _pollingEngine!.Enqueue(new PollingCommand
+                {
+                    Area = PlcArea.Coil,
+                    UnitId = _callbacks.EffectiveUnitId,
+                    StartAddress = _callbacks.CoilStartAddress,
+                    Count = _callbacks.CoilCount,
+                    IsServerMode = _callbacks.IsServerMode,
+                });
+                _callbacks.LastCoilsReadUtc = now;
+            }
+
+            if (_callbacks.DiscreteInputsMonitorEnabled &&
+                (now - _callbacks.LastDiscreteReadUtc).TotalMilliseconds >= (_callbacks.DiscreteInputsMonitorPeriodMs <= 0 ? 1000 : _callbacks.DiscreteInputsMonitorPeriodMs))
+            {
+                _pollingEngine!.Enqueue(new PollingCommand
+                {
+                    Area = PlcArea.DiscreteInput,
+                    UnitId = _callbacks.EffectiveUnitId,
+                    StartAddress = _callbacks.DiscreteInputStartAddress,
+                    Count = _callbacks.DiscreteInputCount,
+                    IsServerMode = _callbacks.IsServerMode,
+                });
+                _callbacks.LastDiscreteReadUtc = now;
+            }
+        }
+
+        private async Task DrainResultsAsync(CancellationToken cancellationToken)
+        {
+            if (_pollingEngine is null)
+                return;
+
+            // Drain all results currently available so the UI can batch-apply them.
+            while (_pollingEngine.Results.TryRead(out var result))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (!result.IsError)
+                {
+                    _callbacks.ApplyPollingResult(result);
+                    _callbacks.SetHasConnectionError(false);
+                }
+
+                // Errors are surfaced by the PollingEngine.Error event handler
+                // and already set the status / error flag, but we still keep the
+                // result out of the channel.
+            }
+
+            // If no results are immediately available and we are not already
+            // throttled, await the next one briefly without blocking the tick.
+            if (_pollingEngine.Results.TryRead(out var nextResult))
+            {
+                if (!nextResult.IsError)
+                {
+                    _callbacks.ApplyPollingResult(nextResult);
+                    _callbacks.SetHasConnectionError(false);
+                }
+            }
+            else
+            {
+                // No result yet. The worker is still running; it will apply on the next tick.
+                await Task.CompletedTask;
+            }
+        }
+
+        private async Task ReadAreasDirectlyAsync(DateTime now, CancellationToken cancellationToken)
+        {
+            if (_callbacks.HoldingMonitorEnabled &&
+                (now - _callbacks.LastHoldingReadUtc).TotalMilliseconds >= (_callbacks.HoldingMonitorPeriodMs <= 0 ? 1000 : _callbacks.HoldingMonitorPeriodMs))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await _callbacks.ReadRegistersAsync();
+                _callbacks.LastHoldingReadUtc = now;
+            }
+
+            if (_callbacks.InputRegistersMonitorEnabled &&
+                (now - _callbacks.LastInputRegReadUtc).TotalMilliseconds >= (_callbacks.InputRegistersMonitorPeriodMs <= 0 ? 1000 : _callbacks.InputRegistersMonitorPeriodMs))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await _callbacks.ReadInputRegistersAsync();
+                _callbacks.LastInputRegReadUtc = now;
+            }
+
+            if (_callbacks.CoilsMonitorEnabled &&
+                (now - _callbacks.LastCoilsReadUtc).TotalMilliseconds >= (_callbacks.CoilsMonitorPeriodMs <= 0 ? 1000 : _callbacks.CoilsMonitorPeriodMs))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await _callbacks.ReadCoilsAsync();
+                _callbacks.LastCoilsReadUtc = now;
+            }
+
+            if (_callbacks.DiscreteInputsMonitorEnabled &&
+                (now - _callbacks.LastDiscreteReadUtc).TotalMilliseconds >= (_callbacks.DiscreteInputsMonitorPeriodMs <= 0 ? 1000 : _callbacks.DiscreteInputsMonitorPeriodMs))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await _callbacks.ReadDiscreteInputsAsync();
+                _callbacks.LastDiscreteReadUtc = now;
             }
         }
     }

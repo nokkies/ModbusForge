@@ -27,20 +27,29 @@ namespace ModbusForge.ViewModels.Coordinators
         public bool IsConnected => ViewModel.IsConnected;
         public bool IsServerMode => ViewModel.IsServerMode;
         public byte UnitId => ViewModel.UnitId;
+        public byte EffectiveUnitId => ViewModel.EffectiveUnitId;
 
         public bool GlobalMonitorEnabled => ViewModel.GlobalMonitorEnabled;
 
         public bool HoldingMonitorEnabled => ViewModel.HoldingMonitorEnabled;
         public int HoldingMonitorPeriodMs => ViewModel.HoldingMonitorPeriodMs;
+        public int HoldingStartAddress => ViewModel.RegisterStart;
+        public int HoldingCount => ViewModel.RegisterCount;
 
         public bool InputRegistersMonitorEnabled => ViewModel.InputRegistersMonitorEnabled;
         public int InputRegistersMonitorPeriodMs => ViewModel.InputRegistersMonitorPeriodMs;
+        public int InputRegisterStartAddress => ViewModel.InputRegisterStart;
+        public int InputRegisterCount => ViewModel.InputRegisterCount;
 
         public bool CoilsMonitorEnabled => ViewModel.CoilsMonitorEnabled;
         public int CoilsMonitorPeriodMs => ViewModel.CoilsMonitorPeriodMs;
+        public int CoilStartAddress => ViewModel.CoilStart;
+        public int CoilCount => ViewModel.CoilCount;
 
         public bool DiscreteInputsMonitorEnabled => ViewModel.DiscreteInputsMonitorEnabled;
         public int DiscreteInputsMonitorPeriodMs => ViewModel.DiscreteInputsMonitorPeriodMs;
+        public int DiscreteInputStartAddress => ViewModel.DiscreteInputStart;
+        public int DiscreteInputCount => ViewModel.DiscreteInputCount;
 
         public DateTime LastHoldingReadUtc
         {
@@ -76,6 +85,12 @@ namespace ModbusForge.ViewModels.Coordinators
         public Task WriteCustomNowAsync(CustomEntry entry) => ViewModel.WriteCustomNowAsync(entry);
         public Task ProcessTrendSamplingAsync() => ViewModel.ProcessTrendSamplingAsync();
         public Task HeartbeatAsync() => ViewModel.HeartbeatAsync();
+
+        public void ApplyPollingResult(PollingResult result) => ViewModel.ApplyPollingResult(result);
+
+        public void SetStatusMessage(string message) => ViewModel.StatusMessage = message;
+
+        public void SetHasConnectionError(bool hasError) => ViewModel.HasConnectionError = hasError;
 
         public bool HasConnectionError
         {

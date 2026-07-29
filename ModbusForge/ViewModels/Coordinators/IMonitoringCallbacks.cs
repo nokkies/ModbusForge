@@ -14,20 +14,29 @@ namespace ModbusForge.ViewModels.Coordinators
         bool IsConnected { get; }
         bool IsServerMode { get; }
         byte UnitId { get; }
+        byte EffectiveUnitId { get; }
 
         bool GlobalMonitorEnabled { get; }
 
         bool HoldingMonitorEnabled { get; }
         int HoldingMonitorPeriodMs { get; }
+        int HoldingStartAddress { get; }
+        int HoldingCount { get; }
 
         bool InputRegistersMonitorEnabled { get; }
         int InputRegistersMonitorPeriodMs { get; }
+        int InputRegisterStartAddress { get; }
+        int InputRegisterCount { get; }
 
         bool CoilsMonitorEnabled { get; }
         int CoilsMonitorPeriodMs { get; }
+        int CoilStartAddress { get; }
+        int CoilCount { get; }
 
         bool DiscreteInputsMonitorEnabled { get; }
         int DiscreteInputsMonitorPeriodMs { get; }
+        int DiscreteInputStartAddress { get; }
+        int DiscreteInputCount { get; }
 
         DateTime LastHoldingReadUtc { get; set; }
         DateTime LastInputRegReadUtc { get; set; }
@@ -44,6 +53,10 @@ namespace ModbusForge.ViewModels.Coordinators
         Task WriteCustomNowAsync(CustomEntry entry);
         Task ProcessTrendSamplingAsync();
         Task HeartbeatAsync();
+
+        void ApplyPollingResult(PollingResult result);
+        void SetStatusMessage(string message);
+        void SetHasConnectionError(bool hasError);
 
         bool HasConnectionError { get; set; }
         DateTime LastErrorTime { get; set; }

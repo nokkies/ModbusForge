@@ -93,7 +93,7 @@ namespace ModbusForge.Tests.Coordinators
             Assert.NotNull(monitorScheduler.StartedTick);
             Assert.NotNull(trendScheduler.StartedTick);
             Assert.Equal(TimeSpan.FromMilliseconds(250), customScheduler.StartedInterval);
-            Assert.Equal(TimeSpan.FromMilliseconds(250), monitorScheduler.StartedInterval);
+            Assert.Equal(TimeSpan.FromMilliseconds(50), monitorScheduler.StartedInterval);
             Assert.Equal(TimeSpan.FromMilliseconds(100), trendScheduler.StartedInterval);
         }
 
