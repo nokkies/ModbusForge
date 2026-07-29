@@ -78,7 +78,12 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
-### 2026.7.1 (v6.2.0) - Current Release
+### 2026.7.2 (v6.2.1) - Current Release
+
+- **Auto-updater CalVer fix**: `UpdateService` now normalises 3-part release tags and 4-part assembly versions to a common 4-part form before comparing, so installed builds with `AssemblyVersion=2026.7.1.0` correctly compare against the `v2026.7.1` tag and future CalVer releases.
+- **Added CalVer asset matching tests** for `UpdateService` to ensure the correct `ModbusForge-YYYY.M.INCREMENT-setup.exe` installer is selected from GitHub releases.
+
+### 2026.7.1 (v6.2.0)
 
 - **CalVer versioning**: Switched from SemVer (`6.x.x`) to `YYYY.M.INCREMENT` starting with `2026.7.1`.
 - **Cross-platform core extraction**: New `ModbusForge.Core` class library targets `net8.0` and contains the view-agnostic models, helpers, configuration and services (Modbus, polling, MQTT, pcap import, logging, etc.).

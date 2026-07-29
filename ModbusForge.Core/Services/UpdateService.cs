@@ -32,29 +32,31 @@ namespace ModbusForge.Services
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                var latestVersion = ParseLatestVersion(json);
+                var latestVersionRaw = ParseLatestVersion(json);
                 var releaseUrl = ParseReleaseUrl(json);
                 var releaseNotes = ParseReleaseNotes(json);
-                var assetDownloadUrl = ParseAssetDownloadUrl(json, latestVersion);
+                var assetDownloadUrl = ParseAssetDownloadUrl(json, latestVersionRaw);
 
-                if (latestVersion == null)
+                if (latestVersionRaw == null)
                 {
                     _logger.LogWarning("Could not parse latest release version from GitHub");
                     return new UpdateCheckResult { ErrorMessage = "Could not determine the latest release version." };
                 }
 
-                var isUpdateAvailable = latestVersion > currentVersion;
+                var currentVersionNormalized = NormalizeVersion(currentVersion);
+                var latestVersionNormalized = NormalizeVersion(latestVersionRaw);
+                var isUpdateAvailable = latestVersionNormalized > currentVersionNormalized;
 
                 _logger.LogInformation(
                     "Update check: current {CurrentVersion}, latest {LatestVersion}, update available: {IsUpdateAvailable}",
                     currentVersion,
-                    latestVersion,
+                    latestVersionRaw,
                     isUpdateAvailable);
 
                 return new UpdateCheckResult
                 {
                     IsUpdateAvailable = isUpdateAvailable,
-                    LatestVersion = latestVersion,
+                    LatestVersion = latestVersionRaw,
                     ReleaseUrl = releaseUrl,
                     ReleaseNotes = releaseNotes,
                     AssetDownloadUrl = assetDownloadUrl
@@ -169,7 +171,17 @@ namespace ModbusForge.Services
         private static Version GetCurrentVersion()
         {
             var assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
-            return assembly.GetName().Version ?? new Version(1, 0, 0, 0);
+            return NormalizeVersion(assembly.GetName().Version);
+        }
+
+        private static Version NormalizeVersion(Version? version)
+        {
+            if (version == null)
+                return new Version(1, 0, 0, 0);
+
+            var build = version.Build >= 0 ? version.Build : 0;
+            var revision = version.Revision >= 0 ? version.Revision : 0;
+            return new Version(version.Major, version.Minor, build, revision);
         }
 
         private static Version? ParseLatestVersion(string json)
