@@ -341,13 +341,7 @@ namespace ModbusForge.ViewModels
                 }
 
                 // enforce retention window based on logger settings
-                var maxPoints = Math.Max(1, (int)Math.Round((_loggerSvc.RetentionMinutes * 60_000.0) / Math.Max(1, _loggerSvc.SampleRateMs)));
-                while (values.Count > maxPoints) values.RemoveAt(0);
-                if (_samplesByKey.TryGetValue(key, out var samples2))
-                {
-                    var cutoff = DateTime.UtcNow.AddMinutes(-_loggerSvc.RetentionMinutes);
-                    while (samples2.Count > 0 && samples2[0].ts < cutoff) samples2.RemoveAt(0);
-                }
+                TrimSeriesToRetention(key);
 
                 // follow live window if enabled
                 if (_followLive && Series.Count > 0)
@@ -390,6 +384,31 @@ namespace ModbusForge.ViewModels
             _followLive = false;
         }
 
+        /// <summary>
+        /// Removes data points older than the configured retention window.
+        /// Keeps the chart values and the CSV export samples in sync by removing
+        /// the same number of oldest points from both collections.
+        /// </summary>
+        private void TrimSeriesToRetention(string key)
+        {
+            if (!_valuesByKey.TryGetValue(key, out var values)) return;
+            if (!_samplesByKey.TryGetValue(key, out var samples)) return;
+
+            var cutoff = DateTime.UtcNow.AddMinutes(-_loggerSvc.RetentionMinutes);
+            int removeCount = 0;
+            while (removeCount < samples.Count && samples[removeCount].ts < cutoff)
+                removeCount++;
+
+            // Guard against any previous de-synchronization between values and samples
+            removeCount = Math.Min(removeCount, Math.Min(values.Count, samples.Count));
+
+            for (int i = 0; i < removeCount; i++)
+            {
+                values.RemoveAt(0);
+                samples.RemoveAt(0);
+            }
+        }
+
         private void ApplyRetention()
         {
             var mins = RetentionMinutes;
@@ -399,6 +418,22 @@ namespace ModbusForge.ViewModels
             _loggerSvc.UpdateSettings(mins, _loggerSvc.SampleRateMs);
             // property may have been clamped; reflect back
             RetentionMinutes = _loggerSvc.RetentionMinutes;
+
+            // Immediately re-trim all existing series so the user sees the new
+            // retention window right away, not just when the next sample arrives.
+            foreach (var key in _valuesByKey.Keys.ToList())
+            {
+                TrimSeriesToRetention(key);
+            }
+
+            // If live-following, re-align the X-axis window to the new data length
+            if (_followLive && Series.Count > 0 && _valuesByKey.Count > 0)
+            {
+                var firstValues = _valuesByKey.First().Value;
+                var count = firstValues.Count;
+                XAxes[0].MinLimit = Math.Max(0, count - _playWindowPoints);
+                XAxes[0].MaxLimit = count;
+            }
         }
 
         private SKColor AcquireColor(string key)
