@@ -75,6 +75,7 @@ namespace ModbusForge.Tests.ViewModels
                 new Mock<IDispatcher>().Object,
                 new Mock<IThemeService>().Object,
                 null!,
+                null!,
                 null!
             );
 

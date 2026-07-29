@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using ModbusForge.Models;
 
 namespace ModbusForge.Services;
 
@@ -90,6 +91,12 @@ public class SettingsService : ISettingsService
         set { _settings.CheckForUpdatesOnStartup = value; OnSettingsChanged(); }
     }
 
+    public MqttSettings MqttSettings
+    {
+        get => _settings.MqttSettings;
+        set { _settings.MqttSettings = value ?? new(); OnSettingsChanged(); }
+    }
+
     public event EventHandler? SettingsChanged;
 
     public SettingsService(ILogger<SettingsService>? logger = null)
@@ -167,5 +174,6 @@ public class SettingsService : ISettingsService
         public string ApiKey { get; set; } = string.Empty;
         public int MaxConcurrentTrendRequests { get; set; } = 8;
         public bool CheckForUpdatesOnStartup { get; set; } = true;
+        public MqttSettings MqttSettings { get; set; } = new();
     }
 }

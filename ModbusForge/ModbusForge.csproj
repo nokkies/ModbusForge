@@ -20,6 +20,7 @@
   <!-- Suppress package compatibility warnings for legacy packages -->
   <ItemGroup>
     <PackageReference Include="Dirkster.AvalonDock" Version="4.74.1" />
+    <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
     <PackageReference Include="NModbus4" Version="2.0.5516.31020" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
     <PackageReference Include="YamlDotNet" Version="17.1.0" />

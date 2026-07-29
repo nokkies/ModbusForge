@@ -1,4 +1,5 @@
 using System;
+using ModbusForge.Models;
 
 namespace ModbusForge.Services;
 
@@ -37,6 +38,9 @@ public interface ISettingsService
 
     // Update settings
     bool CheckForUpdatesOnStartup { get; set; }
+
+    // MQTT publisher settings
+    MqttSettings MqttSettings { get; set; }
 
     // Save/Load
     bool Save();

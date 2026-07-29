@@ -148,6 +148,7 @@ namespace ModbusForge
             // Register services (both Client and Server). ViewModel selects at runtime.
             services.AddSingleton<ModbusTcpService>();
             services.AddSingleton<ModbusServerService>();
+            services.AddSingleton<MqttGatewayService>();
             services.AddSingleton<IModbusService>(provider => 
             {
                 // Get the server settings to determine which service to use

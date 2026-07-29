@@ -1,6 +1,7 @@
 using System;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
+using ModbusForge.Models;
 using ModbusForge.Services;
 
 namespace ModbusForge.ViewModels
@@ -23,6 +24,8 @@ namespace ModbusForge.ViewModels
         private bool _enableApiAuthentication;
         private string _apiKey = string.Empty;
         private bool _checkForUpdatesOnStartup;
+
+        public MqttSettings MqttSettings { get; } = new MqttSettings();
 
         public PreferencesViewModel(ISettingsService settingsService, IDialogService? dialogService = null)
         {
@@ -133,6 +136,19 @@ namespace ModbusForge.ViewModels
             _enableApiAuthentication = _settingsService.EnableApiAuthentication;
             _apiKey = _settingsService.ApiKey;
             _checkForUpdatesOnStartup = _settingsService.CheckForUpdatesOnStartup;
+
+            // Load MQTT settings into the mutable view model copy
+            var mqtt = _settingsService.MqttSettings;
+            MqttSettings.Enabled = mqtt.Enabled;
+            MqttSettings.BrokerHost = mqtt.BrokerHost;
+            MqttSettings.BrokerPort = mqtt.BrokerPort;
+            MqttSettings.ClientId = mqtt.ClientId;
+            MqttSettings.Username = mqtt.Username;
+            MqttSettings.Password = mqtt.Password;
+            MqttSettings.TopicTemplate = mqtt.TopicTemplate;
+            MqttSettings.QualityOfService = mqtt.QualityOfService;
+            MqttSettings.RetainMessages = mqtt.RetainMessages;
+            MqttSettings.PublishPeriodMs = Math.Max(0, mqtt.PublishPeriodMs);
         }
 
         private void Save()
@@ -150,6 +166,7 @@ namespace ModbusForge.ViewModels
             _settingsService.EnableApiAuthentication = EnableApiAuthentication;
             _settingsService.ApiKey = ApiKey?.Trim() ?? string.Empty;
             _settingsService.CheckForUpdatesOnStartup = CheckForUpdatesOnStartup;
+            _settingsService.MqttSettings = MqttSettings;
 
             if (_settingsService.Save())
             {

@@ -135,6 +135,50 @@
                                        Margin="0,4,0,0"/>
                         </StackPanel>
                     </Border>
+                    
+                    <Border Style="{StaticResource FluentCard}">
+                        <StackPanel>
+                            <TextBlock Text="MQTT Publisher" Style="{StaticResource FluentSubtitle}"/>
+                            <ui:ToggleSwitch Content="Enable MQTT publisher" 
+                                             Margin="0,0,0,12"
+                                             IsChecked="{Binding MqttSettings.Enabled, Mode=TwoWay}"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <TextBlock Text="Broker host:" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}" Width="100"/>
+                                <TextBox Width="200" Padding="8,4" Text="{Binding MqttSettings.BrokerHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <TextBlock Text="Broker port:" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}" Width="100"/>
+                                <TextBox Width="90" Padding="8,4" Text="{Binding MqttSettings.BrokerPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <TextBlock Text="Client ID:" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}" Width="100"/>
+                                <TextBox Width="200" Padding="8,4" Text="{Binding MqttSettings.ClientId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <TextBlock Text="Username:" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}" Width="100"/>
+                                <TextBox Width="200" Padding="8,4" Text="{Binding MqttSettings.Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <TextBlock Text="Password:" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}" Width="100"/>
+                                <TextBox Width="200" Padding="8,4" Text="{Binding MqttSettings.Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <TextBlock Text="Topic template:" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}" Width="100"/>
+                                <TextBox Width="300" Padding="8,4" Text="{Binding MqttSettings.TopicTemplate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <TextBlock Text="QoS:" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}" Width="100"/>
+                                <TextBox Width="60" Padding="8,4" Text="{Binding MqttSettings.QualityOfService, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
+                            </StackPanel>
+                            <ui:ToggleSwitch Content="Retain messages" 
+                                             Margin="0,0,0,12"
+                                             IsChecked="{Binding MqttSettings.RetainMessages, Mode=TwoWay}"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <TextBlock Text="Publish period (ms):" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{StaticResource FluentText}" Width="120"/>
+                                <TextBox Width="90" Padding="8,4" Text="{Binding MqttSettings.PublishPeriodMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
             

@@ -61,6 +61,7 @@ namespace ModbusForge.ViewModels
         private readonly VisualNodeEditorViewModel _visualNodeEditorViewModel;
         private readonly IUpdateService? _updateService;
         private readonly ISettingsService? _settingsService;
+        private readonly MqttGatewayService _mqttGatewayService;
         private bool _disposed = false;
         // Mode-aware UI helpers
 
@@ -92,7 +93,7 @@ namespace ModbusForge.ViewModels
 
         public VisualNodeEditorViewModel VisualNodeEditorViewModel => _visualNodeEditorViewModel;
 
-        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, MonitoringCoordinator monitoringCoordinator, IUnitConfigurationStore unitConfigurationStore, IDialogService? dialogService = null, VisualNodeEditorViewModel? visualNodeEditorViewModel = null, IDispatcher? dispatcher = null, IThemeService? themeService = null, IUpdateService? updateService = null, ISettingsService? settingsService = null)
+        public MainViewModel(ModbusTcpService clientService, ModbusServerService serverService, ILogger<MainViewModel> logger, IOptions<ServerSettings> options, ITrendLogger trendLogger, ICustomEntryService customEntryService, IConsoleLoggerService consoleLoggerService, ConnectionCoordinator connectionCoordinator, RegisterCoordinator registerCoordinator, CustomEntryCoordinator customEntryCoordinator, TrendCoordinator trendCoordinator, ConfigurationCoordinator configurationCoordinator, MonitoringCoordinator monitoringCoordinator, IUnitConfigurationStore unitConfigurationStore, IDialogService? dialogService = null, VisualNodeEditorViewModel? visualNodeEditorViewModel = null, IDispatcher? dispatcher = null, IThemeService? themeService = null, IUpdateService? updateService = null, ISettingsService? settingsService = null, MqttGatewayService? mqttGatewayService = null)
         {
             // Store dependencies
             _clientService = clientService ?? throw new ArgumentNullException(nameof(clientService));
@@ -113,6 +114,7 @@ namespace ModbusForge.ViewModels
             _themeService = themeService;
             _updateService = updateService;
             _settingsService = settingsService;
+            _mqttGatewayService = mqttGatewayService ?? new MqttGatewayService(Microsoft.Extensions.Logging.Abstractions.NullLogger<MqttGatewayService>.Instance);
             AttachThemeChangedHandler();
             // Initialize visual node editor
             _visualNodeEditorViewModel = visualNodeEditorViewModel ?? new VisualNodeEditorViewModel();
@@ -990,6 +992,11 @@ namespace ModbusForge.ViewModels
                             }
 
                             HasConnectionError = false;
+
+                            // Apply current MQTT settings and start the publisher
+                            _mqttGatewayService.ApplySettings(GetCurrentMqttSettings());
+                            _mqttGatewayService.SnapshotProvider = BuildMqttSnapshot;
+                            _ = _mqttGatewayService.ConnectAsync();
                         }
                     },
                     ServerUnitId);
@@ -1012,9 +1019,92 @@ namespace ModbusForge.ViewModels
 
         private async Task DisconnectAsync()
         {
+            await _mqttGatewayService.DisconnectAsync();
             await _connectionCoordinator.DisconnectAsync(IsServerMode,
                 msg => StatusMessage = msg, connected => IsConnected = connected);
         }
+
+        private MqttSettings GetCurrentMqttSettings() => _settingsService?.MqttSettings ?? new MqttSettings();
+
+        private IEnumerable<MqttTagUpdate> BuildMqttSnapshot() => _dispatcher.Invoke(() =>
+        {
+            var unitId = EffectiveUnitId;
+            var snapshot = new List<MqttTagUpdate>();
+
+            foreach (var entry in HoldingRegisters)
+            {
+                if (double.TryParse(entry.ValueText, out var d))
+                {
+                    snapshot.Add(new MqttTagUpdate
+                    {
+                        UnitId = unitId,
+                        TagName = $"HoldingRegister_{entry.Address}",
+                        Area = PlcArea.HoldingRegister,
+                        Address = entry.Address,
+                        Value = d,
+                        Timestamp = DateTime.UtcNow,
+                    });
+                }
+            }
+
+            foreach (var entry in InputRegisters)
+            {
+                if (double.TryParse(entry.ValueText, out var d))
+                {
+                    snapshot.Add(new MqttTagUpdate
+                    {
+                        UnitId = unitId,
+                        TagName = $"InputRegister_{entry.Address}",
+                        Area = PlcArea.InputRegister,
+                        Address = entry.Address,
+                        Value = d,
+                        Timestamp = DateTime.UtcNow,
+                    });
+                }
+            }
+
+            foreach (var entry in Coils)
+            {
+                snapshot.Add(new MqttTagUpdate
+                {
+                    UnitId = unitId,
+                    TagName = $"Coil_{entry.Address}",
+                    Area = PlcArea.Coil,
+                    Address = entry.Address,
+                    Value = entry.State,
+                    Timestamp = DateTime.UtcNow,
+                });
+            }
+
+            foreach (var entry in DiscreteInputs)
+            {
+                snapshot.Add(new MqttTagUpdate
+                {
+                    UnitId = unitId,
+                    TagName = $"DiscreteInput_{entry.Address}",
+                    Area = PlcArea.DiscreteInput,
+                    Address = entry.Address,
+                    Value = entry.State,
+                    Timestamp = DateTime.UtcNow,
+                });
+            }
+
+            foreach (var entry in CustomEntries.Where(e => !string.IsNullOrEmpty(e.Value)))
+            {
+                _ = Enum.TryParse<PlcArea>(entry.Area, true, out var area);
+                snapshot.Add(new MqttTagUpdate
+                {
+                    UnitId = unitId,
+                    TagName = entry.Name,
+                    Area = area,
+                    Address = entry.Address,
+                    Value = entry.Value,
+                    Timestamp = DateTime.UtcNow,
+                });
+            }
+
+            return snapshot;
+        });
 
         private async Task RunDiagnosticsAsync()
         {
