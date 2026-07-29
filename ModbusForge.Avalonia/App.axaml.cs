@@ -56,6 +56,14 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<IValidationService, ValidationService>();
             services.AddSingleton<IConnectionManager, ConnectionManager>();
 
+            // File system & file dialogs
+            services.AddSingleton<IFileSystem, FileSystem>();
+
+            // Device scanner
+            services.AddSingleton<IDeviceIdentificationReader, DeviceIdentificationReader>();
+            services.AddSingleton<IModbusDeviceProbe, ModbusDeviceProbe>();
+            services.AddSingleton<IDeviceScannerService, DeviceScannerService>();
+
             // ViewModels
             services.AddSingleton<MainViewModel>();
 

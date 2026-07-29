@@ -1,0 +1,134 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+        x:Class="ModbusForge.Avalonia.Views.DeviceScannerWindow"
+        x:DataType="vm:DeviceScannerViewModel"
+        Title="Device Scanner"
+        Width="980"
+        Height="700"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0" Background="#2B579A" Padding="20,16">
+      <TextBlock Text="Device Scanner" FontSize="20" FontWeight="SemiBold" Foreground="White" />
+    </Border>
+
+    <Grid Grid.Row="1" Margin="16" ColumnDefinitions="300,*">
+      <!-- Scan settings -->
+      <Border Margin="0,0,12,0" BorderBrush="Gray" BorderThickness="1" Padding="8">
+        <ScrollViewer>
+          <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="Scan Settings" FontWeight="SemiBold" Margin="0,0,0,12" />
+
+            <TextBlock Grid.Row="1" Text="Start IP:" VerticalAlignment="Center" Margin="0,0,12,8" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding StartIpAddress, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+
+            <TextBlock Grid.Row="2" Text="End IP:" VerticalAlignment="Center" Margin="0,0,12,8" />
+            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding EndIpAddress, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+
+            <TextBlock Grid.Row="3" Text="Port from:" VerticalAlignment="Center" Margin="0,0,12,8" />
+            <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding StartPort}" Minimum="1" Maximum="65535" Margin="0,0,0,8" />
+
+            <TextBlock Grid.Row="4" Text="Port to:" VerticalAlignment="Center" Margin="0,0,12,8" />
+            <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding EndPort}" Minimum="1" Maximum="65535" Margin="0,0,0,8" />
+
+            <TextBlock Grid.Row="5" Text="Unit ID from:" VerticalAlignment="Center" Margin="0,0,12,8" />
+            <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding StartUnitId}" Minimum="1" Maximum="247" Margin="0,0,0,8" />
+
+            <TextBlock Grid.Row="6" Text="Unit ID to:" VerticalAlignment="Center" Margin="0,0,12,8" />
+            <NumericUpDown Grid.Row="6" Grid.Column="1" Value="{Binding EndUnitId}" Minimum="1" Maximum="247" Margin="0,0,0,8" />
+
+            <TextBlock Grid.Row="7" Text="Register type:" VerticalAlignment="Center" Margin="0,0,12,8" />
+            <ComboBox Grid.Row="7" Grid.Column="1" ItemsSource="{Binding RegisterTypes}" SelectedItem="{Binding RegisterType, Mode=TwoWay}" Margin="0,0,0,8" />
+
+            <TextBlock Grid.Row="8" Text="Probe address:" VerticalAlignment="Center" Margin="0,0,12,8" />
+            <NumericUpDown Grid.Row="8" Grid.Column="1" Value="{Binding ProbeAddress}" Minimum="0" Maximum="65535" Margin="0,0,0,8" />
+
+            <TextBlock Grid.Row="9" Text="Connect (ms):" VerticalAlignment="Center" Margin="0,0,12,8" />
+            <NumericUpDown Grid.Row="9" Grid.Column="1" Value="{Binding ConnectTimeoutMs}" Minimum="1" Maximum="60000" Margin="0,0,0,8" />
+
+            <TextBlock Grid.Row="10" Text="Response (ms):" VerticalAlignment="Center" Margin="0,0,12,8" />
+            <NumericUpDown Grid.Row="10" Grid.Column="1" Value="{Binding ResponseTimeoutMs}" Minimum="1" Maximum="60000" Margin="0,0,0,8" />
+
+            <TextBlock Grid.Row="11" Text="Parallel hosts:" VerticalAlignment="Center" Margin="0,0,12,8" />
+            <NumericUpDown Grid.Row="11" Grid.Column="1" Value="{Binding MaxConcurrency}" Minimum="1" Maximum="64" Margin="0,0,0,8" />
+
+            <CheckBox Grid.Row="12" Grid.ColumnSpan="2" Content="Read device identification (FC43)" IsChecked="{Binding ReadDeviceIdentification, Mode=TwoWay}" Margin="0,0,0,8" />
+
+            <CheckBox Grid.Row="13" Grid.ColumnSpan="2" Content="Detect function codes (FC01-FC04)" IsChecked="{Binding DetectFunctionCodes, Mode=TwoWay}" Margin="0,0,0,8" />
+
+            <CheckBox Grid.Row="14" Grid.ColumnSpan="2" Content="Scan register range on found devices" IsChecked="{Binding ScanRegisterRange, Mode=TwoWay}" Margin="0,0,0,8" />
+
+            <TextBlock Grid.Row="15" Text="Range start:" VerticalAlignment="Center" Margin="0,0,12,8" />
+            <NumericUpDown Grid.Row="15" Grid.Column="1" Value="{Binding RegisterScanStartAddress}" Minimum="0" Maximum="65535" IsEnabled="{Binding ScanRegisterRange}" Margin="0,0,0,8" />
+
+            <TextBlock Grid.Row="16" Text="Range count:" VerticalAlignment="Center" Margin="0,0,12,8" />
+            <NumericUpDown Grid.Row="16" Grid.Column="1" Value="{Binding RegisterScanCount}" Minimum="1" Maximum="2000" IsEnabled="{Binding ScanRegisterRange}" Margin="0,0,0,8" />
+          </Grid>
+        </ScrollViewer>
+      </Border>
+
+      <!-- Results -->
+      <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="1" Padding="8">
+        <Grid RowDefinitions="Auto,*,Auto,140">
+          <TextBlock Text="Discovered Devices" FontWeight="SemiBold" Margin="0,0,0,12" Grid.Row="0" />
+
+          <DataGrid Grid.Row="1"
+                    ItemsSource="{Binding Devices}"
+                    SelectedItem="{Binding SelectedDevice, Mode=TwoWay}"
+                    AutoGenerateColumns="False"
+                    IsReadOnly="True"
+                    HeadersVisibility="Column"
+                    GridLinesVisibility="Horizontal">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Endpoint" Binding="{Binding Endpoint}" Width="160" />
+              <DataGridTextColumn Header="Unit ID" Binding="{Binding UnitId}" Width="70" />
+              <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="140" />
+              <DataGridTextColumn Header="Latency (ms)" Binding="{Binding LatencyMs}" Width="90" />
+              <DataGridTextColumn Header="Function codes" Binding="{Binding SupportedFunctionCodesText}" Width="130" />
+              <DataGridTextColumn Header="Identification" Binding="{Binding Identification}" Width="180" />
+              <DataGridTextColumn Header="Details" Binding="{Binding Message}" Width="*" />
+            </DataGrid.Columns>
+          </DataGrid>
+
+          <TextBlock Grid.Row="2" Text="Registers (selected device)" FontWeight="SemiBold" Margin="0,12,0,8" />
+
+          <DataGrid Grid.Row="3"
+                    ItemsSource="{Binding SelectedDevice.Registers}"
+                    AutoGenerateColumns="False"
+                    IsReadOnly="True"
+                    HeadersVisibility="Column"
+                    GridLinesVisibility="Horizontal">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="90" />
+              <DataGridTextColumn Header="Value" Binding="{Binding DisplayValue}" Width="90" />
+              <DataGridTextColumn Header="Error" Binding="{Binding Error}" Width="*" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- Footer -->
+    <Grid Grid.Row="2" Margin="16,0,16,16" ColumnDefinitions="*,Auto">
+      <StackPanel VerticalAlignment="Center" Grid.Column="0" Margin="0,0,16,0">
+        <ProgressBar Height="6" Minimum="0" Maximum="100" Value="{Binding ProgressPercent, Mode=OneWay}" />
+        <TextBlock Text="{Binding StatusMessage}" Margin="0,6,0,0" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+        <Button Content="Scan" Width="90" Command="{Binding StartScanCommand}" />
+        <Button Content="Stop" Width="90" Command="{Binding CancelScanCommand}" />
+        <Button Content="Add to Profiles" Width="120" Command="{Binding AddToProfilesCommand}" />
+        <Button Content="Export CSV" Width="100" Command="{Binding ExportCsvCommand}" />
+        <Button Content="Clear" Width="80" Command="{Binding ClearResultsCommand}" />
+        <Button Content="Close" Width="80" Command="{Binding CloseCommand}" />
+      </StackPanel>
+    </Grid>
+  </Grid>
+</Window>

@@ -24,6 +24,7 @@
       <TextBlock VerticalAlignment="Center" Text="Count:" />
       <NumericUpDown Value="{Binding RegisterCount}" Minimum="1" Maximum="100" Width="80" />
       <Button Content="Manage Connections" Click="ManageConnections_Click" />
+      <Button Content="Device Scanner" Click="DeviceScanner_Click" />
       <Button Content="Connect" Command="{Binding ConnectCommand}" />
       <Button Content="Disconnect" Command="{Binding DisconnectCommand}" />
     </StackPanel>
