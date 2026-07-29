@@ -25,6 +25,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly IConnectionManager _connectionManager;
         private readonly IDispatcher _dispatcher;
         private readonly IFileDialogService _fileDialogService;
+        private readonly IMessageBoxService _messageBoxService;
         private readonly IFileSystem _fileSystem;
         private readonly ILogger<DeviceScannerViewModel> _logger;
         private CancellationTokenSource? _scanCancellation;
@@ -109,6 +110,7 @@ namespace ModbusForge.Avalonia.ViewModels
             IConnectionManager connectionManager,
             IDispatcher dispatcher,
             IFileDialogService fileDialogService,
+            IMessageBoxService messageBoxService,
             IFileSystem fileSystem,
             ILogger<DeviceScannerViewModel> logger)
         {
@@ -116,6 +118,7 @@ namespace ModbusForge.Avalonia.ViewModels
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
             _fileDialogService = fileDialogService ?? throw new ArgumentNullException(nameof(fileDialogService));
+            _messageBoxService = messageBoxService ?? throw new ArgumentNullException(nameof(messageBoxService));
             _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -177,6 +180,7 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 StatusMessage = validationError;
                 _logger.LogWarning("Invalid scan settings: {Error}", validationError);
+                await _messageBoxService.ShowAsync(validationError, "Invalid scan settings", DialogButton.Ok, DialogIcon.Warning);
                 return;
             }
 
@@ -203,6 +207,7 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 _logger.LogError(ex, "Device scan failed");
                 StatusMessage = $"Scan failed: {ex.Message}";
+                await _messageBoxService.ShowAsync(ex.Message, "Scan failed", DialogButton.Ok, DialogIcon.Error);
             }
             finally
             {
@@ -267,7 +272,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private async Task ExportCsvAsync()
         {
-            var path = _fileDialogService.ShowSaveFileDialog("Export scan results", CsvFilter, "modbus-scan.csv");
+            var path = await _fileDialogService.ShowSaveFileDialogAsync("Export scan results", CsvFilter, "modbus-scan.csv").ConfigureAwait(true);
             if (string.IsNullOrWhiteSpace(path))
             {
                 return;
@@ -282,6 +287,7 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 _logger.LogError(ex, "Failed to export scan results to {Path}", path);
                 StatusMessage = $"Export failed: {ex.Message}";
+                await _messageBoxService.ShowAsync(ex.Message, "Export failed", DialogButton.Ok, DialogIcon.Error);
             }
         }
 

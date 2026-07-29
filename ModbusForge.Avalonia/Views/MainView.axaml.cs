@@ -53,6 +53,7 @@ namespace ModbusForge.Avalonia.Views
             var connectionManager = app.Services.GetRequiredService<IConnectionManager>();
             var dispatcher = app.Services.GetRequiredService<ModbusForge.Services.IDispatcher>();
             var fileDialogService = app.Services.GetRequiredService<IFileDialogService>();
+            var messageBoxService = app.Services.GetRequiredService<IMessageBoxService>();
             var fileSystem = app.Services.GetRequiredService<IFileSystem>();
 
             var window = new DeviceScannerWindow
@@ -62,6 +63,7 @@ namespace ModbusForge.Avalonia.Views
                     connectionManager,
                     dispatcher,
                     fileDialogService,
+                    messageBoxService,
                     fileSystem,
                     app.Services.GetRequiredService<ILogger<DeviceScannerViewModel>>())
             };

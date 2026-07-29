@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:converters="clr-namespace:Avalonia.Data.Converters;assembly=Avalonia.Base"
+        xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+        x:Class="ModbusForge.Avalonia.Views.MessageBoxWindow"
+        x:DataType="vm:MessageBoxViewModel"
+        Title="{Binding Title}"
+        SizeToContent="WidthAndHeight"
+        MinWidth="320"
+        MaxWidth="520"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+  <Grid Margin="20,16" RowDefinitions="Auto,Auto,Auto">
+    <TextBlock Grid.Row="0"
+               Text="{Binding Title}"
+               FontSize="18"
+               FontWeight="SemiBold"
+               TextWrapping="Wrap"
+               Margin="0,0,0,12" />
+
+    <TextBlock Grid.Row="1"
+               Text="{Binding Message}"
+               TextWrapping="Wrap"
+               Margin="0,0,0,20" />
+
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8">
+      <Button Content="{Binding PrimaryText}"
+              Command="{Binding PrimaryCommand}"
+              IsVisible="{Binding PrimaryText, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}"
+              IsDefault="{Binding IsPrimaryDefault}" />
+      <Button Content="{Binding SecondaryText}"
+              Command="{Binding SecondaryCommand}"
+              IsVisible="{Binding SecondaryText, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}"
+              IsDefault="{Binding IsSecondaryDefault}" />
+      <Button Content="{Binding TertiaryText}"
+              Command="{Binding TertiaryCommand}"
+              IsVisible="{Binding TertiaryText, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}"
+              IsDefault="{Binding IsTertiaryDefault}" />
+    </StackPanel>
+  </Grid>
+</Window>
