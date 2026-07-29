@@ -78,7 +78,11 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
-### v6.0.6 - Current Release
+### v6.0.7 - Current Release
+
+- **32/64-bit byte & word swapping endianness matrix**: Added `EndiannessFormat` (`ABCD`, `BADC`, `CDAB`, `DCBA`) and converter methods for `float`, `double`, `int`, `uint`, `long`, and `ulong`. The legacy `Swap Bytes` / `Swap Words` flags now map to the same matrix.
+
+### v6.0.6
 
 - **32-bit float on holding and input (internal) registers**: Holding and Input Register grids now decode `uint`, `int`, `real` (32-bit float), and `string` values. Input Registers get the same **Swap Bytes** / **Swap Words** controls as holding registers, and per-address **Type** and **Swap** settings are now saved in the `.mfp` project file.
 - **Live register value refresh**: Changing the global **Type** or **Swap** settings immediately re-decodes and re-displays the current register values.
