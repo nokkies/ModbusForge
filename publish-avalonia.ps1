@@ -1,4 +1,4 @@
-﻿# Publishes ModbusForge.Avalonia as self-contained single-file executables
+# Publishes ModbusForge.Avalonia as self-contained single-file executables
 # for Windows x64 and Linux x64.
 
 [CmdletBinding()]
@@ -25,7 +25,7 @@ foreach ($profile in $profiles) {
     }
 
     Write-Output "Publishing ModbusForge.Avalonia for $profile..."
-    dotnet publish $project -p:PublishProfile=$profilePath -c Release
+    dotnet publish $project -p:PublishProfile=$profile -c Release
 
     if ($LASTEXITCODE -ne 0) {
         throw "Publish failed for $profile"

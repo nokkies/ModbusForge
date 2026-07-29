@@ -1,99 +1,186 @@
-# ModbusForge Versioned Improvement Roadmap
+# ModbusForge Versioned Roadmap — CalVer 2026.7.x / 2026.07.x
 
-Based on the v4.5.4 code review, here's the split across releases:
+Version format: `YYYY.M.INCREMENT` (repo convention), e.g. `2026.7.3`.  
+All `.csproj` files are bumped together for a release so Core, WPF, Headless and Avalonia share the same assembly version.
 
----
+## Baseline
 
-## v4.5.4 — Debug Cleanup & Dead Code Removal
-**Theme:** "Clean House"  
-**Focus:** Remove noise and clutter
+| Version | Project | State |
+|---------|---------|-------|
+| `2026.7.1` | `ModbusForge`, `ModbusForge.Core`, `ModbusForge.Headless` | Shipped |
+| `2026.7.2` | `ModbusForge.Avalonia` (spike) | Shipped |
 
-### Items:
-1. **Remove excessive Debug.WriteLine calls** (75+ instances)
-   - File: `VisualNodeEditor.xaml.cs`
-   - Action: Delete or wrap in `#if DEBUG` with feature flag
-   
-2. **Delete commented-out code blocks**
-   - File: `VisualNodeEditor.xaml.cs` (ConfigureButton_Click method, lines 858-907)
-   - Action: Remove ~100 lines of old ConnectorConfigWindow code
-   
-3. **Remove or implement placeholder methods**
-   - File: `VisualNodeEditorViewModel.cs`
-   - Action: `GetNodeSimulationValue()` returns false — implement or remove
-   
-4. **Remove potentially dead code**
-   - File: `VisualNodeEditorViewModel.cs`
-   - Action: Verify and remove `ConvertToSimulationElements()` if unused
-
-**Result:** Cleaner codebase, less noise in debug output
+Avalonia currently contains: main window, connection manager, device scanner, basic holding register grid, file/message-box/input dialogs, and self-contained publish profiles for `win-x64` and `linux-x64`.
 
 ---
 
-## v4.5.5 — Error Handling & Logging Consistency
-**Theme:** "Reliability"  
-**Focus:** Fix silent failures and standardize logging
+## 2026.7.3 — Avalonia Foundations
+**Theme:** Cross-platform shell and packaging are solid.
 
-### Items:
-5. **Fix empty catch blocks** (Silent failures)
-   - Files: `MainViewModel.cs`, `VisualNodeEditorViewModel.cs`
-   - Action: Add proper `ILogger` calls to all catch blocks
-   
-6. **Standardize logging approach**
-   - File: `VisualSimulationService.cs`
-   - Action: Replace `DebugLog()` method with proper `ILogger<T>` usage
-   - Remove `System.Diagnostics.Debug.WriteLine` mixing
-   
-7. **Add input validation for address TextBox**
-   - File: `VisualNodeEditor.xaml.cs`
-   - Action: Add visual feedback (red border) for invalid numeric input
-   - Consider numeric-only input restriction
+- Align all `.csproj` versions to `2026.7.3`.
+- Make `ModbusForge.Avalonia` the default startup project in the solution.
+- Add GitHub Actions CI that builds and tests Avalonia on Windows and Linux.
+- Validate Linux `linux-x64` self-contained publish.
+- Smoke-test both `win-x64` and `linux-x64` single-file executables.
+- WPF: keep parity; no new WPF-only features this release.
 
-**Result:** Better error visibility, consistent logging, user input validation
+**Apps:** Avalonia, Core, WPF, Headless  
+**Impact:** Low risk; infrastructure only.
 
 ---
 
-## v4.5.6 — Code Structure & Maintainability
-**Theme:** "Refinement"  
-**Focus:** Improve code organization and readability
+## 2026.7.4 — Core Register Operations in Avalonia
+**Theme:** Port the register read/write experience.
 
-### Items:
-8. **Extract magic numbers to constants**
-   - File: `VisualNodeEditor.xaml.cs`
-   - Action: Create named constants for connector offsets (6), thresholds (500ms), etc.
-   
-9. **Break down long methods**
-   - File: `VisualNodeEditor.xaml.cs`
-   - Action: `CreateNodeElement()` is ~350 lines — extract helpers:
-     - `CreateHeader()`
-     - `CreateInlineEditor()`
-     - `WirePropertyChangedHandlers()`
-     
-10. **Optimize unnecessary LINQ conversions**
-    - File: `VisualSimulationService.cs`
-    - Action: Remove redundant `.ToList()` calls on ObservableCollections
+- Holding / input registers, coils, discrete inputs.
+- Read, write single, write multiple, continuous read.
+- Data grid with address, value, type, swap, format columns.
+- Unit ID switching with per-unit state.
+- Connection diagnostics (TCP latency / serial loopback).
+- WPF: fix any register-grid regressions; add Avalonia-only improvements back to Core.
 
-**Result:** Better maintainability, clearer code structure
+**Affects:** `ModbusForge.Avalonia`, `ModbusForge.Core`  
+**Key services:** `ModbusTcpService`, `ModbusSerialService`, `RegisterCoordinator`.
+
+---
+
+## 2026.7.5 — Custom Watch & Project Save
+**Theme:** User-defined tags and project persistence.
+
+- Custom Watch tab (area, type, read/write value, continuous read/write, read period).
+- Per-row trend enable.
+- Project save/load (`.mfp`) including Unit IDs, connections, custom entries.
+- JSON import/export for custom configurations.
+- Headless: `--custom` JSON import for headless polling.
+
+**Affects:** `ModbusForge.Avalonia`, `ModbusForge.Core`, `ModbusForge.Headless`
+
+---
+
+## 2026.7.6 — Trends & Visualization
+**Theme:** Real-time charts and export.
+
+- Trend view with multiple traces, zoom/pan, retention.
+- CSV and PNG export.
+- Avalonia Skia chart integration (`LiveChartsCore.SkiaSharpView.Avalonia` or equivalent).
+- Trend auto-enable on custom/register line add.
+
+**Affects:** `ModbusForge.Avalonia`, `ModbusForge.Core` (`TrendLoggingService`)
+
+---
+
+## 2026.7.7 — Connection, Transport & Frame Tools
+**Theme:** Complete the connection experience and diagnostics.
+
+- Serial RTU/ASCII settings in Avalonia connection manager (COM, baud, parity, RTS toggle, pre/post tx delays).
+- Connection profile save/load across sessions.
+- Frame Inspector window (live PDU/byte log with timestamps).
+- Pcap import / offline replay (uses `PcapImportService`).
+- MQTT gateway publish from Core (configured in Avalonia preferences).
+
+**Affects:** `ModbusForge.Avalonia`, `ModbusForge.Core`
+
+---
+
+## 2026.7.8 — Scripting & Advanced Functions
+**Theme:** Automation and extended Modbus function codes.
+
+- Script Editor in Avalonia (read, write, delay, log, repeat, run/stop).
+- `.mbscript` save/load.
+- Advanced function codes: FC22 Mask Write, FC23 Read/Write Multiple, FC43 Read Device Identification.
+- Signal generator configuration (ramp, sine, triangle, square).
+
+**Affects:** `ModbusForge.Avalonia`, `ModbusForge.Core` (`ScriptRuleService`, `ModbusServerService`)
+
+---
+
+## 2026.7.9 — Visual Simulation
+**Theme:** Port the visual node editor.
+
+- Visual Node Editor (node palette, canvas, wiring, ADD/COMPARE/CONST/POU blocks).
+- Signal generator nodes.
+- Real-time simulation execution.
+- Save/load simulation programs.
+
+**Affects:** `ModbusForge.Avalonia`, `ModbusForge.Core` (`SimulationService`)
+
+---
+
+## 2026.7.10 — Application Shell & Preferences
+**Theme:** Complete the desktop shell and settings.
+
+- Preferences window (theme, polling defaults, MQTT, API server, update checks).
+- Help, About, Keyboard Shortcuts, Troubleshooting windows.
+- Global keyboard shortcuts (Ctrl+R read, Ctrl+T trends, Ctrl+S save, F5 refresh, F1 help).
+- Theming / dark mode parity with WPF.
+- Auto-updater for Avalonia (asset matching, download, silent install).
+
+**Affects:** `ModbusForge.Avalonia`, `ModbusForge.Core`
+
+---
+
+## 2026.7.11 — Performance & Reliability
+**Theme:** Hardening before broader release.
+
+- Data grid virtualization for large address ranges.
+- Connection pooling / multi-device support improvements.
+- Structured logging with correlation IDs.
+- Address-calculation and boundary-check audit across all services.
+- Unit test coverage for the Avalonia port.
+
+**Affects:** All projects
+
+---
+
+## 2026.7.12 — Release Polish & Cross-Platform Packaging
+**Theme:** Ship Avalonia as the primary entry point.
+
+- Final version bump to `2026.7.12` in all `.csproj` files.
+- Windows installer (`setup/ModbusForge.iss` or a new Avalonia installer).
+- Linux `.tar.gz` packaging.
+- Release notes and README update.
+- Tag `v2026.7.12` and GitHub release.
+
+**Affects:** All projects
+
+---
+
+## Beyond 2026.7.x — Major Features
+
+These are larger initiatives and should start in `2026.8.1` or later once Avalonia parity is reached:
+
+- **Unit ID isolation & save structure redesign** (per-Unit ID state, unified project file).
+- **Alarm / Event system**.
+- **Device Template Library**.
+- **Calculation Engine**.
+- **MQTT subscriber / historian**.
+- **Plugin architecture**.
+- **OpenAPI / Swagger API documentation**.
 
 ---
 
 ## Summary Table
 
-| Version | Theme | Items | Focus |
-|---------|-------|-------|-------|
-| **v4.5.4** | Clean House | 1-4 | Remove debug noise, dead code |
-| **v4.5.5** | Reliability | 5-7 | Error handling, logging, validation |
-| **v4.5.6** | Refinement | 8-10 | Structure, constants, organization |
+| Version | Theme | Main Deliverables | Apps |
+|---------|-------|-------------------|------|
+| `2026.7.3` | Avalonia foundations | CI, Linux publish, default startup | All |
+| `2026.7.4` | Registers | Read/write/poll for all areas | Avalonia, Core |
+| `2026.7.5` | Custom Watch | Custom entries + project save | Avalonia, Core, Headless |
+| `2026.7.6` | Trends | Charts, CSV/PNG, retention | Avalonia, Core |
+| `2026.7.7` | Connection tools | Serial, Frame Inspector, pcap, MQTT | Avalonia, Core |
+| `2026.7.8` | Scripting | Script editor + advanced FCs | Avalonia, Core |
+| `2026.7.9` | Simulation | Visual node editor | Avalonia, Core |
+| `2026.7.10` | Shell | Preferences, help, shortcuts, theme | Avalonia, Core |
+| `2026.7.11` | Hardening | Virtualization, logging, tests | All |
+| `2026.7.12` | Release | Installer, packaging, tag | All |
 
 ---
 
-## Recommended Timeline
+## Notes
 
-- **v4.5.4**: Start immediately — low risk, high cleanup value
-- **v4.5.5**: After 4.5.4 — requires testing error paths
-- **v4.5.6**: Polish release — structural improvements
+- Patch increments (`2026.7.x`) are used for the Avalonia porting milestones while the application is in transition.
+- WPF receives only regression fixes and Core improvements during this period.
+- Headless gets CLI parity for Custom Watch and project save where it makes sense.
+- When Avalonia reaches feature parity, the next minor month (`2026.8.1`) begins the major feature track.
 
-Each version builds on the previous, with v4.5.4 being the easiest and safest to implement first.
-
----
-
-*Roadmap created: March 27, 2026*
+*Roadmap created: July 2026*
