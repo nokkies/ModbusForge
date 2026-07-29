@@ -95,6 +95,7 @@ Tags should still be prefixed with `v`, e.g. `v2026.7.1`.
 - `ModbusForge/` - Main WPF application
 - `ModbusForge.Core/` - Cross-platform view-agnostic class library (`net8.0`)
 - `ModbusForge.Avalonia/` - Cross-platform Avalonia UI spike (`net8.0`)
+- `ModbusForge.Avalonia.Tests/` - Avalonia integration/unit tests (`net8.0`)
 - `ModbusForge.Headless/` - Linux/headless console runtime (`net8.0`)
 - `ModbusForge.Tests/` - Unit tests
 - `setup/ModbusForge.iss` - Inno Setup installer script
@@ -109,6 +110,9 @@ dotnet build c:/Users/rvn/source/repos/ModbusForge/ModbusForge.sln
 
 # Run unit tests (excluding UI automation and smoke tests)
 dotnet test c:/Users/rvn/source/repos/ModbusForge/ModbusForge.Tests/ModbusForge.Tests.csproj --filter "FullyQualifiedName!~UITests & FullyQualifiedName!~SmokeTests" --no-build
+
+# Run Avalonia tests
+dotnet test c:/Users/rvn/source/repos/ModbusForge/ModbusForge.Avalonia.Tests/ModbusForge.Avalonia.Tests.csproj --no-build
 ```
 
 If the build fails because `obj\Debug\net8.0-windows\ModbusForge.dll` is locked, terminate any lingering `dotnet.exe` processes and retry:

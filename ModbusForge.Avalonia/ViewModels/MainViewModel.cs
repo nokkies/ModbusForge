@@ -56,8 +56,8 @@ namespace ModbusForge.Avalonia.ViewModels
             DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => IsConnected);
         }
 
-        public IRelayCommand ConnectCommand { get; }
-        public IRelayCommand DisconnectCommand { get; }
+        public IAsyncRelayCommand ConnectCommand { get; }
+        public IAsyncRelayCommand DisconnectCommand { get; }
 
         private async Task ConnectAsync()
         {
