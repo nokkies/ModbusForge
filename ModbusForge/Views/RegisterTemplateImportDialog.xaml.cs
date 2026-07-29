@@ -58,9 +58,13 @@ namespace ModbusForge.Views
         {
             var dialog = new OpenFileDialog
             {
-                Filter = "Register maps (*.csv;*.tsv;*.txt;*.xlsx)|*.csv;*.tsv;*.txt;*.xlsx|" +
+                Filter = "Register maps (*.csv;*.tsv;*.txt;*.xlsx;*.l5x;*.json;*.yaml;*.yml)|*.csv;*.tsv;*.txt;*.xlsx;*.l5x;*.json;*.yaml;*.yml|" +
                          "CSV files (*.csv;*.tsv;*.txt)|*.csv;*.tsv;*.txt|" +
-                         "Excel files (*.xlsx)|*.xlsx|All files (*.*)|*.*",
+                         "Excel files (*.xlsx)|*.xlsx|" +
+                         "Rockwell L5X (*.l5x)|*.l5x|" +
+                         "JSON (*.json)|*.json|" +
+                         "YAML (*.yaml;*.yml)|*.yaml;*.yml|" +
+                         "All files (*.*)|*.*",
                 Title = "Select a register map"
             };
 

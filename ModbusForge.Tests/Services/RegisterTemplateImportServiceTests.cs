@@ -347,5 +347,138 @@ namespace ModbusForge.Tests.Services
             stream.Position = 0;
             return stream;
         }
+
+        [Fact]
+        public void ImportJson_ParsesArrayOfTagObjects()
+        {
+            var json = @"[
+  { ""Name"": ""Pump_Status"", ""Address"": ""1"", ""Type"": ""Coil"" },
+  { ""Name"": ""Flow_Rate"", ""Address"": ""40001"", ""Type"": ""HoldingRegister"", ""DataType"": ""Float32"", ""Endianness"": ""CDAB"", ""Length"": ""2"", ""Unit"": ""m3/h"" }
+]";
+
+            var result = new RegisterTemplateImportService().ImportJson(json, AddressingConvention.Modicon);
+
+            Assert.Empty(result.Errors);
+            Assert.Equal(2, result.Entries.Count);
+
+            var status = result.Entries[0];
+            Assert.Equal("Pump_Status", status.TagName);
+            Assert.Equal(PlcArea.Coil, status.RegisterType);
+            Assert.Equal(0, status.Address);
+            Assert.Equal(TagDataType.Bool, status.DataType);
+
+            var flow = result.Entries[1];
+            Assert.Equal("Flow_Rate", flow.TagName);
+            Assert.Equal(PlcArea.HoldingRegister, flow.RegisterType);
+            Assert.Equal(0, flow.Address);
+            Assert.Equal(TagDataType.Float, flow.DataType);
+            Assert.Equal(WordOrder.LittleEndian, flow.WordOrder);
+            Assert.Equal(2, flow.Length);
+            Assert.Equal("m3/h", flow.Unit);
+        }
+
+        [Fact]
+        public void ImportYaml_ParsesArrayOfTagMappings()
+        {
+            var yaml = @"
+- Name: Tank_Level
+  Address: 100
+  Type: HoldingRegister
+  DataType: DINT
+  Endianness: CDAB
+  Length: 2
+- Name: Run_Cmd
+  Address: 5
+  Type: Coil
+";
+
+            var result = new RegisterTemplateImportService().ImportYaml(yaml, AddressingConvention.OneBased);
+
+            Assert.Empty(result.Errors);
+            Assert.Equal(2, result.Entries.Count);
+
+            var level = result.Entries[0];
+            Assert.Equal("Tank_Level", level.TagName);
+            Assert.Equal(99, level.Address);
+            Assert.Equal(TagDataType.Int32, level.DataType);
+            Assert.Equal(WordOrder.LittleEndian, level.WordOrder);
+            Assert.Equal(2, level.Length);
+
+            var run = result.Entries[1];
+            Assert.Equal("Run_Cmd", run.TagName);
+            Assert.Equal(4, run.Address);
+            Assert.Equal(TagDataType.Bool, run.DataType);
+        }
+
+        [Fact]
+        public void ImportL5X_ParsesRockwellTagsAndAssignsSequentialAddresses()
+        {
+            var l5x = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<RSLogix5000Content SchemaRevision=""2.0"">
+  <Controller>
+    <Tags>
+      <Tag Name=""Flow"" DataType=""REAL"" Dimensions=""0"" Description=""Flow rate"" />
+      <Tag Name=""Level"" DataType=""DINT"" Dimensions=""0"" />
+      <Tag Name=""Arr"" DataType=""REAL"" Dimensions=""3"" />
+    </Tags>
+  </Controller>
+</RSLogix5000Content>";
+
+            var result = new RegisterTemplateImportService().ImportL5X(l5x, AddressingConvention.ZeroBased);
+
+            Assert.Empty(result.Errors);
+            Assert.Equal(5, result.Entries.Count);
+
+            var flow = result.Entries[0];
+            Assert.Equal("Flow", flow.TagName);
+            Assert.Equal(0, flow.Address);
+            Assert.Equal(TagDataType.Float, flow.DataType);
+            Assert.Equal(2, flow.Length);
+
+            var level = result.Entries[1];
+            Assert.Equal("Level", level.TagName);
+            Assert.Equal(2, level.Address);
+            Assert.Equal(TagDataType.Int32, level.DataType);
+            Assert.Equal(2, level.Length);
+
+            Assert.Equal("Arr[0]", result.Entries[2].TagName);
+            Assert.Equal(4, result.Entries[2].Address);
+            Assert.Equal("Arr[1]", result.Entries[3].TagName);
+            Assert.Equal(6, result.Entries[3].Address);
+            Assert.Equal("Arr[2]", result.Entries[4].TagName);
+            Assert.Equal(8, result.Entries[4].Address);
+        }
+
+        [Fact]
+        public void ImportFromFile_SelectsJsonYamlAndL5xByExtension()
+        {
+            var basePath = Path.Combine(Path.GetTempPath(), $"regmap-{Guid.NewGuid():N}");
+
+            var jsonPath = basePath + ".json";
+            var yamlPath = basePath + ".yaml";
+            var l5xPath = basePath + ".l5x";
+
+            File.WriteAllText(jsonPath, "[{ \"Name\": \"J1\", \"Address\": \"1\", \"Type\": \"HoldingRegister\" }]");
+            File.WriteAllText(yamlPath, "- Name: Y1\n  Address: 2\n  Type: HoldingRegister\n");
+            File.WriteAllText(l5xPath, "<?xml version=\"1.0\"?><RSLogix5000Content><Controller><Tags><Tag Name=\"L1\" DataType=\"REAL\" Dimensions=\"0\"/></Tags></Controller></RSLogix5000Content>");
+
+            try
+            {
+                var jsonResult = new RegisterTemplateImportService().ImportFromFile(jsonPath);
+                Assert.Equal("J1", Assert.Single(jsonResult.Entries).TagName);
+
+                var yamlResult = new RegisterTemplateImportService().ImportFromFile(yamlPath);
+                Assert.Equal("Y1", Assert.Single(yamlResult.Entries).TagName);
+
+                var l5xResult = new RegisterTemplateImportService().ImportFromFile(l5xPath);
+                Assert.Equal("L1", Assert.Single(l5xResult.Entries).TagName);
+            }
+            finally
+            {
+                File.Delete(jsonPath);
+                File.Delete(yamlPath);
+                File.Delete(l5xPath);
+            }
+        }
     }
 }

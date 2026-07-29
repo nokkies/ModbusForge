@@ -4,11 +4,14 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Xml.Linq;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModbusForge.Models;
+using YamlDotNet.Serialization;
 
 namespace ModbusForge.Services
 {
@@ -128,10 +131,12 @@ namespace ModbusForge.Services
                 ["be"] = WordOrder.BigEndian,
                 ["abcd"] = WordOrder.BigEndian,
                 ["msw"] = WordOrder.BigEndian,
+                ["badc"] = WordOrder.BigEndian, // byte-swapped big-endian; word order is still MSW first
                 ["little"] = WordOrder.LittleEndian,
                 ["littleendian"] = WordOrder.LittleEndian,
                 ["le"] = WordOrder.LittleEndian,
                 ["cdab"] = WordOrder.LittleEndian,
+                ["dcba"] = WordOrder.LittleEndian,
                 ["lsw"] = WordOrder.LittleEndian,
                 ["wordswap"] = WordOrder.LittleEndian,
                 ["swapped"] = WordOrder.LittleEndian,
@@ -179,17 +184,15 @@ namespace ModbusForge.Services
             if (string.IsNullOrWhiteSpace(filePath))
                 throw new ArgumentException("File path is required.", nameof(filePath));
 
-            RegisterTemplateImportResult result;
-            if (string.Equals(Path.GetExtension(filePath), ".xlsx", StringComparison.OrdinalIgnoreCase))
+            var extension = Path.GetExtension(filePath).ToLowerInvariant();
+            RegisterTemplateImportResult result = extension switch
             {
-                using var stream = File.OpenRead(filePath);
-                result = ImportExcel(stream, addressing);
-            }
-            else
-            {
-                using var reader = new StreamReader(filePath);
-                result = ImportCsv(reader, addressing);
-            }
+                ".xlsx" => ImportExcel(File.OpenRead(filePath), addressing),
+                ".json" => ImportJson(File.ReadAllText(filePath), addressing),
+                ".yaml" or ".yml" => ImportYaml(File.ReadAllText(filePath), addressing),
+                ".l5x" => ImportL5X(File.ReadAllText(filePath), addressing),
+                _ => ImportCsv(new StringReader(File.ReadAllText(filePath)), addressing),
+            };
 
             result.Template.SourceFile = filePath;
             result.Template.Name = Path.GetFileNameWithoutExtension(filePath);
@@ -256,6 +259,236 @@ namespace ModbusForge.Services
             return BuildResult(rows, addressing);
         }
 
+        public RegisterTemplateImportResult ImportJson(string json, AddressingConvention addressing = AddressingConvention.ZeroBased)
+        {
+            ArgumentNullException.ThrowIfNull(json);
+
+            var result = new RegisterTemplateImportResult();
+
+            try
+            {
+                using var document = JsonDocument.Parse(json);
+                var records = new List<Dictionary<string, string>>();
+
+                if (document.RootElement.ValueKind != JsonValueKind.Array)
+                {
+                    result.Errors.Add(new RegisterMapImportIssue { RowNumber = 1, Message = "JSON register map must contain a top-level array of tag objects." });
+                    return result;
+                }
+
+                int rowNumber = 2;
+                foreach (var element in document.RootElement.EnumerateArray())
+                {
+                    if (element.ValueKind != JsonValueKind.Object)
+                    {
+                        result.Errors.Add(new RegisterMapImportIssue { RowNumber = rowNumber, Message = "JSON array must contain objects." });
+                        rowNumber++;
+                        continue;
+                    }
+
+                    records.Add(element.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.ToString() ?? string.Empty, StringComparer.OrdinalIgnoreCase));
+                    rowNumber++;
+                }
+
+                return BuildResultFromRecords(records, addressing, result);
+            }
+            catch (JsonException ex)
+            {
+                result.Errors.Add(new RegisterMapImportIssue { RowNumber = 1, Message = $"JSON syntax error: {ex.Message}" });
+                return result;
+            }
+        }
+
+        public RegisterTemplateImportResult ImportYaml(string yaml, AddressingConvention addressing = AddressingConvention.ZeroBased)
+        {
+            ArgumentNullException.ThrowIfNull(yaml);
+
+            var result = new RegisterTemplateImportResult();
+
+            try
+            {
+                var deserializer = new DeserializerBuilder().Build();
+                var records = deserializer.Deserialize<List<Dictionary<string, object>>>(yaml)
+                    ?? new List<Dictionary<string, object>>();
+
+                var stringRecords = new List<Dictionary<string, string>>();
+                int rowNumber = 2;
+                foreach (var record in records)
+                {
+                    if (record == null)
+                    {
+                        result.Errors.Add(new RegisterMapImportIssue { RowNumber = rowNumber, Message = "YAML array must contain mappings." });
+                        rowNumber++;
+                        continue;
+                    }
+
+                    stringRecords.Add(record.ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => kvp.Value?.ToString() ?? string.Empty,
+                        StringComparer.OrdinalIgnoreCase));
+                    rowNumber++;
+                }
+
+                return BuildResultFromRecords(stringRecords, addressing, result);
+            }
+            catch (YamlDotNet.Core.YamlException ex)
+            {
+                result.Errors.Add(new RegisterMapImportIssue { RowNumber = 1, Message = $"YAML syntax error: {ex.Message}" });
+                return result;
+            }
+        }
+
+        public RegisterTemplateImportResult ImportL5X(string xml, AddressingConvention addressing = AddressingConvention.ZeroBased)
+        {
+            ArgumentNullException.ThrowIfNull(xml);
+
+            var result = new RegisterTemplateImportResult();
+
+            try
+            {
+                var document = XDocument.Parse(xml);
+                var records = new List<Dictionary<string, string>>();
+
+                // Flatten top-level and program tags. L5X scopes tags under controller or program modules.
+                // L5X files may use an XML namespace; match by local name.
+                var tagElements = document.Descendants().Where(e => e.Name.LocalName == "Tag").ToList();
+                if (!tagElements.Any())
+                {
+                    result.Errors.Add(new RegisterMapImportIssue { RowNumber = 1, Message = "No <Tag> elements found in the L5X file." });
+                    return result;
+                }
+
+                int rowNumber = 2;
+                int nextAddress = addressing == AddressingConvention.OneBased ? 1 : 0;
+
+                foreach (var tag in tagElements)
+                {
+                    var name = tag.Attribute("Name")?.Value;
+                    if (string.IsNullOrWhiteSpace(name))
+                    {
+                        result.Errors.Add(new RegisterMapImportIssue { RowNumber = rowNumber, Message = "L5X <Tag> is missing the Name attribute." });
+                        rowNumber++;
+                        continue;
+                    }
+
+                    var dataType = tag.Attribute("DataType")?.Value ?? string.Empty;
+                    var dimensions = tag.Attribute("Dimensions")?.Value ?? string.Empty;
+                    var radix = tag.Attribute("Radix")?.Value;
+                    var description = tag.Attribute("Description")?.Value ?? string.Empty;
+
+                    if (!TryGetL5XLength(dataType, out var typeLength, out var tagDataType))
+                    {
+                        // Unsupported type; skip silently unless it's a clearly numeric type.
+                        if (IsUnsupportedNumericL5X(dataType))
+                        {
+                            result.Errors.Add(new RegisterMapImportIssue { RowNumber = rowNumber, Column = "DataType", Message = $"L5X data type '{dataType}' is not supported for Modbus mapping." });
+                        }
+
+                        rowNumber++;
+                        continue;
+                    }
+
+                    // Expand 1-D arrays into one entry per element, computing addresses sequentially.
+                    if (!string.IsNullOrWhiteSpace(dimensions) && TryParseDimensions(dimensions, out var dimensionSizes))
+                    {
+                        int totalElements = dimensionSizes.Aggregate(1, (a, b) => a * b);
+                        for (int i = 0; i < totalElements; i++)
+                        {
+                            var indexedName = dimensionSizes.Count == 1 ? $"{name}[{i}]" : $"{name}[{i}]";
+                            records.Add(CreateL5XRecord(indexedName, description, nextAddress, tagDataType, typeLength));
+                            nextAddress += typeLength;
+                        }
+                    }
+                    else
+                    {
+                        records.Add(CreateL5XRecord(name, description, nextAddress, tagDataType, typeLength));
+                        nextAddress += typeLength;
+                    }
+
+                    rowNumber++;
+                }
+
+                return BuildResultFromRecords(records, addressing == AddressingConvention.Modicon ? AddressingConvention.ZeroBased : addressing, result);
+            }
+            catch (System.Xml.XmlException ex)
+            {
+                result.Errors.Add(new RegisterMapImportIssue { RowNumber = 1, Message = $"L5X XML error: {ex.Message}" });
+                return result;
+            }
+        }
+
+        private static bool IsUnsupportedNumericL5X(string dataType) =>
+            !string.IsNullOrWhiteSpace(dataType) &&
+            dataType is "SINT" or "INT" or "DINT" or "LINT" or "REAL" or "LREAL" or "BOOL" or "SINT" or "DINT" or "REAL";
+
+        private static bool TryGetL5XLength(string dataType, out int length, out TagDataType tagDataType)
+        {
+            length = 1;
+            tagDataType = TagDataType.UInt16;
+
+            switch (dataType)
+            {
+                case "SINT":
+                case "INT":
+                    tagDataType = TagDataType.Int16;
+                    length = 1;
+                    return true;
+
+                case "DINT":
+                    tagDataType = TagDataType.Int32;
+                    length = 2;
+                    return true;
+
+                case "LINT":
+                    tagDataType = TagDataType.Int32; // L5X LINT maps to 4-register 64-bit
+                    length = 4;
+                    return true;
+
+                case "REAL":
+                    tagDataType = TagDataType.Float;
+                    length = 2;
+                    return true;
+
+                case "LREAL":
+                    tagDataType = TagDataType.Double;
+                    length = 4;
+                    return true;
+
+                case "BOOL":
+                    tagDataType = TagDataType.Bool;
+                    length = 1;
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
+        private static bool TryParseDimensions(string dimensions, out List<int> sizes)
+        {
+            sizes = new List<int>();
+            var parts = dimensions.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var part in parts)
+            {
+                if (!int.TryParse(part.Trim(), out var size) || size <= 0)
+                    return false;
+                sizes.Add(size);
+            }
+
+            return sizes.Count > 0;
+        }
+
+        private static Dictionary<string, string> CreateL5XRecord(string name, string description, int address, TagDataType dataType, int length)
+            => new(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Name"] = name,
+                ["Description"] = description,
+                ["Type"] = PlcArea.HoldingRegister.ToString(),
+                ["Address"] = address.ToString(CultureInfo.InvariantCulture),
+                ["DataType"] = dataType.ToString(),
+                ["Length"] = length.ToString(CultureInfo.InvariantCulture)
+            };
+
         public IReadOnlyList<Tag> Merge(TagService tagService, IEnumerable<RegisterTemplateEntry> entries, out IReadOnlyList<string> skippedNames)
         {
             ArgumentNullException.ThrowIfNull(tagService);
@@ -304,6 +537,31 @@ namespace ModbusForge.Services
             builder.AppendLine("Pump1_Mode,Pump 1 mode,Pumps,HoldingRegister,110,,UInt16,BigEndian,1,1,0,,rw,0=Off;1=Hand;2=Auto,2,");
             builder.AppendLine("Pump1_Fault,Pump 1 fault bit 3 of status word,Pumps,HoldingRegister,120,3,Bool,BigEndian,1,1,0,,r,0=Ok;1=Fault,,");
             return builder.ToString();
+        }
+
+        private RegisterTemplateImportResult BuildResultFromRecords(
+            IReadOnlyList<Dictionary<string, string>> records,
+            AddressingConvention addressing,
+            RegisterTemplateImportResult result)
+        {
+            if (records.Count == 0)
+            {
+                result.Errors.Add(new RegisterMapImportIssue { RowNumber = 1, Message = "The file contains no tag records." });
+                return result;
+            }
+
+            var header = records.SelectMany(r => r.Keys).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var rows = new List<List<string>> { header };
+
+            foreach (var record in records)
+            {
+                var row = header
+                    .Select(col => record.TryGetValue(col, out var value) ? value : string.Empty)
+                    .ToList();
+                rows.Add(row);
+            }
+
+            return BuildResult(rows, addressing);
         }
 
         private RegisterTemplateImportResult BuildResult(IReadOnlyList<List<string>> rows, AddressingConvention addressing)
