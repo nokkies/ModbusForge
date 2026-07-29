@@ -64,6 +64,24 @@ This file provides instructions for AI coding assistants working on this project
    - Upload: `installers\ModbusForge-4.5.15-setup.exe`
    - Description: Brief changelog
 
+## Versioning
+
+As of the v6.2.0 / headless split work, ModbusForge uses **CalVer-style** versions in the form `YYYY.M.INCREMENT` (e.g. `2026.7.1`):
+
+- `YYYY` = year
+- `M` = month (no leading zero)
+- `INCREMENT` = release number within that month, starting at 1
+
+Update the version in `ModbusForge\ModbusForge.csproj` before tagging:
+
+```xml
+<Version>2026.7.1</Version>
+<AssemblyVersion>2026.7.1</AssemblyVersion>
+<FileVersion>2026.7.1</FileVersion>
+```
+
+Tags should still be prefixed with `v`, e.g. `v2026.7.1`.
+
 ## Release Files Policy
 
 **Do NOT create extra markdown files for releases.**
