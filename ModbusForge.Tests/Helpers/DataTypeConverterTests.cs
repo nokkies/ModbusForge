@@ -1,5 +1,6 @@
 using System;
 using ModbusForge.Helpers;
+using ModbusForge.Models;
 using Xunit;
 
 namespace ModbusForge.Tests.Helpers
@@ -86,6 +87,74 @@ namespace ModbusForge.Tests.Helpers
 
             // Assert
             Assert.Empty(result);
+        }
+
+        [Theory]
+        [InlineData(1.0f, EndiannessFormat.ABCD_BigEndian)]
+        [InlineData(0.0f, EndiannessFormat.ABCD_BigEndian)]
+        [InlineData(-1.0f, EndiannessFormat.ABCD_BigEndian)]
+        [InlineData(123456.0f, EndiannessFormat.ABCD_BigEndian)]
+        [InlineData(1.0f, EndiannessFormat.BADC_ByteSwap)]
+        [InlineData(123456.0f, EndiannessFormat.BADC_ByteSwap)]
+        [InlineData(1.0f, EndiannessFormat.CDAB_WordSwap)]
+        [InlineData(123456.0f, EndiannessFormat.CDAB_WordSwap)]
+        [InlineData(1.0f, EndiannessFormat.DCBA_LittleEndian)]
+        [InlineData(123456.0f, EndiannessFormat.DCBA_LittleEndian)]
+        public void Float32_RoundTrip_AllFormats(float value, EndiannessFormat format)
+        {
+            byte[] bytes = DataTypeConverter.GetBytes(value, format);
+            float result = DataTypeConverter.ToFloat32(bytes, format);
+            Assert.Equal(value, result);
+        }
+
+        [Theory]
+        [InlineData(123456.0, EndiannessFormat.ABCD_BigEndian)]
+        [InlineData(-987654.0, EndiannessFormat.BADC_ByteSwap)]
+        [InlineData(3.14159265358979, EndiannessFormat.CDAB_WordSwap)]
+        [InlineData(-2.71828182845904, EndiannessFormat.DCBA_LittleEndian)]
+        public void Float64_RoundTrip_AllFormats(double value, EndiannessFormat format)
+        {
+            byte[] bytes = DataTypeConverter.GetBytes(value, format);
+            double result = DataTypeConverter.ToFloat64(bytes, format);
+            Assert.Equal(value, result);
+        }
+
+        [Theory]
+        [InlineData(0x12345678, EndiannessFormat.ABCD_BigEndian)]
+        [InlineData(-0x12345678, EndiannessFormat.BADC_ByteSwap)]
+        [InlineData(0x12345678, EndiannessFormat.CDAB_WordSwap)]
+        [InlineData(-0x12345678, EndiannessFormat.DCBA_LittleEndian)]
+        public void Int32_RoundTrip_AllFormats(int value, EndiannessFormat format)
+        {
+            byte[] bytes = DataTypeConverter.GetBytes(value, format);
+            int result = DataTypeConverter.ToInt32(bytes, format);
+            Assert.Equal(value, result);
+        }
+
+        [Theory]
+        [InlineData(0x123456789ABCDEF0, EndiannessFormat.ABCD_BigEndian)]
+        [InlineData(0x123456789ABCDEF0, EndiannessFormat.DCBA_LittleEndian)]
+        [InlineData(0x123456789ABCDEF0, EndiannessFormat.CDAB_WordSwap)]
+        [InlineData(0x123456789ABCDEF0, EndiannessFormat.BADC_ByteSwap)]
+        public void Int64_RoundTrip_AllFormats(long value, EndiannessFormat format)
+        {
+            byte[] bytes = DataTypeConverter.GetBytes(value, format);
+            long result = DataTypeConverter.ToInt64(bytes, format);
+            Assert.Equal(value, result);
+        }
+
+        [Theory]
+        [InlineData(123456.0f, false, false, EndiannessFormat.ABCD_BigEndian)]
+        [InlineData(123456.0f, true, false, EndiannessFormat.BADC_ByteSwap)]
+        [InlineData(123456.0f, false, true, EndiannessFormat.CDAB_WordSwap)]
+        [InlineData(123456.0f, true, true, EndiannessFormat.DCBA_LittleEndian)]
+        public void LegacySwapFlags_MatchEndiannessFormat(float value, bool swapBytes, bool swapWords, EndiannessFormat format)
+        {
+            ushort[] legacy = DataTypeConverter.ToUInt16(value, swapBytes, swapWords);
+            byte[] bytes = DataTypeConverter.GetBytes(value, format);
+
+            Assert.Equal(legacy, new[] { (ushort)((bytes[0] << 8) | bytes[1]), (ushort)((bytes[2] << 8) | bytes[3]) });
+            Assert.Equal(value, DataTypeConverter.ToSingle(legacy[0], legacy[1], swapBytes, swapWords));
         }
     }
 }
