@@ -1432,11 +1432,10 @@ namespace ModbusForge.ViewModels
 
         private async Task SaveAllConfigAsync()
         {
-            await _configurationCoordinator.SaveAllConfigAsync(
-                Mode, ServerAddress, Port, UnitId, CustomEntries,
-                _visualNodeEditorViewModel.Nodes,
-                _visualNodeEditorViewModel.Connections,
-                msg => StatusMessage = msg);
+            var snapshot = BuildWorkspaceSnapshot();
+            var result = await _configurationCoordinator.SaveProjectAsync(snapshot, saveAllUnits: true);
+            if (result != null)
+                StatusMessage = result.Message;
         }
 
         private async Task LoadAllConfigAsync()

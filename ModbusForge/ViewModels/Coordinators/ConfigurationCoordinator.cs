@@ -186,7 +186,7 @@ namespace ModbusForge.ViewModels.Coordinators
         /// <summary>
         /// Saves a project workspace snapshot to a .mfp file.
         /// </summary>
-        public async Task<ProjectPersistenceResult> SaveProjectAsync(ProjectWorkspaceSnapshot snapshot)
+        public async Task<ProjectPersistenceResult> SaveProjectAsync(ProjectWorkspaceSnapshot snapshot, bool saveAllUnits = false)
         {
             if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
 
@@ -194,7 +194,7 @@ namespace ModbusForge.ViewModels.Coordinators
             {
                 var defaultFileName = GenerateAutoFileName(snapshot);
                 var filePath = _fileDialogService.ShowSaveFileDialog(
-                    snapshot.IsServerMode ? "Save Server Project" : "Save Client Project",
+                    saveAllUnits ? "Save All Configurations" : (snapshot.IsServerMode ? "Save Server Project" : "Save Client Project"),
                     "ModbusForge Project (*.mfp)|*.mfp|All Files (*.*)|*.*",
                     defaultFileName);
 
@@ -219,7 +219,7 @@ namespace ModbusForge.ViewModels.Coordinators
                     }
                 };
 
-                if (snapshot.IsServerMode)
+                if (saveAllUnits || snapshot.IsServerMode)
                 {
                     foreach (var kvp in snapshot.UnitConfigurations)
                         projectConfig.UnitConfigurations[kvp.Key] = kvp.Value.Clone();
