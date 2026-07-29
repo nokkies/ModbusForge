@@ -52,6 +52,15 @@ public partial class ConnectionProfile : ObservableObject
     [ObservableProperty]
     private bool _rtsEnable;
 
+    [ObservableProperty]
+    private bool _enableRtsToggle;
+
+    [ObservableProperty]
+    private int _preTxDelayMs;
+
+    [ObservableProperty]
+    private int _postTxDelayMs;
+
     public string DisplayName => Transport switch
     {
         TransportType.Tcp => $"{Name} ({IpAddress}:{Port})",
@@ -83,7 +92,10 @@ public partial class ConnectionProfile : ObservableObject
             Parity = Parity,
             DataBits = DataBits,
             StopBits = StopBits,
-            RtsEnable = RtsEnable
+            RtsEnable = RtsEnable,
+            EnableRtsToggle = EnableRtsToggle,
+            PreTxDelayMs = PreTxDelayMs,
+            PostTxDelayMs = PostTxDelayMs
         };
     }
 }

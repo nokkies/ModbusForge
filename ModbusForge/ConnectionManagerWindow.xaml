@@ -170,6 +170,9 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="100"/>
@@ -204,7 +207,22 @@
                             <TextBlock Text="RTS:" Grid.Row="5" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="{StaticResource FluentText}"/>
                             <CheckBox Grid.Row="5" Grid.Column="1" Margin="0,8,0,0" VerticalAlignment="Center"
                                       IsChecked="{Binding SelectedProfile.RtsEnable}"
-                                      Content="Enable RS-485 RTS"/>
+                                      Content="Enable RS-485 RTS (always high)"/>
+
+                            <TextBlock Text="RTS Toggle:" Grid.Row="6" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="{StaticResource FluentText}"/>
+                            <CheckBox Grid.Row="6" Grid.Column="1" Margin="0,8,0,0" VerticalAlignment="Center"
+                                      IsChecked="{Binding SelectedProfile.EnableRtsToggle}"
+                                      Content="Toggle RTS high only while transmitting"/>
+
+                            <TextBlock Text="Pre Tx (ms):" Grid.Row="7" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="{StaticResource FluentText}"/>
+                            <TextBox Grid.Row="7" Grid.Column="1" Padding="8,4" Margin="0,8,0,0" Width="100" HorizontalAlignment="Left"
+                                     Text="{Binding SelectedProfile.PreTxDelayMs, UpdateSourceTrigger=PropertyChanged}"
+                                     behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
+
+                            <TextBlock Text="Post Tx (ms):" Grid.Row="8" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="{StaticResource FluentText}"/>
+                            <TextBox Grid.Row="8" Grid.Column="1" Padding="8,4" Margin="0,8,0,0" Width="100" HorizontalAlignment="Left"
+                                     Text="{Binding SelectedProfile.PostTxDelayMs, UpdateSourceTrigger=PropertyChanged}"
+                                     behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="UInteger"/>
                         </Grid>
 
                         <TextBlock Text="Unit ID:" Grid.Row="4" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="{StaticResource FluentText}"/>

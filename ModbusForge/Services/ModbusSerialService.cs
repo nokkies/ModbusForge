@@ -14,6 +14,7 @@ namespace ModbusForge.Services
     {
         private SerialPort? _serialPort;
         private IModbusMaster? _client;
+        private ConnectionProfile? _connectionProfile;
         private bool _disposed;
         private readonly ILogger<ModbusSerialService> _logger;
         private readonly IConsoleLoggerService? _consoleLoggerService;
@@ -85,6 +86,8 @@ namespace ModbusForge.Services
                 }
 
                 DisconnectCore();
+
+                _connectionProfile = profile;
 
                 _serialPort = new SerialPort(profile.ComPort, profile.BaudRate, profile.Parity, profile.DataBits, profile.StopBits)
                 {
@@ -306,7 +309,8 @@ namespace ModbusForge.Services
                         if (_client == null)
                             return Array.Empty<T>();
 
-                        var result = readFunc(_client, protocolAddress);
+                        T[]? result = null;
+                        ApplySerialTiming(() => result = readFunc(_client!, protocolAddress));
                         return result ?? Array.Empty<T>();
                     }
                     catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
@@ -345,7 +349,7 @@ namespace ModbusForge.Services
                         ushort protocolAddress = (ushort)(address > 0 ? address - 1 : 0);
 
                         if (_client != null)
-                            writeAction(_client, protocolAddress);
+                            ApplySerialTiming(() => writeAction(_client, protocolAddress));
                     }
                     catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
@@ -382,7 +386,9 @@ namespace ModbusForge.Services
                         if (_client is not ModbusMaster master)
                             return default;
 
-                        return operation(_client, master);
+                        T? result = default;
+                        ApplySerialTiming(() => result = operation(_client, master));
+                        return result;
                     }
                     catch (Modbus.SlaveException ex)
                     {
@@ -401,6 +407,41 @@ namespace ModbusForge.Services
             {
                 _ioLock.Release();
             }
+        }
+
+        private void ApplySerialTiming(Action operation)
+        {
+            if (_connectionProfile is null || _serialPort is null)
+            {
+                operation();
+                return;
+            }
+
+            if (_connectionProfile.PreTxDelayMs > 0)
+                Thread.Sleep(_connectionProfile.PreTxDelayMs);
+
+            if (_connectionProfile.EnableRtsToggle)
+                _serialPort.RtsEnable = true;
+
+            try
+            {
+                operation();
+
+                if (_connectionProfile.EnableRtsToggle)
+                {
+                    _serialPort.BaseStream.Flush();
+                    _serialPort.RtsEnable = false;
+                }
+            }
+            catch
+            {
+                if (_connectionProfile.EnableRtsToggle)
+                    _serialPort.RtsEnable = false;
+                throw;
+            }
+
+            if (_connectionProfile.PostTxDelayMs > 0)
+                Thread.Sleep(_connectionProfile.PostTxDelayMs);
         }
 
         private void HandleConnectionLoss()
@@ -427,6 +468,7 @@ namespace ModbusForge.Services
             catch { }
 
             _serialPort = null;
+            _connectionProfile = null;
         }
 
         public virtual Task<ConnectionDiagnosticResult> RunDiagnosticsAsync(string ipAddress, int port, byte unitId)
