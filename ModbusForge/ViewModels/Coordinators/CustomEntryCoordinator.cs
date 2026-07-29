@@ -41,20 +41,34 @@ namespace ModbusForge.ViewModels.Coordinators
         }
 
         /// <summary>
-        /// Adds a new custom entry to the collection.
+        /// Adds a new custom entry to the collection, inheriting type and area from
+        /// the previous entry and auto-incrementing the address/name.
         /// </summary>
         public void AddCustomEntry(ObservableCollection<CustomEntry> customEntries)
         {
             int nextAddress = 1;
+            string type = "uint";
+            string area = "HoldingRegister";
+            string name = "Tag0";
+
             if (customEntries.Count > 0)
             {
-                nextAddress = customEntries[^1].Address + 1;
+                var last = customEntries[^1];
+                type = last.Type ?? "uint";
+                area = last.Area ?? "HoldingRegister";
+                name = GenerateNextName(last.Name);
+
+                // Request #5: uint and real types occupy two consecutive register addresses.
+                int increment = (type == "uint" || type == "real") ? 2 : 1;
+                nextAddress = Math.Max(1, last.Address + increment);
             }
+
             customEntries.Add(new CustomEntry
             {
+                Name = name,
                 Address = nextAddress,
-                Area = "HoldingRegister",
-                Type = "uint",
+                Area = area,
+                Type = type,
                 Value = "0",
                 WriteValue = "0",
                 Continuous = false,
@@ -62,6 +76,24 @@ namespace ModbusForge.ViewModels.Coordinators
                 Monitor = false,
                 ReadPeriodMs = 1000
             });
+        }
+
+        private static string GenerateNextName(string previousName)
+        {
+            if (string.IsNullOrWhiteSpace(previousName))
+                return "Tag0";
+
+            int i = previousName.Length - 1;
+            while (i >= 0 && char.IsDigit(previousName[i]))
+                i--;
+
+            if (i < previousName.Length - 1 &&
+                int.TryParse(previousName[(i + 1)..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var num))
+            {
+                return previousName.Substring(0, i + 1) + (num + 1).ToString(CultureInfo.InvariantCulture);
+            }
+
+            return previousName + "1";
         }
 
         /// <summary>

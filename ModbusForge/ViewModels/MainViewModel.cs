@@ -914,6 +914,13 @@ namespace ModbusForge.ViewModels
         }
 
         // Setters for delegated properties (needed for two-way binding)
+        private void SetHasConnectionError(bool hasError)
+        {
+            HasConnectionError = hasError;
+            if (hasError)
+                LastErrorTime = DateTime.UtcNow;
+        }
+
         private void SetGlobalMonitorEnabled(bool value) => CurrentConfig.MonitoringSettings.GlobalMonitorEnabled = value;
         private void SetHoldingMonitorEnabled(bool value) => CurrentConfig.MonitoringSettings.HoldingMonitorEnabled = value;
         private void SetHoldingMonitorPeriodMs(int value) => CurrentConfig.MonitoringSettings.HoldingMonitorPeriodMs = value;
@@ -1016,7 +1023,7 @@ namespace ModbusForge.ViewModels
         {
             await _registerCoordinator.ReadRegistersAsync(EffectiveUnitId, RegisterStart, RegisterCount,
                 RegistersGlobalType, HoldingRegisters, msg => StatusMessage = msg,
-                hasError => HasConnectionError = hasError, HoldingMonitorEnabled, IsServerMode,
+                SetHasConnectionError, () => HoldingMonitorEnabled = false, HoldingMonitorEnabled, IsServerMode,
                 CurrentConfig.RegisterSettings);
         }
 
@@ -1024,7 +1031,7 @@ namespace ModbusForge.ViewModels
         {
             await _registerCoordinator.ReadInputRegistersAsync(EffectiveUnitId, InputRegisterStart, InputRegisterCount,
                 InputRegisters, msg => StatusMessage = msg,
-                hasError => HasConnectionError = hasError, InputRegistersMonitorEnabled, IsServerMode,
+                SetHasConnectionError, () => InputRegistersMonitorEnabled = false, InputRegistersMonitorEnabled, IsServerMode,
                 CurrentConfig.RegisterSettings);
         }
 
@@ -1043,14 +1050,14 @@ namespace ModbusForge.ViewModels
         {
             await _registerCoordinator.ReadCoilsAsync(EffectiveUnitId, CoilStart, CoilCount,
                 Coils, msg => StatusMessage = msg,
-                hasError => HasConnectionError = hasError, CoilsMonitorEnabled, IsServerMode);
+                SetHasConnectionError, () => CoilsMonitorEnabled = false, CoilsMonitorEnabled, IsServerMode);
         }
 
         public async Task ReadDiscreteInputsAsync()
         {
             await _registerCoordinator.ReadDiscreteInputsAsync(EffectiveUnitId, DiscreteInputStart, DiscreteInputCount,
                 DiscreteInputs, msg => StatusMessage = msg,
-                hasError => HasConnectionError = hasError, DiscreteInputsMonitorEnabled, IsServerMode);
+                SetHasConnectionError, () => DiscreteInputsMonitorEnabled = false, DiscreteInputsMonitorEnabled, IsServerMode);
         }
 
         private async Task WriteCoilAsync()

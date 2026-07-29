@@ -46,7 +46,7 @@ namespace ModbusForge.ViewModels.Coordinators
         /// </summary>
         public async Task ReadRegistersAsync(byte unitId, int start, int count, string globalType,
             ObservableCollection<RegisterEntry> holdingRegisters, Action<string> setStatusMessage,
-            Action<bool> setHasConnectionError, bool isMonitoringEnabled, bool isServerMode,
+            Action<bool> setHasConnectionError, Action? pauseMonitor, bool isMonitoringEnabled, bool isServerMode,
             RegisterSettings? registerSettings = null)
         {
             try
@@ -132,9 +132,11 @@ namespace ModbusForge.ViewModels.Coordinators
             {
                 setStatusMessage($"Error reading registers: {ex.Message}");
                 _logger.LogError(ex, "Error reading registers");
-                
+                setHasConnectionError(true);
+
                 if (isMonitoringEnabled)
                 {
+                    pauseMonitor?.Invoke();
                     _dialogService.Show($"Failed to read registers: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
@@ -208,7 +210,7 @@ namespace ModbusForge.ViewModels.Coordinators
         /// </summary>
         public async Task ReadInputRegistersAsync(byte unitId, int start, int count,
             ObservableCollection<RegisterEntry> inputRegisters, Action<string> setStatusMessage,
-            Action<bool> setHasConnectionError, bool isMonitoringEnabled, bool isServerMode,
+            Action<bool> setHasConnectionError, Action? pauseMonitor, bool isMonitoringEnabled, bool isServerMode,
             RegisterSettings? registerSettings = null)
         {
             try
@@ -298,9 +300,11 @@ namespace ModbusForge.ViewModels.Coordinators
             {
                 setStatusMessage($"Error reading input registers: {ex.Message}");
                 _logger.LogError(ex, "Error reading input registers");
-                
+                setHasConnectionError(true);
+
                 if (isMonitoringEnabled)
                 {
+                    pauseMonitor?.Invoke();
                     _dialogService.Show($"Failed to read input registers: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
@@ -384,7 +388,7 @@ namespace ModbusForge.ViewModels.Coordinators
         /// </summary>
         public async Task ReadCoilsAsync(byte unitId, int start, int count,
             ObservableCollection<CoilEntry> coils, Action<string> setStatusMessage,
-            Action<bool> setHasConnectionError, bool isMonitoringEnabled, bool isServerMode)
+            Action<bool> setHasConnectionError, Action? pauseMonitor, bool isMonitoringEnabled, bool isServerMode)
         {
             try
             {
@@ -436,9 +440,11 @@ namespace ModbusForge.ViewModels.Coordinators
             {
                 setStatusMessage($"Error reading coils: {ex.Message}");
                 _logger.LogError(ex, "Error reading coils");
-                
+                setHasConnectionError(true);
+
                 if (isMonitoringEnabled)
                 {
+                    pauseMonitor?.Invoke();
                     _dialogService.Show($"Failed to read coils: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
@@ -455,7 +461,7 @@ namespace ModbusForge.ViewModels.Coordinators
         /// </summary>
         public async Task ReadDiscreteInputsAsync(byte unitId, int start, int count,
             ObservableCollection<CoilEntry> discreteInputs, Action<string> setStatusMessage,
-            Action<bool> setHasConnectionError, bool isMonitoringEnabled, bool isServerMode)
+            Action<bool> setHasConnectionError, Action? pauseMonitor, bool isMonitoringEnabled, bool isServerMode)
         {
             try
             {
@@ -507,9 +513,11 @@ namespace ModbusForge.ViewModels.Coordinators
             {
                 setStatusMessage($"Error reading discrete inputs: {ex.Message}");
                 _logger.LogError(ex, "Error reading discrete inputs");
-                
+                setHasConnectionError(true);
+
                 if (isMonitoringEnabled)
                 {
+                    pauseMonitor?.Invoke();
                     _dialogService.Show($"Failed to read discrete inputs: {ex.Message}\n\nContinuous monitoring has been paused. Fix the issue and re-enable monitoring.", "Read Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
