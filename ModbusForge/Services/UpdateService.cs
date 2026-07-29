@@ -35,7 +35,7 @@ namespace ModbusForge.Services
                 var latestVersion = ParseLatestVersion(json);
                 var releaseUrl = ParseReleaseUrl(json);
                 var releaseNotes = ParseReleaseNotes(json);
-                var assetDownloadUrl = ParseAssetDownloadUrl(json);
+                var assetDownloadUrl = ParseAssetDownloadUrl(json, latestVersion);
 
                 if (latestVersion == null)
                 {
@@ -235,7 +235,7 @@ namespace ModbusForge.Services
             return null;
         }
 
-        private static string? ParseAssetDownloadUrl(string json)
+        internal static string? ParseAssetDownloadUrl(string json, Version? version)
         {
             try
             {
@@ -243,18 +243,33 @@ namespace ModbusForge.Services
                 if (document.RootElement.TryGetProperty("assets", out var assetsProperty) &&
                     assetsProperty.ValueKind == JsonValueKind.Array)
                 {
+                    string? firstInstallerUrl = null;
+
                     foreach (var asset in assetsProperty.EnumerateArray())
                     {
                         if (asset.TryGetProperty("name", out var nameProperty) &&
                             asset.TryGetProperty("browser_download_url", out var urlProperty))
                         {
                             var name = nameProperty.GetString() ?? string.Empty;
-                            if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                            var url = urlProperty.GetString();
+
+                            if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                                continue;
+
+                            if (firstInstallerUrl is null)
+                                firstInstallerUrl = url;
+
+                            // Prefer an asset whose filename contains the release version to avoid
+                            // stale installers (e.g. old ModbusForge-2.0.2-setup.exe attached to v6.0.8).
+                            if (version is not null &&
+                                name.Contains(version.ToString(), StringComparison.OrdinalIgnoreCase))
                             {
-                                return urlProperty.GetString();
+                                return url;
                             }
                         }
                     }
+
+                    return firstInstallerUrl;
                 }
             }
             catch (Exception)
