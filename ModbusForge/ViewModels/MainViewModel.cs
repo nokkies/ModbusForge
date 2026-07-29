@@ -6,6 +6,8 @@ using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ModbusForge.Services;
+using ModbusForge.ViewModels;
+using ModbusForge.Views;
 using System.Threading.Tasks;
 using System.ComponentModel;
 using System.Windows.Data;
@@ -289,6 +291,9 @@ namespace ModbusForge.ViewModels
             ShowHelpCommand = new RelayCommand(ShowHelp);
             ShowScriptEditorCommand = new RelayCommand(ShowScriptEditor);
             CheckForUpdatesCommand = new AsyncRelayCommand(async () => await CheckForUpdatesAsync(showWhenUpToDate: true));
+
+            // Diagnostic / analysis windows
+            OpenFrameInspectorCommand = new RelayCommand(OpenFrameInspector);
         }
 
         /// <summary>
@@ -479,6 +484,7 @@ namespace ModbusForge.ViewModels
         public IRelayCommand ReadAllCustomNowCommand { get; private set; } = null!;
         public ICommand SaveProjectCommand { get; private set; } = null!;
         public ICommand LoadProjectCommand { get; private set; } = null!;
+        public ICommand OpenFrameInspectorCommand { get; private set; } = null!;
         public ICommand ImportUnitIdsCommand { get; private set; } = null!;
         public ICommand ExportUnitIdsCommand { get; private set; } = null!;
         public ICommand ExportUnitIdCommand { get; private set; } = null!;
@@ -1643,6 +1649,20 @@ namespace ModbusForge.ViewModels
         {
             // This will be handled by MainWindow via event or direct call
             RequestShowScriptEditor = true;
+        }
+
+        private void OpenFrameInspector()
+        {
+            _dispatcher.Invoke(() =>
+            {
+                var logger = _modbusService?.FrameLogger ?? _clientService.FrameLogger;
+                var viewModel = new FrameInspectorViewModel(logger, $"Frame Inspector - {(IsServerMode ? "Server" : "Client")}");
+                var window = new FrameInspectorWindow(viewModel)
+                {
+                    Owner = Application.Current?.MainWindow
+                };
+                window.Show();
+            });
         }
 
         private async Task CheckForUpdatesAsync(bool showWhenUpToDate)

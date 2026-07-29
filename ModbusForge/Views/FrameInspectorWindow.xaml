@@ -1,0 +1,42 @@
+<Window x:Class="ModbusForge.Views.FrameInspectorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="{Binding Title}"
+        Height="600" Width="900"
+        Background="{StaticResource FluentBackground}">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <ToolBar Grid.Row="0" Background="Transparent" Margin="0,0,0,8">
+            <Button Content="Clear" Command="{Binding ClearCommand}" Padding="12,4" Margin="0,0,8,0" Background="{StaticResource FluentBackground}" Foreground="{StaticResource FluentText}"/>
+            <TextBlock Text="{Binding Frames.Count, StringFormat='Frames: {0}'}" VerticalAlignment="Center" Foreground="{StaticResource FluentText}"/>
+        </ToolBar>
+
+        <DataGrid Grid.Row="1"
+                  ItemsSource="{Binding Frames}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  CanUserAddRows="False"
+                  Background="{StaticResource FluentBackground}"
+                  RowBackground="{StaticResource FluentBackground}"
+                  Foreground="{StaticResource FluentText}"
+                  GridLinesVisibility="Horizontal"
+                  VerticalGridLinesBrush="{StaticResource FluentBorder}">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp, StringFormat='HH:mm:ss.fff'}" Width="120"/>
+                <DataGridTextColumn Header="Delta (ms)" Binding="{Binding DeltaMs, StringFormat='F2'}" Width="90"/>
+                <DataGridTextColumn Header="Dir" Binding="{Binding Direction}" Width="40"/>
+                <DataGridTextColumn Header="Unit" Binding="{Binding UnitId}" Width="50"/>
+                <DataGridTextColumn Header="FC" Binding="{Binding FunctionCode, StringFormat='X2'}" Width="50"/>
+                <DataGridTextColumn Header="Hex" Binding="{Binding HexString}" Width="*" FontFamily="Consolas"/>
+                <DataGridTextColumn Header="CRC" Binding="{Binding IsValidCrc, TargetNullValue='-'}" Width="60"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</Window>

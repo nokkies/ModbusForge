@@ -18,6 +18,7 @@ namespace ModbusForge.Services
         private bool _disposed = false;
         private readonly ILogger<ModbusTcpService> _logger;
         private readonly IConsoleLoggerService? _consoleLoggerService;
+        private readonly ModbusFrameLogger _frameLogger;
         private readonly SemaphoreSlim _ioLock = new SemaphoreSlim(1, 1);
         private string? _lastIpAddress;
         private int _lastPort;
@@ -27,14 +28,20 @@ namespace ModbusForge.Services
         private const int MaxDeviceIdTransactions = 16;
 
         public ModbusTcpService(ILogger<ModbusTcpService> logger)
-            : this(logger, null)
+            : this(logger, null, null)
         {
         }
 
         public ModbusTcpService(ILogger<ModbusTcpService> logger, IConsoleLoggerService? consoleLoggerService)
+            : this(logger, consoleLoggerService, null)
+        {
+        }
+
+        public ModbusTcpService(ILogger<ModbusTcpService> logger, IConsoleLoggerService? consoleLoggerService, ModbusFrameLogger? frameLogger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _consoleLoggerService = consoleLoggerService;
+            _frameLogger = frameLogger ?? new ModbusFrameLogger();
             _logger.LogInformation("Modbus TCP client created");
         }
 
@@ -59,6 +66,8 @@ namespace ModbusForge.Services
         }
 
         public virtual string BoundEndpoint => string.Empty;
+
+        public ModbusFrameLogger FrameLogger => _frameLogger;
 
         public virtual bool IsConnected
         {
@@ -90,7 +99,7 @@ namespace ModbusForge.Services
                 {
                     await tcpClient.ConnectAsync(ipAddress, port, cancellationToken).ConfigureAwait(false);
                     _tcpClient = tcpClient;
-                    _client = ModbusIpMaster.CreateIp(_tcpClient);
+                    _client = ModbusIpMaster.CreateIp(new LoggingStreamResource(ModbusStreamAdapterFactory.CreateTcpAdapter(tcpClient), _frameLogger));
                     var message = $"Connected to Modbus server at {ipAddress}:{port}";
                     _logger.LogInformation(message);
                     _consoleLoggerService?.Log(message);

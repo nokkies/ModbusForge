@@ -18,6 +18,7 @@ namespace ModbusForge.Services
         private bool _disposed = false;
         private readonly ILogger<ModbusServerService> _logger;
         private readonly IConsoleLoggerService? _consoleLoggerService;
+        private readonly ModbusFrameLogger _frameLogger = new();
         private volatile bool _isRunning = false;
         private readonly object _stateLock = new object();
         private const int DefaultPort = 502;
@@ -118,6 +119,8 @@ namespace ModbusForge.Services
             }
             _multiServer = null;
         }
+
+        public ModbusFrameLogger FrameLogger => _frameLogger;
 
         public string BoundEndpoint
         {

@@ -19,6 +19,7 @@ namespace ModbusForge.Services
         private readonly ILogger<ModbusSerialService> _logger;
         private readonly IConsoleLoggerService? _consoleLoggerService;
         private readonly IValidationService? _validationService;
+        private readonly ModbusFrameLogger _frameLogger;
         private readonly SemaphoreSlim _ioLock = new(1, 1);
         private const int DisposeLockTimeoutMs = 5000;
         private const byte DeviceIdMoreFollows = 0xFF;
@@ -27,15 +28,21 @@ namespace ModbusForge.Services
         public TransportType Transport { get; }
 
         public ModbusSerialService(ILogger<ModbusSerialService> logger, TransportType transport)
-            : this(logger, null, null, transport)
+            : this(logger, null, null, null, transport)
         {
         }
 
         public ModbusSerialService(ILogger<ModbusSerialService> logger, IConsoleLoggerService? consoleLoggerService, IValidationService? validationService, TransportType transport)
+            : this(logger, consoleLoggerService, validationService, null, transport)
+        {
+        }
+
+        public ModbusSerialService(ILogger<ModbusSerialService> logger, IConsoleLoggerService? consoleLoggerService, IValidationService? validationService, ModbusFrameLogger? frameLogger, TransportType transport)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _consoleLoggerService = consoleLoggerService;
             _validationService = validationService;
+            _frameLogger = frameLogger ?? new ModbusFrameLogger();
 
             if (transport != TransportType.Rtu && transport != TransportType.Ascii)
             {
@@ -47,6 +54,8 @@ namespace ModbusForge.Services
         }
 
         public virtual string BoundEndpoint => _serialPort?.PortName ?? string.Empty;
+
+        public ModbusFrameLogger FrameLogger => _frameLogger;
 
         public virtual bool IsConnected
         {
@@ -100,9 +109,10 @@ namespace ModbusForge.Services
                 {
                     _serialPort.Open();
 
+                    var adapter = ModbusStreamAdapterFactory.CreateSerialAdapter(_serialPort);
                     _client = Transport == TransportType.Rtu
-                        ? ModbusSerialMaster.CreateRtu(_serialPort)
-                        : ModbusSerialMaster.CreateAscii(_serialPort);
+                        ? ModbusSerialMaster.CreateRtu(new LoggingStreamResource(adapter, _frameLogger))
+                        : ModbusSerialMaster.CreateAscii(new LoggingStreamResource(adapter, _frameLogger));
 
                     _client.Transport.ReadTimeout = 5000;
                     _client.Transport.WriteTimeout = 5000;
@@ -544,9 +554,10 @@ namespace ModbusForge.Services
 
             try
             {
+                var adapter = ModbusStreamAdapterFactory.CreateSerialAdapter(port);
                 using var master = Transport == TransportType.Rtu
-                    ? ModbusSerialMaster.CreateRtu(port)
-                    : ModbusSerialMaster.CreateAscii(port);
+                    ? ModbusSerialMaster.CreateRtu(new LoggingStreamResource(adapter, _frameLogger))
+                    : ModbusSerialMaster.CreateAscii(new LoggingStreamResource(adapter, _frameLogger));
                 master.Transport.ReadTimeout = 1000;
                 master.Transport.WriteTimeout = 1000;
 
