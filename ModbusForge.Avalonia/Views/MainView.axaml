@@ -1,0 +1,42 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+             x:Class="ModbusForge.Avalonia.Views.MainView"
+             x:DataType="vm:MainViewModel">
+
+  <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,Auto,*">
+    <TextBlock Text="ModbusForge Avalonia Spike" FontSize="24" FontWeight="Bold" Margin="0,0,0,16" Grid.Row="0" />
+
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+      <TextBlock VerticalAlignment="Center" Text="Host:" />
+      <TextBox Text="{Binding Host}" Width="120" Watermark="127.0.0.1" IsEnabled="{Binding !IsConnected}" />
+      <TextBlock VerticalAlignment="Center" Text="Port:" />
+      <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" Width="100" IsEnabled="{Binding !IsConnected}" />
+      <TextBlock VerticalAlignment="Center" Text="Unit ID:" />
+      <NumericUpDown Value="{Binding UnitId}" Minimum="1" Maximum="255" Width="80" IsEnabled="{Binding !IsConnected}" />
+    </StackPanel>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+      <TextBlock VerticalAlignment="Center" Text="Start:" />
+      <NumericUpDown Value="{Binding StartAddress}" Minimum="0" Width="100" IsEnabled="{Binding !IsConnected}" />
+      <TextBlock VerticalAlignment="Center" Text="Count:" />
+      <NumericUpDown Value="{Binding RegisterCount}" Minimum="1" Maximum="100" Width="80" IsEnabled="{Binding !IsConnected}" />
+      <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding !IsConnected}" />
+      <Button Content="Disconnect" Command="{Binding DisconnectCommand}" IsEnabled="{Binding IsConnected}" />
+    </StackPanel>
+
+    <TextBlock Grid.Row="3" Text="{Binding StatusMessage}" Margin="0,0,0,8" />
+
+    <DataGrid Grid.Row="4"
+              ItemsSource="{Binding Registers}"
+              AutoGenerateColumns="False"
+              IsReadOnly="True"
+              GridLinesVisibility="All">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
+        <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="120" />
+        <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="80" />
+      </DataGrid.Columns>
+    </DataGrid>
+  </Grid>
+</UserControl>
