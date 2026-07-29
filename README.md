@@ -78,7 +78,11 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
-### v6.0.4 - Current Release
+### v6.0.5 - Current Release
+
+- **Trend retention time**: The Trend view **Retention (min)** setting now takes effect immediately when you click **Apply**. Existing trend data is re-trimmed to the new window and the chart values and CSV export samples stay in sync.
+
+### v6.0.4
 
 - **Fixed startup crash (wpfgfx_cor3.dll EntryPointNotFoundException)**: Removed WPF native runtime DLLs from the installer. These DLLs are part of the shared `Microsoft.WindowsDesktop.App` runtime; shipping them with the app caused a mismatch when the installed .NET runtime was patched to a newer version, leading to a startup `XamlParseException`.
 
