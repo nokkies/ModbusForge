@@ -1,0 +1,38 @@
+name: Avalonia
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Restore dependencies
+      run: |
+        dotnet restore ./ModbusForge.Avalonia/ModbusForge.Avalonia.csproj
+        dotnet restore ./ModbusForge.Avalonia.Tests/ModbusForge.Avalonia.Tests.csproj
+
+    - name: Build Avalonia
+      run: |
+        dotnet build ./ModbusForge.Avalonia/ModbusForge.Avalonia.csproj --configuration Release --no-restore
+        dotnet build ./ModbusForge.Avalonia.Tests/ModbusForge.Avalonia.Tests.csproj --configuration Release --no-restore
+
+    - name: Run Avalonia tests
+      run: dotnet test ./ModbusForge.Avalonia.Tests/ModbusForge.Avalonia.Tests.csproj --configuration Release --no-build --verbosity normal
