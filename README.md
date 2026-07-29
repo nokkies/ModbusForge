@@ -85,6 +85,7 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 - **Rockwell L5X, JSON and YAML register map importers**: `RegisterTemplateImportService` now auto-detects `.json`, `.yaml`/`.yml` and `.l5x` files; L5X `<Tag>` arrays are expanded into sequential virtual Modbus addresses.
 - **PDU/byte frame inspector**: A new `LoggingStreamResource` captures every transmitted and received Modbus byte[] with timestamps and inter-frame timing; open it from `Options > Frame Inspector`.
 - **MQTT publisher**: `MqttGatewayService` publishes JSON snapshots of holding/input registers, coils, discrete inputs and custom entries to a configurable MQTT broker with auto-reconnect and topic templates; configured in `Preferences`.
+- **Pcap import & offline replay**: `PcapImportService` reads `.pcap` files (no Npcap required), extracts Modbus TCP frames on port 502 and displays them in the Frame Inspector for offline analysis.
 
 ### v6.0.6
 
