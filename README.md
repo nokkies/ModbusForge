@@ -82,6 +82,11 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 - **32-bit float on holding and input (internal) registers**: Holding and Input Register grids now decode `uint`, `int`, `real` (32-bit float), and `string` values. Input Registers get the same **Swap Bytes** / **Swap Words** controls as holding registers, and per-address **Type** and **Swap** settings are now saved in the `.mfp` project file.
 - **Live register value refresh**: Changing the global **Type** or **Swap** settings immediately re-decodes and re-displays the current register values.
+- **Custom Watch continuous read**: Added a **Read** checkbox and **Read Period (ms)** column for per-row continuous reads. The **Custom Read** toolbar toggle enables them; the existing **Continuous Write** column is now clearly labeled.
+- **Save All**: The File menu now has a **Save All** option that saves the entire project, including every Unit ID, IP, port and tab.
+- **Continuous poll error handling**: When a continuous read fails, the monitor for that area is paused and the error popup no longer re-appears immediately.
+- **Custom tag add**: New custom tags now inherit the previous row's **Type** and **Area**, auto-increment the name, and advance the address by 2 for `uint`/`real` types.
+- **Console improvements**: The console logs Modbus server requests with client IP, function code, address and count; UI register/coil writes; and visual simulation node value changes.
 
 ### v6.0.5
 
