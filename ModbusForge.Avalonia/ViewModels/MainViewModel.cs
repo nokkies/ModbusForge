@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -12,19 +13,10 @@ namespace ModbusForge.Avalonia.ViewModels
 {
     public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
-        private readonly IModbusService _modbusService;
+        private readonly IConnectionManager _connectionManager;
         private readonly ILogger<MainViewModel> _logger;
         private readonly IDispatcher _dispatcher;
         private CancellationTokenSource? _pollCts;
-
-        [ObservableProperty]
-        private string _host = "127.0.0.1";
-
-        [ObservableProperty]
-        private int _port = 502;
-
-        [ObservableProperty]
-        private int _unitId = 1;
 
         [ObservableProperty]
         private int _startAddress = 0;
@@ -35,10 +27,6 @@ namespace ModbusForge.Avalonia.ViewModels
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
         [NotifyCanExecuteChangedFor(nameof(DisconnectCommand))]
-        private bool _isConnected;
-
-        [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
         private bool _isBusy;
 
         [ObservableProperty]
@@ -46,45 +34,101 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public ObservableCollection<RegisterEntry> Registers { get; } = new();
 
-        public MainViewModel(IModbusService modbusService, ILogger<MainViewModel> logger, IDispatcher dispatcher)
+        public ConnectionProfile? ActiveProfile => _connectionManager.ActiveProfile;
+
+        public IModbusService? ActiveService => _connectionManager.ActiveService;
+
+        public MainViewModel(IConnectionManager connectionManager, ILogger<MainViewModel> logger, IDispatcher dispatcher)
         {
-            _modbusService = modbusService ?? throw new ArgumentNullException(nameof(modbusService));
+            _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
 
-            ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => !IsConnected && !IsBusy);
-            DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => IsConnected);
+            ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => CanConnect());
+            DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => CanDisconnect());
+
+            _connectionManager.ActiveProfileChanged += ConnectionManager_ActiveProfileChanged;
+            _connectionManager.ProfileConnected += ConnectionManager_ProfileConnected;
+            _connectionManager.ProfileDisconnected += ConnectionManager_ProfileDisconnected;
+
+            if (ActiveProfile != null)
+            {
+                ActiveProfile.PropertyChanged += ActiveProfile_PropertyChanged;
+            }
+
+            StatusMessage = ActiveProfile != null
+                ? $"Active profile: {ActiveProfile.DisplayName}"
+                : "No active connection profile";
         }
 
         public IAsyncRelayCommand ConnectCommand { get; }
         public IAsyncRelayCommand DisconnectCommand { get; }
 
+        private bool CanConnect() => ActiveProfile is { IsConnected: false } && !IsBusy;
+
+        private bool CanDisconnect() => ActiveProfile is { IsConnected: true } && !IsBusy;
+
+        private void ActiveProfile_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ConnectionProfile.IsConnected))
+            {
+                OnPropertyChanged(nameof(ConnectCommand));
+                OnPropertyChanged(nameof(DisconnectCommand));
+                ConnectCommand.NotifyCanExecuteChanged();
+                DisconnectCommand.NotifyCanExecuteChanged();
+            }
+
+            if (e.PropertyName == nameof(ConnectionProfile.Status))
+            {
+                StatusMessage = ActiveProfile?.Status ?? "Ready";
+            }
+        }
+
+        private void ConnectionManager_ActiveProfileChanged(object? sender, ConnectionProfile? e)
+        {
+            if (e != null)
+            {
+                e.PropertyChanged += ActiveProfile_PropertyChanged;
+            }
+
+            OnPropertyChanged(nameof(ActiveProfile));
+            OnPropertyChanged(nameof(ActiveService));
+            OnPropertyChanged(nameof(CanConnect));
+            OnPropertyChanged(nameof(CanDisconnect));
+            ConnectCommand.NotifyCanExecuteChanged();
+            DisconnectCommand.NotifyCanExecuteChanged();
+
+            StatusMessage = e != null ? $"Active profile: {e.DisplayName}" : "No active connection profile";
+        }
+
+        private void ConnectionManager_ProfileConnected(object? sender, ConnectionProfile e)
+        {
+            _logger.LogInformation("Profile connected: {Name}", e.Name);
+            _pollCts?.Cancel();
+            _pollCts?.Dispose();
+            _pollCts = new CancellationTokenSource();
+            _ = Task.Run(() => PollLoopAsync(_pollCts.Token), _pollCts.Token);
+        }
+
+        private void ConnectionManager_ProfileDisconnected(object? sender, ConnectionProfile e)
+        {
+            _logger.LogInformation("Profile disconnected: {Name}", e.Name);
+            StopPolling();
+        }
+
         private async Task ConnectAsync()
         {
-            IsBusy = true;
-            StatusMessage = $"Connecting to {Host}:{Port}...";
+            if (ActiveProfile == null) return;
 
+            IsBusy = true;
             try
             {
-                var connected = await _modbusService.ConnectAsync(Host, Port, UnitId.ToString());
-                if (!connected)
-                {
-                    StatusMessage = "Connection failed.";
-                    _logger.LogWarning("Failed to connect to {Host}:{Port}", Host, Port);
-                    return;
-                }
-
-                IsConnected = true;
-                StatusMessage = $"Connected to {Host}:{Port} (unit {UnitId}).";
-                _logger.LogInformation("Connected to {Host}:{Port}", Host, Port);
-
-                _pollCts = new CancellationTokenSource();
-                _ = Task.Run(() => PollLoopAsync(_pollCts.Token), _pollCts.Token);
+                await _connectionManager.ConnectProfileAsync(ActiveProfile);
             }
             catch (Exception ex)
             {
                 StatusMessage = $"Connection error: {ex.Message}";
-                _logger.LogError(ex, "Error connecting to {Host}:{Port}", Host, Port);
+                _logger.LogError(ex, "Error connecting profile {Name}", ActiveProfile.Name);
             }
             finally
             {
@@ -94,25 +138,38 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private async Task DisconnectAsync()
         {
-            _pollCts?.Cancel();
-            _pollCts?.Dispose();
-            _pollCts = null;
+            if (ActiveProfile == null) return;
 
-            await _modbusService.DisconnectAsync();
-            IsConnected = false;
-            StatusMessage = "Disconnected.";
-            _logger.LogInformation("Disconnected");
-
-            await _dispatcher.InvokeAsync(Registers.Clear);
+            IsBusy = true;
+            try
+            {
+                await _connectionManager.DisconnectProfileAsync(ActiveProfile);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Disconnect error: {ex.Message}";
+                _logger.LogError(ex, "Error disconnecting profile {Name}", ActiveProfile.Name);
+            }
+            finally
+            {
+                IsBusy = false;
+            }
         }
 
         private async Task PollLoopAsync(CancellationToken token)
         {
-            while (!token.IsCancellationRequested && _modbusService.IsConnected)
+            while (!token.IsCancellationRequested && ActiveProfile is { IsConnected: true })
             {
+                var service = ActiveService;
+                if (service == null)
+                {
+                    await Task.Delay(500, token);
+                    continue;
+                }
+
                 try
                 {
-                    var values = await _modbusService.ReadHoldingRegistersAsync((byte)UnitId, StartAddress, RegisterCount);
+                    var values = await service.ReadHoldingRegistersAsync(ActiveProfile.UnitId, StartAddress, RegisterCount);
                     await _dispatcher.InvokeAsync(() => ApplyValues(values));
                 }
                 catch (Exception ex)
@@ -153,12 +210,27 @@ namespace ModbusForge.Avalonia.ViewModels
             StatusMessage = $"Read {values.Length} holding registers.";
         }
 
-        public void Dispose()
+        private void StopPolling()
         {
             _pollCts?.Cancel();
             _pollCts?.Dispose();
             _pollCts = null;
-            _modbusService?.DisconnectAsync().GetAwaiter().GetResult();
+
+            _dispatcher.Invoke(Registers.Clear);
+        }
+
+        public void Dispose()
+        {
+            _connectionManager.ActiveProfileChanged -= ConnectionManager_ActiveProfileChanged;
+            _connectionManager.ProfileConnected -= ConnectionManager_ProfileConnected;
+            _connectionManager.ProfileDisconnected -= ConnectionManager_ProfileDisconnected;
+
+            if (ActiveProfile != null)
+            {
+                ActiveProfile.PropertyChanged -= ActiveProfile_PropertyChanged;
+            }
+
+            StopPolling();
         }
     }
 }

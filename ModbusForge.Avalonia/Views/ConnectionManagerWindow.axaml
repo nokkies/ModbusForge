@@ -1,0 +1,78 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+        xmlns:mod="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core"
+        x:Class="ModbusForge.Avalonia.Views.ConnectionManagerWindow"
+        x:DataType="vm:ConnectionManagerViewModel"
+        Title="Connection Manager"
+        Width="700"
+        Height="520"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0" Background="#2B579A" Padding="20,16">
+      <TextBlock Text="Connection Manager" FontSize="20" FontWeight="SemiBold" Foreground="White" />
+    </Border>
+
+    <Grid Grid.Row="1" Margin="16" ColumnDefinitions="280,*">
+      <!-- Profile list -->
+      <Border Margin="0,0,12,0" BorderBrush="Gray" BorderThickness="1" Padding="8">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <TextBlock Text="Connections" FontWeight="SemiBold" Margin="0,0,0,8" Grid.Row="0" />
+          <ListBox Grid.Row="1"
+                   ItemsSource="{Binding Profiles}"
+                   SelectedItem="{Binding SelectedProfile, Mode=TwoWay}">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,8,0,0">
+            <Button Content="Add" Command="{Binding AddCommand}" />
+            <Button Content="Remove" Command="{Binding RemoveCommand}" />
+            <Button Content="Clone" Command="{Binding CloneCommand}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- Details -->
+      <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*" IsEnabled="{Binding HasSelection}" Margin="0,0,0,8">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Text="Name:" Grid.Row="0" VerticalAlignment="Center" Margin="0,0,12,8" />
+        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedProfile.Name, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+
+        <TextBlock Text="Transport:" Grid.Row="1" VerticalAlignment="Center" Margin="0,0,12,8" />
+        <ComboBox Grid.Row="1" Grid.Column="1"
+                  ItemsSource="{Binding Source={x:Static vm:ConnectionManagerViewModel.TransportOptions}}"
+                  SelectedItem="{Binding SelectedProfile.Transport}"
+                  Width="150"
+                  HorizontalAlignment="Left"
+                  Margin="0,0,0,8" />
+
+        <TextBlock Text="Host:" Grid.Row="2" VerticalAlignment="Center" Margin="0,0,12,8" />
+        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SelectedProfile.IpAddress, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+
+        <TextBlock Text="Port:" Grid.Row="3" VerticalAlignment="Center" Margin="0,0,12,8" />
+        <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding SelectedProfile.Port}" Minimum="1" Maximum="65535" Width="120" HorizontalAlignment="Left" Margin="0,0,0,8" />
+
+        <TextBlock Text="Unit ID:" Grid.Row="4" VerticalAlignment="Center" Margin="0,0,12,8" />
+        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding SelectedProfile.UnitId, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left" Margin="0,0,0,8" />
+
+        <TextBlock Text="Status:" Grid.Row="5" VerticalAlignment="Center" Margin="0,0,12,8" />
+        <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding StatusMessage}" VerticalAlignment="Center" Margin="0,0,0,8" />
+      </Grid>
+    </Grid>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="16">
+      <Button Content="Connect" Command="{Binding ConnectCommand}" />
+      <Button Content="Disconnect" Command="{Binding DisconnectCommand}" />
+      <Button Content="Save" Command="{Binding SaveCommand}" />
+      <Button Content="Cancel" Command="{Binding CancelCommand}" />
+    </StackPanel>
+  </Grid>
+</Window>

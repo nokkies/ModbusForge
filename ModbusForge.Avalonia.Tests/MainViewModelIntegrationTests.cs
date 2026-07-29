@@ -3,6 +3,7 @@ using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModbusForge.Avalonia.ViewModels;
+using ModbusForge.Models;
 using ModbusForge.Services;
 using Xunit;
 
@@ -18,13 +19,19 @@ namespace ModbusForge.Avalonia.Tests
             var port = ((IPEndPoint?)server.LocalEndpoint)?.Port
                 ?? throw new InvalidOperationException("Server not bound");
 
-            var modbus = new ModbusTcpService(NullLogger<ModbusTcpService>.Instance);
-            var dispatcher = new SyncDispatcher();
-            var vm = new MainViewModel(modbus, NullLogger<MainViewModel>.Instance, dispatcher);
+            var loggerFactory = NullLoggerFactory.Instance;
+            var connectionManager = new ConnectionManager(
+                NullLogger<ConnectionManager>.Instance,
+                loggerFactory,
+                null);
 
-            vm.Host = "127.0.0.1";
-            vm.Port = port;
-            vm.UnitId = 1;
+            var profile = new ConnectionProfile("Test", "127.0.0.1", port, 1);
+            connectionManager.AddProfile(profile);
+            connectionManager.SetActiveProfile(profile);
+
+            var dispatcher = new SyncDispatcher();
+            var vm = new MainViewModel(connectionManager, NullLogger<MainViewModel>.Instance, dispatcher);
+
             vm.StartAddress = 0;
             vm.RegisterCount = 5;
 
@@ -33,7 +40,8 @@ namespace ModbusForge.Avalonia.Tests
             await Task.Delay(TimeSpan.FromSeconds(1.5));
 
             // Assert
-            Assert.True(vm.IsConnected);
+            Assert.NotNull(vm.ActiveProfile);
+            Assert.True(vm.ActiveProfile.IsConnected);
             Assert.Equal(5, vm.Registers.Count);
             Assert.Equal("10", vm.Registers[0].ValueText);
             Assert.Equal("20", vm.Registers[1].ValueText);
@@ -44,7 +52,6 @@ namespace ModbusForge.Avalonia.Tests
             // Cleanup
             await vm.DisconnectCommand.ExecuteAsync(null);
             vm.Dispose();
-            modbus.Dispose();
             server.Stop();
         }
 

@@ -52,8 +52,9 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<IFileDialogService, AvaloniaFileDialogService>();
             services.AddSingleton<IInputDialogService, AvaloniaInputDialogService>();
 
-            // Modbus service
-            services.AddSingleton<IModbusService, ModbusTcpService>();
+            // Connection management
+            services.AddSingleton<IValidationService, ValidationService>();
+            services.AddSingleton<IConnectionManager, ConnectionManager>();
 
             // ViewModels
             services.AddSingleton<MainViewModel>();
