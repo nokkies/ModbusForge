@@ -349,6 +349,8 @@
                         <Button Content="Read" Command="{Binding ReadInputRegistersCommand}" Width="80" Margin="0,0,10,0"/>
                         <TextBlock Text="Global Type:" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <ComboBox Width="120" SelectedItem="{Binding InputRegistersGlobalType}" ItemsSource="{StaticResource TypeOptionsAll}"/>
+                        <CheckBox Content="Swap Bytes" IsChecked="{Binding InputRegistersSwapBytes, Mode=TwoWay}" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                        <CheckBox Content="Swap Words" IsChecked="{Binding InputRegistersSwapWords, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <Separator Width="10" Opacity="0"/>
                         <ui:ToggleSwitch IsChecked="{Binding InputRegistersMonitorEnabled, Mode=TwoWay}" Content="Continuous Read" VerticalAlignment="Center"/>
                         <TextBlock Text=" Period (ms):" VerticalAlignment="Center" Margin="10,0,5,0"/>
@@ -358,7 +360,7 @@
                         <ui:TextBox Width="150" Text="{Binding InputSearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Address, value, type..."/>
                     </StackPanel>
 
-                    <DataGrid Grid.Row="1" ItemsSource="{Binding InputRegistersView}" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="InputRegistersGrid_MouseDoubleClick"
+                    <DataGrid x:Name="InputRegistersGrid" Grid.Row="1" ItemsSource="{Binding InputRegistersView}" AutoGenerateColumns="False" IsReadOnly="False" CellEditEnding="InputRegistersGrid_CellEditEnding" MouseDoubleClick="InputRegistersGrid_MouseDoubleClick"
                               VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
                         <DataGrid.ContextMenu>
                             <ContextMenu>
@@ -370,9 +372,9 @@
                             </ContextMenu>
                         </DataGrid.ContextMenu>
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
-                            <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"/>
-                            <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="*"/>
+                            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Value" Binding="{Binding ValueText, ValidatesOnDataErrors=True, NotifyOnValidationError=True}" Width="*" IsReadOnly="True"/>
+                            <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Type}" ItemsSource="{StaticResource TypeOptionsAll}" Width="*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>

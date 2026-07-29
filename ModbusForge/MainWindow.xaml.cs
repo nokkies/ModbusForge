@@ -726,6 +726,12 @@ namespace ModbusForge
         }
 
         // Input Registers Grid Handlers
+        private void InputRegistersGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        {
+            if (e.EditAction != DataGridEditAction.Commit) return;
+            _viewModel.RefreshInputRegisterValueText();
+        }
+
         private void InputRegistersGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             if (sender is DataGrid grid && grid.SelectedItem is RegisterEntry entry)

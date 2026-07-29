@@ -34,11 +34,13 @@ namespace ModbusForge.ViewModels
 {
     public partial class MainViewModel : ViewModelBase, IDisposable, IMonitoringCallbacks
     {
-        // Partial method declarations for delegated properties (required by CommunityToolkit.Mvvm)
+        // Partial method declarations for delegated properties
         partial void OnRegistersGlobalTypeChanged(string value);
         partial void OnInputRegistersGlobalTypeChanged(string value);
         partial void OnRegistersSwapBytesChanged(bool value);
         partial void OnRegistersSwapWordsChanged(bool value);
+        partial void OnInputRegistersSwapBytesChanged(bool value);
+        partial void OnInputRegistersSwapWordsChanged(bool value);
 
         // Initialized in InitializeServiceState called from constructor
         private IModbusService _modbusService = null!;
@@ -755,7 +757,15 @@ namespace ModbusForge.ViewModels
         public string RegistersGlobalType
         {
             get => CurrentConfig.RegisterSettings.RegistersGlobalType;
-            set => SetRegistersGlobalType(value);
+            set
+            {
+                if (CurrentConfig.RegisterSettings.RegistersGlobalType != value)
+                {
+                    SetRegistersGlobalType(value);
+                    OnRegistersGlobalTypeChanged(value);
+                    OnPropertyChanged(nameof(RegistersGlobalType));
+                }
+            }
         }
         public bool RegistersSwapBytes
         {
@@ -765,6 +775,7 @@ namespace ModbusForge.ViewModels
                 if (CurrentConfig.RegisterSettings.RegistersSwapBytes != value)
                 {
                     SetRegistersSwapBytes(value);
+                    OnRegistersSwapBytesChanged(value);
                     OnPropertyChanged(nameof(RegistersSwapBytes));
                 }
             }
@@ -777,6 +788,7 @@ namespace ModbusForge.ViewModels
                 if (CurrentConfig.RegisterSettings.RegistersSwapWords != value)
                 {
                     SetRegistersSwapWords(value);
+                    OnRegistersSwapWordsChanged(value);
                     OnPropertyChanged(nameof(RegistersSwapWords));
                 }
             }
@@ -814,7 +826,41 @@ namespace ModbusForge.ViewModels
         public string InputRegistersGlobalType
         {
             get => CurrentConfig.RegisterSettings.InputRegistersGlobalType;
-            set => SetInputRegistersGlobalType(value);
+            set
+            {
+                if (CurrentConfig.RegisterSettings.InputRegistersGlobalType != value)
+                {
+                    SetInputRegistersGlobalType(value);
+                    OnInputRegistersGlobalTypeChanged(value);
+                    OnPropertyChanged(nameof(InputRegistersGlobalType));
+                }
+            }
+        }
+        public bool InputRegistersSwapBytes
+        {
+            get => CurrentConfig.RegisterSettings.InputRegistersSwapBytes;
+            set
+            {
+                if (CurrentConfig.RegisterSettings.InputRegistersSwapBytes != value)
+                {
+                    SetInputRegistersSwapBytes(value);
+                    OnInputRegistersSwapBytesChanged(value);
+                    OnPropertyChanged(nameof(InputRegistersSwapBytes));
+                }
+            }
+        }
+        public bool InputRegistersSwapWords
+        {
+            get => CurrentConfig.RegisterSettings.InputRegistersSwapWords;
+            set
+            {
+                if (CurrentConfig.RegisterSettings.InputRegistersSwapWords != value)
+                {
+                    SetInputRegistersSwapWords(value);
+                    OnInputRegistersSwapWordsChanged(value);
+                    OnPropertyChanged(nameof(InputRegistersSwapWords));
+                }
+            }
         }
         public int DiscreteInputStart
         {
@@ -855,6 +901,9 @@ namespace ModbusForge.ViewModels
                 OnPropertyChanged(nameof(RegistersGlobalType));
                 OnPropertyChanged(nameof(RegistersSwapBytes));
                 OnPropertyChanged(nameof(RegistersSwapWords));
+                OnPropertyChanged(nameof(InputRegistersGlobalType));
+                OnPropertyChanged(nameof(InputRegistersSwapBytes));
+                OnPropertyChanged(nameof(InputRegistersSwapWords));
 
                 SubscribeCustomEntries();
             }
@@ -891,6 +940,8 @@ namespace ModbusForge.ViewModels
         private void SetInputRegisterStart(int value) => CurrentConfig.RegisterSettings.InputRegisterStart = value;
         private void SetInputRegisterCount(int value) => CurrentConfig.RegisterSettings.InputRegisterCount = value;
         private void SetInputRegistersGlobalType(string value) => CurrentConfig.RegisterSettings.InputRegistersGlobalType = value;
+        private void SetInputRegistersSwapBytes(bool value) => CurrentConfig.RegisterSettings.InputRegistersSwapBytes = value;
+        private void SetInputRegistersSwapWords(bool value) => CurrentConfig.RegisterSettings.InputRegistersSwapWords = value;
         private void SetDiscreteInputStart(int value) => CurrentConfig.RegisterSettings.DiscreteInputStart = value;
         private void SetDiscreteInputCount(int value) => CurrentConfig.RegisterSettings.DiscreteInputCount = value;
 
@@ -972,8 +1023,14 @@ namespace ModbusForge.ViewModels
         public async Task ReadInputRegistersAsync()
         {
             await _registerCoordinator.ReadInputRegistersAsync(EffectiveUnitId, InputRegisterStart, InputRegisterCount,
-                InputRegistersGlobalType, InputRegisters, msg => StatusMessage = msg,
-                hasError => HasConnectionError = hasError, InputRegistersMonitorEnabled, IsServerMode);
+                InputRegisters, msg => StatusMessage = msg,
+                hasError => HasConnectionError = hasError, InputRegistersMonitorEnabled, IsServerMode,
+                CurrentConfig.RegisterSettings);
+        }
+
+        public void RefreshInputRegisterValueText()
+        {
+            _registerCoordinator.RefreshInputRegisterValueText(InputRegisters);
         }
 
         private async Task WriteRegisterAsync()
@@ -1104,13 +1161,14 @@ namespace ModbusForge.ViewModels
             }
         }
 
-        // propagate global type selection to each row
+        // propagate global type selection to each row and refresh displayed values
         partial void OnRegistersGlobalTypeChanged(string value)
         {
             foreach (var r in HoldingRegisters)
             {
                 r.Type = value;
             }
+            _registerCoordinator.RefreshHoldingRegisterValueText(HoldingRegisters);
         }
 
         // propagate global swap selection to each row and refresh displayed values
@@ -1132,12 +1190,32 @@ namespace ModbusForge.ViewModels
             _registerCoordinator.RefreshHoldingRegisterValueText(HoldingRegisters);
         }
 
+        // propagate global type selection to each row and refresh displayed values
         partial void OnInputRegistersGlobalTypeChanged(string value)
         {
             foreach (var r in InputRegisters)
             {
                 r.Type = value;
             }
+            _registerCoordinator.RefreshInputRegisterValueText(InputRegisters);
+        }
+
+        partial void OnInputRegistersSwapBytesChanged(bool value)
+        {
+            foreach (var r in InputRegisters)
+            {
+                r.SwapBytes = value;
+            }
+            _registerCoordinator.RefreshInputRegisterValueText(InputRegisters);
+        }
+
+        partial void OnInputRegistersSwapWordsChanged(bool value)
+        {
+            foreach (var r in InputRegisters)
+            {
+                r.SwapWords = value;
+            }
+            _registerCoordinator.RefreshInputRegisterValueText(InputRegisters);
         }
 
         // Allow full byte range 0..255 for Unit ID (some devices like Micro850 require 0 or 255)
@@ -1365,6 +1443,37 @@ namespace ModbusForge.ViewModels
             StatusMessage = result.Message;
         }
 
+        /// <summary>
+        /// Copies the per-address Type/Swap configuration from the live register
+        /// collections into the current unit's RegisterSettings so it is persisted.
+        /// </summary>
+        private void SyncRegisterMetadata()
+        {
+            var settings = CurrentConfig.RegisterSettings;
+
+            settings.HoldingRegisterMetadata = HoldingRegisters
+                .Where(r => r != null)
+                .Select(r => new RegisterMetadata
+                {
+                    Address = r.Address,
+                    Type = r.Type ?? settings.RegistersGlobalType,
+                    SwapBytes = r.SwapBytes,
+                    SwapWords = r.SwapWords
+                })
+                .ToList();
+
+            settings.InputRegisterMetadata = InputRegisters
+                .Where(r => r != null)
+                .Select(r => new RegisterMetadata
+                {
+                    Address = r.Address,
+                    Type = r.Type ?? settings.InputRegistersGlobalType,
+                    SwapBytes = r.SwapBytes,
+                    SwapWords = r.SwapWords
+                })
+                .ToList();
+        }
+
         private ProjectWorkspaceSnapshot BuildWorkspaceSnapshot()
         {
             var snapshot = new ProjectWorkspaceSnapshot
@@ -1380,6 +1489,10 @@ namespace ModbusForge.ViewModels
                 VisualNodes = new List<VisualNode>(_visualNodeEditorViewModel.Nodes),
                 VisualConnections = new List<NodeConnection>(_visualNodeEditorViewModel.Connections)
             };
+
+            // Persist the current register collection metadata (type/swap per address)
+            // into the active unit's settings before cloning.
+            SyncRegisterMetadata();
 
             foreach (var kvp in UnitConfigurations)
                 snapshot.UnitConfigurations[kvp.Key] = kvp.Value.Clone();
@@ -1725,6 +1838,11 @@ namespace ModbusForge.ViewModels
                                     break;
                                 }
                         }
+                    }
+                    else if (e.EditingElement is ComboBox)
+                    {
+                        // The Type column was changed; recompute the displayed ValueText
+                        _registerCoordinator.RefreshHoldingRegisterValueText(HoldingRegisters);
                     }
                 }
                 catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))

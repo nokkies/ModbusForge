@@ -62,7 +62,7 @@ namespace ModbusForge.ViewModels.Coordinators
                     return;
                 }
 
-                // Preserve per-address Type/Swap if rows already exist
+                // Preserve per-address Type/Swap from current rows and saved project metadata
                 var typeByAddress = new System.Collections.Generic.Dictionary<int, string>();
                 var swapBytesByAddress = new System.Collections.Generic.Dictionary<int, bool>();
                 var swapWordsByAddress = new System.Collections.Generic.Dictionary<int, bool>();
@@ -71,6 +71,19 @@ namespace ModbusForge.ViewModels.Coordinators
                     typeByAddress[r.Address] = r.Type ?? globalType;
                     swapBytesByAddress[r.Address] = r.SwapBytes;
                     swapWordsByAddress[r.Address] = r.SwapWords;
+                }
+
+                if (registerSettings?.HoldingRegisterMetadata != null)
+                {
+                    foreach (var m in registerSettings.HoldingRegisterMetadata)
+                    {
+                        if (!typeByAddress.ContainsKey(m.Address))
+                        {
+                            typeByAddress[m.Address] = m.Type ?? globalType;
+                            swapBytesByAddress[m.Address] = m.SwapBytes;
+                            swapWordsByAddress[m.Address] = m.SwapWords;
+                        }
+                    }
                 }
 
                 // In-place update to minimize UI thread re-layout and CollectionChanged events
@@ -139,12 +152,21 @@ namespace ModbusForge.ViewModels.Coordinators
             ApplyValueText(holdingRegisters, values);
         }
 
-        private void ApplyValueText(ObservableCollection<RegisterEntry> holdingRegisters, ushort[] values)
+        public void RefreshInputRegisterValueText(ObservableCollection<RegisterEntry> inputRegisters)
         {
+            var values = inputRegisters.Select(e => e.Value).ToArray();
+            ApplyValueText(inputRegisters, values);
+        }
+
+        private void ApplyValueText(ObservableCollection<RegisterEntry> registers, ushort[] values)
+        {
+            // Reset the display text for every entry so stale values don't linger
+            foreach (var r in registers) r.ValueText = string.Empty;
+
             int idx = 0;
-            while (idx < holdingRegisters.Count)
+            while (idx < registers.Count)
             {
-                var entry = holdingRegisters[idx];
+                var entry = registers[idx];
                 var type = (entry.Type ?? "uint").ToLowerInvariant();
                 if (type == "int")
                 {
@@ -158,7 +180,9 @@ namespace ModbusForge.ViewModels.Coordinators
                     {
                         float f = DataTypeConverter.ToSingle(values[idx], values[idx + 1], entry.SwapBytes, entry.SwapWords);
                         entry.ValueText = f.ToString(CultureInfo.InvariantCulture);
-                        holdingRegisters[idx + 1].ValueText = string.Empty;
+                        // The second 16-bit half is part of this 32-bit value; leave its display blank
+                        if (idx + 1 < registers.Count)
+                            registers[idx + 1].ValueText = string.Empty;
                     }
                     else
                     {
@@ -180,11 +204,12 @@ namespace ModbusForge.ViewModels.Coordinators
         }
 
         /// <summary>
-        /// Reads input registers and populates the collection.
+        /// Reads input registers and populates the collection with data type formatting.
         /// </summary>
-        public async Task ReadInputRegistersAsync(byte unitId, int start, int count, string globalType,
+        public async Task ReadInputRegistersAsync(byte unitId, int start, int count,
             ObservableCollection<RegisterEntry> inputRegisters, Action<string> setStatusMessage,
-            Action<bool> setHasConnectionError, bool isMonitoringEnabled, bool isServerMode)
+            Action<bool> setHasConnectionError, bool isMonitoringEnabled, bool isServerMode,
+            RegisterSettings? registerSettings = null)
         {
             try
             {
@@ -199,6 +224,34 @@ namespace ModbusForge.ViewModels.Coordinators
                     return;
                 }
 
+                var globalType = registerSettings?.InputRegistersGlobalType ?? "uint";
+                var globalSwapBytes = registerSettings?.InputRegistersSwapBytes ?? false;
+                var globalSwapWords = registerSettings?.InputRegistersSwapWords ?? false;
+
+                // Preserve per-address Type/Swap from current rows and saved project metadata
+                var typeByAddress = new System.Collections.Generic.Dictionary<int, string>();
+                var swapBytesByAddress = new System.Collections.Generic.Dictionary<int, bool>();
+                var swapWordsByAddress = new System.Collections.Generic.Dictionary<int, bool>();
+                foreach (var r in inputRegisters)
+                {
+                    typeByAddress[r.Address] = r.Type ?? globalType;
+                    swapBytesByAddress[r.Address] = r.SwapBytes;
+                    swapWordsByAddress[r.Address] = r.SwapWords;
+                }
+
+                if (registerSettings?.InputRegisterMetadata != null)
+                {
+                    foreach (var m in registerSettings.InputRegisterMetadata)
+                    {
+                        if (!typeByAddress.ContainsKey(m.Address))
+                        {
+                            typeByAddress[m.Address] = m.Type ?? globalType;
+                            swapBytesByAddress[m.Address] = m.SwapBytes;
+                            swapWordsByAddress[m.Address] = m.SwapWords;
+                        }
+                    }
+                }
+
                 // In-place update to minimize UI thread re-layout and CollectionChanged events
                 int currentCount = inputRegisters.Count;
                 int newCount = values.Length;
@@ -211,7 +264,9 @@ namespace ModbusForge.ViewModels.Coordinators
                         var entry = inputRegisters[i];
                         entry.Address = addr;
                         entry.Value = values[i];
-                        entry.Type = globalType;
+                        entry.Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType;
+                        entry.SwapBytes = swapBytesByAddress.TryGetValue(addr, out var sb) ? sb : globalSwapBytes;
+                        entry.SwapWords = swapWordsByAddress.TryGetValue(addr, out var sw) ? sw : globalSwapWords;
                     }
                     else
                     {
@@ -219,7 +274,9 @@ namespace ModbusForge.ViewModels.Coordinators
                         {
                             Address = addr,
                             Value = values[i],
-                            Type = globalType
+                            Type = typeByAddress.TryGetValue(addr, out var t) ? t : globalType,
+                            SwapBytes = swapBytesByAddress.TryGetValue(addr, out var sb) ? sb : globalSwapBytes,
+                            SwapWords = swapWordsByAddress.TryGetValue(addr, out var sw) ? sw : globalSwapWords
                         });
                     }
                 }
@@ -229,6 +286,9 @@ namespace ModbusForge.ViewModels.Coordinators
                 {
                     inputRegisters.RemoveAt(inputRegisters.Count - 1);
                 }
+
+                // Compute ValueText based on Type for float/signed/string display
+                ApplyValueText(inputRegisters, values);
 
                 setStatusMessage($"Read {values.Length} input registers");
                 setHasConnectionError(false);

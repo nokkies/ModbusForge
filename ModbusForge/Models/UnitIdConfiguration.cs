@@ -186,6 +186,17 @@ namespace ModbusForge.Models
     }
 
     /// <summary>
+    /// Per-address data type metadata for a 16-bit Modbus register.
+    /// </summary>
+    public class RegisterMetadata
+    {
+        public int Address { get; set; }
+        public string Type { get; set; } = "uint";
+        public bool SwapBytes { get; set; } = false;
+        public bool SwapWords { get; set; } = false;
+    }
+
+    /// <summary>
     /// Register settings specific to a Unit ID
     /// </summary>
     public class RegisterSettings
@@ -198,7 +209,8 @@ namespace ModbusForge.Models
         public string RegistersGlobalType { get; set; } = "uint";
         public bool RegistersSwapBytes { get; set; } = false;
         public bool RegistersSwapWords { get; set; } = false;
-        
+        public List<RegisterMetadata> HoldingRegisterMetadata { get; set; } = new();
+
         // Coils
         public int CoilStart { get; set; } = 1;
         public int CoilCount { get; set; } = 16;
@@ -209,7 +221,10 @@ namespace ModbusForge.Models
         public int InputRegisterStart { get; set; } = 1;
         public int InputRegisterCount { get; set; } = 10;
         public string InputRegistersGlobalType { get; set; } = "uint";
-        
+        public bool InputRegistersSwapBytes { get; set; } = false;
+        public bool InputRegistersSwapWords { get; set; } = false;
+        public List<RegisterMetadata> InputRegisterMetadata { get; set; } = new();
+
         // Discrete inputs
         public int DiscreteInputStart { get; set; } = 1;
         public int DiscreteInputCount { get; set; } = 16;
@@ -225,6 +240,13 @@ namespace ModbusForge.Models
                 RegistersGlobalType = RegistersGlobalType,
                 RegistersSwapBytes = RegistersSwapBytes,
                 RegistersSwapWords = RegistersSwapWords,
+                HoldingRegisterMetadata = HoldingRegisterMetadata?.Select(m => new RegisterMetadata
+                {
+                    Address = m.Address,
+                    Type = m.Type,
+                    SwapBytes = m.SwapBytes,
+                    SwapWords = m.SwapWords
+                }).ToList() ?? new List<RegisterMetadata>(),
                 CoilStart = CoilStart,
                 CoilCount = CoilCount,
                 WriteCoilAddress = WriteCoilAddress,
@@ -232,6 +254,15 @@ namespace ModbusForge.Models
                 InputRegisterStart = InputRegisterStart,
                 InputRegisterCount = InputRegisterCount,
                 InputRegistersGlobalType = InputRegistersGlobalType,
+                InputRegistersSwapBytes = InputRegistersSwapBytes,
+                InputRegistersSwapWords = InputRegistersSwapWords,
+                InputRegisterMetadata = InputRegisterMetadata?.Select(m => new RegisterMetadata
+                {
+                    Address = m.Address,
+                    Type = m.Type,
+                    SwapBytes = m.SwapBytes,
+                    SwapWords = m.SwapWords
+                }).ToList() ?? new List<RegisterMetadata>(),
                 DiscreteInputStart = DiscreteInputStart,
                 DiscreteInputCount = DiscreteInputCount
             };
