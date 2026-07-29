@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Windows.Media;
+using ModbusForge.Models;
 
 namespace ModbusForge.Helpers
 {
@@ -26,6 +27,8 @@ namespace ModbusForge.Helpers
 
             return brush;
         }
+
+        public static SolidColorBrush GetBrush(RgbColor color) => GetBrush(Color.FromArgb(color.A, color.R, color.G, color.B));
 
         public static void Clear()
         {

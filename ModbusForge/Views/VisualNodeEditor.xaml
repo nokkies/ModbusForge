@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:ModbusForge.Views"
-             xmlns:models="clr-namespace:ModbusForge.Models"
+             xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core"
              xmlns:converters="clr-namespace:ModbusForge.Converters"
              xmlns:behaviors="clr-namespace:ModbusForge.Behaviors"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"

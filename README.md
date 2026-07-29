@@ -78,7 +78,15 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
-### v6.1.0 - Current Release
+### 2026.7.1 (v6.2.0) - Current Release
+
+- **CalVer versioning**: Switched from SemVer (`6.x.x`) to `YYYY.M.INCREMENT` starting with `2026.7.1`.
+- **Cross-platform core extraction**: New `ModbusForge.Core` class library targets `net8.0` and contains the view-agnostic models, helpers, configuration and services (Modbus, polling, MQTT, pcap import, logging, etc.).
+- **New `RgbColor` model**: Replaced WPF `System.Windows.Media.Color` in `NodeDescriptors` with a portable `RgbColor` struct; the WPF UI converts back when creating brushes.
+- **Headless Linux runtime**: New `ModbusForge.Headless` console app targets `net8.0`, uses `ModbusForge.Core`, and polls Modbus TCP registers/coil/discrete-input areas from the command line with `--host`, `--port`, `--unit-id`, `--start`, `--count`, `--interval` and `--area` options.
+- **Solution restructure**: `ModbusForge` WPF app now references `ModbusForge.Core`; `ModbusForge.Headless` and `ModbusForge.Core` added to the solution.
+
+### v6.1.0
 
 - **Channels-based background polling engine**: New `PollingEngine` runs Modbus reads off the WPF UI thread using `System.Threading.Channels`. `MonitoringCoordinator` now enqueues `PollingCommand`s, the worker executes the I/O, and results are drained and applied to the UI at 50ms ticks. Area commands coalesce by unit/area so only the latest pending request is processed under back-pressure.
 - **Separated I/O from UI formatting**: `RegisterCoordinator` now has `Apply*` methods for holding/input registers, coils and discrete inputs, letting the polling engine update collections on the UI thread without blocking it during Modbus transactions.

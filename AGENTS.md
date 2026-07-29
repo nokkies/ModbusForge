@@ -72,7 +72,7 @@ As of the v6.2.0 / headless split work, ModbusForge uses **CalVer-style** versio
 - `M` = month (no leading zero)
 - `INCREMENT` = release number within that month, starting at 1
 
-Update the version in `ModbusForge\ModbusForge.csproj` before tagging:
+Update the version in all three `.csproj` files before tagging (`ModbusForge`, `ModbusForge.Core`, `ModbusForge.Headless`):
 
 ```xml
 <Version>2026.7.1</Version>
@@ -93,6 +93,8 @@ Tags should still be prefixed with `v`, e.g. `v2026.7.1`.
 ## Project Structure
 
 - `ModbusForge/` - Main WPF application
+- `ModbusForge.Core/` - Cross-platform view-agnostic class library (`net8.0`)
+- `ModbusForge.Headless/` - Linux/headless console runtime (`net8.0`)
 - `ModbusForge.Tests/` - Unit tests
 - `setup/ModbusForge.iss` - Inno Setup installer script
 - `installers/` - Built installers (gitignored)

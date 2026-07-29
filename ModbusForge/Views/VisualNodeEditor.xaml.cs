@@ -1456,7 +1456,8 @@ namespace ModbusForge.Views
 
         private Color GetElementColor(PlcElementType elementType)
         {
-            return NodeDescriptors.Get(elementType).HeaderColor;
+            var c = NodeDescriptors.Get(elementType).HeaderColor;
+            return Color.FromArgb(c.A, c.R, c.G, c.B);
         }
         
         private void Canvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

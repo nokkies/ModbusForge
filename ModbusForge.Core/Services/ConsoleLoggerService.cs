@@ -16,13 +16,13 @@ namespace ModbusForge.Services
         // Default constructor for backwards compatibility / tests without settings
         public ConsoleLoggerService(IDispatcher? dispatcher = null)
         {
-            _dispatcher = dispatcher ?? new WpfDispatcher();
+            _dispatcher = dispatcher ?? new ImmediateDispatcher();
         }
 
         public ConsoleLoggerService(ISettingsService settingsService, IDispatcher? dispatcher = null)
         {
             _settingsService = settingsService;
-            _dispatcher = dispatcher ?? new WpfDispatcher();
+            _dispatcher = dispatcher ?? new ImmediateDispatcher();
             if (_settingsService != null)
             {
                 _settingsService.SettingsChanged += OnSettingsChanged;
