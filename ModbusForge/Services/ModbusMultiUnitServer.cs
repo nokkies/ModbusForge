@@ -158,7 +158,8 @@ namespace ModbusForge.Services
                         var pdu = new byte[length - 1];
                         if (!await ReadExactAsync(stream, pdu, pdu.Length, ct)) break;
 
-                        _consoleLoggerService?.Log($"Request from {remoteEndpoint} Unit ID {unitId} FC {(pdu.Length > 0 ? pdu[0] : 0)}");
+                        var details = FormatRequestDetails(pdu);
+                        _consoleLoggerService?.Log($"Request from {remoteEndpoint} Unit ID {unitId} FC {(pdu.Length > 0 ? pdu[0] : 0)}{details}");
 
                         var responseData = ProcessPdu(unitId, pdu);
                         if (responseData == null) continue;
@@ -239,6 +240,24 @@ namespace ModbusForge.Services
                 _logger.LogDebug(ex, "Error processing FC{FC} for Unit ID {UnitId}", fc, unitId);
                 return ExceptionResponse(fc, 4); // Slave device failure
             }
+        }
+
+        private string FormatRequestDetails(byte[] pdu)
+        {
+            if (pdu.Length < 5) return string.Empty;
+            byte fc = pdu[0];
+            int address = (pdu[1] << 8) | pdu[2];
+
+            return fc switch
+            {
+                1 or 2 or 3 or 4 => pdu.Length >= 5 ? $" addr {address} count {((pdu[3] << 8) | pdu[4])}" : string.Empty,
+                5 => pdu.Length >= 5 ? $" addr {address} = {(pdu[3] == 0xFF ? 1 : 0)}" : string.Empty,
+                6 => pdu.Length >= 5 ? $" addr {address} = {((pdu[3] << 8) | pdu[4])}" : string.Empty,
+                15 or 16 => pdu.Length >= 6 ? $" addr {address} count {((pdu[3] << 8) | pdu[4])}" : string.Empty,
+                22 => pdu.Length >= 7 ? $" addr {address}" : string.Empty,
+                23 => pdu.Length >= 10 ? $" read {address}/{((pdu[3] << 8) | pdu[4])} write {((pdu[5] << 8) | pdu[6])}/{((pdu[7] << 8) | pdu[8])}" : string.Empty,
+                _ => string.Empty
+            };
         }
 
         // FC01/FC02: Read Coils / Read Discrete Inputs

@@ -352,6 +352,7 @@ namespace ModbusForge.ViewModels.Coordinators
         {
             var service = GetService(isServerMode);
             await service.WriteSingleRegisterAsync(unitId, address, value);
+            _consoleLoggerService.Log($"Wrote holding register {address} = {value}");
         }
 
         /// <summary>
@@ -362,6 +363,7 @@ namespace ModbusForge.ViewModels.Coordinators
             var service = GetService(isServerMode);
             var registers = DataTypeConverter.ToUInt16(value, swapBytes, swapWords);
             await service.WriteRegistersAsync(unitId, address, registers);
+            _consoleLoggerService.Log($"Wrote real {value} to holding registers {address}..{address + registers.Length - 1}");
         }
 
         /// <summary>
@@ -372,6 +374,7 @@ namespace ModbusForge.ViewModels.Coordinators
             var service = GetService(isServerMode);
             var registers = DataTypeConverter.ToUInt16(text);
             await service.WriteRegistersAsync(unitId, address, registers);
+            _consoleLoggerService.Log($"Wrote string '{text}' to holding registers {address}..{address + registers.Length - 1}");
         }
 
         /// <summary>
@@ -381,6 +384,7 @@ namespace ModbusForge.ViewModels.Coordinators
         {
             var service = GetService(isServerMode);
             await service.WriteSingleCoilAsync(unitId, address, state);
+            _consoleLoggerService.Log($"Wrote coil {address} = {(state ? 1 : 0)}");
         }
 
         /// <summary>

@@ -231,6 +231,7 @@ namespace ModbusForge.Services
 
                 if (shouldUpdate)
                 {
+                    _consoleLoggerService?.Log($"Simulation: {node.Name} ({node.Id}) changed to {result.IntValue} ({(result.BoolValue ? "true" : "false")})");
                     node.CurrentValue = result.BoolValue;
                     node.IntValue = result.IntValue;
                     // Mirror the live value into the property bound by the Live Values panel.
