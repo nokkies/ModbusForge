@@ -62,6 +62,7 @@ namespace ModbusForge.ViewModels
         private readonly IUpdateService? _updateService;
         private readonly ISettingsService? _settingsService;
         private readonly MqttGatewayService _mqttGatewayService;
+        private readonly PcapImportService _pcapImportService;
         private bool _disposed = false;
         // Mode-aware UI helpers
 
@@ -115,6 +116,7 @@ namespace ModbusForge.ViewModels
             _updateService = updateService;
             _settingsService = settingsService;
             _mqttGatewayService = mqttGatewayService ?? new MqttGatewayService(Microsoft.Extensions.Logging.Abstractions.NullLogger<MqttGatewayService>.Instance);
+            _pcapImportService = new PcapImportService(Microsoft.Extensions.Logging.Abstractions.NullLogger<PcapImportService>.Instance);
             AttachThemeChangedHandler();
             // Initialize visual node editor
             _visualNodeEditorViewModel = visualNodeEditorViewModel ?? new VisualNodeEditorViewModel();
@@ -296,6 +298,7 @@ namespace ModbusForge.ViewModels
 
             // Diagnostic / analysis windows
             OpenFrameInspectorCommand = new RelayCommand(OpenFrameInspector);
+            OpenPcapCommand = new RelayCommand(OpenPcapFile);
         }
 
         /// <summary>
@@ -486,6 +489,7 @@ namespace ModbusForge.ViewModels
         public IRelayCommand ReadAllCustomNowCommand { get; private set; } = null!;
         public ICommand SaveProjectCommand { get; private set; } = null!;
         public ICommand LoadProjectCommand { get; private set; } = null!;
+        public ICommand OpenPcapCommand { get; private set; } = null!;
         public ICommand OpenFrameInspectorCommand { get; private set; } = null!;
         public ICommand ImportUnitIdsCommand { get; private set; } = null!;
         public ICommand ExportUnitIdsCommand { get; private set; } = null!;
@@ -1747,6 +1751,40 @@ namespace ModbusForge.ViewModels
             {
                 var logger = _modbusService?.FrameLogger ?? _clientService.FrameLogger;
                 var viewModel = new FrameInspectorViewModel(logger, $"Frame Inspector - {(IsServerMode ? "Server" : "Client")}");
+                var window = new FrameInspectorWindow(viewModel)
+                {
+                    Owner = Application.Current?.MainWindow
+                };
+                window.Show();
+            });
+        }
+
+        private void OpenPcapFile()
+        {
+            _dispatcher.Invoke(() =>
+            {
+                var dialog = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "Import pcap capture",
+                    Filter = "Pcap files (*.pcap)|*.pcap|All files (*.*)|*.*",
+                    CheckFileExists = true,
+                };
+
+                if (dialog.ShowDialog() != true)
+                    return;
+
+                var result = _pcapImportService.Import(dialog.FileName);
+                if (!result.Success)
+                {
+                    _dialogService.Show(result.Message, "Pcap Import", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var logger = new ModbusFrameLogger(result.Frames.Count + 1);
+                foreach (var frame in result.Frames)
+                    logger.Frames.Add(frame);
+
+                var viewModel = new FrameInspectorViewModel(logger, $"Pcap Replay - {System.IO.Path.GetFileName(dialog.FileName)}");
                 var window = new FrameInspectorWindow(viewModel)
                 {
                     Owner = Application.Current?.MainWindow
