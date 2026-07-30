@@ -1,212 +1,242 @@
-# ModbusForge Versioned Roadmap — CalVer 2026.7.x / 2026.07.x
+# ModbusForge Versioned Roadmap — CalVer 2026.7.x
 
-Version format: `YYYY.M.INCREMENT` (repo convention), e.g. `2026.7.3`.  
-All `.csproj` files are bumped together for a release so Core, WPF, Headless and Avalonia share the same assembly version.
+Version format: `YYYY.M.INCREMENT`. All `.csproj` files are bumped together.
 
-## Baseline
+## Important: 2026.7.4–2026.7.12 are NOT completed
 
-| Version | Project | State |
-|---------|---------|-------|
-| `2026.7.1` | `ModbusForge`, `ModbusForge.Core`, `ModbusForge.Headless` | Shipped |
-| `2026.7.2` | `ModbusForge.Avalonia` (spike) | Shipped |
+Those milestones were previously marked complete, but only the **UI shell / packaging** was done. The actual features were not ported from the working WPF app. This roadmap is now the living **Avalonia = WPF parity plan**. Items will only be marked **Done** when the Avalonia feature works end-to-end.
 
-Avalonia currently contains: main window, connection manager, device scanner, basic holding register grid, file/message-box/input dialogs, and self-contained publish profiles for `win-x64` and `linux-x64`.
+## Legend
 
----
-
-## 2026.7.3 — Avalonia Foundations (Completed)
-**Theme:** Cross-platform shell and packaging are solid.
-
-- Align all `.csproj` versions to `2026.7.3`.
-- Make `ModbusForge.Avalonia` the default startup project in the solution.
-- Add GitHub Actions CI that builds and tests Avalonia on Windows and Linux.
-- Validate Linux `linux-x64` self-contained publish.
-- Smoke-test both `win-x64` and `linux-x64` single-file executables.
-- WPF: keep parity; no new WPF-only features this release.
-
-**Apps:** Avalonia, Core, WPF, Headless  
-**Impact:** Low risk; infrastructure only.
+- `[ ]` Not started / not working
+- `[~]` In progress
+- `[x]` Done (end-to-end verified)
 
 ---
 
-## 2026.7.4 — Core Register Operations in Avalonia (Completed)
-**Theme:** Port the register read/write experience.
+## Shipped Baseline
 
-- Holding / input registers, coils, discrete inputs.
-- Read, write single, write multiple, continuous read.
-- Data grid with address, value, type, swap, format columns.
-- Unit ID switching with per-unit state.
-
-- Holding / input registers, coils, discrete inputs.
-- Read, write single, write multiple, continuous read.
-- Data grid with address, value, type, swap, format columns.
-- Unit ID switching with per-unit state.
-- Connection diagnostics (TCP latency / serial loopback).
-- WPF: fix any register-grid regressions; add Avalonia-only improvements back to Core.
-
-**Affects:** `ModbusForge.Avalonia`, `ModbusForge.Core`  
-**Key services:** `ModbusTcpService`, `ModbusSerialService`, `RegisterCoordinator`.
+| Version | State | Notes |
+|---------|-------|-------|
+| `2026.7.1` | [x] | WPF / Core / Headless shipped. |
+| `2026.7.2` | [x] | Avalonia spike (window, dialogs, publish profiles). |
+| `2026.7.3` | [x] | Avalonia foundations: CI, Linux publish, default startup. |
 
 ---
 
-## 2026.7.5 — Custom Watch & Project Save (Completed)
-**Theme:** User-defined tags and project persistence.
+## Master/Slave Client-Server Mode — [x] Done
 
-- Custom Watch tab in Avalonia.
-- Continuous read/write with per-entry periods.
-- Project save/load (`.mfp`/`.json`).
-- Headless `--custom` JSON support.
-
-- Custom Watch tab (area, type, read/write value, continuous read/write, read period).
-- Per-row trend enable.
-- Project save/load (`.mfp`) including Unit IDs, connections, custom entries.
-- JSON import/export for custom configurations.
-- Headless: `--custom` JSON import for headless polling.
-
-**Affects:** `ModbusForge.Avalonia`, `ModbusForge.Core`, `ModbusForge.Headless`
+- [x] `ConnectionProfile` has `Mode` (Client/Server) and `ServerUnitIds`.
+- [x] `ConnectionManager` creates `ModbusServerService` for Server mode.
+- [x] `ModbusServerService` uses `ServerUnitIds` and supports 0-based data store.
+- [x] Avalonia `MainViewModel` exposes `Mode`, `IsServerMode`, `EffectiveUnitId`, `AvailableUnitIds`, `SelectedUnitId`.
+- [x] Avalonia `MainView` connection bar shows Mode ComboBox and conditional server/client fields.
+- [x] End-to-end test: server + client read/write through `ConnectionManager`.
 
 ---
 
-## 2026.7.6 — Trends & Visualization (Completed)
-**Theme:** Real-time charts and export.
+## Main Shell & Navigation — [~] In Progress
 
-- Avalonia `Trends` tab with LiveCharts Cartesian chart.
-- `TrendLoggingService` integrated and auto-started/stopped with connection.
-- Custom Watch entries can trend numeric/coil values.
-- Start/stop, remove, clear, retention, and sample-rate controls.
+| Feature | WPF | Avalonia | Target |
+|---------|-----|----------|--------|
+| Left NavigationView with icons | Yes | No | 2026.7.13 |
+| Status bar at bottom (status, version, connection) | Yes | Partial (status only) | 2026.7.13 |
+| View menu: dark mode, sim visibility, tab visibility toggles | Yes | Minimal | 2026.7.13 |
+| Debug / Console tabs | Yes | No | 2026.7.13 |
+| Connection bar styled card, status indicator, Diagnostics button | Yes | Partial | 2026.7.13 |
+| Main menu: Open Pcap, Import/Export Unit IDs, Save All, Trend export | Yes | Missing | 2026.7.13 |
+| Full AvalonDock docking with 11 documents | Yes | Simple TabControl | 2026.7.14 |
+| DataGrid context menus (Quick Write, Add to Watch, etc.) | Yes | No | 2026.7.14 |
+| Dashboard tab | Yes | No | 2026.7.14 |
 
----
+### 2026.7.13 subtasks
+- [ ] Add left NavigationView or equivalent with all WPF items.
+- [ ] Add StatusBar at bottom: status, version, connection indicator.
+- [ ] Add View menu with tab visibility toggles, Show All, Reset to Default.
+- [ ] Add Debug and Console tabs/collections.
+- [ ] Add connection status indicator ellipse and Diagnostics button.
+- [ ] Add missing File menu items (Open Pcap, Import/Export Unit IDs, Save All).
+- [ ] Add missing Options/Tools menu items (Connection Manager, Device Scanner, Script Editor, Advanced Functions, Frame Inspector).
 
-## 2026.7.7 — Connection, Transport & Frame Tools (Completed)
-**Theme:** Complete the connection experience and diagnostics.
-
-- Serial RTU/ASCII settings in Avalonia Connection Manager (COM, baud, parity, RTS toggle, pre/post tx delays).
-- Connection profile save/load across sessions.
-- Frame Inspector window (live PDU/byte log with timestamps).
-- Pcap import / offline replay (uses `PcapImportService`).
-- MQTT gateway publish from Core (configured in Avalonia preferences).
-
-- Trend view with multiple traces, zoom/pan, retention.
-- CSV and PNG export.
-- Avalonia Skia chart integration (`LiveChartsCore.SkiaSharpView.Avalonia` or equivalent).
-- Trend auto-enable on custom/register line add.
-
-**Affects:** `ModbusForge.Avalonia`, `ModbusForge.Core` (`TrendLoggingService`)
-
----
-
-## 2026.7.7 — Connection, Transport & Frame Tools (Completed)
-**Theme:** Complete the connection experience and diagnostics.
-
-- Serial RTU/ASCII settings in Avalonia connection manager (COM, baud, parity, RTS toggle, pre/post tx delays).
-- Connection profile save/load across sessions.
-- Frame Inspector window (live PDU/byte log with timestamps).
-- Pcap import / offline replay (uses `PcapImportService`).
-- MQTT gateway publish from Core (configured in Avalonia preferences).
-
-**Affects:** `ModbusForge.Avalonia`, `ModbusForge.Core`
+### 2026.7.14 subtasks
+- [ ] Add Dashboard tab.
+- [ ] Add DataGrid context menus for Quick Write, Add to Custom Watch, Add to Trend, Copy.
+- [ ] Evaluate/imitate dockable/floatable layout if required.
 
 ---
 
-## 2026.7.8 — Scripting & Advanced Functions (Completed)
-**Theme:** Automation and extended Modbus function codes.
+## Registers — [ ] Not Done
 
-- Script Editor in Avalonia (read, write, delay, log, repeat, run/stop).
-- `.mbscript` save/load.
-- Advanced function codes: FC22 Mask Write, FC23 Read/Write Multiple, FC43 Read Device Identification.
-- Signal generator configuration (ramp, sine, triangle, square).
+| Feature | WPF | Avalonia | Target |
+|---------|-----|----------|--------|
+| 4 register tabs | Yes | Yes | — |
+| Per-area Start/Count | Yes | Global only | 2026.7.15 |
+| Per-area monitoring toggle + period + auto-pause | Yes | Global only | 2026.7.15 |
+| Inline editing (Holding/Coils) | Yes | Read-only | 2026.7.15 |
+| Per-area Read/Write buttons | Yes | Global only | 2026.7.15 |
+| Quick Write via context menu | Yes | No | 2026.7.15 |
+| PollingEngine command coalescing | Yes | Simple loop | 2026.7.16 |
+| Comprehensive error handling (HasConnectionError, auto-pause, dialogs) | Yes | Basic status only | 2026.7.16 |
 
-**Affects:** `ModbusForge.Avalonia`, `ModbusForge.Core` (`ScriptRuleService`, `ModbusServerService`)
+### 2026.7.15 subtasks
+- [ ] Add per-area Start/Count properties for Holding/Input/Coils/Discrete.
+- [ ] Add per-area monitoring toggles and period controls.
+- [ ] Enable inline editing in Holding Registers and Coils DataGrids.
+- [ ] Add per-area Read and Write commands.
+- [ ] Implement Quick Write context menu.
 
----
-
-## 2026.7.9 — Visual Simulation (Completed)
-**Theme:** Port the visual node editor.
-
-- Visual Node Editor (node palette, canvas, wiring, ADD/COMPARE/CONST/POU blocks).
-- Signal generator nodes.
-- Real-time simulation execution.
-- Save/load simulation programs.
-
-**Affects:** `ModbusForge.Avalonia`, `ModbusForge.Core` (`SimulationService`)
-
----
-
-## 2026.7.10 — Application Shell & Preferences (Completed)
-**Theme:** Complete the desktop shell and settings.
-
-- Preferences window (theme, polling defaults, MQTT, API server, update checks).
-- Help, About, Keyboard Shortcuts, Troubleshooting windows.
-- Global keyboard shortcuts (Ctrl+R read, Ctrl+T trends, Ctrl+S save, F5 refresh, F1 help).
-- Theming / dark mode parity with WPF.
-- Auto-updater for Avalonia (asset matching, download, silent install).
-
-**Affects:** `ModbusForge.Avalonia`, `ModbusForge.Core`
+### 2026.7.16 subtasks
+- [ ] Port `PollingEngine` (or equivalent) for optimized/coalesced background reads.
+- [ ] Add `HasConnectionError` flag and per-area auto-pause on errors.
+- [ ] Add error dialogs for monitoring failures.
 
 ---
 
-## 2026.7.11 — Performance & Reliability (Completed)
-**Theme:** Hardening before broader release.
+## Custom Watch — [ ] Not Done
 
-- Data grid virtualization for large address ranges.
-- Connection pooling / multi-device support improvements.
-- Structured logging with correlation IDs.
-- Address-calculation and boundary-check audit across all services.
-- Unit test coverage for the Avalonia port.
+| Feature | WPF | Avalonia | Target |
+|---------|-----|----------|--------|
+| Grid columns | Yes | Yes (missing per-row action buttons) | 2026.7.17 |
+| Continuous Read | Yes | Yes | — |
+| Continuous Write | Yes | Missing | 2026.7.17 |
+| Import/Export custom entries | Yes | Yes (via service) | — |
+| Auto-increment address | `uint`/`real` +2 | `real` only +2 (bug) | 2026.7.17 |
+| Per-row Trend checkbox | Yes | Yes | — |
 
-**Affects:** All projects
-
----
-
-## 2026.7.12 — Release Polish & Cross-Platform Packaging
-**Theme:** Ship Avalonia as the primary entry point.
-
-- Final version bump to `2026.7.12` in all `.csproj` files.
-- Windows installer (`setup/ModbusForge.iss` or a new Avalonia installer).
-- Linux `.tar.gz` packaging.
-- Release notes and README update.
-- Tag `v2026.7.12` and GitHub release.
-
-**Affects:** All projects
+### 2026.7.17 subtasks
+- [ ] Implement continuous write timer.
+- [ ] Fix auto-increment: `uint` and `real` should both increment by 2.
+- [ ] Add per-row Read/Write action buttons.
 
 ---
 
-## Beyond 2026.7.x — Major Features
+## Trends — [ ] Not Done
 
-These are larger initiatives and should start in `2026.8.1` or later once Avalonia parity is reached:
+| Feature | WPF | Avalonia | Target |
+|---------|-----|----------|--------|
+| Series management | Yes | Simpler | 2026.7.18 |
+| Play/Pause | Yes | Start/Stop (naming only) | — |
+| Lock X/Y zoom controls | Yes | Hardcoded X only | 2026.7.18 |
+| Export CSV | Yes | Missing | 2026.7.18 |
+| Import CSV | Yes | Missing | 2026.7.18 |
+| Export PNG | Yes | Missing | 2026.7.18 |
+| Reset view | Yes | Missing | 2026.7.18 |
+| Retention control | Yes | Yes | — |
+| Sample rate control | Internal | Yes (UI) | — |
 
-- **Unit ID isolation & save structure redesign** (per-Unit ID state, unified project file).
-- **Alarm / Event system**.
-- **Device Template Library**.
-- **Calculation Engine**.
-- **MQTT subscriber / historian**.
-- **Plugin architecture**.
-- **OpenAPI / Swagger API documentation**.
+### 2026.7.18 subtasks
+- [ ] Add Export CSV, Import CSV, Export PNG buttons/commands.
+- [ ] Add Lock X / Lock Y zoom controls.
+- [ ] Add Reset View button.
 
 ---
 
-## Summary Table
+## Decode View — [ ] Not Done
 
-| Version | Theme | Main Deliverables | Apps |
-|---------|-------|-------------------|------|
-| `2026.7.3` | Avalonia foundations | CI, Linux publish, default startup | All |
-| `2026.7.4` | Registers | Read/write/poll for all areas | Avalonia, Core |
-| `2026.7.5` | Custom Watch | Custom entries + project save | Avalonia, Core, Headless |
-| `2026.7.6` | Trends | Charts, CSV/PNG, retention | Avalonia, Core |
-| `2026.7.7` | Connection tools | Serial, Frame Inspector, pcap, MQTT | Avalonia, Core |
-| `2026.7.8` | Scripting | Script editor + advanced FCs | Avalonia, Core |
-| `2026.7.9` | Simulation | Visual node editor | Avalonia, Core |
-| `2026.7.10` | Shell | Preferences, help, shortcuts, theme | Avalonia, Core |
-| `2026.7.11` | Hardening | Virtualization, logging, tests | All |
-| `2026.7.12` | Release | Installer, packaging, tag | All |
+| Feature | WPF | Avalonia | Target |
+|---------|-----|----------|--------|
+| 16-bit decoder (None, Swap Bytes, Swap Words, Swap B+W) | Yes | Missing | 2026.7.19 |
+| 32-bit decoder (UInt32, Int32, Float32, ASCII 4) | Yes | Missing | 2026.7.19 |
+
+### 2026.7.19 subtasks
+- [ ] Create `DecodeView.axaml` and `DecodeViewModel`.
+- [ ] Implement all 16-bit and 32-bit swap combinations.
+
+---
+
+## Connection, Transport & Frame Tools — [~] Partial
+
+| Feature | WPF | Avalonia | Target |
+|---------|-----|----------|--------|
+| Connection profile management (TCP/Serial) | Yes | Yes | — |
+| Serial RTU/ASCII settings | Yes | Yes | — |
+| Frame Inspector | Yes | Yes (with extra features) | — |
+| Device Scanner | Yes | Yes | — |
+| Open Pcap / offline replay | Yes | In Frame Inspector only | 2026.7.20 |
+| MQTT gateway | Integrated | Dedicated tab | — |
+| Update service (download/install) | Yes | Check only | 2026.7.20 |
+
+### 2026.7.20 subtasks
+- [ ] Add Open Pcap to File menu.
+- [ ] Implement update download/install in Avalonia.
+
+---
+
+## Scripting & Advanced Functions — [~] Partial
+
+| Feature | WPF | Avalonia | Target |
+|---------|-----|----------|--------|
+| Script editor | Yes | Yes | — |
+| Advanced Functions (FC22, FC23, FC43) | Yes | Missing | 2026.7.21 |
+
+### 2026.7.21 subtasks
+- [ ] Create `AdvancedFunctionsWindow.axaml` and `AdvancedFunctionsViewModel`.
+- [ ] Implement FC22 Mask Write, FC23 Read/Write Multiple, FC43 Device Identification.
+
+---
+
+## Visual Simulation — [~] Partial
+
+| Feature | WPF | Avalonia | Target |
+|---------|-----|----------|--------|
+| Node palette | Yes | Yes (basic) | 2026.7.22 |
+| Drag-drop canvas | Yes | Missing | 2026.7.22 |
+| POU tree (programs) | Yes | Missing | 2026.7.22 |
+| Run/stop | Yes | Yes | — |
+| Save/load simulation | Yes | Yes (basic) | 2026.7.22 |
+| Live values, auto layout, snap, zoom, undo/redo | Yes | Missing | 2026.7.23 |
+| Tag Browser / Watch integration | Yes | Missing | 2026.7.23 |
+
+### 2026.7.22 subtasks
+- [ ] Implement drag-drop canvas for Visual Node Editor.
+- [ ] Add POU tree (programs) with create/rename/duplicate/delete.
+- [ ] Save/load visual simulation in project file.
+
+### 2026.7.23 subtasks
+- [ ] Add live values panel, auto layout, snap to grid, zoom, undo/redo.
+- [ ] Integrate Tag Browser / Watch Window.
+
+---
+
+## Project Save/Load & Unit ID State — [ ] Not Done
+
+| Feature | WPF | Avalonia | Target |
+|---------|-----|----------|--------|
+| Project save/load (.mfp) | Full (per-unit configs, visual nodes) | Partial (profiles + custom entries) | 2026.7.24 |
+| Import/Export Unit IDs | Yes | Missing | 2026.7.24 |
+| Per-Unit ID state (UnitConfigurationStore) | Yes | Missing | 2026.7.24 |
+
+### 2026.7.24 subtasks
+- [ ] Integrate `IUnitConfigurationStore` in Avalonia.
+- [ ] Save/load `UnitConfigurations`, `VisualNodes`, `VisualConnections` in project.
+- [ ] Add Import/Export Unit ID commands and menu items.
+
+---
+
+## Missing Tool Windows — [ ] Not Done
+
+| Feature | WPF | Avalonia | Target |
+|---------|-----|----------|--------|
+| Tag Browser | Yes | Missing | 2026.7.25 |
+| Register Template Import | Yes | Missing | 2026.7.25 |
+
+### 2026.7.25 subtasks
+- [ ] Create `TagBrowserWindow.axaml` and `TagBrowserViewModel`.
+- [ ] Create `RegisterTemplateImportWindow.axaml` and view model.
+
+---
+
+## Release / Packaging
+
+- [ ] No version bump until the above features are actually working.
+- [ ] No `v*` tags or GitHub Releases until parity is reached.
+- [ ] Keep `release.yml` on `workflow_dispatch` only until then.
+- [ ] When parity is reached, bump to `2026.7.26` or later and re-enable releases.
 
 ---
 
 ## Notes
 
-- Patch increments (`2026.7.x`) are used for the Avalonia porting milestones while the application is in transition.
-- WPF receives only regression fixes and Core improvements during this period.
-- Headless gets CLI parity for Custom Watch and project save where it makes sense.
-- When Avalonia reaches feature parity, the next minor month (`2026.8.1`) begins the major feature track.
-
-*Roadmap created: July 2026*
+- WPF is the source of truth.
+- Every feature must be verified end-to-end before it is marked `[x]`.
+- Core improvements (fixing `ModbusServerService` bounds, etc.) can ship independently but do not count as Avalonia parity.
