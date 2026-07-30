@@ -35,21 +35,21 @@ This file provides instructions for AI coding assistants working on this project
 
 1. **Update version in `.csproj`**:
    ```xml
-   <Version>4.5.15</Version>
-   <AssemblyVersion>4.5.15.0</AssemblyVersion>
-   <FileVersion>4.5.15.0</FileVersion>
+   <Version>2026.7.12</Version>
+   <AssemblyVersion>2026.7.12</AssemblyVersion>
+   <FileVersion>2026.7.12</FileVersion>
    ```
 
 2. **Commit version bump**:
    ```powershell
-   git add -A; git commit -m "v4.5.15: Description of changes"
+   git add -A; git commit -m "v2026.7.12: Description of changes"
    ```
 
 3. **Create and push tag**:
    ```powershell
-   git tag -a v4.5.15 -m "v4.5.15 release"
+   git tag -a v2026.7.12 -m "v2026.7.12 release"
    git push origin master
-   git push origin v4.5.15
+   git push origin v2026.7.12
    ```
 
 4. **Build installer** (optional - for full release):
@@ -61,20 +61,20 @@ This file provides instructions for AI coding assistants working on this project
 5. **Create GitHub release** manually at:
    https://github.com/nokkies/ModbusForge/releases/new
 
-   - Select the tag (e.g., v4.5.15)
-   - Title: `ModbusForge v4.5.15`
-   - Upload: `installers\ModbusForge-4.5.15-setup.exe`
+   - Select the tag (e.g., v2026.7.12)
+   - Title: `ModbusForge v2026.7.12`
+   - Upload: `installers\ModbusForge-2026.7.12-setup.exe`
    - Description: Brief changelog
 
 ## Versioning
 
-As of the v6.2.0 / headless split work, ModbusForge uses **CalVer-style** versions in the form `YYYY.M.INCREMENT` (e.g. `2026.7.1`):
+As of the v6.1.0 / headless split work, ModbusForge uses **CalVer-style** versions in the form `YYYY.M.INCREMENT` (e.g. `2026.7.1`):
 
 - `YYYY` = year
 - `M` = month (no leading zero)
 - `INCREMENT` = release number within that month, starting at 1
 
-Update the version in all three `.csproj` files before tagging (`ModbusForge`, `ModbusForge.Core`, `ModbusForge.Headless`):
+Update the version in all four `.csproj` files before tagging (`ModbusForge`, `ModbusForge.Core`, `ModbusForge.Headless`, `ModbusForge.Avalonia`):
 
 ```xml
 <Version>2026.7.1</Version>
@@ -88,7 +88,7 @@ Tags should still be prefixed with `v`, e.g. `v2026.7.1`.
 
 **Do NOT create extra markdown files for releases.**
 
-- ❌ Don't create: `RELEASE_v4.5.15.md`, `RELEASE_SUMMARY.md`, etc.
+- ❌ Don't create: `RELEASE_v2026.7.12.md`, `RELEASE_SUMMARY.md`, etc.
 - ✅ Update: `README.md` changelog section
 - ✅ Upload: Only the installer `.exe` to GitHub Releases
 

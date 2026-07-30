@@ -2,9 +2,9 @@
 
 Version format: `YYYY.M.INCREMENT`. All `.csproj` files are bumped together.
 
-## Important: 2026.7.4–2026.7.12 are NOT completed
+## Important: baseline reset to `2026.7.1`
 
-Those milestones were previously marked complete, but only the **UI shell / packaging** was done. The actual features were not ported from the working WPF app. This roadmap is now the living **Avalonia = WPF parity plan**. Items will only be marked **Done** when the Avalonia feature works end-to-end.
+All `.csproj` files are now back at `2026.7.1`. The `v2026.7.2`–`v2026.7.11` tags still exist in history, but they represent premature/fake milestones. This roadmap is now the living **Avalonia = WPF parity plan**. Items will only be marked **Done** when the Avalonia feature works end-to-end. Real versions will resume at `2026.7.12` so we do not overwrite the historical tags.
 
 ## Legend
 
@@ -18,9 +18,9 @@ Those milestones were previously marked complete, but only the **UI shell / pack
 
 | Version | State | Notes |
 |---------|-------|-------|
-| `2026.7.1` | [x] | WPF / Core / Headless shipped. |
-| `2026.7.2` | [x] | Avalonia spike (window, dialogs, publish profiles). |
-| `2026.7.3` | [x] | Avalonia foundations: CI, Linux publish, default startup. |
+| `2026.7.1` | [x] | WPF / Core / Headless shipped. This is the current baseline. |
+
+The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milestone tracking and should not be treated as real shipped versions. Avalonia parity work will be versioned from `2026.7.12` onward.
 
 ---
 
@@ -231,7 +231,7 @@ Those milestones were previously marked complete, but only the **UI shell / pack
 - [ ] No version bump until the above features are actually working.
 - [ ] No `v*` tags or GitHub Releases until parity is reached.
 - [ ] Keep `release.yml` on `workflow_dispatch` only until then.
-- [ ] When parity is reached, bump to `2026.7.26` or later and re-enable releases.
+- [ ] When a feature block is done and tested, bump to the next available CalVer starting at `2026.7.12` (to avoid overwriting `v2026.7.2`–`v2026.7.11`) and tag it so we can always roll back.
 
 ---
 
