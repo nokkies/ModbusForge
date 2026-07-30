@@ -145,7 +145,7 @@ Avalonia currently contains: main window, connection manager, device scanner, ba
 
 ---
 
-## 2026.7.11 — Performance & Reliability
+## 2026.7.11 — Performance & Reliability (Completed)
 **Theme:** Hardening before broader release.
 
 - Data grid virtualization for large address ranges.

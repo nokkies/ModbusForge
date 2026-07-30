@@ -78,6 +78,12 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.7.11 — Performance & Reliability
+
+- **Address validation**: New `IModbusAddressValidator` / `ModbusAddressValidator` validates unit ID, start address, and count/range before every Modbus operation. `ModbusTcpService` and `ModbusSerialService` now reject out-of-bounds requests with `ArgumentOutOfRangeException`, and `MainViewModel.CanRead()` disables the read command for invalid ranges.
+- **Correlation IDs**: New `ICorrelationContext` / `CorrelationContext` with async-local storage for tracing operations across async boundaries. `ConnectionManager` starts a new correlation ID and adds it to `ILogger` scopes when connecting a profile.
+- **More Avalonia unit tests**: Added `ModbusAddressValidatorTests`, `CorrelationContextTests`, and `PreferencesViewModelTests` (plus `FakeSettingsService`). `ModbusForge.Avalonia.Tests` now has 5 tests covering the main view, preferences, and validator.
+
 ### 2026.7.10 — Application Shell & Preferences
 
 - **Application menu in Avalonia**: Added File, Edit, View, Tools, and Help menus to `MainView` with Save, Load, Exit, Read/Refresh, Preferences, Toggle Theme, Check for Updates, Help, Keyboard Shortcuts, Troubleshooting, and About commands.

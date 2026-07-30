@@ -22,6 +22,8 @@ public class ConnectionManager : IConnectionManager
     private readonly ILogger<ConnectionManager> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IValidationService? _validationService;
+    private readonly ICorrelationContext _correlationContext;
+    private readonly IModbusAddressValidator _addressValidator;
     private readonly ConcurrentDictionary<string, IModbusService> _services = new();
     private ConnectionProfile? _activeProfile;
 
@@ -36,10 +38,17 @@ public class ConnectionManager : IConnectionManager
     public event EventHandler<ConnectionProfile>? ProfileDisconnected;
 
     public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService = null)
+        : this(logger, loggerFactory, validationService, null, null)
+    {
+    }
+
+    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService, ICorrelationContext? correlationContext, IModbusAddressValidator? addressValidator)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
         _validationService = validationService;
+        _correlationContext = correlationContext ?? new CorrelationContext();
+        _addressValidator = addressValidator ?? new ModbusAddressValidator();
         LoadProfiles();
 
         // Add default profile if none exist
@@ -101,6 +110,9 @@ public class ConnectionManager : IConnectionManager
 
     public async Task<bool> ConnectProfileAsync(ConnectionProfile profile)
     {
+        var correlationId = _correlationContext.StartNew();
+        using var scope = _logger.BeginScope(new Dictionary<string, object> { ["CorrelationId"] = correlationId, ["Profile"] = profile.Name });
+
         try
         {
             // Validate serial settings before attempting to connect.
@@ -197,8 +209,10 @@ public class ConnectionManager : IConnectionManager
                 _loggerFactory.CreateLogger<ModbusSerialService>(),
                 null,
                 _validationService,
+                null,
+                _addressValidator,
                 transport),
-            _ => new ModbusTcpService(_loggerFactory.CreateLogger<ModbusTcpService>())
+            _ => new ModbusTcpService(_loggerFactory.CreateLogger<ModbusTcpService>(), null, null, _addressValidator)
         };
 
         return _services.AddOrUpdate(profile.Id, service, (_, old) =>

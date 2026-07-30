@@ -304,7 +304,14 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private bool CanDisconnect() => ActiveProfile is { IsConnected: true } && !IsBusy;
 
-        private bool CanRead() => ActiveProfile is { IsConnected: true } && !IsBusy;
+        private bool CanRead()
+        {
+            if (ActiveProfile is not { IsConnected: true } || IsBusy)
+                return false;
+
+            var validator = new ModbusAddressValidator();
+            return validator.IsValidRange(StartAddress, RegisterCount);
+        }
 
         private bool CanWrite() => ActiveProfile is { IsConnected: true } && !IsBusy &&
                                    (SelectedArea is PlcArea.HoldingRegister or PlcArea.Coil);

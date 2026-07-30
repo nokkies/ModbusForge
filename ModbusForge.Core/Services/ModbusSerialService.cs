@@ -20,6 +20,7 @@ namespace ModbusForge.Services
         private readonly IConsoleLoggerService? _consoleLoggerService;
         private readonly IValidationService? _validationService;
         private readonly ModbusFrameLogger _frameLogger;
+        private readonly IModbusAddressValidator _addressValidator;
         private readonly SemaphoreSlim _ioLock = new(1, 1);
         private const int DisposeLockTimeoutMs = 5000;
         private const byte DeviceIdMoreFollows = 0xFF;
@@ -28,21 +29,27 @@ namespace ModbusForge.Services
         public TransportType Transport { get; }
 
         public ModbusSerialService(ILogger<ModbusSerialService> logger, TransportType transport)
-            : this(logger, null, null, null, transport)
+            : this(logger, null, null, null, null, transport)
         {
         }
 
         public ModbusSerialService(ILogger<ModbusSerialService> logger, IConsoleLoggerService? consoleLoggerService, IValidationService? validationService, TransportType transport)
-            : this(logger, consoleLoggerService, validationService, null, transport)
+            : this(logger, consoleLoggerService, validationService, null, null, transport)
         {
         }
 
         public ModbusSerialService(ILogger<ModbusSerialService> logger, IConsoleLoggerService? consoleLoggerService, IValidationService? validationService, ModbusFrameLogger? frameLogger, TransportType transport)
+            : this(logger, consoleLoggerService, validationService, frameLogger, null, transport)
+        {
+        }
+
+        public ModbusSerialService(ILogger<ModbusSerialService> logger, IConsoleLoggerService? consoleLoggerService, IValidationService? validationService, ModbusFrameLogger? frameLogger, IModbusAddressValidator? addressValidator, TransportType transport)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _consoleLoggerService = consoleLoggerService;
             _validationService = validationService;
             _frameLogger = frameLogger ?? new ModbusFrameLogger();
+            _addressValidator = addressValidator ?? new ModbusAddressValidator();
 
             if (transport != TransportType.Rtu && transport != TransportType.Ascii)
             {
@@ -166,6 +173,7 @@ namespace ModbusForge.Services
 
         public virtual async Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count)
         {
+            ValidateRead(unitId, startAddress, count);
             return await ExecuteReadAsync(
                 unitId,
                 startAddress,
@@ -176,6 +184,7 @@ namespace ModbusForge.Services
 
         public virtual async Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
         {
+            ValidateRead(unitId, startAddress, count);
             return await ExecuteReadAsync(
                 unitId,
                 startAddress,
@@ -186,6 +195,7 @@ namespace ModbusForge.Services
 
         public virtual async Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
         {
+            ValidateRead(unitId, startAddress, count);
             return await ExecuteReadAsync(
                 unitId,
                 startAddress,
@@ -196,6 +206,7 @@ namespace ModbusForge.Services
 
         public virtual async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
         {
+            ValidateRead(unitId, startAddress, count);
             return await ExecuteReadAsync(
                 unitId,
                 startAddress,
@@ -206,6 +217,7 @@ namespace ModbusForge.Services
 
         public virtual async Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
         {
+            ValidateSingleAddress(unitId, registerAddress);
             await ExecuteWriteAsync(
                 unitId,
                 registerAddress,
@@ -216,6 +228,8 @@ namespace ModbusForge.Services
 
         public virtual async Task WriteRegistersAsync(byte unitId, int startAddress, ushort[] values)
         {
+            ArgumentNullException.ThrowIfNull(values);
+            ValidateRead(unitId, startAddress, values.Length);
             await ExecuteWriteAsync(
                 unitId,
                 startAddress,
@@ -226,6 +240,7 @@ namespace ModbusForge.Services
 
         public virtual async Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)
         {
+            ValidateSingleAddress(unitId, coilAddress);
             await ExecuteWriteAsync(
                 unitId,
                 coilAddress,
@@ -236,6 +251,7 @@ namespace ModbusForge.Services
 
         public virtual async Task<ushort?> MaskWriteRegisterAsync(byte unitId, int registerAddress, ushort andMask, ushort orMask)
         {
+            ValidateSingleAddress(unitId, registerAddress);
             return await ExecuteMasterAsync<ushort?>(
                 $"Mask writing register at {registerAddress} (AND 0x{andMask:X4}, OR 0x{orMask:X4})",
                 "Error mask writing register",
@@ -254,6 +270,8 @@ namespace ModbusForge.Services
         public virtual async Task<ushort[]?> ReadWriteMultipleRegistersAsync(byte unitId, int readStartAddress, int readCount, int writeStartAddress, ushort[] writeValues)
         {
             ArgumentNullException.ThrowIfNull(writeValues);
+            ValidateRead(unitId, readStartAddress, readCount);
+            ValidateRead(unitId, writeStartAddress, writeValues.Length);
 
             return await ExecuteMasterAsync<ushort[]?>(
                 $"Reading {readCount} registers at {readStartAddress} and writing {writeValues.Length} registers at {writeStartAddress}",
@@ -376,6 +394,22 @@ namespace ModbusForge.Services
 
         private static ushort ToProtocolAddress(int uiAddress)
             => (ushort)(uiAddress > 0 ? uiAddress - 1 : 0);
+
+        private void ValidateRead(byte unitId, int startAddress, int count)
+        {
+            if (!_addressValidator.IsValidUnitId(unitId))
+                throw new ArgumentOutOfRangeException(nameof(unitId), $"Unit ID must be between {ModbusAddressValidator.MinUnitId} and {ModbusAddressValidator.MaxUnitId}.");
+            if (!_addressValidator.IsValidRange(startAddress, count))
+                throw new ArgumentOutOfRangeException(nameof(startAddress), $"The requested range {startAddress}..{startAddress + count - 1} is outside the Modbus address space.");
+        }
+
+        private void ValidateSingleAddress(byte unitId, int address)
+        {
+            if (!_addressValidator.IsValidUnitId(unitId))
+                throw new ArgumentOutOfRangeException(nameof(unitId), $"Unit ID must be between {ModbusAddressValidator.MinUnitId} and {ModbusAddressValidator.MaxUnitId}.");
+            if (!_addressValidator.IsValidStartAddress(address))
+                throw new ArgumentOutOfRangeException(nameof(address), $"Address must be between {ModbusAddressValidator.MinStartAddress} and {ModbusAddressValidator.MaxStartAddress}.");
+        }
 
         private async Task<T?> ExecuteMasterAsync<T>(
             string debugLogMessage,
