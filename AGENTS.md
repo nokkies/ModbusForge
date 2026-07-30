@@ -31,6 +31,8 @@ This file provides instructions for AI coding assistants working on this project
 
 ### Creating a Release
 
+**Important:** Do **not** create GitHub Releases or push `v*` tags while the program is being rebuilt on the new system. The `.github/workflows/release.yml` trigger is currently disabled (`workflow_dispatch` only) to prevent accidental releases. Re-enable tag-based releases only after the rebuild is complete.
+
 1. **Update version in `.csproj`**:
    ```xml
    <Version>4.5.15</Version>
