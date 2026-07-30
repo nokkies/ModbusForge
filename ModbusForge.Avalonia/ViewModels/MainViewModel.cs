@@ -35,12 +35,18 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly ITrendLogger? _trendLogger;
         private CancellationTokenSource? _pollCts;
         private CancellationTokenSource? _customWatchCts;
+        private DateTime _lastHoldingReadUtc;
+        private DateTime _lastInputRegReadUtc;
+        private DateTime _lastCoilsReadUtc;
+        private DateTime _lastDiscreteReadUtc;
         private byte _unitId = 1;
 
         [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ReadCommand))]
         private int _startAddress = 0;
 
         [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ReadCommand))]
         private int _registerCount = 20;
 
         [ObservableProperty]
@@ -61,6 +67,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private bool _isContinuousRead = true;
 
         [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ReadCommand))]
         [NotifyCanExecuteChangedFor(nameof(WriteCommand))]
         private PlcArea _selectedArea = PlcArea.HoldingRegister;
 
@@ -75,6 +82,80 @@ namespace ModbusForge.Avalonia.ViewModels
 
         [ObservableProperty]
         private bool _swapWords;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ReadHoldingRegistersCommand))]
+        private int _holdingRegisterStart = 0;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ReadHoldingRegistersCommand))]
+        private int _holdingRegisterCount = 20;
+
+        [ObservableProperty]
+        private string _registersGlobalType = "uint";
+
+        [ObservableProperty]
+        private bool _registersSwapBytes;
+
+        [ObservableProperty]
+        private bool _registersSwapWords;
+
+        [ObservableProperty]
+        private bool _holdingMonitorEnabled = true;
+
+        [ObservableProperty]
+        private int _holdingMonitorPeriodMs = 1000;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ReadInputRegistersCommand))]
+        private int _inputRegisterStart = 0;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ReadInputRegistersCommand))]
+        private int _inputRegisterCount = 20;
+
+        [ObservableProperty]
+        private string _inputRegistersGlobalType = "uint";
+
+        [ObservableProperty]
+        private bool _inputRegistersSwapBytes;
+
+        [ObservableProperty]
+        private bool _inputRegistersSwapWords;
+
+        [ObservableProperty]
+        private bool _inputRegistersMonitorEnabled;
+
+        [ObservableProperty]
+        private int _inputRegistersMonitorPeriodMs = 1000;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ReadCoilsCommand))]
+        private int _coilStart = 0;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ReadCoilsCommand))]
+        private int _coilCount = 20;
+
+        [ObservableProperty]
+        private bool _coilsMonitorEnabled;
+
+        [ObservableProperty]
+        private int _coilsMonitorPeriodMs = 1000;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ReadDiscreteInputsCommand))]
+        private int _discreteInputStart = 0;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ReadDiscreteInputsCommand))]
+        private int _discreteInputCount = 20;
+
+        [ObservableProperty]
+        private bool _discreteInputsMonitorEnabled;
+
+        [ObservableProperty]
+        private int _discreteInputsMonitorPeriodMs = 1000;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(UnitId))]
@@ -257,6 +338,12 @@ namespace ModbusForge.Avalonia.ViewModels
             DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => CanDisconnect());
             ReadCommand = new AsyncRelayCommand(ReadAsync, () => CanRead());
             WriteCommand = new AsyncRelayCommand(WriteAsync, () => CanWrite());
+            ReadHoldingRegistersCommand = new AsyncRelayCommand(ReadHoldingRegistersAsync, () => CanRead(PlcArea.HoldingRegister));
+            ReadInputRegistersCommand = new AsyncRelayCommand(ReadInputRegistersAsync, () => CanRead(PlcArea.InputRegister));
+            ReadCoilsCommand = new AsyncRelayCommand(ReadCoilsAsync, () => CanRead(PlcArea.Coil));
+            ReadDiscreteInputsCommand = new AsyncRelayCommand(ReadDiscreteInputsAsync, () => CanRead(PlcArea.DiscreteInput));
+            WriteHoldingRegisterCommand = new AsyncRelayCommand(WriteHoldingRegisterAsync, () => CanWrite(PlcArea.HoldingRegister));
+            WriteCoilCommand = new AsyncRelayCommand(WriteCoilAsync, () => CanWrite(PlcArea.Coil));
 
             AddCustomEntryCommand = new AsyncRelayCommand(AddCustomEntryAsync, () => !IsBusy);
             RemoveCustomEntryCommand = new AsyncRelayCommand(RemoveCustomEntryAsync, () => CanRemoveCustomEntry());
@@ -299,6 +386,12 @@ namespace ModbusForge.Avalonia.ViewModels
         public IAsyncRelayCommand DisconnectCommand { get; }
         public IAsyncRelayCommand ReadCommand { get; }
         public IAsyncRelayCommand WriteCommand { get; }
+        public IAsyncRelayCommand ReadHoldingRegistersCommand { get; }
+        public IAsyncRelayCommand ReadInputRegistersCommand { get; }
+        public IAsyncRelayCommand ReadCoilsCommand { get; }
+        public IAsyncRelayCommand ReadDiscreteInputsCommand { get; }
+        public IAsyncRelayCommand WriteHoldingRegisterCommand { get; }
+        public IAsyncRelayCommand WriteCoilCommand { get; }
 
         public IAsyncRelayCommand AddCustomEntryCommand { get; }
         public IAsyncRelayCommand RemoveCustomEntryCommand { get; }
@@ -329,6 +422,13 @@ namespace ModbusForge.Avalonia.ViewModels
             OnPropertyChanged(nameof(IsRegisterArea));
             OnPropertyChanged(nameof(CanWrite));
             WriteCommand.NotifyCanExecuteChanged();
+
+            // Keep legacy global properties in sync with the newly selected area
+            StartAddress = GetAreaStart(value);
+            RegisterCount = GetAreaCount(value);
+            GlobalType = GetAreaGlobalType(value);
+            SwapBytes = GetAreaSwapBytes(value);
+            SwapWords = GetAreaSwapWords(value);
         }
 
         partial void OnSelectedAreaIndexChanged(int value)
@@ -338,11 +438,77 @@ namespace ModbusForge.Avalonia.ViewModels
 
         partial void OnIsContinuousReadChanged(bool value)
         {
+            HoldingMonitorEnabled = value;
+        }
+
+        partial void OnStartAddressChanged(int value)
+        {
+            SetAreaStart(SelectedArea, value);
+        }
+
+        partial void OnRegisterCountChanged(int value)
+        {
+            SetAreaCount(SelectedArea, value);
+        }
+
+        partial void OnGlobalTypeChanged(string value)
+        {
+            SetAreaGlobalType(SelectedArea, value);
+        }
+
+        partial void OnSwapBytesChanged(bool value)
+        {
+            SetAreaSwapBytes(SelectedArea, value);
+        }
+
+        partial void OnSwapWordsChanged(bool value)
+        {
+            SetAreaSwapWords(SelectedArea, value);
+        }
+
+        partial void OnHoldingMonitorEnabledChanged(bool value)
+        {
             if (value)
             {
                 StartPolling();
             }
-            else
+            else if (!AnyMonitorEnabled())
+            {
+                StopPolling();
+            }
+        }
+
+        partial void OnInputRegistersMonitorEnabledChanged(bool value)
+        {
+            if (value)
+            {
+                StartPolling();
+            }
+            else if (!AnyMonitorEnabled())
+            {
+                StopPolling();
+            }
+        }
+
+        partial void OnCoilsMonitorEnabledChanged(bool value)
+        {
+            if (value)
+            {
+                StartPolling();
+            }
+            else if (!AnyMonitorEnabled())
+            {
+                StopPolling();
+            }
+        }
+
+        partial void OnDiscreteInputsMonitorEnabledChanged(bool value)
+        {
+            if (value)
+            {
+                StartPolling();
+            }
+            else if (!AnyMonitorEnabled())
             {
                 StopPolling();
             }
@@ -360,21 +526,134 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
+        partial void OnIsBusyChanged(bool value)
+        {
+            ReadHoldingRegistersCommand.NotifyCanExecuteChanged();
+            ReadInputRegistersCommand.NotifyCanExecuteChanged();
+            ReadCoilsCommand.NotifyCanExecuteChanged();
+            ReadDiscreteInputsCommand.NotifyCanExecuteChanged();
+            WriteHoldingRegisterCommand.NotifyCanExecuteChanged();
+            WriteCoilCommand.NotifyCanExecuteChanged();
+        }
+
         private bool CanConnect() => ActiveProfile is { IsConnected: false } && !IsBusy;
 
         private bool CanDisconnect() => ActiveProfile is { IsConnected: true } && !IsBusy;
 
-        private bool CanRead()
+        private bool CanRead() => CanRead(SelectedArea);
+
+        private bool CanRead(PlcArea area)
         {
             if (ActiveProfile is not { IsConnected: true } || IsBusy)
                 return false;
 
+            var (start, count) = GetAreaStartCount(area);
             var validator = new ModbusAddressValidator();
-            return validator.IsValidRange(StartAddress, RegisterCount);
+            return validator.IsValidRange(start, count);
         }
 
-        private bool CanWrite() => ActiveProfile is { IsConnected: true } && !IsBusy &&
-                                   (SelectedArea is PlcArea.HoldingRegister or PlcArea.Coil);
+        private bool CanWrite() => CanWrite(SelectedArea);
+
+        private bool CanWrite(PlcArea area) => ActiveProfile is { IsConnected: true } && !IsBusy &&
+                                               (area is PlcArea.HoldingRegister or PlcArea.Coil);
+
+        private (int Start, int Count) GetAreaStartCount(PlcArea area) => (GetAreaStart(area), GetAreaCount(area));
+
+        private int GetAreaStart(PlcArea area)
+        {
+            return area switch
+            {
+                PlcArea.HoldingRegister => HoldingRegisterStart,
+                PlcArea.InputRegister => InputRegisterStart,
+                PlcArea.Coil => CoilStart,
+                PlcArea.DiscreteInput => DiscreteInputStart,
+                _ => 0
+            };
+        }
+
+        private int GetAreaCount(PlcArea area)
+        {
+            return area switch
+            {
+                PlcArea.HoldingRegister => HoldingRegisterCount,
+                PlcArea.InputRegister => InputRegisterCount,
+                PlcArea.Coil => CoilCount,
+                PlcArea.DiscreteInput => DiscreteInputCount,
+                _ => 0
+            };
+        }
+
+        private string GetAreaGlobalType(PlcArea area)
+        {
+            return area switch
+            {
+                PlcArea.HoldingRegister => RegistersGlobalType,
+                PlcArea.InputRegister => InputRegistersGlobalType,
+                _ => "uint"
+            };
+        }
+
+        private bool GetAreaSwapBytes(PlcArea area)
+        {
+            return area switch
+            {
+                PlcArea.HoldingRegister => RegistersSwapBytes,
+                PlcArea.InputRegister => InputRegistersSwapBytes,
+                _ => false
+            };
+        }
+
+        private bool GetAreaSwapWords(PlcArea area)
+        {
+            return area switch
+            {
+                PlcArea.HoldingRegister => RegistersSwapWords,
+                PlcArea.InputRegister => InputRegistersSwapWords,
+                _ => false
+            };
+        }
+
+        private void SetAreaStart(PlcArea area, int value)
+        {
+            switch (area)
+            {
+                case PlcArea.HoldingRegister: HoldingRegisterStart = value; break;
+                case PlcArea.InputRegister: InputRegisterStart = value; break;
+                case PlcArea.Coil: CoilStart = value; break;
+                case PlcArea.DiscreteInput: DiscreteInputStart = value; break;
+            }
+        }
+
+        private void SetAreaCount(PlcArea area, int value)
+        {
+            switch (area)
+            {
+                case PlcArea.HoldingRegister: HoldingRegisterCount = value; break;
+                case PlcArea.InputRegister: InputRegisterCount = value; break;
+                case PlcArea.Coil: CoilCount = value; break;
+                case PlcArea.DiscreteInput: DiscreteInputCount = value; break;
+            }
+        }
+
+        private void SetAreaGlobalType(PlcArea area, string value)
+        {
+            if (area == PlcArea.HoldingRegister) RegistersGlobalType = value;
+            else if (area == PlcArea.InputRegister) InputRegistersGlobalType = value;
+        }
+
+        private void SetAreaSwapBytes(PlcArea area, bool value)
+        {
+            if (area == PlcArea.HoldingRegister) RegistersSwapBytes = value;
+            else if (area == PlcArea.InputRegister) InputRegistersSwapBytes = value;
+        }
+
+        private void SetAreaSwapWords(PlcArea area, bool value)
+        {
+            if (area == PlcArea.HoldingRegister) RegistersSwapWords = value;
+            else if (area == PlcArea.InputRegister) InputRegistersSwapWords = value;
+        }
+
+        private bool AnyMonitorEnabled() => HoldingMonitorEnabled || InputRegistersMonitorEnabled || CoilsMonitorEnabled || DiscreteInputsMonitorEnabled;
 
         private bool CanRemoveCustomEntry() => SelectedCustomEntry != null && !IsBusy;
 
@@ -404,6 +683,12 @@ namespace ModbusForge.Avalonia.ViewModels
                 DisconnectCommand.NotifyCanExecuteChanged();
                 ReadCommand.NotifyCanExecuteChanged();
                 WriteCommand.NotifyCanExecuteChanged();
+                ReadHoldingRegistersCommand.NotifyCanExecuteChanged();
+                ReadInputRegistersCommand.NotifyCanExecuteChanged();
+                ReadCoilsCommand.NotifyCanExecuteChanged();
+                ReadDiscreteInputsCommand.NotifyCanExecuteChanged();
+                WriteHoldingRegisterCommand.NotifyCanExecuteChanged();
+                WriteCoilCommand.NotifyCanExecuteChanged();
                 ReadCustomEntryCommand.NotifyCanExecuteChanged();
                 WriteCustomEntryCommand.NotifyCanExecuteChanged();
             }
@@ -471,6 +756,12 @@ namespace ModbusForge.Avalonia.ViewModels
             DisconnectCommand.NotifyCanExecuteChanged();
             ReadCommand.NotifyCanExecuteChanged();
             WriteCommand.NotifyCanExecuteChanged();
+            ReadHoldingRegistersCommand.NotifyCanExecuteChanged();
+            ReadInputRegistersCommand.NotifyCanExecuteChanged();
+            ReadCoilsCommand.NotifyCanExecuteChanged();
+            ReadDiscreteInputsCommand.NotifyCanExecuteChanged();
+            WriteHoldingRegisterCommand.NotifyCanExecuteChanged();
+            WriteCoilCommand.NotifyCanExecuteChanged();
             ReadCustomEntryCommand.NotifyCanExecuteChanged();
             WriteCustomEntryCommand.NotifyCanExecuteChanged();
 
@@ -558,15 +849,47 @@ namespace ModbusForge.Avalonia.ViewModels
         private async Task ReadAsync()
         {
             if (ActiveProfile == null || ActiveService == null) return;
+            await ReadAreaWithBusyAsync(SelectedArea);
+        }
 
+        private async Task ReadHoldingRegistersAsync()
+        {
+            if (ActiveProfile == null || ActiveService == null) return;
+            SelectedArea = PlcArea.HoldingRegister;
+            await ReadAreaWithBusyAsync(PlcArea.HoldingRegister);
+        }
+
+        private async Task ReadInputRegistersAsync()
+        {
+            if (ActiveProfile == null || ActiveService == null) return;
+            SelectedArea = PlcArea.InputRegister;
+            await ReadAreaWithBusyAsync(PlcArea.InputRegister);
+        }
+
+        private async Task ReadCoilsAsync()
+        {
+            if (ActiveProfile == null || ActiveService == null) return;
+            SelectedArea = PlcArea.Coil;
+            await ReadAreaWithBusyAsync(PlcArea.Coil);
+        }
+
+        private async Task ReadDiscreteInputsAsync()
+        {
+            if (ActiveProfile == null || ActiveService == null) return;
+            SelectedArea = PlcArea.DiscreteInput;
+            await ReadAreaWithBusyAsync(PlcArea.DiscreteInput);
+        }
+
+        private async Task ReadAreaWithBusyAsync(PlcArea area)
+        {
             IsBusy = true;
             try
             {
-                await Task.Run(() => ReadCurrentAreaAsync(CancellationToken.None));
+                await Task.Run(() => ReadAreaAsync(area, CancellationToken.None));
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Read error: {ex.Message}";
+                _dispatcher.Invoke(() => StatusMessage = $"Read error: {ex.Message}");
                 _logger.LogError(ex, "Manual read failed");
             }
             finally
@@ -575,44 +898,25 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
-        private async Task WriteAsync()
+        private async Task WriteAsync() => await PromptAndWriteAsync(SelectedArea);
+
+        private async Task WriteHoldingRegisterAsync() => await PromptAndWriteAsync(PlcArea.HoldingRegister);
+
+        private async Task WriteCoilAsync() => await PromptAndWriteAsync(PlcArea.Coil);
+
+        private async Task PromptAndWriteAsync(PlcArea area)
         {
             if (ActiveProfile == null || ActiveService == null || _inputDialogService == null) return;
+            if (area is not (PlcArea.HoldingRegister or PlcArea.Coil)) return;
 
-            var address = PromptAddress("Write Address");
+            var address = PromptAddress($"Write {area}", GetAreaStart(area));
             if (!address.HasValue) return;
 
             try
             {
                 IsBusy = true;
-                var unitId = EffectiveUnitId;
-
-                if (SelectedArea == PlcArea.HoldingRegister)
-                {
-                    var valueText = _inputDialogService.TryGetInput("Write Value", "Value:", "0", out var input) ? input : null;
-                    if (string.IsNullOrWhiteSpace(valueText) || !ushort.TryParse(valueText, out var value))
-                    {
-                        _dispatcher.Invoke(() => StatusMessage = "Invalid register value.");
-                        return;
-                    }
-
-                    await ActiveService.WriteSingleRegisterAsync(unitId, address.Value, value);
-                    _dispatcher.Invoke(() => StatusMessage = $"Wrote {value} to holding register {address.Value}.");
-                    await ReadCurrentAreaAsync(CancellationToken.None);
-                }
-                else if (SelectedArea == PlcArea.Coil)
-                {
-                    var valueText = _inputDialogService.TryGetInput("Write Coil", "Value (true/false):", "false", out var input) ? input : null;
-                    if (string.IsNullOrWhiteSpace(valueText) || !TryParseBool(valueText, out var value))
-                    {
-                        _dispatcher.Invoke(() => StatusMessage = "Invalid coil value. Use true/false, 1/0, on/off.");
-                        return;
-                    }
-
-                    await ActiveService.WriteSingleCoilAsync(unitId, address.Value, value);
-                    _dispatcher.Invoke(() => StatusMessage = $"Wrote {value} to coil {address.Value}.");
-                    await ReadCurrentAreaAsync(CancellationToken.None);
-                }
+                await WriteValueToAreaAsync(area, address.Value);
+                await ReadAreaAsync(area, CancellationToken.None);
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
@@ -625,11 +929,134 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
-        private int? PromptAddress(string title)
+        private async Task WriteValueToAreaAsync(PlcArea area, int address)
+        {
+            if (_inputDialogService == null || ActiveService == null)
+                return;
+
+            var unitId = EffectiveUnitId;
+
+            if (area == PlcArea.HoldingRegister)
+            {
+                var valueText = _inputDialogService.TryGetInput("Write Value", "Value:", "0", out var input) ? input : null;
+                if (string.IsNullOrWhiteSpace(valueText) || !ushort.TryParse(valueText, out var value))
+                {
+                    _dispatcher.Invoke(() => StatusMessage = "Invalid register value.");
+                    return;
+                }
+
+                await ActiveService.WriteSingleRegisterAsync(unitId, address, value);
+                _dispatcher.Invoke(() => StatusMessage = $"Wrote {value} to holding register {address}.");
+            }
+            else if (area == PlcArea.Coil)
+            {
+                var valueText = _inputDialogService.TryGetInput("Write Coil", "Value (true/false):", "false", out var input) ? input : null;
+                if (string.IsNullOrWhiteSpace(valueText) || !TryParseBool(valueText, out var value))
+                {
+                    _dispatcher.Invoke(() => StatusMessage = "Invalid coil value. Use true/false, 1/0, on/off.");
+                    return;
+                }
+
+                await ActiveService.WriteSingleCoilAsync(unitId, address, value);
+                _dispatcher.Invoke(() => StatusMessage = $"Wrote {value} to coil {address}.");
+            }
+        }
+
+        public async Task WriteHoldingRegisterFromEditAsync(RegisterEntry? entry)
+        {
+            if (entry == null || ActiveProfile == null || ActiveService == null) return;
+
+            IsBusy = true;
+            try
+            {
+                var unitId = EffectiveUnitId;
+                var type = (entry.Type ?? "uint").ToLowerInvariant();
+                var text = (entry.ValueText ?? string.Empty).Trim().Replace(',', '.');
+
+                switch (type)
+                {
+                    case "real":
+                        if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out float f))
+                        {
+                            var words = DataTypeConverter.ToUInt16(f, RegistersSwapBytes, RegistersSwapWords);
+                            await ActiveService.WriteRegistersAsync(unitId, entry.Address, words);
+                        }
+                        else
+                        {
+                            _dispatcher.Invoke(() => StatusMessage = $"Invalid float value: {entry.ValueText}");
+                            return;
+                        }
+                        break;
+
+                    case "string":
+                        var stringWords = DataTypeConverter.ToUInt16(text);
+                        await ActiveService.WriteRegistersAsync(unitId, entry.Address, stringWords);
+                        break;
+
+                    case "int":
+                        if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int iv))
+                        {
+                            await ActiveService.WriteSingleRegisterAsync(unitId, entry.Address, unchecked((ushort)iv));
+                        }
+                        else
+                        {
+                            _dispatcher.Invoke(() => StatusMessage = $"Invalid integer value: {entry.ValueText}");
+                            return;
+                        }
+                        break;
+
+                    default:
+                        if (uint.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out uint uv) && uv <= ushort.MaxValue)
+                        {
+                            await ActiveService.WriteSingleRegisterAsync(unitId, entry.Address, (ushort)uv);
+                        }
+                        else
+                        {
+                            _dispatcher.Invoke(() => StatusMessage = $"Invalid unsigned value: {entry.ValueText}");
+                            return;
+                        }
+                        break;
+                }
+
+                await ReadAreaAsync(PlcArea.HoldingRegister, CancellationToken.None);
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogError(ex, "Holding register write failed");
+                _dispatcher.Invoke(() => StatusMessage = $"Write error: {ex.Message}");
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        public async Task WriteCoilFromEditAsync(CoilEntry? entry)
+        {
+            if (entry == null || ActiveProfile == null || ActiveService == null) return;
+
+            IsBusy = true;
+            try
+            {
+                await ActiveService.WriteSingleCoilAsync(EffectiveUnitId, entry.Address, entry.State);
+                await ReadAreaAsync(PlcArea.Coil, CancellationToken.None);
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogError(ex, "Coil write failed");
+                _dispatcher.Invoke(() => StatusMessage = $"Write error: {ex.Message}");
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        private int? PromptAddress(string title, int defaultAddress)
         {
             if (_inputDialogService == null) return null;
 
-            var defaultValue = StartAddress.ToString(CultureInfo.InvariantCulture);
+            var defaultValue = defaultAddress.ToString(CultureInfo.InvariantCulture);
             if (!_inputDialogService.TryGetInput(title, "Address:", defaultValue, out var input) ||
                 !int.TryParse(input, out var address))
             {
@@ -650,7 +1077,7 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             if (_pollCts != null) return;
             if (ActiveProfile is not { IsConnected: true }) return;
-            if (!IsContinuousRead) return;
+            if (!AnyMonitorEnabled()) return;
 
             _pollCts = new CancellationTokenSource();
             _ = Task.Run(() => PollLoopAsync(_pollCts.Token), _pollCts.Token);
@@ -665,11 +1092,34 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private async Task PollLoopAsync(CancellationToken token)
         {
-            while (!token.IsCancellationRequested && ActiveProfile is { IsConnected: true } && IsContinuousRead)
+            while (!token.IsCancellationRequested && ActiveProfile is { IsConnected: true } && AnyMonitorEnabled())
             {
+                var now = DateTime.UtcNow;
                 try
                 {
-                    await ReadCurrentAreaAsync(token);
+                    if (HoldingMonitorEnabled && (now - _lastHoldingReadUtc).TotalMilliseconds >= Math.Max(50, HoldingMonitorPeriodMs))
+                    {
+                        _lastHoldingReadUtc = now;
+                        await ReadAreaAsync(PlcArea.HoldingRegister, token);
+                    }
+
+                    if (InputRegistersMonitorEnabled && (now - _lastInputRegReadUtc).TotalMilliseconds >= Math.Max(50, InputRegistersMonitorPeriodMs))
+                    {
+                        _lastInputRegReadUtc = now;
+                        await ReadAreaAsync(PlcArea.InputRegister, token);
+                    }
+
+                    if (CoilsMonitorEnabled && (now - _lastCoilsReadUtc).TotalMilliseconds >= Math.Max(50, CoilsMonitorPeriodMs))
+                    {
+                        _lastCoilsReadUtc = now;
+                        await ReadAreaAsync(PlcArea.Coil, token);
+                    }
+
+                    if (DiscreteInputsMonitorEnabled && (now - _lastDiscreteReadUtc).TotalMilliseconds >= Math.Max(50, DiscreteInputsMonitorPeriodMs))
+                    {
+                        _lastDiscreteReadUtc = now;
+                        await ReadAreaAsync(PlcArea.DiscreteInput, token);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -679,7 +1129,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
                 try
                 {
-                    await Task.Delay(1000, token);
+                    await Task.Delay(100, token);
                 }
                 catch (OperationCanceledException)
                 {
@@ -688,7 +1138,7 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
-        private async Task ReadCurrentAreaAsync(CancellationToken token)
+        private async Task ReadAreaAsync(PlcArea area, CancellationToken token)
         {
             var service = ActiveService;
             if (service == null || ActiveProfile == null)
@@ -698,14 +1148,14 @@ namespace ModbusForge.Avalonia.ViewModels
             }
 
             var unitId = EffectiveUnitId;
-            var start = StartAddress;
-            var count = RegisterCount;
+            var (start, count) = GetAreaStartCount(area);
 
-            _dispatcher.Invoke(() => StatusMessage = $"Reading {SelectedArea}...");
+            _dispatcher.Invoke(() => StatusMessage = $"Reading {area}...");
 
             try
             {
-                switch (SelectedArea)
+                token.ThrowIfCancellationRequested();
+                switch (area)
                 {
                     case PlcArea.HoldingRegister:
                         var holding = await service.ReadHoldingRegistersAsync(unitId, start, count);
@@ -713,7 +1163,7 @@ namespace ModbusForge.Avalonia.ViewModels
                         {
                             _dispatcher.Invoke(() =>
                             {
-                                ApplyRegisterValues(HoldingRegisters, start, holding, GlobalType, SwapBytes, SwapWords);
+                                ApplyRegisterValues(HoldingRegisters, start, holding, RegistersGlobalType, RegistersSwapBytes, RegistersSwapWords);
                                 StatusMessage = $"Read {holding.Length} holding registers";
                             });
                         }
@@ -725,7 +1175,7 @@ namespace ModbusForge.Avalonia.ViewModels
                         {
                             _dispatcher.Invoke(() =>
                             {
-                                ApplyRegisterValues(InputRegisters, start, input, GlobalType, SwapBytes, SwapWords);
+                                ApplyRegisterValues(InputRegisters, start, input, InputRegistersGlobalType, InputRegistersSwapBytes, InputRegistersSwapWords);
                                 StatusMessage = $"Read {input.Length} input registers";
                             });
                         }
@@ -756,10 +1206,14 @@ namespace ModbusForge.Avalonia.ViewModels
                         break;
                 }
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
-                _logger.LogError(ex, "Error reading {Area}", SelectedArea);
-                _dispatcher.Invoke(() => StatusMessage = $"Error reading {SelectedArea}: {ex.Message}");
+                _logger.LogError(ex, "Error reading {Area}", area);
+                _dispatcher.Invoke(() => StatusMessage = $"Error reading {area}: {ex.Message}");
             }
         }
 
@@ -1390,9 +1844,9 @@ namespace ModbusForge.Avalonia.ViewModels
                         CustomEntries.Add(e);
                     }
 
+                    SelectedArea = config.SelectedArea;
                     StartAddress = config.StartAddress;
                     RegisterCount = config.RegisterCount;
-                    SelectedArea = config.SelectedArea;
                     GlobalType = config.GlobalType ?? "uint";
                     SwapBytes = config.SwapBytes;
                     SwapWords = config.SwapWords;

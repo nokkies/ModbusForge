@@ -18,7 +18,8 @@ All `.csproj` files are now back at `2026.7.1`. The `v2026.7.2`–`v2026.7.11` t
 
 | Version | State | Notes |
 |---------|-------|-------|
-| `2026.7.1` | [x] | WPF / Core / Headless shipped. This is the current baseline. |
+| `2026.7.1` | [x] | WPF / Core / Headless shipped. Baseline reset. |
+| `2026.7.12` | [x] | Avalonia per-area registers (Start/Count, monitoring, inline edit, per-area R/W, Quick Write). |
 
 The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milestone tracking and should not be treated as real shipped versions. Avalonia parity work will be versioned from `2026.7.12` onward.
 
@@ -65,25 +66,25 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ---
 
-## Registers — [ ] Not Done
+## Registers — [~] Partial (2026.7.12 core shipped)
 
 | Feature | WPF | Avalonia | Target |
 |---------|-----|----------|--------|
 | 4 register tabs | Yes | Yes | — |
-| Per-area Start/Count | Yes | Global only | 2026.7.15 |
-| Per-area monitoring toggle + period + auto-pause | Yes | Global only | 2026.7.15 |
-| Inline editing (Holding/Coils) | Yes | Read-only | 2026.7.15 |
-| Per-area Read/Write buttons | Yes | Global only | 2026.7.15 |
-| Quick Write via context menu | Yes | No | 2026.7.15 |
+| Per-area Start/Count | Yes | Yes | 2026.7.12 |
+| Per-area monitoring toggle + period + auto-pause | Yes | Yes | 2026.7.12 |
+| Inline editing (Holding/Coils) | Yes | Yes | 2026.7.12 |
+| Per-area Read/Write buttons | Yes | Yes | 2026.7.12 |
+| Quick Write via context menu | Yes | Yes | 2026.7.12 |
 | PollingEngine command coalescing | Yes | Simple loop | 2026.7.16 |
 | Comprehensive error handling (HasConnectionError, auto-pause, dialogs) | Yes | Basic status only | 2026.7.16 |
 
-### 2026.7.15 subtasks
-- [ ] Add per-area Start/Count properties for Holding/Input/Coils/Discrete.
-- [ ] Add per-area monitoring toggles and period controls.
-- [ ] Enable inline editing in Holding Registers and Coils DataGrids.
-- [ ] Add per-area Read and Write commands.
-- [ ] Implement Quick Write context menu.
+### 2026.7.12 shipped subtasks
+- [x] Add per-area Start/Count properties for Holding/Input/Coils/Discrete.
+- [x] Add per-area monitoring toggles and period controls.
+- [x] Enable inline editing in Holding Registers and Coils DataGrids.
+- [x] Add per-area Read and Write commands.
+- [x] Implement Quick Write context menu.
 
 ### 2026.7.16 subtasks
 - [ ] Port `PollingEngine` (or equivalent) for optimized/coalesced background reads.
@@ -228,10 +229,10 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ## Release / Packaging
 
-- [ ] No version bump until the above features are actually working.
-- [ ] No `v*` tags or GitHub Releases until parity is reached.
+- [x] Bumped to `2026.7.12` when the per-area register block passed build and tests.
+- [ ] No `v*` tags or GitHub Releases until parity is reached (per `AGENTS.md`).
 - [ ] Keep `release.yml` on `workflow_dispatch` only until then.
-- [ ] When a feature block is done and tested, bump to the next available CalVer starting at `2026.7.12` (to avoid overwriting `v2026.7.2`–`v2026.7.11`) and tag it so we can always roll back.
+- [ ] When the next feature block is done and tested, bump to the next available CalVer and commit. `v*` tags can be added after parity is complete.
 
 ---
 

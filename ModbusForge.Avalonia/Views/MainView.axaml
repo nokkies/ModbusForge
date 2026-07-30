@@ -5,7 +5,7 @@
              x:Class="ModbusForge.Avalonia.Views.MainView"
              x:DataType="vm:MainViewModel">
 
-  <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*">
+  <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,Auto,Auto,*">
     <DockPanel Grid.Row="0" LastChildFill="False">
       <Menu DockPanel.Dock="Top">
         <MenuItem Header="_File">
@@ -54,32 +54,17 @@
     </StackPanel>
 
     <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-      <TextBlock VerticalAlignment="Center" Text="Start:" />
-      <NumericUpDown Value="{Binding StartAddress}" Minimum="0" Width="100" />
-      <TextBlock VerticalAlignment="Center" Text="Count:" />
-      <NumericUpDown Value="{Binding RegisterCount}" Minimum="1" Maximum="100" Width="80" />
       <Button Content="Manage Connections" Click="ManageConnections_Click" />
       <Button Content="Device Scanner" Click="DeviceScanner_Click" />
       <Button Content="{Binding ConnectButtonText, FallbackValue='Connect'}" Command="{Binding ConnectCommand}" />
       <Button Content="Disconnect" Command="{Binding DisconnectCommand}" />
-      <Button Content="Read" Command="{Binding ReadCommand}" />
-      <Button Content="Write" Command="{Binding WriteCommand}" />
-      <CheckBox Content="Continuous Read" IsChecked="{Binding IsContinuousRead}" VerticalAlignment="Center" />
       <Button Content="Save Project" Command="{Binding SaveProjectCommand}" />
       <Button Content="Load Project" Command="{Binding LoadProjectCommand}" />
     </StackPanel>
 
-    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8"
-                IsVisible="{Binding IsRegisterArea}">
-      <TextBlock VerticalAlignment="Center" Text="Type:" />
-      <ComboBox ItemsSource="{Binding RegisterTypes}" SelectedItem="{Binding GlobalType}" Width="80" />
-      <CheckBox Content="Swap Bytes" IsChecked="{Binding SwapBytes}" VerticalAlignment="Center" />
-      <CheckBox Content="Swap Words" IsChecked="{Binding SwapWords}" VerticalAlignment="Center" />
-    </StackPanel>
+    <TextBlock Grid.Row="3" Text="{Binding StatusMessage}" Margin="0,0,0,8" />
 
-    <TextBlock Grid.Row="4" Text="{Binding StatusMessage}" Margin="0,0,0,8" />
-
-    <TabControl Grid.Row="6" SelectedIndex="{Binding SelectedTabIndex}">
+    <TabControl Grid.Row="4" SelectedIndex="{Binding SelectedTabIndex}">
       <TabItem Header="Trends">
         <views:TrendView DataContext="{Binding TrendViewModel}" />
       </TabItem>
@@ -105,57 +90,157 @@
       </TabItem>
 
       <TabItem Header="Holding Registers">
-        <DataGrid ItemsSource="{Binding HoldingRegisters}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  GridLinesVisibility="All">
-          <DataGrid.Columns>
-            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
-            <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="120" />
-            <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="80" />
-            <DataGridCheckBoxColumn Header="Swap Bytes" Binding="{Binding SwapBytes}" Width="100" />
-            <DataGridCheckBoxColumn Header="Swap Words" Binding="{Binding SwapWords}" Width="100" />
-          </DataGrid.Columns>
-        </DataGrid>
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+            <TextBlock VerticalAlignment="Center" Text="Start:" />
+            <NumericUpDown Value="{Binding HoldingRegisterStart}" Minimum="0" Width="100" />
+            <TextBlock VerticalAlignment="Center" Text="Count:" />
+            <NumericUpDown Value="{Binding HoldingRegisterCount}" Minimum="1" Maximum="100" Width="80" />
+            <Button Content="Read" Command="{Binding ReadHoldingRegistersCommand}" />
+            <TextBlock VerticalAlignment="Center" Text="Type:" Margin="16,0,0,0" />
+            <ComboBox ItemsSource="{Binding RegisterTypes}" SelectedItem="{Binding RegistersGlobalType}" Width="80" />
+            <CheckBox Content="Swap Bytes" IsChecked="{Binding RegistersSwapBytes}" VerticalAlignment="Center" />
+            <CheckBox Content="Swap Words" IsChecked="{Binding RegistersSwapWords}" VerticalAlignment="Center" />
+            <CheckBox Content="Continuous Read" IsChecked="{Binding HoldingMonitorEnabled}" VerticalAlignment="Center" />
+            <TextBlock VerticalAlignment="Center" Text="Period (ms):" />
+            <NumericUpDown Value="{Binding HoldingMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
+          </StackPanel>
+
+          <DataGrid x:Name="HoldingRegistersGrid" Grid.Row="1" ItemsSource="{Binding HoldingRegisters}"
+                    AutoGenerateColumns="False"
+                    IsReadOnly="False"
+                    GridLinesVisibility="All"
+                    CellEditEnded="HoldingRegistersGrid_CellEditEnded">
+            <DataGrid.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="Quick Write" Click="HoldingRegisters_QuickWrite_Click" />
+                <MenuItem Header="Add to Custom Watch" Click="HoldingRegisters_AddToCustom_Click" />
+                <MenuItem Header="Add to Trend" Click="HoldingRegisters_AddToTrend_Click" />
+                <Separator />
+                <MenuItem Header="Copy Address" Click="HoldingRegisters_CopyAddress_Click" />
+                <MenuItem Header="Copy Value" Click="HoldingRegisters_CopyValue_Click" />
+              </ContextMenu>
+            </DataGrid.ContextMenu>
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" IsReadOnly="True" />
+              <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="120" />
+              <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="80" IsReadOnly="True" />
+              <DataGridCheckBoxColumn Header="Swap Bytes" Binding="{Binding SwapBytes}" Width="100" IsReadOnly="True" />
+              <DataGridCheckBoxColumn Header="Swap Words" Binding="{Binding SwapWords}" Width="100" IsReadOnly="True" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
       </TabItem>
 
       <TabItem Header="Coils">
-        <DataGrid ItemsSource="{Binding Coils}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  GridLinesVisibility="All">
-          <DataGrid.Columns>
-            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
-            <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="80" />
-          </DataGrid.Columns>
-        </DataGrid>
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+            <TextBlock VerticalAlignment="Center" Text="Start:" />
+            <NumericUpDown Value="{Binding CoilStart}" Minimum="0" Width="100" />
+            <TextBlock VerticalAlignment="Center" Text="Count:" />
+            <NumericUpDown Value="{Binding CoilCount}" Minimum="1" Maximum="100" Width="80" />
+            <Button Content="Read" Command="{Binding ReadCoilsCommand}" />
+            <CheckBox Content="Continuous Read" IsChecked="{Binding CoilsMonitorEnabled}" VerticalAlignment="Center" />
+            <TextBlock VerticalAlignment="Center" Text="Period (ms):" />
+            <NumericUpDown Value="{Binding CoilsMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
+          </StackPanel>
+
+          <DataGrid x:Name="CoilsGrid" Grid.Row="1" ItemsSource="{Binding Coils}"
+                    AutoGenerateColumns="False"
+                    IsReadOnly="False"
+                    GridLinesVisibility="All"
+                    CellEditEnded="CoilsGrid_CellEditEnded">
+            <DataGrid.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="Quick Write" Click="Coils_QuickWrite_Click" />
+                <MenuItem Header="Add to Custom Watch" Click="Coils_AddToCustom_Click" />
+                <MenuItem Header="Add to Trend" Click="Coils_AddToTrend_Click" />
+                <Separator />
+                <MenuItem Header="Copy Address" Click="Coils_CopyAddress_Click" />
+                <MenuItem Header="Copy State" Click="Coils_CopyState_Click" />
+              </ContextMenu>
+            </DataGrid.ContextMenu>
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" IsReadOnly="True" />
+              <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="80" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
       </TabItem>
 
       <TabItem Header="Input Registers">
-        <DataGrid ItemsSource="{Binding InputRegisters}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  GridLinesVisibility="All">
-          <DataGrid.Columns>
-            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
-            <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="120" />
-            <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="80" />
-            <DataGridCheckBoxColumn Header="Swap Bytes" Binding="{Binding SwapBytes}" Width="100" />
-            <DataGridCheckBoxColumn Header="Swap Words" Binding="{Binding SwapWords}" Width="100" />
-          </DataGrid.Columns>
-        </DataGrid>
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+            <TextBlock VerticalAlignment="Center" Text="Start:" />
+            <NumericUpDown Value="{Binding InputRegisterStart}" Minimum="0" Width="100" />
+            <TextBlock VerticalAlignment="Center" Text="Count:" />
+            <NumericUpDown Value="{Binding InputRegisterCount}" Minimum="1" Maximum="100" Width="80" />
+            <Button Content="Read" Command="{Binding ReadInputRegistersCommand}" />
+            <TextBlock VerticalAlignment="Center" Text="Type:" Margin="16,0,0,0" />
+            <ComboBox ItemsSource="{Binding RegisterTypes}" SelectedItem="{Binding InputRegistersGlobalType}" Width="80" />
+            <CheckBox Content="Swap Bytes" IsChecked="{Binding InputRegistersSwapBytes}" VerticalAlignment="Center" />
+            <CheckBox Content="Swap Words" IsChecked="{Binding InputRegistersSwapWords}" VerticalAlignment="Center" />
+            <CheckBox Content="Continuous Read" IsChecked="{Binding InputRegistersMonitorEnabled}" VerticalAlignment="Center" />
+            <TextBlock VerticalAlignment="Center" Text="Period (ms):" />
+            <NumericUpDown Value="{Binding InputRegistersMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
+          </StackPanel>
+
+          <DataGrid x:Name="InputRegistersGrid" Grid.Row="1" ItemsSource="{Binding InputRegisters}"
+                    AutoGenerateColumns="False"
+                    IsReadOnly="True"
+                    GridLinesVisibility="All">
+            <DataGrid.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="Add to Custom Watch" Click="InputRegisters_AddToCustom_Click" />
+                <MenuItem Header="Add to Trend" Click="InputRegisters_AddToTrend_Click" />
+                <Separator />
+                <MenuItem Header="Copy Address" Click="InputRegisters_CopyAddress_Click" />
+                <MenuItem Header="Copy Value" Click="InputRegisters_CopyValue_Click" />
+              </ContextMenu>
+            </DataGrid.ContextMenu>
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" IsReadOnly="True" />
+              <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="120" IsReadOnly="True" />
+              <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="80" IsReadOnly="True" />
+              <DataGridCheckBoxColumn Header="Swap Bytes" Binding="{Binding SwapBytes}" Width="100" IsReadOnly="True" />
+              <DataGridCheckBoxColumn Header="Swap Words" Binding="{Binding SwapWords}" Width="100" IsReadOnly="True" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
       </TabItem>
 
       <TabItem Header="Discrete Inputs">
-        <DataGrid ItemsSource="{Binding DiscreteInputs}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  GridLinesVisibility="All">
-          <DataGrid.Columns>
-            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
-            <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="80" />
-          </DataGrid.Columns>
-        </DataGrid>
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+            <TextBlock VerticalAlignment="Center" Text="Start:" />
+            <NumericUpDown Value="{Binding DiscreteInputStart}" Minimum="0" Width="100" />
+            <TextBlock VerticalAlignment="Center" Text="Count:" />
+            <NumericUpDown Value="{Binding DiscreteInputCount}" Minimum="1" Maximum="100" Width="80" />
+            <Button Content="Read" Command="{Binding ReadDiscreteInputsCommand}" />
+            <CheckBox Content="Continuous Read" IsChecked="{Binding DiscreteInputsMonitorEnabled}" VerticalAlignment="Center" />
+            <TextBlock VerticalAlignment="Center" Text="Period (ms):" />
+            <NumericUpDown Value="{Binding DiscreteInputsMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
+          </StackPanel>
+
+          <DataGrid x:Name="DiscreteInputsGrid" Grid.Row="1" ItemsSource="{Binding DiscreteInputs}"
+                    AutoGenerateColumns="False"
+                    IsReadOnly="True"
+                    GridLinesVisibility="All">
+            <DataGrid.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="Add to Custom Watch" Click="DiscreteInputs_AddToCustom_Click" />
+                <MenuItem Header="Add to Trend" Click="DiscreteInputs_AddToTrend_Click" />
+                <Separator />
+                <MenuItem Header="Copy Address" Click="DiscreteInputs_CopyAddress_Click" />
+                <MenuItem Header="Copy State" Click="DiscreteInputs_CopyState_Click" />
+              </ContextMenu>
+            </DataGrid.ContextMenu>
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" IsReadOnly="True" />
+              <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="80" IsReadOnly="True" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
       </TabItem>
 
       <TabItem Header="Custom Watch">
