@@ -78,6 +78,14 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.7.5 — Custom Watch & Project Save
+
+- **Avalonia Custom Watch tab**: Add/remove custom tags with name, address, area, type, value, write value, and continuous/monitor/trend flags.
+- **Continuous custom monitoring**: A background loop in the Avalonia app reads `Monitor`-enabled and writes `Continuous`-enabled entries on their configured periods.
+- **Custom read/write**: Manual read and write buttons support `uint`, `int`, `real`, `string`, and coil types, with proper byte/word handling for floats and strings.
+- **Custom and project save/load**: Save/load custom entry JSON files and full project `.mfp`/`.json` files that restore connection profiles, active profile, register area, and custom entries.
+- **Headless `--custom`**: `ModbusForge.Headless` now accepts `--custom <path>` to run a custom watch JSON file from the command line.
+
 ### 2026.7.4 — Avalonia Core Register Operations
 
 - **All four Modbus areas in Avalonia**: Holding registers, input registers, coils, and discrete inputs are now available as tabs with read, continuous read, and write support.

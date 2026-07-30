@@ -36,6 +36,11 @@ Avalonia currently contains: main window, connection manager, device scanner, ba
 - Read, write single, write multiple, continuous read.
 - Data grid with address, value, type, swap, format columns.
 - Unit ID switching with per-unit state.
+
+- Holding / input registers, coils, discrete inputs.
+- Read, write single, write multiple, continuous read.
+- Data grid with address, value, type, swap, format columns.
+- Unit ID switching with per-unit state.
 - Connection diagnostics (TCP latency / serial loopback).
 - WPF: fix any register-grid regressions; add Avalonia-only improvements back to Core.
 
@@ -44,7 +49,7 @@ Avalonia currently contains: main window, connection manager, device scanner, ba
 
 ---
 
-## 2026.7.5 — Custom Watch & Project Save
+## 2026.7.5 — Custom Watch & Project Save (Completed)
 **Theme:** User-defined tags and project persistence.
 
 - Custom Watch tab (area, type, read/write value, continuous read/write, read period).

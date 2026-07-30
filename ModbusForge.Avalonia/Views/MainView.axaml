@@ -30,6 +30,8 @@
       <Button Content="Read" Command="{Binding ReadCommand}" />
       <Button Content="Write" Command="{Binding WriteCommand}" />
       <CheckBox Content="Continuous Read" IsChecked="{Binding IsContinuousRead}" VerticalAlignment="Center" />
+      <Button Content="Save Project" Command="{Binding SaveProjectCommand}" />
+      <Button Content="Load Project" Command="{Binding LoadProjectCommand}" />
     </StackPanel>
 
     <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8"
@@ -95,6 +97,40 @@
             <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="80" />
           </DataGrid.Columns>
         </DataGrid>
+      </TabItem>
+
+      <TabItem Header="Custom Watch">
+        <Grid RowDefinitions="Auto,*" Margin="0,0,0,0">
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+            <Button Content="Add" Command="{Binding AddCustomEntryCommand}" />
+            <Button Content="Remove" Command="{Binding RemoveCustomEntryCommand}" />
+            <Button Content="Read Selected" Command="{Binding ReadCustomEntryCommand}" />
+            <Button Content="Write Selected" Command="{Binding WriteCustomEntryCommand}" />
+            <Button Content="Save Custom" Command="{Binding SaveCustomCommand}" />
+            <Button Content="Load Custom" Command="{Binding LoadCustomCommand}" />
+            <CheckBox Content="Monitor" IsChecked="{Binding IsCustomWatchMonitoring}" VerticalAlignment="Center" />
+          </StackPanel>
+
+          <DataGrid Grid.Row="1" ItemsSource="{Binding CustomEntries}"
+                    SelectedItem="{Binding SelectedCustomEntry}"
+                    AutoGenerateColumns="False"
+                    IsReadOnly="False"
+                    GridLinesVisibility="All">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="120" />
+              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
+              <DataGridTextColumn Header="Area" Binding="{Binding Area}" Width="120" />
+              <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="80" />
+              <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="120" IsReadOnly="True" />
+              <DataGridTextColumn Header="Write Value" Binding="{Binding WriteValue}" Width="120" />
+              <DataGridCheckBoxColumn Header="Continuous" Binding="{Binding Continuous}" Width="90" />
+              <DataGridTextColumn Header="Period (ms)" Binding="{Binding PeriodMs}" Width="90" />
+              <DataGridCheckBoxColumn Header="Monitor" Binding="{Binding Monitor}" Width="80" />
+              <DataGridTextColumn Header="Read Period (ms)" Binding="{Binding ReadPeriodMs}" Width="110" />
+              <DataGridCheckBoxColumn Header="Trend" Binding="{Binding Trend}" Width="70" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
       </TabItem>
     </TabControl>
   </Grid>

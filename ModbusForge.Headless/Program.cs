@@ -27,6 +27,8 @@ namespace ModbusForge.Headless
                         ["--count"] = "Polling:Count",
                         ["--interval"] = "Polling:IntervalMs",
                         ["--area"] = "Polling:Area",
+                        ["--custom"] = "Custom:Path",
+                        ["--custom-tick"] = "Custom:TickMs",
                     });
                 })
                 .ConfigureServices((context, services) =>
@@ -39,7 +41,15 @@ namespace ModbusForge.Headless
 
                     services.AddSingleton<IConsoleLoggerService, ConsoleLoggerService>();
                     services.AddSingleton<IModbusService, ModbusTcpService>();
-                    services.AddHostedService<HeadlessPollingService>();
+
+                    if (!string.IsNullOrWhiteSpace(context.Configuration["Custom:Path"]))
+                    {
+                        services.AddHostedService<HeadlessCustomService>();
+                    }
+                    else
+                    {
+                        services.AddHostedService<HeadlessPollingService>();
+                    }
                 })
                 .Build();
 

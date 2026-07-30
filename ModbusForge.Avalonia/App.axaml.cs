@@ -65,6 +65,9 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<IModbusDeviceProbe, ModbusDeviceProbe>();
             services.AddSingleton<IDeviceScannerService, DeviceScannerService>();
 
+            // Custom entries
+            services.AddSingleton<ICustomEntryService, CustomEntryService>();
+
             // ViewModels
             services.AddSingleton<MainViewModel>();
 

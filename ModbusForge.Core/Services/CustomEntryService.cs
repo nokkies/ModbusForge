@@ -23,7 +23,8 @@ namespace ModbusForge.Services
 
         public async Task<ObservableCollection<CustomEntry>?> LoadCustomAsync()
         {
-            var path = _fileDialogService.ShowOpenFileDialog("Load Custom Entries", "JSON files (*.json)|*.json|All files (*.*)|*.*");
+            var path = await _fileDialogService.ShowOpenFileDialogAsync("Load Custom Entries", "JSON files (*.json)|*.json|All files (*.*)|*.*")
+                       ?? _fileDialogService.ShowOpenFileDialog("Load Custom Entries", "JSON files (*.json)|*.json|All files (*.*)|*.*");
             if (path is null)
             {
                 return null;
@@ -62,7 +63,8 @@ namespace ModbusForge.Services
 
         public async Task SaveCustomAsync(ObservableCollection<CustomEntry> entries)
         {
-            var path = _fileDialogService.ShowSaveFileDialog("Save Custom Entries", "JSON files (*.json)|*.json|All files (*.*)|*.*", "custom-entries.json");
+            var path = await _fileDialogService.ShowSaveFileDialogAsync("Save Custom Entries", "JSON files (*.json)|*.json|All files (*.*)|*.*", "custom-entries.json")
+                       ?? _fileDialogService.ShowSaveFileDialog("Save Custom Entries", "JSON files (*.json)|*.json|All files (*.*)|*.*", "custom-entries.json");
             if (path is null)
             {
                 return;
