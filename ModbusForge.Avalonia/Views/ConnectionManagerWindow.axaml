@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
         xmlns:mod="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core"
+        xmlns:converters="clr-namespace:Avalonia.Data.Converters;assembly=Avalonia.Base"
         x:Class="ModbusForge.Avalonia.Views.ConnectionManagerWindow"
         x:DataType="vm:ConnectionManagerViewModel"
         Title="Connection Manager"
@@ -37,35 +38,78 @@
       </Border>
 
       <!-- Details -->
-      <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*" IsEnabled="{Binding HasSelection}" Margin="0,0,0,8">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
+      <ScrollViewer Grid.Column="1" IsEnabled="{Binding HasSelection}" Margin="0,0,0,8">
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
 
-        <TextBlock Text="Name:" Grid.Row="0" VerticalAlignment="Center" Margin="0,0,12,8" />
-        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedProfile.Name, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+          <TextBlock Text="Name:" Grid.Row="0" VerticalAlignment="Center" Margin="0,0,12,8" />
+          <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedProfile.Name, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
 
-        <TextBlock Text="Transport:" Grid.Row="1" VerticalAlignment="Center" Margin="0,0,12,8" />
-        <ComboBox Grid.Row="1" Grid.Column="1"
-                  ItemsSource="{Binding Source={x:Static vm:ConnectionManagerViewModel.TransportOptions}}"
-                  SelectedItem="{Binding SelectedProfile.Transport}"
-                  Width="150"
-                  HorizontalAlignment="Left"
-                  Margin="0,0,0,8" />
+          <TextBlock Text="Transport:" Grid.Row="1" VerticalAlignment="Center" Margin="0,0,12,8" />
+          <ComboBox Grid.Row="1" Grid.Column="1"
+                    ItemsSource="{Binding Source={x:Static vm:ConnectionManagerViewModel.TransportOptions}}"
+                    SelectedItem="{Binding SelectedProfile.Transport}"
+                    Width="150"
+                    HorizontalAlignment="Left"
+                    Margin="0,0,0,8" />
 
-        <TextBlock Text="Host:" Grid.Row="2" VerticalAlignment="Center" Margin="0,0,12,8" />
-        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SelectedProfile.IpAddress, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+          <!-- TCP settings -->
+          <StackPanel Grid.Row="2" Grid.ColumnSpan="2" IsVisible="{Binding IsSerial, Converter={x:Static converters:BoolConverters.Not}, FallbackValue=True}">
+            <Grid ColumnDefinitions="Auto,*">
+              <TextBlock Text="Host:" VerticalAlignment="Center" Margin="0,0,12,8" />
+              <TextBox Grid.Column="1" Text="{Binding SelectedProfile.IpAddress, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+            </Grid>
+            <Grid ColumnDefinitions="Auto,*">
+              <TextBlock Text="Port:" VerticalAlignment="Center" Margin="0,0,12,8" />
+              <NumericUpDown Grid.Column="1" Value="{Binding SelectedProfile.Port}" Minimum="1" Maximum="65535" Width="120" HorizontalAlignment="Left" Margin="0,0,0,8" />
+            </Grid>
+          </StackPanel>
 
-        <TextBlock Text="Port:" Grid.Row="3" VerticalAlignment="Center" Margin="0,0,12,8" />
-        <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding SelectedProfile.Port}" Minimum="1" Maximum="65535" Width="120" HorizontalAlignment="Left" Margin="0,0,0,8" />
+          <!-- Serial settings -->
+          <StackPanel Grid.Row="3" Grid.ColumnSpan="2" IsVisible="{Binding IsSerial}">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+              <TextBlock Text="COM Port:" Grid.Row="0" VerticalAlignment="Center" Margin="0,0,12,8" />
+              <AutoCompleteBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding AvailableSerialPorts}"
+                               Text="{Binding SelectedProfile.ComPort}" Width="160" HorizontalAlignment="Left" Margin="0,0,0,8" />
 
-        <TextBlock Text="Unit ID:" Grid.Row="4" VerticalAlignment="Center" Margin="0,0,12,8" />
-        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding SelectedProfile.UnitId, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left" Margin="0,0,0,8" />
+              <TextBlock Text="Baud Rate:" Grid.Row="1" VerticalAlignment="Center" Margin="0,0,12,8" />
+              <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding SelectedProfile.BaudRate}" Minimum="75" Maximum="2000000" Width="120" HorizontalAlignment="Left" Margin="0,0,0,8" />
 
-        <TextBlock Text="Status:" Grid.Row="5" VerticalAlignment="Center" Margin="0,0,12,8" />
-        <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding StatusMessage}" VerticalAlignment="Center" Margin="0,0,0,8" />
-      </Grid>
+              <TextBlock Text="Data Bits:" Grid.Row="2" VerticalAlignment="Center" Margin="0,0,12,8" />
+              <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding SelectedProfile.DataBits}" Minimum="5" Maximum="9" Width="80" HorizontalAlignment="Left" Margin="0,0,0,8" />
+
+              <TextBlock Text="Parity:" Grid.Row="3" VerticalAlignment="Center" Margin="0,0,12,8" />
+              <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Source={x:Static vm:ConnectionManagerViewModel.ParityOptions}}"
+                        SelectedItem="{Binding SelectedProfile.Parity}" Width="120" HorizontalAlignment="Left" Margin="0,0,0,8" />
+
+              <TextBlock Text="Stop Bits:" Grid.Row="4" VerticalAlignment="Center" Margin="0,0,12,8" />
+              <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding Source={x:Static vm:ConnectionManagerViewModel.StopBitsOptions}}"
+                        SelectedItem="{Binding SelectedProfile.StopBits}" Width="120" HorizontalAlignment="Left" Margin="0,0,0,8" />
+
+              <TextBlock Text="RTS:" Grid.Row="5" VerticalAlignment="Center" Margin="0,0,12,8" />
+              <CheckBox Grid.Row="5" Grid.Column="1" IsChecked="{Binding SelectedProfile.RtsEnable}" Content="Enable RS-485 RTS (always high)" Margin="0,0,0,8" />
+
+              <TextBlock Text="RTS Toggle:" Grid.Row="6" VerticalAlignment="Center" Margin="0,0,12,8" />
+              <CheckBox Grid.Row="6" Grid.Column="1" IsChecked="{Binding SelectedProfile.EnableRtsToggle}" Content="Toggle RTS high only while transmitting" Margin="0,0,0,8" />
+
+              <TextBlock Text="Pre Tx (ms):" Grid.Row="7" VerticalAlignment="Center" Margin="0,0,12,8" />
+              <NumericUpDown Grid.Row="7" Grid.Column="1" Value="{Binding SelectedProfile.PreTxDelayMs}" Minimum="0" Maximum="10000" Width="100" HorizontalAlignment="Left" Margin="0,0,0,8" />
+
+              <TextBlock Text="Post Tx (ms):" Grid.Row="8" VerticalAlignment="Center" Margin="0,0,12,8" />
+              <NumericUpDown Grid.Row="8" Grid.Column="1" Value="{Binding SelectedProfile.PostTxDelayMs}" Minimum="0" Maximum="10000" Width="100" HorizontalAlignment="Left" Margin="0,0,0,8" />
+            </Grid>
+          </StackPanel>
+
+          <TextBlock Text="Unit ID:" Grid.Row="4" VerticalAlignment="Center" Margin="0,0,12,8" />
+          <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding SelectedProfile.UnitId, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left" Margin="0,0,0,8" />
+
+          <TextBlock Text="Status:" Grid.Row="5" VerticalAlignment="Center" Margin="0,0,12,8" />
+          <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding StatusMessage}" VerticalAlignment="Center" Margin="0,0,0,8" />
+        </Grid>
+      </ScrollViewer>
     </Grid>
 
     <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="16">

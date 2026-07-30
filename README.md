@@ -78,6 +78,14 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.7.7 — Connection, Transport & Frame Tools
+
+- **Avalonia serial RTU/ASCII settings**: Connection Manager now exposes COM port, baud rate, data bits, parity, stop bits, RTS, RTS toggle, and pre/post tx delays when a serial transport is selected.
+- **Connection profile persistence**: Profiles are saved and reloaded across sessions.
+- **Frame Inspector tab**: Live PDU/byte log with timestamp, delta, direction, unit ID, function code, and hex payload. Includes Clear and Pcap import buttons.
+- **Pcap import / offline replay**: Import `.pcap` files and view the extracted Modbus TCP frames directly in the Frame Inspector.
+- **MQTT gateway tab**: Configure broker host/port, client ID, credentials, topic template, QoS, retain, and publish period; connect and publish custom watch tag values.
+
 ### 2026.7.6 — Avalonia Trends
 
 - **Live trend chart in Avalonia**: Added a `Trends` tab with a `LiveCharts` Cartesian chart, Start/Stop/Remove/Clear controls, and a color-blind-safe palette.

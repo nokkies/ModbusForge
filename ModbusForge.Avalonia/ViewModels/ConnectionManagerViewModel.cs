@@ -20,6 +20,14 @@ namespace ModbusForge.Avalonia.ViewModels
         public static IReadOnlyList<TransportType> TransportOptions { get; } =
             new[] { TransportType.Tcp, TransportType.Rtu, TransportType.Ascii };
 
+        public static IReadOnlyList<Parity> ParityOptions { get; } =
+            new[] { Parity.None, Parity.Even, Parity.Odd, Parity.Mark, Parity.Space };
+
+        public static IReadOnlyList<StopBits> StopBitsOptions { get; } =
+            new[] { StopBits.None, StopBits.One, StopBits.OnePointFive, StopBits.Two };
+
+        public bool IsSerial => SelectedProfile?.Transport is TransportType.Rtu or TransportType.Ascii;
+
         private readonly IConnectionManager _connectionManager;
         private readonly IDispatcher _dispatcher;
 
@@ -90,10 +98,12 @@ namespace ModbusForge.Avalonia.ViewModels
             }
 
             OnPropertyChanged(nameof(HasSelection));
+            OnPropertyChanged(nameof(IsSerial));
             OnPropertyChanged(nameof(CanRemove));
             OnPropertyChanged(nameof(CanClone));
             OnPropertyChanged(nameof(CanConnect));
             OnPropertyChanged(nameof(CanDisconnect));
+            RefreshSerialPorts();
         }
 
         partial void OnSelectedProfileChanging(ConnectionProfile? value)
@@ -114,6 +124,10 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 OnPropertyChanged(nameof(CanConnect));
                 OnPropertyChanged(nameof(CanDisconnect));
+            }
+            else if (e.PropertyName == nameof(ConnectionProfile.Transport))
+            {
+                OnPropertyChanged(nameof(IsSerial));
             }
         }
 

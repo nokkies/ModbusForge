@@ -50,6 +50,14 @@
         <views:TrendView DataContext="{Binding TrendViewModel}" />
       </TabItem>
 
+      <TabItem Header="Frame Inspector">
+        <views:FrameInspectorView DataContext="{Binding FrameInspectorViewModel}" />
+      </TabItem>
+
+      <TabItem Header="MQTT">
+        <views:MqttView DataContext="{Binding MqttViewModel}" />
+      </TabItem>
+
       <TabItem Header="Holding Registers">
         <DataGrid ItemsSource="{Binding HoldingRegisters}"
                   AutoGenerateColumns="False"

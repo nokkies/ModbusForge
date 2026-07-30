@@ -75,6 +75,17 @@ Avalonia currently contains: main window, connection manager, device scanner, ba
 - Custom Watch entries can trend numeric/coil values.
 - Start/stop, remove, clear, retention, and sample-rate controls.
 
+---
+
+## 2026.7.7 — Connection, Transport & Frame Tools (Completed)
+**Theme:** Complete the connection experience and diagnostics.
+
+- Serial RTU/ASCII settings in Avalonia Connection Manager (COM, baud, parity, RTS toggle, pre/post tx delays).
+- Connection profile save/load across sessions.
+- Frame Inspector window (live PDU/byte log with timestamps).
+- Pcap import / offline replay (uses `PcapImportService`).
+- MQTT gateway publish from Core (configured in Avalonia preferences).
+
 - Trend view with multiple traces, zoom/pan, retention.
 - CSV and PNG export.
 - Avalonia Skia chart integration (`LiveChartsCore.SkiaSharpView.Avalonia` or equivalent).

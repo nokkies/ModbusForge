@@ -68,6 +68,20 @@ namespace ModbusForge.Services
             }
         }
 
+        public void Log(ModbusFrameLog log)
+        {
+            if (log is null)
+                return;
+
+            lock (_sync)
+            {
+                Frames.Add(log);
+
+                while (Frames.Count > Capacity)
+                    Frames.RemoveAt(0);
+            }
+        }
+
         public void Clear()
         {
             lock (_sync)

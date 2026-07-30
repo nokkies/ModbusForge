@@ -62,6 +62,10 @@ namespace ModbusForge.Avalonia
             // File system & file dialogs
             services.AddSingleton<IFileSystem, FileSystem>();
 
+            // Settings and MQTT gateway
+            services.AddSingleton<ISettingsService, SettingsService>();
+            services.AddSingleton<MqttGatewayService>();
+
             // Device scanner
             services.AddSingleton<IDeviceIdentificationReader, DeviceIdentificationReader>();
             services.AddSingleton<IModbusDeviceProbe, ModbusDeviceProbe>();
@@ -74,9 +78,14 @@ namespace ModbusForge.Avalonia
             services.Configure<LoggingSettings>(_ => { });
             services.AddSingleton<ITrendLogger, TrendLoggingService>();
 
+            // Frame inspector & pcap import
+            services.AddSingleton<FrameInspectorViewModel>();
+            services.AddSingleton<PcapImportService>();
+
             // ViewModels
             services.AddSingleton<MainViewModel>();
             services.AddSingleton<TrendViewModel>();
+            services.AddSingleton<MqttViewModel>();
 
             return services.BuildServiceProvider();
         }

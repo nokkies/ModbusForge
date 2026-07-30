@@ -129,6 +129,10 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public TrendViewModel? TrendViewModel { get; }
 
+        public FrameInspectorViewModel? FrameInspectorViewModel { get; }
+
+        public MqttViewModel? MqttViewModel { get; }
+
         public MainViewModel(
             IConnectionManager connectionManager,
             ILogger<MainViewModel> logger,
@@ -137,7 +141,10 @@ namespace ModbusForge.Avalonia.ViewModels
             IFileDialogService? fileDialogService = null,
             IInputDialogService? inputDialogService = null,
             ITrendLogger? trendLogger = null,
-            TrendViewModel? trendViewModel = null)
+            TrendViewModel? trendViewModel = null,
+            FrameInspectorViewModel? frameInspectorViewModel = null,
+            MqttViewModel? mqttViewModel = null,
+            MqttGatewayService? mqttGateway = null)
         {
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -147,6 +154,13 @@ namespace ModbusForge.Avalonia.ViewModels
             _inputDialogService = inputDialogService;
             _trendLogger = trendLogger;
             TrendViewModel = trendViewModel;
+            FrameInspectorViewModel = frameInspectorViewModel;
+            MqttViewModel = mqttViewModel;
+
+            if (mqttGateway is not null)
+            {
+                mqttGateway.SnapshotProvider = BuildMqttSnapshot;
+            }
 
             ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => CanConnect());
             DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => CanDisconnect());
@@ -1083,6 +1097,34 @@ namespace ModbusForge.Avalonia.ViewModels
             }
 
             return false;
+        }
+
+        private IEnumerable<MqttTagUpdate> BuildMqttSnapshot()
+        {
+            var updates = new List<MqttTagUpdate>();
+
+            var entries = CustomEntries.ToList();
+            var unitId = UnitId;
+
+            foreach (var entry in entries)
+            {
+                if (!Enum.TryParse<PlcArea>(entry.Area, true, out var area))
+                {
+                    area = PlcArea.HoldingRegister;
+                }
+
+                updates.Add(new MqttTagUpdate
+                {
+                    UnitId = (byte)unitId,
+                    TagName = entry.Name,
+                    Area = area,
+                    Address = entry.Address,
+                    Value = entry.Value,
+                    Timestamp = entry.LastReadUtc == default ? DateTime.UtcNow : entry.LastReadUtc
+                });
+            }
+
+            return updates;
         }
 
         #endregion

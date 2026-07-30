@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+             x:Class="ModbusForge.Avalonia.Views.FrameInspectorView"
+             x:DataType="vm:FrameInspectorViewModel">
+
+  <Grid RowDefinitions="Auto,Auto,*">
+    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+      <Button Content="Clear" Command="{Binding ClearCommand}" />
+      <Button Content="Import Pcap" Command="{Binding ImportPcapCommand}" />
+      <CheckBox Content="Auto Scroll" IsChecked="{Binding IsAutoScroll}" />
+      <TextBlock VerticalAlignment="Center" Text="{Binding FrameLogger.Frames.Count, StringFormat='Frames: {0}'}" />
+    </StackPanel>
+
+    <TextBlock Grid.Row="1" Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" Margin="0,0,0,8" />
+
+    <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="1">
+      <DataGrid ItemsSource="{Binding FrameLogger.Frames}"
+                AutoGenerateColumns="False"
+                IsReadOnly="True"
+                GridLinesVisibility="All"
+                CanUserReorderColumns="True"
+                CanUserResizeColumns="True">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss.fff}'}" Width="110" />
+          <DataGridTextColumn Header="Delta (ms)" Binding="{Binding DeltaMs, StringFormat='{}{0:F2}'}" Width="90" />
+          <DataGridTextColumn Header="Dir" Binding="{Binding Direction}" Width="50" />
+          <DataGridTextColumn Header="Unit" Binding="{Binding UnitId}" Width="60" />
+          <DataGridTextColumn Header="FC" Binding="{Binding FunctionCode}" Width="50" />
+          <DataGridTextColumn Header="Hex" Binding="{Binding HexString}" Width="*" MinWidth="200" />
+          <DataGridTextColumn Header="CRC" Binding="{Binding IsValidCrc, FallbackValue='-'}" Width="60" />
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+  </Grid>
+</UserControl>
