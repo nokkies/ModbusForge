@@ -78,6 +78,14 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.7.8 — Scripting & Advanced Functions
+
+- **Avalonia Script Editor**: Create, edit, run, and stop Modbus scripts with a live output log.
+- **Script command types**: read/write coils and registers, delay, log, plus advanced FC22 Mask Write, FC23 Read/Write Multiple, and FC43 Read Device Identification.
+- **`.mbscript` save/load**: Save and load script files as JSON.
+- **Signal Generator tab**: Generate ramp, sine, triangle, or square waveforms and write values to a holding register on a configurable period.
+- Core `ScriptCommand` and `ScriptRunner` extended to support the new advanced command types.
+
 ### 2026.7.7 — Connection, Transport & Frame Tools
 
 - **Avalonia serial RTU/ASCII settings**: Connection Manager now exposes COM port, baud rate, data bits, parity, stop bits, RTS, RTS toggle, and pre/post tx delays when a serial transport is selected.

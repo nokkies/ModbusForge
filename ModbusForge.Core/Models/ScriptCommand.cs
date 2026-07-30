@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ModbusForge.Models;
@@ -11,6 +13,10 @@ public enum ScriptCommandType
     ReadDiscreteInputs,
     WriteSingleRegister,
     WriteSingleCoil,
+    WriteMultipleRegisters,
+    MaskWriteRegister,
+    ReadWriteMultipleRegisters,
+    ReadDeviceIdentification,
     Delay,
     Log,
     Loop
@@ -51,6 +57,22 @@ public partial class ScriptCommand : ObservableObject
     [ObservableProperty]
     private bool _lastSuccess;
 
+    // Advanced function code parameters
+    [ObservableProperty]
+    private ushort _andMask;
+
+    [ObservableProperty]
+    private ushort _orMask;
+
+    [ObservableProperty]
+    private int _writeStartAddress = 1;
+
+    [ObservableProperty]
+    private string _writeValuesText = string.Empty;
+
+    [ObservableProperty]
+    private byte _objectId = 0;
+
     public string DisplayText
     {
         get
@@ -63,12 +85,31 @@ public partial class ScriptCommand : ObservableObject
                 ScriptCommandType.ReadDiscreteInputs => $"Read {Count} Discrete Input(s) from {Address}",
                 ScriptCommandType.WriteSingleRegister => $"Write {Value} to Register {Address}",
                 ScriptCommandType.WriteSingleCoil => $"Write {(BoolValue ? "ON" : "OFF")} to Coil {Address}",
+                ScriptCommandType.WriteMultipleRegisters => $"Write [{WriteValuesText}] to Registers {WriteStartAddress}",
+                ScriptCommandType.MaskWriteRegister => $"Mask Write Reg {Address} (AND {AndMask}, OR {OrMask})",
+                ScriptCommandType.ReadWriteMultipleRegisters => $"Read {Count} from {Address}, Write [{WriteValuesText}] to {WriteStartAddress}",
+                ScriptCommandType.ReadDeviceIdentification => $"Read Device Id Object {ObjectId}",
                 ScriptCommandType.Delay => $"Delay {DelayMs}ms",
                 ScriptCommandType.Log => $"Log: {Message}",
                 ScriptCommandType.Loop => $"Loop {LoopCount} times",
                 _ => "Unknown"
             };
         }
+    }
+
+    public IEnumerable<ushort>? ParseWriteValues()
+    {
+        if (string.IsNullOrWhiteSpace(WriteValuesText))
+            return null;
+
+        var values = new List<ushort>();
+        foreach (var token in WriteValuesText.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (ushort.TryParse(token.Trim(), out var v))
+                values.Add(v);
+        }
+
+        return values;
     }
 
     public ScriptCommand Clone()
@@ -83,7 +124,12 @@ public partial class ScriptCommand : ObservableObject
             DelayMs = DelayMs,
             Message = Message,
             LoopCount = LoopCount,
-            IsEnabled = IsEnabled
+            IsEnabled = IsEnabled,
+            AndMask = AndMask,
+            OrMask = OrMask,
+            WriteStartAddress = WriteStartAddress,
+            WriteValuesText = WriteValuesText,
+            ObjectId = ObjectId
         };
     }
 }

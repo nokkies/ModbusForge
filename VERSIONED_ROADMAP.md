@@ -95,7 +95,7 @@ Avalonia currently contains: main window, connection manager, device scanner, ba
 
 ---
 
-## 2026.7.7 — Connection, Transport & Frame Tools
+## 2026.7.7 — Connection, Transport & Frame Tools (Completed)
 **Theme:** Complete the connection experience and diagnostics.
 
 - Serial RTU/ASCII settings in Avalonia connection manager (COM, baud, parity, RTS toggle, pre/post tx delays).
@@ -108,7 +108,7 @@ Avalonia currently contains: main window, connection manager, device scanner, ba
 
 ---
 
-## 2026.7.8 — Scripting & Advanced Functions
+## 2026.7.8 — Scripting & Advanced Functions (Completed)
 **Theme:** Automation and extended Modbus function codes.
 
 - Script Editor in Avalonia (read, write, delay, log, repeat, run/stop).

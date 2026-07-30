@@ -58,6 +58,14 @@
         <views:MqttView DataContext="{Binding MqttViewModel}" />
       </TabItem>
 
+      <TabItem Header="Script Editor">
+        <views:ScriptEditorView DataContext="{Binding ScriptEditorViewModel}" />
+      </TabItem>
+
+      <TabItem Header="Signal Generator">
+        <views:SignalGeneratorView DataContext="{Binding SignalGeneratorViewModel}" />
+      </TabItem>
+
       <TabItem Header="Holding Registers">
         <DataGrid ItemsSource="{Binding HoldingRegisters}"
                   AutoGenerateColumns="False"

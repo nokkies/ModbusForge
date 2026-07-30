@@ -1,0 +1,64 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+             x:Class="ModbusForge.Avalonia.Views.ScriptEditorView"
+             x:DataType="vm:ScriptEditorViewModel">
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto,150">
+    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+      <TextBlock Text="Name:" VerticalAlignment="Center" />
+      <TextBox Text="{Binding Script.Name, UpdateSourceTrigger=PropertyChanged}" Width="200" />
+      <TextBlock Text="Repeat:" VerticalAlignment="Center" Margin="16,0,0,0" />
+      <NumericUpDown Value="{Binding Script.RepeatCount}" Minimum="1" Maximum="10000" Width="80" />
+      <TextBlock Text="Delay (ms):" VerticalAlignment="Center" Margin="16,0,0,0" />
+      <NumericUpDown Value="{Binding Script.DelayBetweenCommandsMs}" Minimum="0" Maximum="60000" Width="100" />
+      <CheckBox Content="Stop on Error" IsChecked="{Binding Script.StopOnError}" Margin="16,0,0,0" />
+    </StackPanel>
+
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+      <Button Content="Add" Command="{Binding AddCommand}" />
+      <Button Content="Remove" Command="{Binding RemoveCommand}" IsEnabled="{Binding CanRemoveSelected}" />
+      <Button Content="Move Up" Command="{Binding MoveUpCommand}" IsEnabled="{Binding CanMoveUp}" />
+      <Button Content="Move Down" Command="{Binding MoveDownCommand}" IsEnabled="{Binding CanMoveDown}" />
+      <Button Content="Clone" Command="{Binding CloneCommand}" IsEnabled="{Binding CanCloneSelected}" />
+    </StackPanel>
+
+    <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,8">
+      <DataGrid ItemsSource="{Binding Script.Commands}"
+                SelectedItem="{Binding SelectedCommand}"
+                AutoGenerateColumns="False"
+                GridLinesVisibility="All">
+        <DataGrid.Columns>
+          <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding IsEnabled}" Width="70" />
+          <DataGridTextColumn Header="Type" Binding="{Binding CommandType}" Width="180" />
+          <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
+          <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="70" />
+          <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="80" />
+          <DataGridCheckBoxColumn Header="Bool" Binding="{Binding BoolValue}" Width="60" />
+          <DataGridTextColumn Header="AND" Binding="{Binding AndMask}" Width="70" />
+          <DataGridTextColumn Header="OR" Binding="{Binding OrMask}" Width="70" />
+          <DataGridTextColumn Header="Wr Addr" Binding="{Binding WriteStartAddress}" Width="80" />
+          <DataGridTextColumn Header="Wr Values" Binding="{Binding WriteValuesText}" Width="120" />
+          <DataGridTextColumn Header="Object Id" Binding="{Binding ObjectId}" Width="80" />
+          <DataGridTextColumn Header="Delay ms" Binding="{Binding DelayMs}" Width="80" />
+          <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="120" />
+          <DataGridTextColumn Header="Description" Binding="{Binding DisplayText}" Width="*" MinWidth="200" IsReadOnly="True" />
+          <DataGridTextColumn Header="Last Result" Binding="{Binding LastResult}" Width="120" IsReadOnly="True" />
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+      <Button Content="Run Script" Command="{Binding RunScriptCommand}" IsEnabled="{Binding CanRun}" />
+      <Button Content="Stop" Command="{Binding StopScriptCommand}" IsEnabled="{Binding IsRunning}" />
+      <Button Content="Save" Command="{Binding SaveScriptCommand}" />
+      <Button Content="Load" Command="{Binding LoadScriptCommand}" />
+      <Button Content="Clear Log" Command="{Binding ClearLogCommand}" />
+      <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="Bold" />
+    </StackPanel>
+
+    <Border Grid.Row="4" BorderBrush="Gray" BorderThickness="1">
+      <ListBox ItemsSource="{Binding OutputLog}" FontFamily="Consolas" FontSize="11" />
+    </Border>
+  </Grid>
+</UserControl>

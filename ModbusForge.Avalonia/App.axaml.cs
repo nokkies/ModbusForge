@@ -82,6 +82,11 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<FrameInspectorViewModel>();
             services.AddSingleton<PcapImportService>();
 
+            // Scripting & signal generator
+            services.AddSingleton<IScriptRunner, ScriptRunner>();
+            services.AddSingleton<ScriptEditorViewModel>();
+            services.AddSingleton<SignalGeneratorViewModel>();
+
             // ViewModels
             services.AddSingleton<MainViewModel>();
             services.AddSingleton<TrendViewModel>();

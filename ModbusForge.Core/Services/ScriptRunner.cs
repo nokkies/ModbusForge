@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -64,7 +65,7 @@ public class ScriptRunner : IScriptRunner
                     }
 
                     var (success, result) = await ExecuteCommandAsync(cmd, modbusService, unitId, token);
-                    
+
                     cmd.LastSuccess = success;
                     cmd.LastResult = result;
 
@@ -152,6 +153,38 @@ public class ScriptRunner : IScriptRunner
                     Log($"Write Coil [{cmd.Address}] = {(cmd.BoolValue ? "ON" : "OFF")}");
                     return (true, $"Written: {(cmd.BoolValue ? "ON" : "OFF")}");
 
+                case ScriptCommandType.WriteMultipleRegisters:
+                    var valuesToWrite = cmd.ParseWriteValues()?.ToArray();
+                    if (valuesToWrite == null || valuesToWrite.Length == 0)
+                        return (false, "No write values provided");
+
+                    await modbusService.WriteRegistersAsync(unitId, cmd.WriteStartAddress, valuesToWrite);
+                    Log($"Write Registers [{cmd.WriteStartAddress}..{cmd.WriteStartAddress + valuesToWrite.Length - 1}] = {string.Join(", ", valuesToWrite)}");
+                    return (true, $"Written {valuesToWrite.Length} registers");
+
+                case ScriptCommandType.MaskWriteRegister:
+                    var masked = await modbusService.MaskWriteRegisterAsync(unitId, cmd.Address, cmd.AndMask, cmd.OrMask);
+                    var maskResult = masked.HasValue ? masked.Value.ToString(CultureInfo.InvariantCulture) : "null";
+                    Log($"Mask Write Register [{cmd.Address}] AND={cmd.AndMask} OR={cmd.OrMask}: {maskResult}");
+                    return (masked.HasValue, maskResult);
+
+                case ScriptCommandType.ReadWriteMultipleRegisters:
+                    var writeValues = cmd.ParseWriteValues()?.ToArray();
+                    if (writeValues == null || writeValues.Length == 0)
+                        return (false, "No write values provided");
+
+                    var readWriteResult = await modbusService.ReadWriteMultipleRegistersAsync(
+                        unitId, cmd.Address, cmd.Count, cmd.WriteStartAddress, writeValues);
+                    var readWriteText = readWriteResult != null ? string.Join(", ", readWriteResult) : "null";
+                    Log($"Read/Write Multiple: read {readWriteText}, wrote {writeValues.Length} regs to {cmd.WriteStartAddress}");
+                    return (readWriteResult != null, readWriteText);
+
+                case ScriptCommandType.ReadDeviceIdentification:
+                    var deviceId = await modbusService.ReadDeviceIdentificationAsync(unitId, cmd.ObjectId, DeviceIdCategory.Basic);
+                    var deviceIdText = deviceId != null ? FormatDeviceIdentification(deviceId) : "null";
+                    Log($"Read Device Identification Object {cmd.ObjectId}: {deviceIdText}");
+                    return (deviceId != null, deviceIdText);
+
                 case ScriptCommandType.Delay:
                     Log($"Delay {cmd.DelayMs}ms");
                     await Task.Delay(cmd.DelayMs, token);
@@ -170,6 +203,11 @@ public class ScriptRunner : IScriptRunner
             Log($"Command failed: {ex.Message}");
             return (false, ex.Message);
         }
+    }
+
+    private static string FormatDeviceIdentification(DeviceIdentification deviceId)
+    {
+        return $"Vendor={deviceId.VendorName ?? ""}, Product={deviceId.ProductCode ?? ""}, Version={deviceId.MajorMinorRevision ?? ""}";
     }
 
     public void Stop()
