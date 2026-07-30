@@ -137,6 +137,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public SignalGeneratorViewModel? SignalGeneratorViewModel { get; }
 
+        public VisualNodeEditorViewModel? VisualNodeEditorViewModel { get; }
+
         public MainViewModel(
             IConnectionManager connectionManager,
             ILogger<MainViewModel> logger,
@@ -150,7 +152,8 @@ namespace ModbusForge.Avalonia.ViewModels
             MqttViewModel? mqttViewModel = null,
             MqttGatewayService? mqttGateway = null,
             ScriptEditorViewModel? scriptEditorViewModel = null,
-            SignalGeneratorViewModel? signalGeneratorViewModel = null)
+            SignalGeneratorViewModel? signalGeneratorViewModel = null,
+            VisualNodeEditorViewModel? visualNodeEditorViewModel = null)
         {
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -164,6 +167,7 @@ namespace ModbusForge.Avalonia.ViewModels
             MqttViewModel = mqttViewModel;
             ScriptEditorViewModel = scriptEditorViewModel;
             SignalGeneratorViewModel = signalGeneratorViewModel;
+            VisualNodeEditorViewModel = visualNodeEditorViewModel;
 
             if (mqttGateway is not null)
             {

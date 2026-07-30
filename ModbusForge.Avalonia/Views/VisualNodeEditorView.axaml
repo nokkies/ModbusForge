@@ -1,0 +1,128 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+             xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core"
+             x:Class="ModbusForge.Avalonia.Views.VisualNodeEditorView"
+             x:DataType="vm:VisualNodeEditorViewModel">
+
+  <Grid ColumnDefinitions="200,*,250">
+    <!-- Palette -->
+    <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="1" Padding="8" Margin="0,0,8,0">
+      <Grid RowDefinitions="Auto,*">
+        <TextBlock Grid.Row="0" Text="Palette" FontWeight="Bold" Margin="0,0,0,8" />
+        <ListBox Grid.Row="1" ItemsSource="{Binding Palette}" SelectedItem="{Binding SelectedPaletteItem}">
+          <ListBox.ItemTemplate>
+            <DataTemplate DataType="vm:PaletteItem">
+              <StackPanel>
+                <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" />
+                <TextBlock Text="{Binding Category}" FontSize="11" Opacity="0.7" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Grid>
+    </Border>
+
+    <!-- Main editor -->
+    <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto,120">
+      <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+        <Button Content="Add Node" Command="{Binding AddNodeCommand}" />
+        <Button Content="Remove Node" Command="{Binding RemoveNodeCommand}" />
+        <Button Content="Connect" Command="{Binding AddConnectionCommand}" />
+        <Button Content="Disconnect" Command="{Binding RemoveConnectionCommand}" />
+        <Button Content="Run" Command="{Binding RunCommand}" />
+        <Button Content="Stop" Command="{Binding StopCommand}" />
+        <Button Content="Save" Command="{Binding SaveCommand}" />
+        <Button Content="Load" Command="{Binding LoadCommand}" />
+        <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="Bold" Margin="8,0,0,0" />
+      </StackPanel>
+
+      <DataGrid Grid.Row="1" ItemsSource="{Binding Config.Nodes}" SelectedItem="{Binding SelectedNode}"
+                AutoGenerateColumns="False" GridLinesVisibility="All" Margin="0,0,0,8">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="120" />
+          <DataGridTextColumn Header="Type" Binding="{Binding ElementType}" Width="120" IsReadOnly="True" />
+          <DataGridTextColumn Header="X" Binding="{Binding X}" Width="70" />
+          <DataGridTextColumn Header="Y" Binding="{Binding Y}" Width="70" />
+          <DataGridTextColumn Header="Width" Binding="{Binding Width}" Width="70" />
+          <DataGridTextColumn Header="Height" Binding="{Binding Height}" Width="70" />
+          <DataGridTextColumn Header="Address" Binding="{Binding Input1Address.Address, FallbackValue=''}" Width="80" />
+          <DataGridTextColumn Header="Preset" Binding="{Binding TimerPresetMs}" Width="80" />
+          <DataGridTextColumn Header="Value" Binding="{Binding CurrentValueDouble, StringFormat='{}{0:F2}'}" Width="80" IsReadOnly="True" />
+        </DataGrid.Columns>
+      </DataGrid>
+
+      <DataGrid Grid.Row="2" ItemsSource="{Binding Config.Connections}" SelectedItem="{Binding SelectedConnection}"
+                AutoGenerateColumns="False" GridLinesVisibility="All" Margin="0,0,0,8" Height="120">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Source" Binding="{Binding SourceNodeId}" Width="*" />
+          <DataGridTextColumn Header="Target" Binding="{Binding TargetNodeId}" Width="*" />
+        </DataGrid.Columns>
+      </DataGrid>
+
+      <!-- Selected node properties -->
+      <Border Grid.Row="3" BorderBrush="Gray" BorderThickness="1" Padding="8"
+              IsVisible="{Binding SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <ScrollViewer>
+          <StackPanel Spacing="4" DataContext="{Binding SelectedNode}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Name:" VerticalAlignment="Center" Width="80" />
+              <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="150" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="X:" VerticalAlignment="Center" Width="80" />
+              <NumericUpDown Value="{Binding X}" Minimum="0" Maximum="2000" Width="100" />
+              <TextBlock Text="Y:" VerticalAlignment="Center" Margin="8,0,0,0" />
+              <NumericUpDown Value="{Binding Y}" Minimum="0" Maximum="2000" Width="100" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Waveform:" VerticalAlignment="Center" Width="80" />
+              <TextBox Text="{Binding Waveform, UpdateSourceTrigger=PropertyChanged}" Width="100" />
+              <TextBlock Text="Period ms:" VerticalAlignment="Center" Margin="8,0,0,0" />
+              <NumericUpDown Value="{Binding PeriodMs}" Minimum="0" Maximum="60000" Width="100" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Amplitude:" VerticalAlignment="Center" Width="80" />
+              <NumericUpDown Value="{Binding Amplitude}" Minimum="-100000" Maximum="100000" Width="100" />
+              <TextBlock Text="Offset:" VerticalAlignment="Center" Margin="8,0,0,0" />
+              <NumericUpDown Value="{Binding Offset}" Minimum="-100000" Maximum="100000" Width="100" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Preset:" VerticalAlignment="Center" Width="80" />
+              <NumericUpDown Value="{Binding TimerPresetMs}" Minimum="0" Maximum="100000" Width="100" />
+              <TextBlock Text="Compare:" VerticalAlignment="Center" Margin="8,0,0,0" />
+              <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Width="100" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+
+    <!-- Preview canvas -->
+    <Border Grid.Column="2" BorderBrush="Gray" BorderThickness="1" Margin="8,0,0,0">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+        <Canvas Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}" Background="#F5F5F5">
+          <ItemsControl ItemsSource="{Binding Config.Nodes}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <Canvas />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="models:VisualNode">
+                <Border Canvas.Left="{Binding X}" Canvas.Top="{Binding Y}" Width="{Binding Width}" Height="{Binding Height}"
+                        BorderBrush="Black" BorderThickness="1" CornerRadius="4" Background="LightBlue">
+                  <Grid RowDefinitions="Auto,Auto,*">
+                    <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="Bold" HorizontalAlignment="Center" />
+                    <TextBlock Grid.Row="1" Text="{Binding ElementType}" FontSize="10" HorizontalAlignment="Center" />
+                    <TextBlock Grid.Row="2" Text="{Binding CurrentValueDouble, StringFormat='{}{0:F2}'}" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Bottom" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Canvas>
+      </ScrollViewer>
+    </Border>
+  </Grid>
+</UserControl>

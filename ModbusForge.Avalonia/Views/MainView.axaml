@@ -66,6 +66,10 @@
         <views:SignalGeneratorView DataContext="{Binding SignalGeneratorViewModel}" />
       </TabItem>
 
+      <TabItem Header="Visual Simulation">
+        <views:VisualNodeEditorView DataContext="{Binding VisualNodeEditorViewModel}" />
+      </TabItem>
+
       <TabItem Header="Holding Registers">
         <DataGrid ItemsSource="{Binding HoldingRegisters}"
                   AutoGenerateColumns="False"

@@ -78,6 +78,15 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.7.9 — Visual Simulation
+
+- **Visual Simulation tab in Avalonia**: Build, edit, and run node-based PLC simulations.
+- **Simulation engine and blocks moved to Core**: Logic gates (AND, OR, NOT, RS), timers (TON, TOF, TP), counters (CTU, CTD, CTC), comparators, math (ADD/SUB/MUL/DIV), and signal generator blocks now run cross-platform.
+- **Node palette and data grid editor**: Add nodes from the palette, edit X/Y and parameters, and wire them together in a connection grid.
+- **Live preview canvas**: Nodes render on a scrollable canvas with current live values.
+- **Run/stop simulation**: The `AvaloniaVisualSimulationService` executes the graph against a local `DataStore` on a 100 ms timer.
+- **`.mfsim` save/load**: Save and load simulation programs as JSON.
+
 ### 2026.7.8 — Scripting & Advanced Functions
 
 - **Avalonia Script Editor**: Create, edit, run, and stop Modbus scripts with a live output log.

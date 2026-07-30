@@ -120,7 +120,7 @@ Avalonia currently contains: main window, connection manager, device scanner, ba
 
 ---
 
-## 2026.7.9 — Visual Simulation
+## 2026.7.9 — Visual Simulation (Completed)
 **Theme:** Port the visual node editor.
 
 - Visual Node Editor (node palette, canvas, wiring, ADD/COMPARE/CONST/POU blocks).
