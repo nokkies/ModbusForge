@@ -15,7 +15,7 @@
       <TextBlock VerticalAlignment="Center" Text="Port:" Margin="16,0,0,0" />
       <TextBlock VerticalAlignment="Center" Text="{Binding ActiveProfile.Port, FallbackValue='502'}" />
       <TextBlock VerticalAlignment="Center" Text="Unit ID:" Margin="16,0,0,0" />
-      <TextBlock VerticalAlignment="Center" Text="{Binding ActiveProfile.UnitId, FallbackValue='1'}" />
+      <NumericUpDown Value="{Binding UnitId}" Minimum="1" Maximum="247" Width="80" />
     </StackPanel>
 
     <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
@@ -27,20 +27,75 @@
       <Button Content="Device Scanner" Click="DeviceScanner_Click" />
       <Button Content="Connect" Command="{Binding ConnectCommand}" />
       <Button Content="Disconnect" Command="{Binding DisconnectCommand}" />
+      <Button Content="Read" Command="{Binding ReadCommand}" />
+      <Button Content="Write" Command="{Binding WriteCommand}" />
+      <CheckBox Content="Continuous Read" IsChecked="{Binding IsContinuousRead}" VerticalAlignment="Center" />
     </StackPanel>
 
-    <TextBlock Grid.Row="3" Text="{Binding StatusMessage}" Margin="0,0,0,8" />
+    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8"
+                IsVisible="{Binding IsRegisterArea}">
+      <TextBlock VerticalAlignment="Center" Text="Type:" />
+      <ComboBox ItemsSource="{Binding RegisterTypes}" SelectedItem="{Binding GlobalType}" Width="80" />
+      <CheckBox Content="Swap Bytes" IsChecked="{Binding SwapBytes}" VerticalAlignment="Center" />
+      <CheckBox Content="Swap Words" IsChecked="{Binding SwapWords}" VerticalAlignment="Center" />
+    </StackPanel>
 
-    <DataGrid Grid.Row="4"
-              ItemsSource="{Binding Registers}"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              GridLinesVisibility="All">
-      <DataGrid.Columns>
-        <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
-        <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="120" />
-        <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="80" />
-      </DataGrid.Columns>
-    </DataGrid>
+    <TextBlock Grid.Row="4" Text="{Binding StatusMessage}" Margin="0,0,0,8" />
+
+    <TabControl Grid.Row="5" SelectedIndex="{Binding SelectedAreaIndex}">
+      <TabItem Header="Holding Registers">
+        <DataGrid ItemsSource="{Binding HoldingRegisters}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  GridLinesVisibility="All">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
+            <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="120" />
+            <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="80" />
+            <DataGridCheckBoxColumn Header="Swap Bytes" Binding="{Binding SwapBytes}" Width="100" />
+            <DataGridCheckBoxColumn Header="Swap Words" Binding="{Binding SwapWords}" Width="100" />
+          </DataGrid.Columns>
+        </DataGrid>
+      </TabItem>
+
+      <TabItem Header="Coils">
+        <DataGrid ItemsSource="{Binding Coils}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  GridLinesVisibility="All">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
+            <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="80" />
+          </DataGrid.Columns>
+        </DataGrid>
+      </TabItem>
+
+      <TabItem Header="Input Registers">
+        <DataGrid ItemsSource="{Binding InputRegisters}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  GridLinesVisibility="All">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
+            <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="120" />
+            <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="80" />
+            <DataGridCheckBoxColumn Header="Swap Bytes" Binding="{Binding SwapBytes}" Width="100" />
+            <DataGridCheckBoxColumn Header="Swap Words" Binding="{Binding SwapWords}" Width="100" />
+          </DataGrid.Columns>
+        </DataGrid>
+      </TabItem>
+
+      <TabItem Header="Discrete Inputs">
+        <DataGrid ItemsSource="{Binding DiscreteInputs}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  GridLinesVisibility="All">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
+            <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="80" />
+          </DataGrid.Columns>
+        </DataGrid>
+      </TabItem>
+    </TabControl>
   </Grid>
 </UserControl>

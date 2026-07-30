@@ -78,7 +78,20 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
-### 2026.7.2 (v6.2.1) - Current Release
+### 2026.7.4 — Avalonia Core Register Operations
+
+- **All four Modbus areas in Avalonia**: Holding registers, input registers, coils, and discrete inputs are now available as tabs with read, continuous read, and write support.
+- **Unit ID switching**: The active Unit ID can be changed directly from the main view and is used for the next read/write.
+- **Data type formatting**: Registers support `uint`, `int`, `real`, and `string` display with optional byte/word swapping.
+- **Single-point writes**: Holding register and coil single writes are available through the new `Write` button.
+
+### 2026.7.3 — Avalonia Foundations
+
+- **Default startup project**: `ModbusForge.Avalonia` is now first in `ModbusForge.sln`.
+- **Cross-platform CI**: Added GitHub Actions workflow to build and test Avalonia on Windows and Linux.
+- **Self-contained publishing**: Validated `win-x64` and `linux-x64` single-file publishes.
+
+### 2026.7.2 (v6.2.1)
 
 - **Auto-updater CalVer fix**: `UpdateService` now normalises 3-part release tags and 4-part assembly versions to a common 4-part form before comparing, so installed builds with `AssemblyVersion=2026.7.1.0` correctly compare against the `v2026.7.1` tag and future CalVer releases.
 - **Added CalVer asset matching tests** for `UpdateService` to ensure the correct `ModbusForge-YYYY.M.INCREMENT-setup.exe` installer is selected from GitHub releases.

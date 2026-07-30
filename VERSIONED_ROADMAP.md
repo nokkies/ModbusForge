@@ -14,7 +14,7 @@ Avalonia currently contains: main window, connection manager, device scanner, ba
 
 ---
 
-## 2026.7.3 — Avalonia Foundations
+## 2026.7.3 — Avalonia Foundations (Completed)
 **Theme:** Cross-platform shell and packaging are solid.
 
 - Align all `.csproj` versions to `2026.7.3`.
@@ -29,7 +29,7 @@ Avalonia currently contains: main window, connection manager, device scanner, ba
 
 ---
 
-## 2026.7.4 — Core Register Operations in Avalonia
+## 2026.7.4 — Core Register Operations in Avalonia (Completed)
 **Theme:** Port the register read/write experience.
 
 - Holding / input registers, coils, discrete inputs.
