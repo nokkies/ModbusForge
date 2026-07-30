@@ -78,6 +78,14 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.7.12 — Release Polish & Cross-Platform Packaging
+
+- **Avalonia is now the primary release artifact** for Windows and Linux.
+- **Windows Avalonia installer**: New `setup/ModbusForge.Avalonia.iss` Inno Setup script builds `ModbusForge-Avalonia-{version}-setup.exe` from the self-contained `publish/avalonia/win-x64` output.
+- **Linux `.tar.gz` packaging**: `publish-avalonia.ps1` now creates `packages/ModbusForge-{version}-linux-x64-avalonia.tar.gz` and `packages/ModbusForge-{version}-win-x64-avalonia.zip` after publishing.
+- **Release pipeline updates**: `.github/workflows/release.yml` now publishes Avalonia for Windows and Linux, packages the artifacts, builds the Avalonia installer, and uploads the `.zip`, `.tar.gz`, checksums, and installer to GitHub Releases.
+- **Version bumped to `2026.7.12`** in all projects.
+
 ### 2026.7.11 — Performance & Reliability
 
 - **Address validation**: New `IModbusAddressValidator` / `ModbusAddressValidator` validates unit ID, start address, and count/range before every Modbus operation. `ModbusTcpService` and `ModbusSerialService` now reject out-of-bounds requests with `ArgumentOutOfRangeException`, and `MainViewModel.CanRead()` disables the read command for invalid ranges.

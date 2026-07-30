@@ -100,6 +100,16 @@ jobs:
             }
           }
 
+      - name: Publish Avalonia (Windows)
+        run: >
+          dotnet publish .\ModbusForge.Avalonia\ModbusForge.Avalonia.csproj -c Release
+          -p:PublishProfile=win-x64
+
+      - name: Publish Avalonia (Linux)
+        run: >
+          dotnet publish .\ModbusForge.Avalonia\ModbusForge.Avalonia.csproj -c Release
+          -p:PublishProfile=linux-x64
+
       - name: Package artifacts (ZIP)
         shell: pwsh
         run: |
@@ -113,6 +123,32 @@ jobs:
         shell: pwsh
         run: |
           $files = Get-ChildItem -Path . -Filter 'ModbusForge-*-win-x64*.zip'
+          foreach ($f in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -Path $f.FullName).Hash.ToLower()
+            $out = "$hash  $($f.Name)"
+            $out | Out-File -FilePath "$($f.FullName).sha256" -Encoding ascii -NoNewline
+          }
+
+      - name: Package Avalonia artifacts
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $avaloniaWin = ".\publish\avalonia\win-x64"
+          $avaloniaLinux = ".\publish\avalonia\linux-x64"
+          New-Item -ItemType Directory -Path .\packages -Force | Out-Null
+
+          Compress-Archive -Path "$avaloniaWin\*" -DestinationPath ".\packages\ModbusForge-$version-win-x64-avalonia.zip" -Force
+
+          $staging = ".\packages\ModbusForge"
+          if (Test-Path $staging) { Remove-Item -Path $staging -Recurse -Force }
+          Copy-Item -Path $avaloniaLinux -Destination $staging -Recurse
+          tar -czf ".\packages\ModbusForge-$version-linux-x64-avalonia.tar.gz" -C .\packages ModbusForge
+          Remove-Item -Path $staging -Recurse -Force
+
+      - name: Generate Avalonia checksums
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path .\packages -Filter 'ModbusForge-*'
           foreach ($f in $files) {
             $hash = (Get-FileHash -Algorithm SHA256 -Path $f.FullName).Hash.ToLower()
             $out = "$hash  $($f.Name)"
@@ -147,6 +183,21 @@ jobs:
           if (Test-Path .\installers) {
             Write-Host "Installer created:"
             Get-ChildItem .\installers\*.exe | Select-Object Name,Length
+          } else {
+            Write-Host "ERROR: installers directory not found!"
+            exit 1
+          }
+
+      - name: Build Avalonia Inno Setup Installer
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $env:PATH += ";${env:ProgramFiles(x86)}\Inno Setup 6"
+          Write-Host "Building Avalonia installer with version $version..."
+          & iscc /DAppVersion=$version setup\ModbusForge.Avalonia.iss
+          if (Test-Path .\installers) {
+            Write-Host "Avalonia installer created:"
+            Get-ChildItem .\installers\*Avalonia*.exe | Select-Object Name,Length
           } else {
             Write-Host "ERROR: installers directory not found!"
             exit 1
@@ -242,8 +293,13 @@ jobs:
             ModbusForge-*-win-x64-sc.zip
             ModbusForge-*-win-x64.zip.sha256
             ModbusForge-*-win-x64-sc.zip.sha256
+            packages/ModbusForge-*-win-x64-avalonia.zip
+            packages/ModbusForge-*-win-x64-avalonia.zip.sha256
+            packages/ModbusForge-*-linux-x64-avalonia.tar.gz
+            packages/ModbusForge-*-linux-x64-avalonia.tar.gz.sha256
             ModbusForge-*-win-x64.msix
             installers/ModbusForge-${{ steps.version.outputs.version }}-setup.exe
+            installers/ModbusForge-Avalonia-${{ steps.version.outputs.version }}-setup.exe
           if-no-files-found: ignore
 
       - name: Create GitHub Release and upload assets
@@ -254,14 +310,20 @@ jobs:
           generate_release_notes: true
           body: |
             Automated release for ${{ github.ref_name }}.
+            The Avalonia build is now the recommended cross-platform entry point.
             See README.md Changelog for details.
           files: |
             ModbusForge-*-win-x64.zip
             ModbusForge-*-win-x64-sc.zip
             ModbusForge-*-win-x64.zip.sha256
             ModbusForge-*-win-x64-sc.zip.sha256
+            packages/ModbusForge-*-win-x64-avalonia.zip
+            packages/ModbusForge-*-win-x64-avalonia.zip.sha256
+            packages/ModbusForge-*-linux-x64-avalonia.tar.gz
+            packages/ModbusForge-*-linux-x64-avalonia.tar.gz.sha256
             ModbusForge-*-win-x64.msix
             installers/ModbusForge-${{ steps.version.outputs.version }}-setup.exe
+            installers/ModbusForge-Avalonia-${{ steps.version.outputs.version }}-setup.exe
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
