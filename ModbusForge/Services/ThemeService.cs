@@ -16,6 +16,11 @@ namespace ModbusForge.Services
             ThemeChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        public void ToggleTheme()
+        {
+            SetTheme(!IsDarkMode);
+        }
+
         public event EventHandler? ThemeChanged;
     }
 }

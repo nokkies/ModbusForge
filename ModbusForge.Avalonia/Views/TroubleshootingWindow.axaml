@@ -1,0 +1,51 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ModbusForge.Avalonia.Views.TroubleshootingWindow"
+        x:CompileBindings="False"
+        Title="Troubleshooting"
+        Width="600"
+        Height="500"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0" Background="DodgerBlue" Padding="20,16">
+      <TextBlock Text="Troubleshooting" FontSize="20" FontWeight="Bold" Foreground="White" />
+    </Border>
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="16">
+      <StackPanel Spacing="12">
+        <Border BorderBrush="Gray" BorderThickness="1" Padding="12" CornerRadius="4">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Connection fails" FontWeight="Bold" FontSize="14" />
+            <TextBlock Text="Verify the IP address / COM port, unit ID, and that the Modbus device is reachable. Try disabling the firewall temporarily for port 502." TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <Border BorderBrush="Gray" BorderThickness="1" Padding="12" CornerRadius="4">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Values do not update" FontWeight="Bold" FontSize="14" />
+            <TextBlock Text="Check that polling is enabled, the start address and count are correct, and the function code matches the register area." TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <Border BorderBrush="Gray" BorderThickness="1" Padding="12" CornerRadius="4">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Charts are empty" FontWeight="Bold" FontSize="14" />
+            <TextBlock Text="Enable the Trend checkbox on a numeric Custom Watch entry and start monitoring. Values appear after the first successful poll." TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <Border BorderBrush="Gray" BorderThickness="1" Padding="12" CornerRadius="4">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Application crashes on startup" FontWeight="Bold" FontSize="14" />
+            <TextBlock Text="Delete the corrupted settings file at %APPDATA%\ModbusForge\settings.json and restart the application." TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+
+    <Border Grid.Row="2" Background="LightGray" Padding="16">
+      <Button Content="Close" HorizontalAlignment="Right" Click="Close_Click" />
+    </Border>
+  </Grid>
+</Window>

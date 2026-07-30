@@ -40,7 +40,7 @@ namespace ModbusForge.Services
                 if (latestVersionRaw == null)
                 {
                     _logger.LogWarning("Could not parse latest release version from GitHub");
-                    return new UpdateCheckResult { ErrorMessage = "Could not determine the latest release version." };
+                    return new UpdateCheckResult { CurrentVersion = currentVersion.ToString(), ErrorMessage = "Could not determine the latest release version." };
                 }
 
                 var currentVersionNormalized = NormalizeVersion(currentVersion);
@@ -56,7 +56,8 @@ namespace ModbusForge.Services
                 return new UpdateCheckResult
                 {
                     IsUpdateAvailable = isUpdateAvailable,
-                    LatestVersion = latestVersionRaw,
+                    CurrentVersion = currentVersion.ToString(),
+                    LatestVersion = latestVersionRaw?.ToString() ?? string.Empty,
                     ReleaseUrl = releaseUrl,
                     ReleaseNotes = releaseNotes,
                     AssetDownloadUrl = assetDownloadUrl
@@ -69,7 +70,7 @@ namespace ModbusForge.Services
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to check for application updates");
-                return new UpdateCheckResult { ErrorMessage = $"Unable to check for updates: {ex.Message}" };
+                return new UpdateCheckResult { CurrentVersion = currentVersion.ToString(), ErrorMessage = $"Unable to check for updates: {ex.Message}" };
             }
         }
 

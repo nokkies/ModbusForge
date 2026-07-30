@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -25,6 +26,12 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly ICustomEntryService? _customEntryService;
         private readonly IFileDialogService? _fileDialogService;
         private readonly IInputDialogService? _inputDialogService;
+        private readonly IMessageBoxService? _messageBoxService;
+        private readonly ISettingsService? _settingsService;
+        private readonly IThemeService? _themeService;
+        private readonly IUpdateService? _updateService;
+        private readonly IWindowService? _windowService;
+        private readonly IApplicationLifetime? _applicationLifetime;
         private readonly ITrendLogger? _trendLogger;
         private CancellationTokenSource? _pollCts;
         private CancellationTokenSource? _customWatchCts;
@@ -146,6 +153,12 @@ namespace ModbusForge.Avalonia.ViewModels
             ICustomEntryService? customEntryService = null,
             IFileDialogService? fileDialogService = null,
             IInputDialogService? inputDialogService = null,
+            IMessageBoxService? messageBoxService = null,
+            ISettingsService? settingsService = null,
+            IThemeService? themeService = null,
+            IUpdateService? updateService = null,
+            IWindowService? windowService = null,
+            IApplicationLifetime? applicationLifetime = null,
             ITrendLogger? trendLogger = null,
             TrendViewModel? trendViewModel = null,
             FrameInspectorViewModel? frameInspectorViewModel = null,
@@ -161,6 +174,12 @@ namespace ModbusForge.Avalonia.ViewModels
             _customEntryService = customEntryService;
             _fileDialogService = fileDialogService;
             _inputDialogService = inputDialogService;
+            _messageBoxService = messageBoxService;
+            _settingsService = settingsService;
+            _themeService = themeService;
+            _updateService = updateService;
+            _windowService = windowService;
+            _applicationLifetime = applicationLifetime;
             _trendLogger = trendLogger;
             TrendViewModel = trendViewModel;
             FrameInspectorViewModel = frameInspectorViewModel;
@@ -187,6 +206,17 @@ namespace ModbusForge.Avalonia.ViewModels
             LoadCustomCommand = new AsyncRelayCommand(LoadCustomAsync, () => CanLoadCustom());
             SaveProjectCommand = new AsyncRelayCommand(SaveProjectAsync, () => CanSaveProject());
             LoadProjectCommand = new AsyncRelayCommand(LoadProjectAsync, () => CanLoadProject());
+
+            OpenPreferencesCommand = new RelayCommand(() => _windowService?.ShowPreferences());
+            OpenAboutCommand = new RelayCommand(() => _windowService?.ShowAbout());
+            OpenHelpCommand = new RelayCommand(() => _windowService?.ShowHelp());
+            OpenKeyboardShortcutsCommand = new RelayCommand(() => _windowService?.ShowKeyboardShortcuts());
+            OpenTroubleshootingCommand = new RelayCommand(() => _windowService?.ShowTroubleshooting());
+            ToggleThemeCommand = new RelayCommand(ToggleTheme);
+            CheckForUpdatesCommand = new AsyncRelayCommand(CheckForUpdatesAsync);
+            ExitCommand = new RelayCommand(() => _applicationLifetime?.Shutdown());
+            ReadShortcutCommand = new RelayCommand(() => ReadCommand.Execute(null));
+            OpenTrendsCommand = new RelayCommand(() => SelectedTabIndex = 0);
 
             _connectionManager.ActiveProfileChanged += ConnectionManager_ActiveProfileChanged;
             _connectionManager.ProfileConnected += ConnectionManager_ProfileConnected;
@@ -218,6 +248,20 @@ namespace ModbusForge.Avalonia.ViewModels
         public IAsyncRelayCommand LoadCustomCommand { get; }
         public IAsyncRelayCommand SaveProjectCommand { get; }
         public IAsyncRelayCommand LoadProjectCommand { get; }
+
+        public ICommand OpenPreferencesCommand { get; }
+        public ICommand OpenAboutCommand { get; }
+        public ICommand OpenHelpCommand { get; }
+        public ICommand OpenKeyboardShortcutsCommand { get; }
+        public ICommand OpenTroubleshootingCommand { get; }
+        public ICommand ToggleThemeCommand { get; }
+        public ICommand CheckForUpdatesCommand { get; }
+        public ICommand ExitCommand { get; }
+        public ICommand ReadShortcutCommand { get; }
+        public ICommand OpenTrendsCommand { get; }
+
+        [ObservableProperty]
+        private int _selectedTabIndex;
 
         partial void OnSelectedAreaChanged(PlcArea value)
         {
@@ -1252,6 +1296,62 @@ namespace ModbusForge.Avalonia.ViewModels
             finally
             {
                 IsBusy = false;
+            }
+        }
+
+        private void ToggleTheme()
+        {
+            _themeService?.ToggleTheme();
+        }
+
+        private async Task CheckForUpdatesAsync()
+        {
+            if (_updateService == null) return;
+
+            try
+            {
+                var result = await _updateService.CheckForUpdateAsync();
+                if (result.IsUpdateAvailable)
+                {
+                    var msg = $"A newer version is available: {result.LatestVersion}\nCurrent: {result.CurrentVersion}\n\nOpen release page?";
+                    if (_messageBoxService != null)
+                    {
+                        var dialogResult = await _messageBoxService.ShowAsync(msg, "Update Available", DialogButton.YesNo, DialogIcon.Question);
+                        if (dialogResult == DialogResult.Yes)
+                        {
+                            OpenUrl(result.ReleaseUrl);
+                        }
+                    }
+                    else
+                    {
+                        StatusMessage = $"Update available: {result.LatestVersion}";
+                    }
+                }
+                else
+                {
+                    StatusMessage = $"Up to date ({result.CurrentVersion}).";
+                    _messageBoxService?.ShowAsync($"You are running the latest version ({result.CurrentVersion}).", "No Update", DialogButton.Ok, DialogIcon.Information).ConfigureAwait(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Update check failed: {ex.Message}";
+                _logger.LogWarning(ex, "Update check failed");
+            }
+        }
+
+        private static void OpenUrl(string url)
+        {
+            try
+            {
+                using var process = new System.Diagnostics.Process();
+                process.StartInfo.UseShellExecute = true;
+                process.StartInfo.FileName = url;
+                process.Start();
+            }
+            catch (Exception)
+            {
+                // ignore
             }
         }
 

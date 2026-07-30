@@ -78,6 +78,15 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.7.10 — Application Shell & Preferences
+
+- **Application menu in Avalonia**: Added File, Edit, View, Tools, and Help menus to `MainView` with Save, Load, Exit, Read/Refresh, Preferences, Toggle Theme, Check for Updates, Help, Keyboard Shortcuts, Troubleshooting, and About commands.
+- **Preferences window**: Full Avalonia port with sections for Connection, Diagnostics, Console, Performance, Application, API (with API key generation), and MQTT. Persists through the existing `SettingsService`.
+- **Help, About, Keyboard Shortcuts, and Troubleshooting windows**: Avalonia windows with content reused from the WPF implementation and core `IHelpContentService`.
+- **Global keyboard shortcuts**: `Ctrl+R` / `F5` read, `Ctrl+T` open Trends, `Ctrl+S` save, `Ctrl+P` preferences, `Ctrl+Q` exit, `F1` help.
+- **Theme toggle**: Added `ToggleTheme()` to `IThemeService` and implementations for WPF and Avalonia.
+- **Auto-updater**: Wired `IUpdateService` into Avalonia; checks GitHub releases for the latest tag and compares to the running version. On a newer release it offers to open the release page; the existing `UpdateService` also supports installer download and silent launch.
+
 ### 2026.7.9 — Visual Simulation
 
 - **Visual Simulation tab in Avalonia**: Build, edit, and run node-based PLC simulations.

@@ -10,9 +10,9 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <AssemblyName>ModbusForge</AssemblyName>
     <RootNamespace>ModbusForge</RootNamespace>
-    <Version>2026.7.9</Version>
-    <AssemblyVersion>2026.7.9</AssemblyVersion>
-    <FileVersion>2026.7.9</FileVersion>
+    <Version>2026.7.10</Version>
+    <AssemblyVersion>2026.7.10</AssemblyVersion>
+    <FileVersion>2026.7.10</FileVersion>
     <LangVersion>12.0</LangVersion>
     <ApplicationIcon>Resources\ModbusForge.ico</ApplicationIcon>
   </PropertyGroup>

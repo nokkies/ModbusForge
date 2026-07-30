@@ -9,6 +9,7 @@ namespace ModbusForge.Services
     {
         bool IsDarkMode { get; }
         void SetTheme(bool isDark);
+        void ToggleTheme();
         event EventHandler? ThemeChanged;
     }
 }

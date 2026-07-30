@@ -62,8 +62,11 @@ namespace ModbusForge.Avalonia
             // File system & file dialogs
             services.AddSingleton<IFileSystem, FileSystem>();
 
-            // Settings and MQTT gateway
+            // Settings, help, update check and window service
             services.AddSingleton<ISettingsService, SettingsService>();
+            services.AddSingleton<IHelpContentService, HelpContentService>();
+            services.AddSingleton<IUpdateService, UpdateService>();
+            services.AddSingleton<IWindowService, AvaloniaWindowService>();
             services.AddSingleton<MqttGatewayService>();
 
             // Device scanner

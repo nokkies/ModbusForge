@@ -132,7 +132,7 @@ Avalonia currently contains: main window, connection manager, device scanner, ba
 
 ---
 
-## 2026.7.10 — Application Shell & Preferences
+## 2026.7.10 — Application Shell & Preferences (Completed)
 **Theme:** Complete the desktop shell and settings.
 
 - Preferences window (theme, polling defaults, MQTT, API server, update checks).

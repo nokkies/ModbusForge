@@ -1,0 +1,53 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+        x:Class="ModbusForge.Avalonia.Views.AboutWindow"
+        x:DataType="vm:AboutViewModel"
+        Title="{Binding Title}"
+        Width="500"
+        Height="460"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0" Background="DodgerBlue" Padding="24,20">
+      <StackPanel HorizontalAlignment="Center">
+        <TextBlock Text="ModbusForge" FontSize="24" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" />
+        <TextBlock Text="{Binding Version}" FontSize="14" Foreground="LightGray" HorizontalAlignment="Center" Margin="0,4,0,0" />
+      </StackPanel>
+    </Border>
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="32,24">
+      <StackPanel Spacing="16">
+        <TextBlock Text="{Binding Description}" TextAlignment="Center" TextWrapping="Wrap" FontSize="14" />
+
+        <Border BorderBrush="Gray" BorderThickness="1" Padding="16" CornerRadius="4">
+          <StackPanel>
+            <TextBlock Text="Created by" FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBlock Text="{Binding Author}" />
+          </StackPanel>
+        </Border>
+
+        <StackPanel Spacing="8">
+          <TextBlock Text="Connect &amp; Support" FontWeight="Bold" />
+          <StackPanel>
+            <TextBlock Text="LinkedIn" Opacity="0.7" />
+            <Button Content="{Binding LinkedInUrl}" Padding="0" HorizontalAlignment="Left" Background="Transparent" Foreground="DodgerBlue" Click="LinkButton_Click" Tag="{Binding LinkedInUrl}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="GitHub" Opacity="0.7" />
+            <Button Content="{Binding GitHubUrl}" Padding="0" HorizontalAlignment="Left" Background="Transparent" Foreground="DodgerBlue" Click="LinkButton_Click" Tag="{Binding GitHubUrl}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Email" Opacity="0.7" />
+            <Button Content="{Binding Email}" Padding="0" HorizontalAlignment="Left" Background="Transparent" Foreground="DodgerBlue" Click="LinkButton_Click" Tag="{Binding Email}" />
+          </StackPanel>
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+
+    <Border Grid.Row="2" Background="LightGray" Padding="24,16">
+      <Button Content="Close" HorizontalAlignment="Right" Click="Close_Click" />
+    </Border>
+  </Grid>
+</Window>

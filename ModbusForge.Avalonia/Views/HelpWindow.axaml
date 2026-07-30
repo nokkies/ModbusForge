@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:ModbusForge.Avalonia.Views"
+        x:Class="ModbusForge.Avalonia.Views.HelpWindow"
+        x:DataType="views:HelpWindow"
+        x:CompileBindings="False"
+        Title="Help"
+        Width="600"
+        Height="500"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0" Background="DodgerBlue" Padding="20,16">
+      <TextBlock Text="Help" FontSize="20" FontWeight="Bold" Foreground="White" />
+    </Border>
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="16">
+      <TextBlock Text="{Binding HelpText}" TextWrapping="Wrap" />
+    </ScrollViewer>
+
+    <Border Grid.Row="2" Background="LightGray" Padding="16">
+      <Button Content="Close" HorizontalAlignment="Right" Click="Close_Click" />
+    </Border>
+  </Grid>
+</Window>

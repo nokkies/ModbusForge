@@ -5,8 +5,36 @@
              x:Class="ModbusForge.Avalonia.Views.MainView"
              x:DataType="vm:MainViewModel">
 
-  <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,Auto,Auto,*">
-    <TextBlock Text="ModbusForge Avalonia" FontSize="24" FontWeight="Bold" Margin="0,0,0,16" Grid.Row="0" />
+  <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*">
+    <DockPanel Grid.Row="0" LastChildFill="False">
+      <Menu DockPanel.Dock="Top">
+        <MenuItem Header="_File">
+          <MenuItem Header="_Save Project" Command="{Binding SaveProjectCommand}" InputGesture="Ctrl+S" />
+          <MenuItem Header="_Load Project" Command="{Binding LoadProjectCommand}" />
+          <Separator />
+          <MenuItem Header="E_xit" Command="{Binding ExitCommand}" InputGesture="Ctrl+Q" />
+        </MenuItem>
+        <MenuItem Header="_Edit">
+          <MenuItem Header="_Read" Command="{Binding ReadShortcutCommand}" InputGesture="Ctrl+R" />
+          <MenuItem Header="_Refresh" Command="{Binding ReadShortcutCommand}" InputGesture="F5" />
+        </MenuItem>
+        <MenuItem Header="_View">
+          <MenuItem Header="_Trends" Command="{Binding OpenTrendsCommand}" InputGesture="Ctrl+T" />
+          <MenuItem Header="_Toggle Theme" Command="{Binding ToggleThemeCommand}" />
+        </MenuItem>
+        <MenuItem Header="_Tools">
+          <MenuItem Header="_Preferences" Command="{Binding OpenPreferencesCommand}" InputGesture="Ctrl+P" />
+          <MenuItem Header="_Check for Updates" Command="{Binding CheckForUpdatesCommand}" />
+        </MenuItem>
+        <MenuItem Header="_Help">
+          <MenuItem Header="_Help" Command="{Binding OpenHelpCommand}" InputGesture="F1" />
+          <MenuItem Header="_Keyboard Shortcuts" Command="{Binding OpenKeyboardShortcutsCommand}" />
+          <MenuItem Header="_Troubleshooting" Command="{Binding OpenTroubleshootingCommand}" />
+          <MenuItem Header="_About ModbusForge" Command="{Binding OpenAboutCommand}" />
+        </MenuItem>
+      </Menu>
+      <TextBlock Text="ModbusForge Avalonia" FontSize="24" FontWeight="Bold" Margin="0,8,0,8" DockPanel.Dock="Top" />
+    </DockPanel>
 
     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
       <TextBlock VerticalAlignment="Center" Text="Active profile:" />
@@ -45,7 +73,7 @@
 
     <TextBlock Grid.Row="4" Text="{Binding StatusMessage}" Margin="0,0,0,8" />
 
-    <TabControl Grid.Row="5" SelectedIndex="{Binding SelectedAreaIndex}">
+    <TabControl Grid.Row="6" SelectedIndex="{Binding SelectedTabIndex}">
       <TabItem Header="Trends">
         <views:TrendView DataContext="{Binding TrendViewModel}" />
       </TabItem>
