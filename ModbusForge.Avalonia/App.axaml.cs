@@ -4,7 +4,9 @@ using global::Avalonia.Controls.ApplicationLifetimes;
 using global::Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using ModbusForge.Avalonia.Services;
+using ModbusForge.Configuration;
 using ModbusForge.Avalonia.ViewModels;
 using ModbusForge.Avalonia.Views;
 using ModbusForge.Services;
@@ -68,8 +70,13 @@ namespace ModbusForge.Avalonia
             // Custom entries
             services.AddSingleton<ICustomEntryService, CustomEntryService>();
 
+            // Trend logging
+            services.Configure<LoggingSettings>(_ => { });
+            services.AddSingleton<ITrendLogger, TrendLoggingService>();
+
             // ViewModels
             services.AddSingleton<MainViewModel>();
+            services.AddSingleton<TrendViewModel>();
 
             return services.BuildServiceProvider();
         }

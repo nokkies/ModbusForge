@@ -25,6 +25,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly ICustomEntryService? _customEntryService;
         private readonly IFileDialogService? _fileDialogService;
         private readonly IInputDialogService? _inputDialogService;
+        private readonly ITrendLogger? _trendLogger;
         private CancellationTokenSource? _pollCts;
         private CancellationTokenSource? _customWatchCts;
         private byte _unitId = 1;
@@ -126,13 +127,17 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public IReadOnlyList<string> CustomAreas { get; } = new[] { "HoldingRegister", "InputRegister", "Coil", "DiscreteInput" };
 
+        public TrendViewModel? TrendViewModel { get; }
+
         public MainViewModel(
             IConnectionManager connectionManager,
             ILogger<MainViewModel> logger,
             IDispatcher dispatcher,
             ICustomEntryService? customEntryService = null,
             IFileDialogService? fileDialogService = null,
-            IInputDialogService? inputDialogService = null)
+            IInputDialogService? inputDialogService = null,
+            ITrendLogger? trendLogger = null,
+            TrendViewModel? trendViewModel = null)
         {
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -140,6 +145,8 @@ namespace ModbusForge.Avalonia.ViewModels
             _customEntryService = customEntryService;
             _fileDialogService = fileDialogService;
             _inputDialogService = inputDialogService;
+            _trendLogger = trendLogger;
+            TrendViewModel = trendViewModel;
 
             ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => CanConnect());
             DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => CanDisconnect());
@@ -312,6 +319,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private void ConnectionManager_ProfileConnected(object? sender, ConnectionProfile e)
         {
             _logger.LogInformation("Profile connected: {Name}", e.Name);
+            _trendLogger?.Start();
             StartPolling();
             StartCustomWatchMonitoring();
         }
@@ -319,6 +327,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private void ConnectionManager_ProfileDisconnected(object? sender, ConnectionProfile e)
         {
             _logger.LogInformation("Profile disconnected: {Name}", e.Name);
+            _trendLogger?.Stop();
             StopPolling();
             StopCustomWatchMonitoring();
         }
@@ -952,6 +961,14 @@ namespace ModbusForge.Avalonia.ViewModels
                                     entry.Value = value;
                                     entry.LastReadUtc = now;
                                 });
+
+                                if (entry.Trend && _trendLogger != null)
+                                {
+                                    if (TryParseTrendValue(value, out var trendValue))
+                                    {
+                                        _trendLogger.Publish(entry.Name, trendValue, now);
+                                    }
+                                }
                             }
                             catch (Exception ex)
                             {
@@ -1043,6 +1060,28 @@ namespace ModbusForge.Avalonia.ViewModels
             }
 
             result = false;
+            return false;
+        }
+
+        private static bool TryParseTrendValue(string? text, out double result)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                result = 0;
+                return false;
+            }
+
+            var trimmed = text.Trim();
+
+            if (double.TryParse(trimmed, NumberStyles.Float, CultureInfo.InvariantCulture, out result))
+                return true;
+
+            if (bool.TryParse(trimmed, out var b))
+            {
+                result = b ? 1 : 0;
+                return true;
+            }
+
             return false;
         }
 
@@ -1175,6 +1214,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 ActiveProfile.PropertyChanged -= ActiveProfile_PropertyChanged;
             }
 
+            _trendLogger?.Stop();
             StopPolling();
             StopCustomWatchMonitoring();
         }

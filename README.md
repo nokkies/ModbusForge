@@ -78,6 +78,13 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.7.6 — Avalonia Trends
+
+- **Live trend chart in Avalonia**: Added a `Trends` tab with a `LiveCharts` Cartesian chart, Start/Stop/Remove/Clear controls, and a color-blind-safe palette.
+- **Trend logging service integration**: `TrendLoggingService` is now registered in the Avalonia app and starts/stops with connection state.
+- **Trend from Custom Watch**: Any custom entry with the `Trend` flag checked publishes its numeric/coil value to the trend chart while monitoring.
+- **Retention and sample-rate control**: Configure how many minutes of data to retain and how fast to sample.
+
 ### 2026.7.5 — Custom Watch & Project Save
 
 - **Avalonia Custom Watch tab**: Add/remove custom tags with name, address, area, type, value, write value, and continuous/monitor/trend flags.

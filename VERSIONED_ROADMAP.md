@@ -52,6 +52,11 @@ Avalonia currently contains: main window, connection manager, device scanner, ba
 ## 2026.7.5 — Custom Watch & Project Save (Completed)
 **Theme:** User-defined tags and project persistence.
 
+- Custom Watch tab in Avalonia.
+- Continuous read/write with per-entry periods.
+- Project save/load (`.mfp`/`.json`).
+- Headless `--custom` JSON support.
+
 - Custom Watch tab (area, type, read/write value, continuous read/write, read period).
 - Per-row trend enable.
 - Project save/load (`.mfp`) including Unit IDs, connections, custom entries.
@@ -62,8 +67,13 @@ Avalonia currently contains: main window, connection manager, device scanner, ba
 
 ---
 
-## 2026.7.6 — Trends & Visualization
+## 2026.7.6 — Trends & Visualization (Completed)
 **Theme:** Real-time charts and export.
+
+- Avalonia `Trends` tab with LiveCharts Cartesian chart.
+- `TrendLoggingService` integrated and auto-started/stopped with connection.
+- Custom Watch entries can trend numeric/coil values.
+- Start/stop, remove, clear, retention, and sample-rate controls.
 
 - Trend view with multiple traces, zoom/pan, retention.
 - CSV and PNG export.

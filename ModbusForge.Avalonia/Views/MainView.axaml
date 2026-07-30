@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+             xmlns:views="clr-namespace:ModbusForge.Avalonia.Views"
              x:Class="ModbusForge.Avalonia.Views.MainView"
              x:DataType="vm:MainViewModel">
 
@@ -45,6 +46,10 @@
     <TextBlock Grid.Row="4" Text="{Binding StatusMessage}" Margin="0,0,0,8" />
 
     <TabControl Grid.Row="5" SelectedIndex="{Binding SelectedAreaIndex}">
+      <TabItem Header="Trends">
+        <views:TrendView DataContext="{Binding TrendViewModel}" />
+      </TabItem>
+
       <TabItem Header="Holding Registers">
         <DataGrid ItemsSource="{Binding HoldingRegisters}"
                   AutoGenerateColumns="False"
