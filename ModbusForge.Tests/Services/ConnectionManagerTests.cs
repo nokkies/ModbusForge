@@ -513,4 +513,48 @@ public class ConnectionManagerTests : IDisposable
         Assert.Equal(5020, loadedProfile.Port);
         Assert.Equal(2, loadedProfile.UnitId);
     }
+
+    [Fact]
+    public async Task ServerProfile_CanStartServerAndClientCanReadAndWrite()
+    {
+        // Arrange
+        var serverProfile = new ConnectionProfile("Server", "127.0.0.1", 1502, 1)
+        {
+            Mode = "Server",
+            ServerUnitIds = "1,2"
+        };
+        var clientProfile = new ConnectionProfile("Client", "127.0.0.1", 1502, 1)
+        {
+            Mode = "Client"
+        };
+
+        _manager.AddProfile(serverProfile);
+        _manager.AddProfile(clientProfile);
+
+        // Act
+        var serverStarted = await _manager.ConnectProfileAsync(serverProfile);
+        Assert.True(serverStarted);
+
+        var clientConnected = await _manager.ConnectProfileAsync(clientProfile);
+        Assert.True(clientConnected);
+
+        var clientService = _manager.GetServiceForProfile(clientProfile);
+        Assert.NotNull(clientService);
+
+        await clientService.WriteSingleRegisterAsync(1, 1, 42);
+
+        var serverService = _manager.GetServiceForProfile(serverProfile);
+        Assert.NotNull(serverService);
+
+        var values = await serverService.ReadHoldingRegistersAsync(1, 1, 1);
+
+        // Assert
+        Assert.NotNull(values);
+        Assert.Single(values);
+        Assert.Equal(42, values[0]);
+
+        // Cleanup
+        await _manager.DisconnectProfileAsync(clientProfile);
+        await _manager.DisconnectProfileAsync(serverProfile);
+    }
 }

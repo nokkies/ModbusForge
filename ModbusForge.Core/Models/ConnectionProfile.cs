@@ -33,6 +33,15 @@ public partial class ConnectionProfile : ObservableObject
     [ObservableProperty]
     private TransportType _transport = TransportType.Tcp;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsServerMode))]
+    private string _mode = "Client";
+
+    [ObservableProperty]
+    private string _serverUnitIds = "1";
+
+    public bool IsServerMode => string.Equals(Mode, "Server", StringComparison.OrdinalIgnoreCase);
+
     // Serial settings
     [ObservableProperty]
     private string _comPort = "COM1";
@@ -87,6 +96,8 @@ public partial class ConnectionProfile : ObservableObject
             Port = Port,
             UnitId = UnitId,
             Transport = Transport,
+            Mode = Mode,
+            ServerUnitIds = ServerUnitIds,
             ComPort = ComPort,
             BaudRate = BaudRate,
             Parity = Parity,

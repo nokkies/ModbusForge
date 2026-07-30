@@ -134,6 +134,66 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public IReadOnlyList<string> CustomAreas { get; } = new[] { "HoldingRegister", "InputRegister", "Coil", "DiscreteInput" };
 
+        public IReadOnlyList<string> Modes { get; } = new[] { "Client", "Server" };
+
+        public ObservableCollection<byte> AvailableUnitIds { get; } = new();
+
+        public string Mode
+        {
+            get => ActiveProfile?.Mode ?? "Client";
+            set
+            {
+                if (ActiveProfile != null && ActiveProfile.Mode != value)
+                {
+                    ActiveProfile.Mode = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsServerMode));
+                    OnPropertyChanged(nameof(ConnectButtonText));
+                    OnPropertyChanged(nameof(AddressLabel));
+                    OnPropertyChanged(nameof(ShowClientFields));
+                    OnPropertyChanged(nameof(ShowServerFields));
+                }
+            }
+        }
+
+        public bool IsServerMode => string.Equals(Mode, "Server", StringComparison.OrdinalIgnoreCase);
+
+        public bool ShowClientFields => !IsServerMode;
+
+        public bool ShowServerFields => IsServerMode;
+
+        public string ConnectButtonText => IsServerMode ? "Start Server" : "Connect";
+
+        public string AddressLabel => IsServerMode ? "Interface:" : "Server:";
+
+        public byte EffectiveUnitId => IsServerMode ? SelectedUnitId : (byte)UnitId;
+
+        public string ServerUnitIds
+        {
+            get => ActiveProfile?.ServerUnitIds ?? "1";
+            set
+            {
+                if (ActiveProfile != null && ActiveProfile.ServerUnitIds != value)
+                {
+                    ActiveProfile.ServerUnitIds = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public byte SelectedUnitId
+        {
+            get => _unitId;
+            set
+            {
+                if (_unitId != value)
+                {
+                    _unitId = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         public TrendViewModel? TrendViewModel { get; }
 
         public FrameInspectorViewModel? FrameInspectorViewModel { get; }
@@ -357,6 +417,21 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 OnPropertyChanged(nameof(UnitId));
             }
+
+            if (e.PropertyName == nameof(ConnectionProfile.Mode))
+            {
+                OnPropertyChanged(nameof(Mode));
+                OnPropertyChanged(nameof(IsServerMode));
+                OnPropertyChanged(nameof(ShowClientFields));
+                OnPropertyChanged(nameof(ShowServerFields));
+                OnPropertyChanged(nameof(ConnectButtonText));
+                OnPropertyChanged(nameof(AddressLabel));
+            }
+
+            if (e.PropertyName == nameof(ConnectionProfile.ServerUnitIds))
+            {
+                OnPropertyChanged(nameof(ServerUnitIds));
+            }
         }
 
         private void ConnectionManager_ActiveProfileChanged(object? sender, ConnectionProfile? e)
@@ -377,6 +452,15 @@ namespace ModbusForge.Avalonia.ViewModels
             OnPropertyChanged(nameof(ActiveProfile));
             OnPropertyChanged(nameof(ActiveService));
             OnPropertyChanged(nameof(UnitId));
+            OnPropertyChanged(nameof(Mode));
+            OnPropertyChanged(nameof(IsServerMode));
+            OnPropertyChanged(nameof(ShowClientFields));
+            OnPropertyChanged(nameof(ShowServerFields));
+            OnPropertyChanged(nameof(ConnectButtonText));
+            OnPropertyChanged(nameof(AddressLabel));
+            OnPropertyChanged(nameof(ServerUnitIds));
+            OnPropertyChanged(nameof(AvailableUnitIds));
+            OnPropertyChanged(nameof(SelectedUnitId));
             OnPropertyChanged(nameof(CanConnect));
             OnPropertyChanged(nameof(CanDisconnect));
             OnPropertyChanged(nameof(CanRead));
@@ -390,12 +474,34 @@ namespace ModbusForge.Avalonia.ViewModels
             ReadCustomEntryCommand.NotifyCanExecuteChanged();
             WriteCustomEntryCommand.NotifyCanExecuteChanged();
 
+            AvailableUnitIds.Clear();
+
             StatusMessage = e != null ? $"Active profile: {e.DisplayName}" : "No active connection profile";
         }
 
         private void ConnectionManager_ProfileConnected(object? sender, ConnectionProfile e)
         {
             _logger.LogInformation("Profile connected: {Name}", e.Name);
+
+            if (e.IsServerMode && _connectionManager.ActiveService is ModbusServerService server)
+            {
+                AvailableUnitIds.Clear();
+
+                foreach (var id in server.GetUnitIds())
+                {
+                    AvailableUnitIds.Add(id);
+                }
+
+                if (AvailableUnitIds.Count > 0)
+                {
+                    SelectedUnitId = AvailableUnitIds[0];
+                }
+
+                OnPropertyChanged(nameof(AvailableUnitIds));
+                OnPropertyChanged(nameof(SelectedUnitId));
+                OnPropertyChanged(nameof(ShowServerFields));
+            }
+
             _trendLogger?.Start();
             StartPolling();
             StartCustomWatchMonitoring();
@@ -479,7 +585,7 @@ namespace ModbusForge.Avalonia.ViewModels
             try
             {
                 IsBusy = true;
-                var unitId = ActiveProfile.UnitId;
+                var unitId = EffectiveUnitId;
 
                 if (SelectedArea == PlcArea.HoldingRegister)
                 {
@@ -591,7 +697,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 return;
             }
 
-            var unitId = ActiveProfile.UnitId;
+            var unitId = EffectiveUnitId;
             var start = StartAddress;
             var count = RegisterCount;
 
@@ -848,7 +954,7 @@ namespace ModbusForge.Avalonia.ViewModels
             var service = ActiveService;
             if (service == null || ActiveProfile == null) return string.Empty;
 
-            var unitId = ActiveProfile.UnitId;
+            var unitId = EffectiveUnitId;
             var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
             var type = (entry.Type ?? "uint").ToLowerInvariant();
 
@@ -890,7 +996,7 @@ namespace ModbusForge.Avalonia.ViewModels
             var service = ActiveService;
             if (service == null || ActiveProfile == null) return false;
 
-            var unitId = ActiveProfile.UnitId;
+            var unitId = EffectiveUnitId;
             var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
             var type = (entry.Type ?? "uint").ToLowerInvariant();
 

@@ -203,17 +203,28 @@ public class ConnectionManager : IConnectionManager
             existing.Dispose();
         }
 
-        IModbusService service = transport switch
+        IModbusService service;
+
+        if (profile.IsServerMode && transport == TransportType.Tcp)
         {
-            TransportType.Rtu or TransportType.Ascii => new ModbusSerialService(
-                _loggerFactory.CreateLogger<ModbusSerialService>(),
-                null,
-                _validationService,
-                null,
-                _addressValidator,
-                transport),
-            _ => new ModbusTcpService(_loggerFactory.CreateLogger<ModbusTcpService>(), null, null, _addressValidator)
-        };
+            service = new ModbusServerService(
+                _loggerFactory.CreateLogger<ModbusServerService>(),
+                null);
+        }
+        else
+        {
+            service = transport switch
+            {
+                TransportType.Rtu or TransportType.Ascii => new ModbusSerialService(
+                    _loggerFactory.CreateLogger<ModbusSerialService>(),
+                    null,
+                    _validationService,
+                    null,
+                    _addressValidator,
+                    transport),
+                _ => new ModbusTcpService(_loggerFactory.CreateLogger<ModbusTcpService>(), null, null, _addressValidator)
+            };
+        }
 
         return _services.AddOrUpdate(profile.Id, service, (_, old) =>
         {

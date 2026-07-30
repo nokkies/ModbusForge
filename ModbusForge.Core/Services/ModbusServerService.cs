@@ -45,6 +45,17 @@ namespace ModbusForge.Services
 
         public virtual bool IsConnected => _isRunning;
 
+        public virtual async Task<bool> ConnectAsync(ConnectionProfile profile, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(profile);
+
+            var unitIds = string.IsNullOrWhiteSpace(profile.ServerUnitIds)
+                ? profile.UnitId.ToString()
+                : profile.ServerUnitIds;
+
+            return await ConnectAsync(profile.IpAddress, profile.Port, unitIds, cancellationToken);
+        }
+
         public virtual async Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1", CancellationToken cancellationToken = default)
         {
             return await Task.Run(() =>
@@ -204,7 +215,7 @@ namespace ModbusForge.Services
             await Task.Run(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null || registerAddress < 1 || registerAddress >= ds.HoldingRegisters.Count)
+                if (ds == null || registerAddress < 0 || registerAddress >= ds.HoldingRegisters.Count)
                     throw new ArgumentOutOfRangeException(nameof(registerAddress));
                 ds.HoldingRegisters[(ushort)registerAddress] = value;
                 _consoleLoggerService?.Log($"Server wrote holding register {registerAddress} = {value} (Unit ID: {unitId})");
@@ -217,7 +228,7 @@ namespace ModbusForge.Services
             await Task.Run(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null || startAddress < 1 || startAddress + values.Length - 1 >= ds.HoldingRegisters.Count)
+                if (ds == null || startAddress < 0 || startAddress + values.Length > ds.HoldingRegisters.Count)
                     throw new ArgumentOutOfRangeException(nameof(startAddress));
 
                 for (int i = 0; i < values.Length; i++)
@@ -242,7 +253,7 @@ namespace ModbusForge.Services
                 var ds = GetDataStore(unitId) ?? GetDataStore(_primaryUnitId);
                 if (ds == null) throw new InvalidOperationException("Data store not initialized");
                 var collection = collectionSelector(ds);
-                if (startAddress < 1 || count < 0 || startAddress + count - 1 > collection.Count)
+                if (startAddress < 0 || count < 0 || startAddress + count > collection.Count)
                     throw new ArgumentOutOfRangeException(nameof(startAddress), $"{resourceName} range out of bounds");
                 var result = new T[count];
                 for (int i = 0; i < count; i++)
@@ -257,7 +268,7 @@ namespace ModbusForge.Services
             return Task.Run(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null || coilAddress < 1 || coilAddress >= ds.CoilDiscretes.Count)
+                if (ds == null || coilAddress < 0 || coilAddress >= ds.CoilDiscretes.Count)
                     throw new ArgumentOutOfRangeException(nameof(coilAddress));
                 ds.CoilDiscretes[(ushort)coilAddress] = value;
                 _consoleLoggerService?.Log($"Server wrote coil {coilAddress} = {(value ? 1 : 0)} (Unit ID: {unitId})");
@@ -270,7 +281,7 @@ namespace ModbusForge.Services
             return await Task.Run<ushort?>(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null || registerAddress < 1 || registerAddress >= ds.HoldingRegisters.Count)
+                if (ds == null || registerAddress < 0 || registerAddress >= ds.HoldingRegisters.Count)
                     throw new ArgumentOutOfRangeException(nameof(registerAddress));
 
                 ushort current = ds.HoldingRegisters[(ushort)registerAddress];
