@@ -4,7 +4,7 @@ Version format: `YYYY.M.INCREMENT`. All `.csproj` files are bumped together.
 
 ## Important: baseline reset to `2026.7.1`
 
-All `.csproj` files are now back at `2026.7.1`. The `v2026.7.2`–`v2026.7.11` tags still exist in history, but they represent premature/fake milestones. This roadmap is now the living **Avalonia = WPF parity plan**. Items will only be marked **Done** when the Avalonia feature works end-to-end. Real versions will resume at `2026.7.12` so we do not overwrite the historical tags.
+The baseline reset occurred at `2026.7.1`. The `v2026.7.2`–`v2026.7.11` tags still exist in history, but they represent premature/fake milestones. This roadmap is now the living **Avalonia = WPF parity plan**. Items will only be marked **Done** when the Avalonia feature works end-to-end. Real versions resumed at `2026.7.12` so we do not overwrite the historical tags.
 
 ## Legend
 
@@ -21,6 +21,7 @@ All `.csproj` files are now back at `2026.7.1`. The `v2026.7.2`–`v2026.7.11` t
 | `2026.7.1` | [x] | WPF / Core / Headless shipped. Baseline reset. |
 | `2026.7.12` | [x] | Avalonia per-area registers (Start/Count, monitoring, inline edit, per-area R/W, Quick Write). |
 | `2026.7.13` | [x] | Avalonia shell navigation, status bar, View toggles, Diagnostics, File/Tools menu parity, and Debug/Console tabs. |
+| `2026.7.14` | [x] | Avalonia Dashboard tab with connection status, quick actions, and recent profile summary. |
 
 The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milestone tracking and should not be treated as real shipped versions. Avalonia parity work will be versioned from `2026.7.12` onward.
 
@@ -37,7 +38,7 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ---
 
-## Main Shell & Navigation — [x] 2026.7.13 core shipped
+## Main Shell & Navigation — [~] Partial (2026.7.14 Dashboard shipped)
 
 | Feature | WPF | Avalonia | Target |
 |---------|-----|----------|--------|
@@ -47,9 +48,9 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 | Debug / Console tabs | Yes | Yes | 2026.7.13 |
 | Connection bar styled card, status indicator, Diagnostics button | Yes | Yes | 2026.7.13 |
 | Main menu: Open Pcap, Import/Export Unit IDs, Save All, Trend export | Yes | Core items | 2026.7.13 |
-| Full AvalonDock docking with 11 documents | Yes | Simple TabControl | 2026.7.14 |
+| Full AvalonDock docking with 11 documents | Yes | Simple TabControl | Future / evaluate |
 | DataGrid context menus (Quick Write, Add to Watch, etc.) | Yes | Yes | 2026.7.12 |
-| Dashboard tab | Yes | No | 2026.7.14 |
+| Dashboard tab | Yes | Yes (core dashboard) | 2026.7.14 |
 
 ### 2026.7.13 shipped subtasks
 - [x] Add left navigation sidebar equivalent for the Avalonia views.
@@ -60,10 +61,10 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 - [x] Add File menu items for Open Pcap, Import/Export Unit IDs, and Save All.
 - [x] Add Options/Tools menu items for Connection Manager, Device Scanner, Script Editor, Advanced Functions placeholder, and Frame Inspector.
 
-### 2026.7.14 subtasks
-- [ ] Add Dashboard tab.
-- [ ] Add DataGrid context menus for Quick Write, Add to Custom Watch, Add to Trend, Copy.
-- [ ] Evaluate/imitate dockable/floatable layout if required.
+### 2026.7.14 shipped subtasks
+- [x] Add Dashboard tab with connection status, quick actions, and recent profiles.
+- [x] Add DataGrid context menus for Quick Write, Add to Custom Watch, Add to Trend, Copy (shipped with 2026.7.12).
+- [x] Evaluate layout parity; retain the cross-platform sidebar plus TabControl while deferring full AvalonDock docking.
 
 ---
 
@@ -230,7 +231,7 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ## Release / Packaging
 
-- [x] Bumped to `2026.7.12` when the per-area register block passed build and tests.
+- [x] Bumped to `2026.7.14` after the Dashboard block passed build and tests.
 - [ ] No `v*` tags or GitHub Releases until parity is reached (per `AGENTS.md`).
 - [ ] Keep `release.yml` on `workflow_dispatch` only until then.
 - [ ] When the next feature block is done and tested, bump to the next available CalVer and commit. `v*` tags can be added after parity is complete.

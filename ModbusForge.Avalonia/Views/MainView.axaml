@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
              xmlns:views="clr-namespace:ModbusForge.Avalonia.Views"
+             xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core"
              x:Class="ModbusForge.Avalonia.Views.MainView"
              x:DataType="vm:MainViewModel">
 
@@ -104,7 +105,7 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="4">
             <TextBlock Text="Navigation" FontSize="16" FontWeight="SemiBold" Margin="4,2,4,8" />
-            <Button Content="Dashboard (coming soon)" IsEnabled="False" HorizontalContentAlignment="Left" />
+            <Button Content="Dashboard" Tag="Dashboard" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
             <Button Content="Trends" Tag="Trend" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
             <Button Content="Frame Inspector" Tag="FrameInspector" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
             <Button Content="MQTT" Tag="Mqtt" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
@@ -125,6 +126,53 @@
       </Border>
 
       <TabControl x:Name="MainTabControl" Grid.Column="1" SelectedIndex="{Binding SelectedTabIndex}">
+      <TabItem x:Name="DashboardTab" Header="Dashboard">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <Grid Margin="8" RowDefinitions="Auto,Auto,Auto,*">
+            <TextBlock Grid.Row="0" Text="Dashboard" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,16" />
+
+            <Border Grid.Row="1" Background="#12000000" CornerRadius="6" Padding="16" Margin="0,0,0,16">
+              <Grid ColumnDefinitions="Auto,*,Auto">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <TextBlock Text="●" Foreground="#2E8B57" IsVisible="{Binding IsConnected}" />
+                  <TextBlock Text="○" Foreground="#777777" IsVisible="{Binding IsDisconnected}" />
+                  <TextBlock Text="●" Foreground="#C62828" IsVisible="{Binding IsConnectionErrorVisible}" />
+                  <TextBlock Text="{Binding ConnectionStatusText}" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="{Binding ActiveProfile.DisplayName, StringFormat='Active profile: {0}', FallbackValue='Active profile: None'}" VerticalAlignment="Center" Margin="16,0" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                  <Button Content="Connect" Command="{Binding ConnectCommand}" />
+                  <Button Content="Disconnect" Command="{Binding DisconnectCommand}" />
+                  <Button Content="Connection Manager" Click="ManageConnections_Click" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Border Grid.Row="2" Background="#12000000" CornerRadius="6" Padding="16" Margin="0,0,0,16">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Quick actions:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <Button Content="Read Holding Registers" Command="{Binding ReadHoldingRegistersCommand}" />
+                <Button Content="Open Script Editor" Click="ScriptEditor_Click" />
+                <Button Content="Open Trends" Command="{Binding OpenTrendsCommand}" />
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Row="3" Background="#12000000" CornerRadius="6" Padding="16">
+              <Grid RowDefinitions="Auto,*">
+                <TextBlock Grid.Row="0" Text="Recent connection profiles" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8" />
+                <ListBox Grid.Row="1" ItemsSource="{Binding ConnectionProfiles}" SelectedItem="{Binding DashboardSelectedProfile, Mode=TwoWay}" BorderBrush="#40000000" BorderThickness="1">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="models:ConnectionProfile">
+                      <TextBlock Text="{Binding DisplayName}" Margin="8,4" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </Grid>
+            </Border>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
       <TabItem x:Name="TrendTab" Header="Trends" IsVisible="{Binding IsTrendTabVisible}">
         <views:TrendView DataContext="{Binding TrendViewModel}" />
       </TabItem>

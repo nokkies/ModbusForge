@@ -44,6 +44,7 @@ namespace ModbusForge.Avalonia.Views
 
             var tab = tag switch
             {
+                "Dashboard" => this.FindControl<TabItem>("DashboardTab"),
                 "Trend" => this.FindControl<TabItem>("TrendTab"),
                 "FrameInspector" => this.FindControl<TabItem>("FrameInspectorTab"),
                 "Mqtt" => this.FindControl<TabItem>("MqttTab"),

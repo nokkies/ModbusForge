@@ -220,6 +220,22 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public ObservableCollection<byte> AvailableUnitIds { get; } = new();
 
+        public ObservableCollection<ConnectionProfile> ConnectionProfiles => _connectionManager.Profiles;
+
+        public ConnectionProfile? DashboardSelectedProfile
+        {
+            get => ActiveProfile;
+            set
+            {
+                if (value != null && !ReferenceEquals(_connectionManager.ActiveProfile, value))
+                {
+                    _connectionManager.SetActiveProfile(value);
+                }
+
+                OnPropertyChanged();
+            }
+        }
+
         public string Mode
         {
             get => ActiveProfile?.Mode ?? "Client";
@@ -367,11 +383,11 @@ namespace ModbusForge.Avalonia.ViewModels
             CheckForUpdatesCommand = new AsyncRelayCommand(CheckForUpdatesAsync);
             ExitCommand = new RelayCommand(() => _applicationLifetime?.Shutdown());
             ReadShortcutCommand = new RelayCommand(() => ReadCommand.Execute(null));
-            OpenTrendsCommand = new RelayCommand(() => SelectedTabIndex = 0);
-            OpenFrameInspectorCommand = new RelayCommand(() => SelectedTabIndex = 1);
+            OpenTrendsCommand = new RelayCommand(() => SelectedTabIndex = 1);
+            OpenFrameInspectorCommand = new RelayCommand(() => SelectedTabIndex = 2);
             OpenPcapCommand = new RelayCommand(() =>
             {
-                SelectedTabIndex = 1;
+                SelectedTabIndex = 2;
                 FrameInspectorViewModel?.ImportPcapCommand.Execute(null);
             });
             ImportUnitIdsCommand = new AsyncRelayCommand(ImportUnitIdsAsync);
@@ -619,22 +635,24 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             if (IsTabIndexVisible(SelectedTabIndex)) return;
 
-            SelectedTabIndex = Enumerable.Range(0, 14).FirstOrDefault(IsTabIndexVisible);
+            SelectedTabIndex = Enumerable.Range(0, 15).FirstOrDefault(IsTabIndexVisible);
         }
 
         private bool IsTabIndexVisible(int index)
         {
             return index switch
             {
-                0 => IsTrendTabVisible,
-                6 => IsRegistersTabVisible,
-                7 => IsCoilsTabVisible,
-                8 => IsInputRegistersTabVisible,
-                9 => IsDiscreteInputsTabVisible,
-                10 => IsCustomWatchTabVisible,
-                11 => IsDecodeTabVisible,
-                12 => IsConsoleTabVisible,
-                13 => IsDebugTabVisible,
+                0 => true,
+                1 => IsTrendTabVisible,
+                6 => IsSimulationTabVisible,
+                7 => IsRegistersTabVisible,
+                8 => IsCoilsTabVisible,
+                9 => IsInputRegistersTabVisible,
+                10 => IsDiscreteInputsTabVisible,
+                11 => IsCustomWatchTabVisible,
+                12 => IsDecodeTabVisible,
+                13 => IsConsoleTabVisible,
+                14 => IsDebugTabVisible,
                 _ => true
             };
         }
@@ -976,6 +994,7 @@ namespace ModbusForge.Avalonia.ViewModels
             }
 
             OnPropertyChanged(nameof(ActiveProfile));
+            OnPropertyChanged(nameof(DashboardSelectedProfile));
             OnPropertyChanged(nameof(ActiveService));
             OnPropertyChanged(nameof(UnitId));
             OnPropertyChanged(nameof(Mode));
