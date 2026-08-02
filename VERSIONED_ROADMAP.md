@@ -20,6 +20,7 @@ All `.csproj` files are now back at `2026.7.1`. The `v2026.7.2`–`v2026.7.11` t
 |---------|-------|-------|
 | `2026.7.1` | [x] | WPF / Core / Headless shipped. Baseline reset. |
 | `2026.7.12` | [x] | Avalonia per-area registers (Start/Count, monitoring, inline edit, per-area R/W, Quick Write). |
+| `2026.7.13` | [x] | Avalonia shell navigation, status bar, View toggles, Diagnostics, File/Tools menu parity, and Debug/Console tabs. |
 
 The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milestone tracking and should not be treated as real shipped versions. Avalonia parity work will be versioned from `2026.7.12` onward.
 
@@ -36,28 +37,28 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ---
 
-## Main Shell & Navigation — [~] In Progress
+## Main Shell & Navigation — [x] 2026.7.13 core shipped
 
 | Feature | WPF | Avalonia | Target |
 |---------|-----|----------|--------|
-| Left NavigationView with icons | Yes | No | 2026.7.13 |
-| Status bar at bottom (status, version, connection) | Yes | Partial (status only) | 2026.7.13 |
-| View menu: dark mode, sim visibility, tab visibility toggles | Yes | Minimal | 2026.7.13 |
-| Debug / Console tabs | Yes | No | 2026.7.13 |
-| Connection bar styled card, status indicator, Diagnostics button | Yes | Partial | 2026.7.13 |
-| Main menu: Open Pcap, Import/Export Unit IDs, Save All, Trend export | Yes | Missing | 2026.7.13 |
+| Left NavigationView with icons | Yes | Sidebar equivalent | 2026.7.13 |
+| Status bar at bottom (status, version, connection) | Yes | Yes | 2026.7.13 |
+| View menu: dark mode, sim visibility, tab visibility toggles | Yes | Yes | 2026.7.13 |
+| Debug / Console tabs | Yes | Yes | 2026.7.13 |
+| Connection bar styled card, status indicator, Diagnostics button | Yes | Yes | 2026.7.13 |
+| Main menu: Open Pcap, Import/Export Unit IDs, Save All, Trend export | Yes | Core items | 2026.7.13 |
 | Full AvalonDock docking with 11 documents | Yes | Simple TabControl | 2026.7.14 |
-| DataGrid context menus (Quick Write, Add to Watch, etc.) | Yes | No | 2026.7.14 |
+| DataGrid context menus (Quick Write, Add to Watch, etc.) | Yes | Yes | 2026.7.12 |
 | Dashboard tab | Yes | No | 2026.7.14 |
 
-### 2026.7.13 subtasks
-- [ ] Add left NavigationView or equivalent with all WPF items.
-- [ ] Add StatusBar at bottom: status, version, connection indicator.
-- [ ] Add View menu with tab visibility toggles, Show All, Reset to Default.
-- [ ] Add Debug and Console tabs/collections.
-- [ ] Add connection status indicator ellipse and Diagnostics button.
-- [ ] Add missing File menu items (Open Pcap, Import/Export Unit IDs, Save All).
-- [ ] Add missing Options/Tools menu items (Connection Manager, Device Scanner, Script Editor, Advanced Functions, Frame Inspector).
+### 2026.7.13 shipped subtasks
+- [x] Add left navigation sidebar equivalent for the Avalonia views.
+- [x] Add status bar with status, version, and connection state.
+- [x] Add View menu with theme/tab toggles, Show All, and Reset to Default.
+- [x] Add Debug and Console tabs/collections.
+- [x] Add connection status indicators and Diagnostics button.
+- [x] Add File menu items for Open Pcap, Import/Export Unit IDs, and Save All.
+- [x] Add Options/Tools menu items for Connection Manager, Device Scanner, Script Editor, Advanced Functions placeholder, and Frame Inspector.
 
 ### 2026.7.14 subtasks
 - [ ] Add Dashboard tab.

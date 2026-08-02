@@ -34,6 +34,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly IApplicationLifetime? _applicationLifetime;
         private readonly ITrendLogger? _trendLogger;
         private CancellationTokenSource? _pollCts;
+        private readonly ObservableCollection<string> _fallbackConsoleMessages = new();
         private CancellationTokenSource? _customWatchCts;
         private DateTime _lastHoldingReadUtc;
         private DateTime _lastInputRegReadUtc;
@@ -230,6 +231,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(IsServerMode));
                     OnPropertyChanged(nameof(ConnectButtonText));
+                    OnPropertyChanged(nameof(ConnectionHeader));
                     OnPropertyChanged(nameof(AddressLabel));
                     OnPropertyChanged(nameof(ShowClientFields));
                     OnPropertyChanged(nameof(ShowServerFields));
@@ -244,6 +246,8 @@ namespace ModbusForge.Avalonia.ViewModels
         public bool ShowServerFields => IsServerMode;
 
         public string ConnectButtonText => IsServerMode ? "Start Server" : "Connect";
+
+        public string ConnectionHeader => IsServerMode ? "Modbus Connection (Server)" : "Modbus Connection (Client)";
 
         public string AddressLabel => IsServerMode ? "Interface:" : "Server:";
 
@@ -364,6 +368,24 @@ namespace ModbusForge.Avalonia.ViewModels
             ExitCommand = new RelayCommand(() => _applicationLifetime?.Shutdown());
             ReadShortcutCommand = new RelayCommand(() => ReadCommand.Execute(null));
             OpenTrendsCommand = new RelayCommand(() => SelectedTabIndex = 0);
+            OpenFrameInspectorCommand = new RelayCommand(() => SelectedTabIndex = 1);
+            OpenPcapCommand = new RelayCommand(() =>
+            {
+                SelectedTabIndex = 1;
+                FrameInspectorViewModel?.ImportPcapCommand.Execute(null);
+            });
+            ImportUnitIdsCommand = new AsyncRelayCommand(ImportUnitIdsAsync);
+            ExportUnitIdsCommand = new AsyncRelayCommand(ExportUnitIdsAsync);
+            SaveAllConfigCommand = new AsyncRelayCommand(SaveProjectAsync);
+            ShowAllTabsCommand = new RelayCommand(ShowAllTabs);
+            ResetTabsCommand = new RelayCommand(ResetTabs);
+            ClearConsoleCommand = new RelayCommand(() => ConsoleMessages.Clear());
+            ClearDebugCommand = new RelayCommand(() => DebugMessages.Clear());
+
+            if (_themeService != null)
+            {
+                _themeService.ThemeChanged += ThemeService_ThemeChanged;
+            }
 
             _connectionManager.ActiveProfileChanged += ConnectionManager_ActiveProfileChanged;
             _connectionManager.ProfileConnected += ConnectionManager_ProfileConnected;
@@ -412,9 +434,215 @@ namespace ModbusForge.Avalonia.ViewModels
         public ICommand ExitCommand { get; }
         public ICommand ReadShortcutCommand { get; }
         public ICommand OpenTrendsCommand { get; }
+        public ICommand OpenFrameInspectorCommand { get; }
+        public ICommand OpenPcapCommand { get; }
+        public IAsyncRelayCommand ImportUnitIdsCommand { get; }
+        public IAsyncRelayCommand ExportUnitIdsCommand { get; }
+        public IAsyncRelayCommand SaveAllConfigCommand { get; }
+        public ICommand ShowAllTabsCommand { get; }
+        public ICommand ResetTabsCommand { get; }
+        public ICommand ClearConsoleCommand { get; }
+        public ICommand ClearDebugCommand { get; }
+
+        public bool IsDarkMode
+        {
+            get => _themeService?.IsDarkMode ?? false;
+            set
+            {
+                if (_themeService != null && _themeService.IsDarkMode != value)
+                {
+                    _themeService.SetTheme(value);
+                }
+
+                OnPropertyChanged();
+            }
+        }
 
         [ObservableProperty]
         private int _selectedTabIndex;
+
+        [ObservableProperty]
+        private bool _isRegistersTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isInputRegistersTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isCoilsTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isDiscreteInputsTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isCustomWatchTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isSimulationTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isDecodeTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isTrendTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isConsoleTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isDebugTabVisible = true;
+
+        [ObservableProperty]
+        private bool _hasConnectionError;
+
+        public ObservableCollection<string> ConsoleMessages { get; } = new();
+
+        public ObservableCollection<string> DebugMessages { get; } = new();
+
+        public string VersionText => $"v{typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "unknown"}";
+
+        public bool IsConnected => ActiveProfile?.IsConnected == true;
+
+        public bool IsDisconnected => !IsConnected && !HasConnectionError;
+
+        public bool IsConnectionErrorVisible => HasConnectionError && !IsConnected;
+
+        public string ConnectionStatusText => IsConnected
+            ? (ActiveProfile?.Status ?? "Connected")
+            : HasConnectionError ? "Connection error" : "Not connected";
+
+        public string DebugSummary => $"Profile: {ActiveProfile?.DisplayName ?? "None"} | " +
+                                      $"Connected: {IsConnected} | Busy: {IsBusy} | " +
+                                      $"Holding: {HoldingRegisters.Count} | Input: {InputRegisters.Count} | " +
+                                      $"Coils: {Coils.Count} | Discrete: {DiscreteInputs.Count}";
+
+        partial void OnStatusMessageChanged(string value)
+        {
+            AppendConsoleMessage(value);
+            AppendDebugMessage($"{DateTime.Now:HH:mm:ss.fff} {value}");
+            OnPropertyChanged(nameof(DebugSummary));
+        }
+
+        partial void OnHasConnectionErrorChanged(bool value)
+        {
+            OnPropertyChanged(nameof(IsDisconnected));
+            OnPropertyChanged(nameof(IsConnectionErrorVisible));
+            OnPropertyChanged(nameof(ConnectionStatusText));
+            OnPropertyChanged(nameof(DebugSummary));
+        }
+
+        partial void OnIsRegistersTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
+        partial void OnIsInputRegistersTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
+        partial void OnIsCoilsTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
+        partial void OnIsDiscreteInputsTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
+        partial void OnIsCustomWatchTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
+        partial void OnIsSimulationTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
+        partial void OnIsDecodeTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
+        partial void OnIsTrendTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
+        partial void OnIsConsoleTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
+        partial void OnIsDebugTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
+
+        private void AppendConsoleMessage(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return;
+
+            ConsoleMessages.Add(message);
+            while (ConsoleMessages.Count > 1000)
+            {
+                ConsoleMessages.RemoveAt(0);
+            }
+        }
+
+        private void AppendDebugMessage(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return;
+
+            DebugMessages.Add(message);
+            while (DebugMessages.Count > 1000)
+            {
+                DebugMessages.RemoveAt(0);
+            }
+        }
+
+        public void ShowAllTabs()
+        {
+            IsRegistersTabVisible = true;
+            IsInputRegistersTabVisible = true;
+            IsCoilsTabVisible = true;
+            IsDiscreteInputsTabVisible = true;
+            IsCustomWatchTabVisible = true;
+            IsSimulationTabVisible = true;
+            IsDecodeTabVisible = true;
+            IsTrendTabVisible = true;
+            IsConsoleTabVisible = true;
+            IsDebugTabVisible = true;
+        }
+
+        public void ResetTabs() => ShowAllTabs();
+
+        public List<string> GetVisibleTabs()
+        {
+            var visibleTabs = new List<string>();
+            if (IsRegistersTabVisible) visibleTabs.Add("Registers");
+            if (IsInputRegistersTabVisible) visibleTabs.Add("InputRegisters");
+            if (IsCoilsTabVisible) visibleTabs.Add("Coils");
+            if (IsDiscreteInputsTabVisible) visibleTabs.Add("DiscreteInputs");
+            if (IsCustomWatchTabVisible) visibleTabs.Add("CustomWatch");
+            if (IsSimulationTabVisible) visibleTabs.Add("Simulation");
+            if (IsDecodeTabVisible) visibleTabs.Add("Decode");
+            if (IsTrendTabVisible) visibleTabs.Add("Trend");
+            if (IsConsoleTabVisible) visibleTabs.Add("Console");
+            if (IsDebugTabVisible) visibleTabs.Add("Debug");
+            return visibleTabs;
+        }
+
+        public void SetVisibleTabs(IReadOnlyCollection<string>? visibleTabs)
+        {
+            if (visibleTabs == null || visibleTabs.Count == 0)
+            {
+                ShowAllTabs();
+                return;
+            }
+
+            IsRegistersTabVisible = visibleTabs.Contains("Registers");
+            IsInputRegistersTabVisible = visibleTabs.Contains("InputRegisters");
+            IsCoilsTabVisible = visibleTabs.Contains("Coils");
+            IsDiscreteInputsTabVisible = visibleTabs.Contains("DiscreteInputs");
+            IsCustomWatchTabVisible = visibleTabs.Contains("CustomWatch");
+            IsSimulationTabVisible = visibleTabs.Contains("Simulation");
+            IsDecodeTabVisible = visibleTabs.Contains("Decode");
+            IsTrendTabVisible = visibleTabs.Contains("Trend");
+            IsConsoleTabVisible = visibleTabs.Contains("Console");
+            IsDebugTabVisible = visibleTabs.Contains("Debug");
+        }
+
+        private void EnsureSelectedTabIsVisible()
+        {
+            if (IsTabIndexVisible(SelectedTabIndex)) return;
+
+            SelectedTabIndex = Enumerable.Range(0, 14).FirstOrDefault(IsTabIndexVisible);
+        }
+
+        private bool IsTabIndexVisible(int index)
+        {
+            return index switch
+            {
+                0 => IsTrendTabVisible,
+                6 => IsRegistersTabVisible,
+                7 => IsCoilsTabVisible,
+                8 => IsInputRegistersTabVisible,
+                9 => IsDiscreteInputsTabVisible,
+                10 => IsCustomWatchTabVisible,
+                11 => IsDecodeTabVisible,
+                12 => IsConsoleTabVisible,
+                13 => IsDebugTabVisible,
+                _ => true
+            };
+        }
+
+        private void ThemeService_ThemeChanged(object? sender, EventArgs e)
+        {
+            OnPropertyChanged(nameof(IsDarkMode));
+        }
 
         partial void OnSelectedAreaChanged(PlcArea value)
         {
@@ -528,6 +756,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         partial void OnIsBusyChanged(bool value)
         {
+            OnPropertyChanged(nameof(DebugSummary));
             ReadHoldingRegistersCommand.NotifyCanExecuteChanged();
             ReadInputRegistersCommand.NotifyCanExecuteChanged();
             ReadCoilsCommand.NotifyCanExecuteChanged();
@@ -673,6 +902,16 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             if (e.PropertyName == nameof(ConnectionProfile.IsConnected))
             {
+                if (ActiveProfile?.IsConnected == true)
+                {
+                    HasConnectionError = false;
+                }
+
+                OnPropertyChanged(nameof(IsConnected));
+                OnPropertyChanged(nameof(IsDisconnected));
+                OnPropertyChanged(nameof(IsConnectionErrorVisible));
+                OnPropertyChanged(nameof(ConnectionStatusText));
+                OnPropertyChanged(nameof(DebugSummary));
                 OnPropertyChanged(nameof(CanConnect));
                 OnPropertyChanged(nameof(CanDisconnect));
                 OnPropertyChanged(nameof(CanRead));
@@ -696,6 +935,7 @@ namespace ModbusForge.Avalonia.ViewModels
             if (e.PropertyName == nameof(ConnectionProfile.Status))
             {
                 StatusMessage = ActiveProfile?.Status ?? "Ready";
+                OnPropertyChanged(nameof(ConnectionStatusText));
             }
 
             if (e.PropertyName == nameof(ConnectionProfile.UnitId))
@@ -710,6 +950,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 OnPropertyChanged(nameof(ShowClientFields));
                 OnPropertyChanged(nameof(ShowServerFields));
                 OnPropertyChanged(nameof(ConnectButtonText));
+                OnPropertyChanged(nameof(ConnectionHeader));
                 OnPropertyChanged(nameof(AddressLabel));
             }
 
@@ -742,6 +983,7 @@ namespace ModbusForge.Avalonia.ViewModels
             OnPropertyChanged(nameof(ShowClientFields));
             OnPropertyChanged(nameof(ShowServerFields));
             OnPropertyChanged(nameof(ConnectButtonText));
+            OnPropertyChanged(nameof(ConnectionHeader));
             OnPropertyChanged(nameof(AddressLabel));
             OnPropertyChanged(nameof(ServerUnitIds));
             OnPropertyChanged(nameof(AvailableUnitIds));
@@ -767,12 +1009,24 @@ namespace ModbusForge.Avalonia.ViewModels
 
             AvailableUnitIds.Clear();
 
+            HasConnectionError = false;
+            OnPropertyChanged(nameof(IsConnected));
+            OnPropertyChanged(nameof(IsDisconnected));
+            OnPropertyChanged(nameof(IsConnectionErrorVisible));
+            OnPropertyChanged(nameof(ConnectionStatusText));
+            OnPropertyChanged(nameof(DebugSummary));
             StatusMessage = e != null ? $"Active profile: {e.DisplayName}" : "No active connection profile";
         }
 
         private void ConnectionManager_ProfileConnected(object? sender, ConnectionProfile e)
         {
             _logger.LogInformation("Profile connected: {Name}", e.Name);
+            HasConnectionError = false;
+            OnPropertyChanged(nameof(IsConnected));
+            OnPropertyChanged(nameof(IsDisconnected));
+            OnPropertyChanged(nameof(IsConnectionErrorVisible));
+            OnPropertyChanged(nameof(ConnectionStatusText));
+            OnPropertyChanged(nameof(DebugSummary));
 
             if (e.IsServerMode && _connectionManager.ActiveService is ModbusServerService server)
             {
@@ -817,6 +1071,7 @@ namespace ModbusForge.Avalonia.ViewModels
             }
             catch (Exception ex)
             {
+                HasConnectionError = true;
                 StatusMessage = $"Connection error: {ex.Message}";
                 _logger.LogError(ex, "Error connecting profile {Name}", ActiveProfile.Name);
             }
@@ -1754,6 +2009,82 @@ namespace ModbusForge.Avalonia.ViewModels
 
         #region Project Save/Load
 
+        private async Task ExportUnitIdsAsync()
+        {
+            if (_fileDialogService == null) return;
+
+            try
+            {
+                var path = await _fileDialogService.ShowSaveFileDialogAsync(
+                    "Export Unit IDs",
+                    "Unit ID list (*.json)|*.json|All files (*.*)|*.*",
+                    "unit-ids.json");
+
+                if (path == null) return;
+
+                var ids = AvailableUnitIds.Count > 0
+                    ? AvailableUnitIds.ToList()
+                    : new List<byte> { (byte)UnitId };
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                await File.WriteAllTextAsync(path, JsonSerializer.Serialize(ids, options));
+                StatusMessage = $"Exported {ids.Count} Unit ID(s) to {Path.GetFileName(path)}.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error exporting Unit IDs");
+                StatusMessage = $"Unit ID export error: {ex.Message}";
+            }
+        }
+
+        private async Task ImportUnitIdsAsync()
+        {
+            if (_fileDialogService == null) return;
+
+            try
+            {
+                var path = await _fileDialogService.ShowOpenFileDialogAsync(
+                    "Import Unit IDs",
+                    "Unit ID list (*.json)|*.json|All files (*.*)|*.*");
+
+                if (path == null) return;
+
+                var json = await File.ReadAllTextAsync(path);
+                var ids = JsonSerializer.Deserialize<List<byte>>(json)?
+                    .Where(id => id is >= 1 and <= 247)
+                    .Distinct()
+                    .OrderBy(id => id)
+                    .ToList();
+
+                if (ids == null || ids.Count == 0)
+                {
+                    StatusMessage = "No valid Unit IDs were found in the selected file.";
+                    return;
+                }
+
+                if (ActiveProfile != null)
+                {
+                    ActiveProfile.ServerUnitIds = string.Join(",", ids);
+                }
+
+                AvailableUnitIds.Clear();
+                foreach (var id in ids)
+                {
+                    AvailableUnitIds.Add(id);
+                }
+
+                SelectedUnitId = ids[0];
+                OnPropertyChanged(nameof(ServerUnitIds));
+                OnPropertyChanged(nameof(AvailableUnitIds));
+                OnPropertyChanged(nameof(SelectedUnitId));
+                StatusMessage = $"Imported {ids.Count} Unit ID(s) from {Path.GetFileName(path)}.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error importing Unit IDs");
+                StatusMessage = $"Unit ID import error: {ex.Message}";
+            }
+        }
+
         private async Task SaveProjectAsync()
         {
             if (_fileDialogService == null) return;
@@ -1929,6 +2260,10 @@ namespace ModbusForge.Avalonia.ViewModels
             _connectionManager.ActiveProfileChanged -= ConnectionManager_ActiveProfileChanged;
             _connectionManager.ProfileConnected -= ConnectionManager_ProfileConnected;
             _connectionManager.ProfileDisconnected -= ConnectionManager_ProfileDisconnected;
+            if (_themeService != null)
+            {
+                _themeService.ThemeChanged -= ThemeService_ThemeChanged;
+            }
 
             if (ActiveProfile != null)
             {

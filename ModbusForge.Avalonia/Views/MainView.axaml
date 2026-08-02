@@ -5,12 +5,17 @@
              x:Class="ModbusForge.Avalonia.Views.MainView"
              x:DataType="vm:MainViewModel">
 
-  <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,Auto,Auto,*">
+  <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
     <DockPanel Grid.Row="0" LastChildFill="False">
       <Menu DockPanel.Dock="Top">
         <MenuItem Header="_File">
           <MenuItem Header="_Save Project" Command="{Binding SaveProjectCommand}" InputGesture="Ctrl+S" />
           <MenuItem Header="_Load Project" Command="{Binding LoadProjectCommand}" />
+          <MenuItem Header="Open _Pcap..." Command="{Binding OpenPcapCommand}" />
+          <Separator />
+          <MenuItem Header="_Import Unit IDs..." Command="{Binding ImportUnitIdsCommand}" />
+          <MenuItem Header="_Export Unit IDs..." Command="{Binding ExportUnitIdsCommand}" />
+          <MenuItem Header="_Save All..." Command="{Binding SaveAllConfigCommand}" InputGesture="Ctrl+Shift+S" />
           <Separator />
           <MenuItem Header="E_xit" Command="{Binding ExitCommand}" InputGesture="Ctrl+Q" />
         </MenuItem>
@@ -19,11 +24,31 @@
           <MenuItem Header="_Refresh" Command="{Binding ReadShortcutCommand}" InputGesture="F5" />
         </MenuItem>
         <MenuItem Header="_View">
+          <MenuItem Header="_Dark Mode" ToggleType="CheckBox" IsChecked="{Binding IsDarkMode, Mode=TwoWay}" />
           <MenuItem Header="_Trends" Command="{Binding OpenTrendsCommand}" InputGesture="Ctrl+T" />
-          <MenuItem Header="_Toggle Theme" Command="{Binding ToggleThemeCommand}" />
+          <MenuItem Header="_Frame Inspector" Command="{Binding OpenFrameInspectorCommand}" />
+          <Separator />
+          <MenuItem Header="_Registers" ToggleType="CheckBox" IsChecked="{Binding IsRegistersTabVisible}" />
+          <MenuItem Header="_Input Registers" ToggleType="CheckBox" IsChecked="{Binding IsInputRegistersTabVisible}" />
+          <MenuItem Header="_Coils" ToggleType="CheckBox" IsChecked="{Binding IsCoilsTabVisible}" />
+          <MenuItem Header="_Discrete Inputs" ToggleType="CheckBox" IsChecked="{Binding IsDiscreteInputsTabVisible}" />
+          <MenuItem Header="_Custom Watch" ToggleType="CheckBox" IsChecked="{Binding IsCustomWatchTabVisible}" />
+          <MenuItem Header="_Simulation" ToggleType="CheckBox" IsChecked="{Binding IsSimulationTabVisible}" />
+          <MenuItem Header="_Decode (not yet ported)" ToggleType="CheckBox" IsChecked="{Binding IsDecodeTabVisible}" />
+          <MenuItem Header="_Trend" ToggleType="CheckBox" IsChecked="{Binding IsTrendTabVisible}" />
+          <MenuItem Header="_Console" ToggleType="CheckBox" IsChecked="{Binding IsConsoleTabVisible}" />
+          <MenuItem Header="_Debug" ToggleType="CheckBox" IsChecked="{Binding IsDebugTabVisible}" />
+          <Separator />
+          <MenuItem Header="_Show All" Command="{Binding ShowAllTabsCommand}" />
+          <MenuItem Header="_Reset to Default" Command="{Binding ResetTabsCommand}" />
         </MenuItem>
         <MenuItem Header="_Tools">
           <MenuItem Header="_Preferences" Command="{Binding OpenPreferencesCommand}" InputGesture="Ctrl+P" />
+          <MenuItem Header="_Connection Manager..." Click="ManageConnections_Click" />
+          <MenuItem Header="_Device Scanner..." Click="DeviceScanner_Click" />
+          <MenuItem Header="_Script Editor..." Click="ScriptEditor_Click" InputGesture="Ctrl+E" />
+          <MenuItem Header="_Advanced Functions (not yet ported)" IsEnabled="False" />
+          <MenuItem Header="_Frame Inspector..." Command="{Binding OpenFrameInspectorCommand}" />
           <MenuItem Header="_Check for Updates" Command="{Binding CheckForUpdatesCommand}" />
         </MenuItem>
         <MenuItem Header="_Help">
@@ -62,34 +87,69 @@
       <Button Content="Load Project" Command="{Binding LoadProjectCommand}" />
     </StackPanel>
 
-    <TextBlock Grid.Row="3" Text="{Binding StatusMessage}" Margin="0,0,0,8" />
+    <Border Grid.Row="3" Background="#12000000" CornerRadius="4" Padding="10" Margin="0,0,0,8">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Text="{Binding ConnectionHeader}" FontWeight="SemiBold" />
+        <TextBlock Text="●" Foreground="#2E8B57" IsVisible="{Binding IsConnected}" />
+        <TextBlock Text="●" Foreground="#C62828" IsVisible="{Binding IsConnectionErrorVisible}" />
+        <TextBlock Text="○" Foreground="#777777" IsVisible="{Binding IsDisconnected}" />
+        <TextBlock Text="{Binding ConnectionStatusText}" />
+        <TextBlock Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" />
+        <Button Content="Diagnostics" Command="{Binding OpenTroubleshootingCommand}" />
+      </StackPanel>
+    </Border>
 
-    <TabControl Grid.Row="4" SelectedIndex="{Binding SelectedTabIndex}">
-      <TabItem Header="Trends">
+    <Grid Grid.Row="4" ColumnDefinitions="190,*">
+      <Border Grid.Column="0" BorderBrush="#40000000" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,12,0">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Navigation" FontSize="16" FontWeight="SemiBold" Margin="4,2,4,8" />
+            <Button Content="Dashboard (coming soon)" IsEnabled="False" HorizontalContentAlignment="Left" />
+            <Button Content="Trends" Tag="Trend" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+            <Button Content="Frame Inspector" Tag="FrameInspector" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+            <Button Content="MQTT" Tag="Mqtt" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+            <Button Content="Script Editor" Tag="ScriptEditor" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+            <Button Content="Signal Generator" Tag="SignalGenerator" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+            <Button Content="Visual Simulation" Tag="Simulation" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+            <Separator />
+            <Button Content="Registers" Tag="Registers" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+            <Button Content="Input Registers" Tag="InputRegisters" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+            <Button Content="Coils" Tag="Coils" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+            <Button Content="Discrete Inputs" Tag="DiscreteInputs" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+            <Button Content="Custom Watch" Tag="CustomWatch" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+            <Button Content="Decode" Tag="Decode" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+            <Button Content="Console" Tag="Console" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+            <Button Content="Debug" Tag="Debug" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+
+      <TabControl x:Name="MainTabControl" Grid.Column="1" SelectedIndex="{Binding SelectedTabIndex}">
+      <TabItem x:Name="TrendTab" Header="Trends" IsVisible="{Binding IsTrendTabVisible}">
         <views:TrendView DataContext="{Binding TrendViewModel}" />
       </TabItem>
 
-      <TabItem Header="Frame Inspector">
+      <TabItem x:Name="FrameInspectorTab" Header="Frame Inspector">
         <views:FrameInspectorView DataContext="{Binding FrameInspectorViewModel}" />
       </TabItem>
 
-      <TabItem Header="MQTT">
+      <TabItem x:Name="MqttTab" Header="MQTT">
         <views:MqttView DataContext="{Binding MqttViewModel}" />
       </TabItem>
 
-      <TabItem Header="Script Editor">
+      <TabItem x:Name="ScriptEditorTab" Header="Script Editor">
         <views:ScriptEditorView DataContext="{Binding ScriptEditorViewModel}" />
       </TabItem>
 
-      <TabItem Header="Signal Generator">
+      <TabItem x:Name="SignalGeneratorTab" Header="Signal Generator">
         <views:SignalGeneratorView DataContext="{Binding SignalGeneratorViewModel}" />
       </TabItem>
 
-      <TabItem Header="Visual Simulation">
+      <TabItem x:Name="SimulationTab" Header="Visual Simulation" IsVisible="{Binding IsSimulationTabVisible}">
         <views:VisualNodeEditorView DataContext="{Binding VisualNodeEditorViewModel}" />
       </TabItem>
 
-      <TabItem Header="Holding Registers">
+      <TabItem x:Name="RegistersTab" Header="Holding Registers" IsVisible="{Binding IsRegistersTabVisible}">
         <Grid RowDefinitions="Auto,*">
           <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
             <TextBlock VerticalAlignment="Center" Text="Start:" />
@@ -132,7 +192,7 @@
         </Grid>
       </TabItem>
 
-      <TabItem Header="Coils">
+      <TabItem x:Name="CoilsTab" Header="Coils" IsVisible="{Binding IsCoilsTabVisible}">
         <Grid RowDefinitions="Auto,*">
           <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
             <TextBlock VerticalAlignment="Center" Text="Start:" />
@@ -168,7 +228,7 @@
         </Grid>
       </TabItem>
 
-      <TabItem Header="Input Registers">
+      <TabItem x:Name="InputRegistersTab" Header="Input Registers" IsVisible="{Binding IsInputRegistersTabVisible}">
         <Grid RowDefinitions="Auto,*">
           <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
             <TextBlock VerticalAlignment="Center" Text="Start:" />
@@ -209,7 +269,7 @@
         </Grid>
       </TabItem>
 
-      <TabItem Header="Discrete Inputs">
+      <TabItem x:Name="DiscreteInputsTab" Header="Discrete Inputs" IsVisible="{Binding IsDiscreteInputsTabVisible}">
         <Grid RowDefinitions="Auto,*">
           <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
             <TextBlock VerticalAlignment="Center" Text="Start:" />
@@ -243,7 +303,7 @@
         </Grid>
       </TabItem>
 
-      <TabItem Header="Custom Watch">
+      <TabItem x:Name="CustomWatchTab" Header="Custom Watch" IsVisible="{Binding IsCustomWatchTabVisible}">
         <Grid RowDefinitions="Auto,*" Margin="0,0,0,0">
           <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
             <Button Content="Add" Command="{Binding AddCustomEntryCommand}" />
@@ -276,6 +336,49 @@
           </DataGrid>
         </Grid>
       </TabItem>
+
+      <TabItem x:Name="DecodeTab" Header="Decode" IsVisible="{Binding IsDecodeTabVisible}">
+        <Border BorderBrush="#40000000" BorderThickness="1" Padding="16">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Decode" FontSize="20" FontWeight="SemiBold" />
+            <TextBlock Text="The decoder view is planned for a later Avalonia parity milestone." TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+      </TabItem>
+
+      <TabItem x:Name="ConsoleTab" Header="Console" IsVisible="{Binding IsConsoleTabVisible}">
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+            <Button Content="Clear" Command="{Binding ClearConsoleCommand}" />
+            <TextBlock VerticalAlignment="Center" Text="Runtime status and operation messages" />
+          </StackPanel>
+          <ListBox Grid.Row="1" ItemsSource="{Binding ConsoleMessages}" />
+        </Grid>
+      </TabItem>
+
+      <TabItem x:Name="DebugTab" Header="Debug" IsVisible="{Binding IsDebugTabVisible}">
+        <Grid RowDefinitions="Auto,Auto,*">
+          <TextBlock Grid.Row="0" Text="Debug information" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,8" />
+          <TextBlock Grid.Row="1" Text="{Binding DebugSummary}" TextWrapping="Wrap" Margin="0,0,0,8" />
+          <Grid Grid.Row="2" RowDefinitions="Auto,*">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+              <Button Content="Clear" Command="{Binding ClearDebugCommand}" />
+              <TextBlock VerticalAlignment="Center" Text="Recent view-model events" />
+            </StackPanel>
+            <ListBox Grid.Row="1" ItemsSource="{Binding DebugMessages}" />
+          </Grid>
+        </Grid>
+      </TabItem>
     </TabControl>
   </Grid>
+
+  <Border Grid.Row="5" Background="#12000000" CornerRadius="4" Padding="8" Margin="0,8,0,0">
+    <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+      <TextBlock Grid.Column="0" Text="ModbusForge" FontWeight="SemiBold" />
+      <TextBlock Grid.Column="1" Text="{Binding VersionText}" Margin="12,0,0,0" />
+      <TextBlock Grid.Column="2" Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" Margin="16,0,0,0" />
+      <TextBlock Grid.Column="3" Text="{Binding ConnectionStatusText}" Margin="16,0,0,0" />
+    </Grid>
+  </Border>
+</Grid>
 </UserControl>

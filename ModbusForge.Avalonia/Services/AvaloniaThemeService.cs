@@ -1,4 +1,6 @@
 using System;
+using global::Avalonia;
+using global::Avalonia.Styling;
 using ModbusForge.Services;
 
 namespace ModbusForge.Avalonia.Services
@@ -8,11 +10,19 @@ namespace ModbusForge.Avalonia.Services
     /// </summary>
     public sealed class AvaloniaThemeService : IThemeService
     {
-        public bool IsDarkMode => false;
+        public bool IsDarkMode => _isDarkMode;
 
         public void SetTheme(bool isDark)
         {
             _isDarkMode = isDark;
+
+            if (Application.Current != null)
+            {
+                Application.Current.RequestedThemeVariant = isDark
+                    ? ThemeVariant.Dark
+                    : ThemeVariant.Light;
+            }
+
             ThemeChanged?.Invoke(this, EventArgs.Empty);
         }
 
