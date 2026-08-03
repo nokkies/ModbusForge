@@ -502,6 +502,8 @@ namespace ModbusForge.Avalonia.ViewModels
             StatusMessage = ActiveProfile != null
                 ? $"Active profile: {ActiveProfile.DisplayName}"
                 : "No active connection profile";
+
+            ShowAllTabs();
         }
 
         public IAsyncRelayCommand ConnectCommand { get; }
