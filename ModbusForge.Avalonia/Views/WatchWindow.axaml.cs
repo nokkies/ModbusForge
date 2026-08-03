@@ -1,12 +1,14 @@
 using System;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using ModbusForge.Avalonia.Services;
 using ModbusForge.Avalonia.ViewModels;
 using ModbusForge.Services;
 
 namespace ModbusForge.Avalonia.Views
 {
-    public partial class WatchWindow : Window
+    public partial class WatchWindow : Window, IDockableTool
     {
         private WatchViewModel? _viewModel;
         private readonly IRegisterTemplateImportService? _registerTemplateImportService;
@@ -15,6 +17,9 @@ namespace ModbusForge.Avalonia.Views
         private readonly IFileSystem? _fileSystem;
         private readonly IMessageBoxService? _messageBoxService;
         private bool _initialized;
+        private Control? _content;
+        private Button? _dockToggleButton;
+        private Action? _toggleDockCallback;
 
         public WatchWindow()
         {
@@ -59,7 +64,30 @@ namespace ModbusForge.Avalonia.Views
         private void InitializeComponent()
         {
             AvaloniaXamlLoader.Load(this);
+            _content = this.Content as Control;
+            _dockToggleButton = this.FindControl<Button>("DockToggleButton");
         }
+
+        public Action? ToggleDockCallback
+        {
+            get => _toggleDockCallback;
+            set => _toggleDockCallback = value;
+        }
+
+        public void SetDocked(bool isDocked)
+        {
+            if (_dockToggleButton != null)
+            {
+                _dockToggleButton.Content = isDocked ? "Float" : "Dock";
+            }
+        }
+
+        private void DockToggleButton_Click(object? sender, RoutedEventArgs e)
+        {
+            _toggleDockCallback?.Invoke();
+        }
+
+        private Window GetDialogOwner() => TopLevel.GetTopLevel(_content) as Window ?? this;
 
         protected override void OnDataContextChanged(EventArgs e)
         {
@@ -118,7 +146,7 @@ namespace ModbusForge.Avalonia.Views
                     _messageBoxService,
                     selectionMode: true);
                 var browser = new TagBrowserWindow(browserViewModel);
-                var accepted = await browser.ShowDialog<bool?>(this);
+                var accepted = await browser.ShowDialog<bool?>(GetDialogOwner());
                 if (accepted == true && browserViewModel.SelectedTag != null)
                     _viewModel.AddTag(browserViewModel.SelectedTag.Id);
             }

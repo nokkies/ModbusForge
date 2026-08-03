@@ -1,9 +1,11 @@
+using global::Avalonia;
 using global::Avalonia.Controls;
 using global::Avalonia.Input;
 using global::Avalonia.Interactivity;
 using global::Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using ModbusForge.Avalonia.Services;
 using ModbusForge.Avalonia.ViewModels;
 using ModbusForge.Models;
 using ModbusForge.Services;
@@ -34,6 +36,17 @@ namespace ModbusForge.Avalonia.Views
             _inputRegistersGrid = this.FindControl<DataGrid>("InputRegistersGrid");
             _discreteInputsGrid = this.FindControl<DataGrid>("DiscreteInputsGrid");
             _mainTabControl = this.FindControl<TabControl>("MainTabControl");
+        }
+
+        protected override void OnAttachedToVisualTree(global::Avalonia.VisualTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToVisualTree(e);
+
+            if (global::Avalonia.Application.Current is App app)
+            {
+                var host = app.Services?.GetService<AvaloniaDockingHost>();
+                host?.SetMainView(this);
+            }
         }
 
         private MainViewModel? ViewModel => DataContext as MainViewModel;
@@ -402,30 +415,6 @@ namespace ModbusForge.Avalonia.Views
 
         #endregion
 
-        private void ManageConnections_Click(object? sender, RoutedEventArgs e)
-        {
-            var app = global::Avalonia.Application.Current as App;
-            if (app?.Services == null) return;
-
-            var connectionManager = app.Services.GetRequiredService<IConnectionManager>();
-            var dispatcher = app.Services.GetRequiredService<ModbusForge.Services.IDispatcher>();
-
-            var window = new ConnectionManagerWindow
-            {
-                DataContext = new ConnectionManagerViewModel(connectionManager, dispatcher)
-            };
-
-            var topLevel = global::Avalonia.Controls.TopLevel.GetTopLevel(this);
-            if (topLevel is global::Avalonia.Controls.Window owner)
-            {
-                _ = window.ShowDialog(owner);
-            }
-            else
-            {
-                window.Show();
-            }
-        }
-
         private void AdvancedFunctions_Click(object? sender, RoutedEventArgs e)
         {
             var app = global::Avalonia.Application.Current as App;
@@ -447,18 +436,6 @@ namespace ModbusForge.Avalonia.Views
                 _ = window.ShowDialog(owner);
             else
                 window.Show();
-        }
-
-        private void TagBrowser_Click(object? sender, RoutedEventArgs e)
-        {
-            var app = global::Avalonia.Application.Current as App;
-            app?.Services?.GetRequiredService<ITagWindowService>().ShowTagBrowser();
-        }
-
-        private void WatchWindow_Click(object? sender, RoutedEventArgs e)
-        {
-            var app = global::Avalonia.Application.Current as App;
-            app?.Services?.GetRequiredService<ITagWindowService>().ShowWatchWindow();
         }
 
         private void DeviceScanner_Click(object? sender, RoutedEventArgs e)

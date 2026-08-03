@@ -1,8 +1,10 @@
+// Test
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
@@ -14,7 +16,10 @@ namespace ModbusForge.Avalonia.Views
     public partial class VisualNodeEditorView : UserControl
     {
         private const string PaletteDragFormat = "ModbusForge.VisualNodeType";
+        private const string TagDragFormat = "ModbusForge.Avalonia.Tag";
+        private const string TagDragTextPrefix = "MF|Tag|";
         private const double DragThreshold = 4.0;
+        private const double PortHitTolerance = 24.0;
 
         private Canvas? _nodeCanvas;
         private IReadOnlyList<VisualNode> _draggedNodes = Array.Empty<VisualNode>();
@@ -28,13 +33,41 @@ namespace ModbusForge.Avalonia.Views
         private IPointer? _palettePointer;
         private bool _paletteDragStarted;
 
+        private bool _isMarqueeActive;
+        private Point _marqueeStartPoint;
+        private IPointer? _marqueePointer;
+
+        private bool _isConnecting;
+        private VisualNode? _connectionSourceNode;
+        private string _connectionSourceConnector = string.Empty;
+        private IPointer? _connectionPointer;
+        private Line? _tempConnectionLine;
+
+        private const string ProgramTreeDragFormat = "ModbusForge.ProgramTreeItem";
+
+        private IProgramTreeItem? _treeDragItem;
+        private Point _treeDragStart;
+        private IPointer? _treeDragPointer;
+        private bool _treeDragStarted;
+
+        private TreeView? _programTreeView;
+
         public VisualNodeEditorView()
         {
             InitializeComponent();
             _nodeCanvas = this.FindControl<Canvas>("NodeCanvas");
+            _tempConnectionLine = this.FindControl<Line>("TempConnectionLine");
+            _programTreeView = this.FindControl<TreeView>("ProgramTreeView");
             AddHandler(KeyDownEvent, View_KeyDown, RoutingStrategies.Tunnel);
             _nodeCanvas?.AddHandler(DragDrop.DragOverEvent, Canvas_DragOver, RoutingStrategies.Bubble);
             _nodeCanvas?.AddHandler(DragDrop.DropEvent, Canvas_Drop, RoutingStrategies.Bubble);
+
+            if (_programTreeView != null)
+            {
+                _programTreeView.AddHandler(PointerPressedEvent, TreeView_PointerPressed, RoutingStrategies.Tunnel);
+                _programTreeView.AddHandler(PointerMovedEvent, TreeView_PointerMoved, RoutingStrategies.Bubble);
+                _programTreeView.AddHandler(PointerReleasedEvent, TreeView_PointerReleased, RoutingStrategies.Bubble, handledEventsToo: true);
+            }
         }
 
         private VisualNodeEditorViewModel? ViewModel => DataContext as VisualNodeEditorViewModel;
@@ -46,44 +79,353 @@ namespace ModbusForge.Avalonia.Views
 
         private void Canvas_PointerPressed(object? sender, PointerPressedEventArgs e)
         {
-            if (e.Source == sender && ViewModel != null)
+            if (e.Source != sender || ViewModel == null || _nodeCanvas == null)
+            {
+                return;
+            }
+
+            if (_isConnecting)
+            {
+                CancelConnectionDrag();
+                ViewModel.SelectedConnection = null;
+                e.Handled = true;
+                return;
+            }
+
+            if (ViewModel.IsConnectMode)
+            {
+                ViewModel.CancelConnectCommand.Execute(null);
+            }
+
+            ViewModel.SelectedConnection = null;
+
+            var point = e.GetCurrentPoint(_nodeCanvas);
+            if (!point.Properties.IsLeftButtonPressed)
             {
                 ViewModel.ClearSelection();
+                e.Handled = true;
+                return;
+            }
+
+            var extendSelection = (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Shift)) != 0;
+            var zoom = Math.Max(ViewModel.ZoomLevel, 0.01);
+            var position = point.Position;
+            var logicalPosition = new Point(position.X / zoom, position.Y / zoom);
+
+            _isMarqueeActive = true;
+            _marqueeStartPoint = logicalPosition;
+            _marqueePointer = e.Pointer;
+            e.Pointer.Capture(_nodeCanvas);
+
+            ViewModel.StartMarquee(logicalPosition.X, logicalPosition.Y, extendSelection);
+            e.Handled = true;
+        }
+
+        private void Canvas_PointerMoved(object? sender, PointerEventArgs e)
+        {
+            if (_isConnecting && _connectionSourceNode != null && _connectionPointer == e.Pointer
+                && _tempConnectionLine != null && _nodeCanvas != null && ViewModel != null)
+            {
+                var start = GetPortPosition(_connectionSourceNode, _connectionSourceConnector);
+                var connectionPoint = e.GetPosition(_nodeCanvas);
+                var connectionZoom = Math.Max(ViewModel.ZoomLevel, 0.01);
+                var end = new Point(connectionPoint.X / connectionZoom, connectionPoint.Y / connectionZoom);
+
+                _tempConnectionLine.StartPoint = start;
+                _tempConnectionLine.EndPoint = end;
+                e.Handled = true;
+                return;
+            }
+
+            if (!_isMarqueeActive || ViewModel == null || _marqueePointer != e.Pointer || _nodeCanvas == null)
+            {
+                return;
+            }
+
+            if (!e.GetCurrentPoint(_nodeCanvas).Properties.IsLeftButtonPressed)
+            {
+                FinishMarquee(e.Pointer);
+                return;
+            }
+
+            var marqueePosition = e.GetPosition(_nodeCanvas);
+            var marqueeZoom = Math.Max(ViewModel.ZoomLevel, 0.01);
+            ViewModel.UpdateMarquee(marqueePosition.X / marqueeZoom, marqueePosition.Y / marqueeZoom);
+            e.Handled = true;
+        }
+
+        private void Canvas_PointerReleased(object? sender, PointerReleasedEventArgs e)
+        {
+            if (_isConnecting)
+            {
+                TryCompleteConnection(e);
+                CancelConnectionDrag();
+                e.Handled = true;
+                return;
+            }
+
+            if (!_isMarqueeActive || _marqueePointer != e.Pointer)
+            {
+                return;
+            }
+
+            FinishMarquee(e.Pointer);
+            e.Handled = true;
+        }
+
+        private void Canvas_PointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+        {
+            if (_isMarqueeActive)
+            {
+                FinishMarquee(null);
+            }
+
+            if (_isConnecting)
+            {
+                CancelConnectionDrag();
+            }
+        }
+
+        private void Port_PointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (sender is not Ellipse port || ViewModel == null || _nodeCanvas == null || _tempConnectionLine == null)
+            {
+                return;
+            }
+
+            var point = e.GetCurrentPoint(port);
+            if (!point.Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            if (port.DataContext is not VisualNode node)
+            {
+                return;
+            }
+
+            var connector = GetPortConnector(port);
+            if (connector == null)
+            {
+                return;
+            }
+
+            if (connector == "Output")
+            {
                 if (ViewModel.IsConnectMode)
                 {
                     ViewModel.CancelConnectCommand.Execute(null);
                 }
 
-                ViewModel.SelectedConnection = null;
+                _isConnecting = true;
+                _connectionSourceNode = node;
+                _connectionSourceConnector = "Output";
+                _connectionPointer = e.Pointer;
+                _connectionPointer.Capture(_nodeCanvas);
+
+                var start = GetPortPosition(node, "Output");
+                var canvasPosition = e.GetPosition(_nodeCanvas);
+                var zoom = Math.Max(ViewModel.ZoomLevel, 0.01);
+                var end = new Point(canvasPosition.X / zoom, canvasPosition.Y / zoom);
+
+                _tempConnectionLine.StartPoint = start;
+                _tempConnectionLine.EndPoint = end;
+                _tempConnectionLine.IsVisible = true;
+
+                e.Handled = true;
+            }
+            else
+            {
+                if (_isConnecting)
+                {
+                    e.Handled = true;
+                    return;
+                }
+
+                if (ViewModel.IsConnectMode)
+                {
+                    if (ViewModel.ConnectionSourceNode != null
+                        && !ReferenceEquals(ViewModel.ConnectionSourceNode, node))
+                    {
+                        ViewModel.TryConnectNodes(ViewModel.ConnectionSourceNode, node, connector);
+                    }
+
+                    e.Handled = true;
+                    return;
+                }
+
+                ViewModel.SelectNode(node, false);
                 e.Handled = true;
             }
         }
 
+        private void ConnectionLine_PointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (sender is not Path path || ViewModel == null || path.DataContext is not ConnectionLine line)
+            {
+                return;
+            }
+
+            ViewModel.SelectConnection(line.ConnectionId);
+            e.Handled = true;
+        }
+
+        private static string? GetPortConnector(Ellipse port)
+        {
+            if (port.Classes.Contains("OutputPort"))
+            {
+                return "Output";
+            }
+
+            if (port.Classes.Contains("Input2Port"))
+            {
+                return "Input2";
+            }
+
+            if (port.Classes.Contains("Input1Port"))
+            {
+                return "Input1";
+            }
+
+            return null;
+        }
+
+        private static Point GetPortPosition(VisualNode node, string connector)
+        {
+            var centerY = node.Y + node.Height / 2.0;
+
+            if (connector == "Output")
+            {
+                return new Point(node.X + node.Width, centerY);
+            }
+
+            if (connector == "Input2" && node.HasSecondInput)
+            {
+                return new Point(node.X, node.Y + node.Height * 0.68);
+            }
+
+            return new Point(node.X, node.Y + node.Height * 0.32);
+        }
+
+        private void TryCompleteConnection(PointerEventArgs e)
+        {
+            if (_connectionSourceNode == null || ViewModel == null)
+            {
+                return;
+            }
+
+            var (target, connector) = GetPortAt(e);
+            if (target != null && !ReferenceEquals(_connectionSourceNode, target)
+                && connector is "Input1" or "Input2")
+            {
+                ViewModel.TryConnectNodes(_connectionSourceNode, target, connector);
+            }
+        }
+
+        private (VisualNode? Node, string? Connector) GetPortAt(PointerEventArgs e)
+        {
+            if (TopLevel.GetTopLevel(this) is not { } topLevel)
+            {
+                return (null, null);
+            }
+
+            var position = e.GetPosition(topLevel);
+            var hit = topLevel.InputHitTest(position);
+            if (hit is Ellipse port && port.DataContext is VisualNode node)
+            {
+                var connector = GetPortConnector(port);
+                if (connector is "Input1" or "Input2")
+                {
+                    return (node, connector);
+                }
+            }
+
+            return (null, null);
+        }
+
+        private void CancelConnectionDrag()
+        {
+            _isConnecting = false;
+            _connectionSourceNode = null;
+            _connectionSourceConnector = string.Empty;
+            _connectionPointer?.Capture(null);
+            _connectionPointer = null;
+
+            if (_tempConnectionLine != null)
+            {
+                _tempConnectionLine.IsVisible = false;
+            }
+        }
+
+        private void FinishMarquee(IPointer? pointer)
+        {
+            if (!_isMarqueeActive || ViewModel == null)
+            {
+                return;
+            }
+
+            _isMarqueeActive = false;
+            _marqueePointer = null;
+            ViewModel.EndMarquee();
+            pointer?.Capture(null);
+        }
+
         private void Canvas_DragOver(object? sender, DragEventArgs e)
         {
-            e.DragEffects = TryGetDraggedElementType(e.Data, out _)
-                ? DragDropEffects.Copy
-                : DragDropEffects.None;
+            if (TryGetDraggedElementType(e.Data, out _) || TryGetDraggedTag(e.Data, out _))
+            {
+                e.DragEffects = DragDropEffects.Copy;
+            }
+            else
+            {
+                e.DragEffects = DragDropEffects.None;
+            }
+
             e.Handled = true;
         }
 
         private void Canvas_Drop(object? sender, DragEventArgs e)
         {
-            if (ViewModel == null || sender is not Canvas canvas
-                || !TryGetDraggedElementType(e.Data, out var elementType))
+            if (ViewModel == null || sender is not Canvas canvas)
             {
                 return;
             }
 
             var point = e.GetPosition(canvas);
             var zoom = Math.Max(ViewModel.ZoomLevel, 0.01);
-            // The canvas is rendered through a ScaleTransform. Use the same
-            // logical-coordinate conversion as node dragging.
-            var node = ViewModel.AddNodeAt(elementType, point.X / zoom, point.Y / zoom);
-            if (node != null)
+            var logicalPoint = new Point(point.X / zoom, point.Y / zoom);
+
+            if (TryGetDraggedTag(e.Data, out var tag))
             {
-                e.DragEffects = DragDropEffects.Copy;
-                e.Handled = true;
+                if (TryGetNodeInputPortAt(e.Source, logicalPoint, out var targetNode, out var connector))
+                {
+                    ViewModel.BindTagToNodeInput(targetNode, tag, connector);
+                    e.DragEffects = DragDropEffects.Copy;
+                    e.Handled = true;
+                }
+                else
+                {
+                    var node = ViewModel.AddNodeForTagAt(tag, logicalPoint.X, logicalPoint.Y);
+                    if (node != null)
+                    {
+                        e.DragEffects = DragDropEffects.Copy;
+                        e.Handled = true;
+                    }
+                }
+
+                return;
+            }
+
+            if (TryGetDraggedElementType(e.Data, out var elementType))
+            {
+                // The canvas is rendered through a ScaleTransform. Use the same
+                // logical-coordinate conversion as node dragging.
+                var node = ViewModel.AddNodeAt(elementType, logicalPoint.X, logicalPoint.Y);
+                if (node != null)
+                {
+                    e.DragEffects = DragDropEffects.Copy;
+                    e.Handled = true;
+                }
             }
         }
 
@@ -200,6 +542,84 @@ namespace ModbusForge.Avalonia.Views
 
             elementType = parsedType;
             return true;
+        }
+
+        private bool TryGetDraggedTag(IDataObject data, out Tag? tag)
+        {
+            tag = null;
+
+            if (data.Contains(TagDragFormat))
+            {
+                if (data.Get(TagDragFormat) is Tag directTag)
+                {
+                    tag = directTag;
+                    return true;
+                }
+            }
+
+            if (data.Contains(DataFormats.Text))
+            {
+                var text = data.GetText();
+                if (!string.IsNullOrEmpty(text) && text.StartsWith(TagDragTextPrefix, StringComparison.Ordinal))
+                {
+                    var id = text.Substring(TagDragTextPrefix.Length);
+                    tag = ViewModel?.FindTagById(id);
+                    return tag != null;
+                }
+            }
+
+            return false;
+        }
+
+        private bool TryGetNodeInputPortAt(object? source, Point logicalPoint, out VisualNode? node, out string? connector)
+        {
+            node = null;
+            connector = null;
+
+            if (source is Control control)
+            {
+                for (var current = control; current != null; current = current.Parent as Control)
+                {
+                    if (current.DataContext is not VisualNode visualNode)
+                        continue;
+
+                    if (current.Classes.Contains("Input1Port"))
+                    {
+                        node = visualNode;
+                        connector = "Input1";
+                        return true;
+                    }
+
+                    if (current.Classes.Contains("Input2Port"))
+                    {
+                        node = visualNode;
+                        connector = visualNode.HasSecondInput ? "Input2" : "Input1";
+                        return true;
+                    }
+                }
+            }
+
+            // Fallback geometric test for the left input-port region of any node.
+            if (ViewModel == null)
+                return false;
+
+            foreach (var visualNode in ViewModel.Nodes)
+            {
+                if (logicalPoint.X >= visualNode.X - PortHitTolerance
+                    && logicalPoint.X <= visualNode.X + PortHitTolerance
+                    && logicalPoint.Y >= visualNode.Y
+                    && logicalPoint.Y <= visualNode.Y + visualNode.Height)
+                {
+                    node = visualNode;
+                    var relativeY = logicalPoint.Y - visualNode.Y;
+                    connector = visualNode.HasSecondInput && relativeY > visualNode.Height / 2.0
+                        ? "Input2"
+                        : "Input1";
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void ResetPaletteDrag(IPointer? pointer)
@@ -377,12 +797,309 @@ namespace ModbusForge.Avalonia.Views
                     FinishNodeDrag(_dragPointer, commit: false);
                     e.Handled = true;
                 }
+                else if (_isConnecting)
+                {
+                    CancelConnectionDrag();
+                    e.Handled = true;
+                }
                 else if (ViewModel.IsConnectMode)
                 {
                     ViewModel.CancelConnectCommand.Execute(null);
                     e.Handled = true;
                 }
+                else if (e.Source is TextBox textBox && textBox.DataContext is IProgramTreeItem item)
+                {
+                    item.IsRenaming = false;
+                    e.Handled = true;
+                }
             }
         }
+
+        #region POU Tree Rename
+
+        private void TreeItem_DoubleTapped(object? sender, TappedEventArgs e)
+        {
+            if (sender is not Grid grid || grid.DataContext is not IProgramTreeItem item)
+            {
+                return;
+            }
+
+            var viewPanel = grid.FindControl<StackPanel>("ViewPanel");
+            var renameBox = grid.FindControl<TextBox>("RenameBox");
+            if (viewPanel != null && renameBox != null)
+            {
+                item.IsRenaming = true;
+                renameBox.Focus();
+                renameBox.SelectAll();
+                e.Handled = true;
+            }
+        }
+
+        private void RenameBox_LostFocus(object? sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox textBox && textBox.DataContext is IProgramTreeItem item)
+            {
+                item.IsRenaming = false;
+            }
+        }
+
+        private void RenameBox_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (sender is not TextBox textBox || textBox.DataContext is not IProgramTreeItem item)
+            {
+                return;
+            }
+
+            if (e.Key == Key.Enter)
+            {
+                item.IsRenaming = false;
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                item.IsRenaming = false;
+                e.Handled = true;
+            }
+        }
+
+        #endregion
+
+        #region POU Tree Drag / Drop
+
+        private void TreeView_PointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (ViewModel == null || sender is not TreeView treeView || e.Source is TextBox)
+            {
+                return;
+            }
+
+            var treeViewItem = FindParentTreeViewItem(e.Source as Control);
+            if (treeViewItem?.DataContext is not IProgramTreeItem item)
+            {
+                return;
+            }
+
+            var point = e.GetCurrentPoint(treeView);
+            if (!point.Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            _treeDragItem = item;
+            _treeDragStart = e.GetPosition(treeView);
+            _treeDragPointer = e.Pointer;
+            _treeDragStarted = false;
+        }
+
+        private async void TreeView_PointerMoved(object? sender, PointerEventArgs e)
+        {
+            if (_treeDragItem == null || _treeDragPointer != e.Pointer || sender is not TreeView treeView)
+            {
+                return;
+            }
+
+            if (!e.GetCurrentPoint(treeView).Properties.IsLeftButtonPressed)
+            {
+                ResetTreeDrag(e.Pointer);
+                return;
+            }
+
+            var current = e.GetPosition(treeView);
+            var deltaX = current.X - _treeDragStart.X;
+            var deltaY = current.Y - _treeDragStart.Y;
+            if (_treeDragStarted || Math.Sqrt(deltaX * deltaX + deltaY * deltaY) < DragThreshold)
+            {
+                return;
+            }
+
+            _treeDragStarted = true;
+            var item = _treeDragItem;
+            var data = new DataObject();
+            data.Set(ProgramTreeDragFormat, item.Id);
+            e.Pointer.Capture(null);
+
+            try
+            {
+                await DragDrop.DoDragDrop(e, data, DragDropEffects.Move);
+            }
+            finally
+            {
+                ResetTreeDrag(e.Pointer);
+            }
+        }
+
+        private void TreeView_PointerReleased(object? sender, PointerReleasedEventArgs e)
+        {
+            if (_treeDragPointer == e.Pointer)
+            {
+                ResetTreeDrag(e.Pointer);
+            }
+        }
+
+        private void TreeView_DragOver(object? sender, DragEventArgs e)
+        {
+            e.Handled = true;
+
+            if (ViewModel == null || !e.Data.Contains(ProgramTreeDragFormat))
+            {
+                e.DragEffects = DragDropEffects.None;
+                return;
+            }
+
+            var source = GetDragSource(e.Data);
+            var target = FindParentTreeViewItem(e.Source as Control)?.DataContext as IProgramTreeItem;
+            e.DragEffects = GetAllowedDragEffect(source, target);
+        }
+
+        private void TreeView_Drop(object? sender, DragEventArgs e)
+        {
+            e.Handled = true;
+
+            if (ViewModel == null || !e.Data.Contains(ProgramTreeDragFormat))
+            {
+                e.DragEffects = DragDropEffects.None;
+                return;
+            }
+
+            var source = GetDragSource(e.Data);
+            if (source == null)
+            {
+                e.DragEffects = DragDropEffects.None;
+                return;
+            }
+
+            var treeViewItem = FindParentTreeViewItem(e.Source as Control);
+            var target = treeViewItem?.DataContext as IProgramTreeItem;
+            var position = GetDropPosition(treeViewItem, e, source, target);
+
+            if (target == null)
+            {
+                ViewModel.MoveItem(source, null, DropPosition.Into);
+                e.DragEffects = DragDropEffects.Move;
+                return;
+            }
+
+            if (GetAllowedDragEffect(source, target) == DragDropEffects.None)
+            {
+                e.DragEffects = DragDropEffects.None;
+                return;
+            }
+
+            // Convert a program dropped near a folder into a move-into that folder.
+            if (source is ProgramModel && target is ProgramFolder)
+            {
+                position = DropPosition.Into;
+            }
+
+            // Folders cannot be dropped onto programs.
+            if (source is ProgramFolder && target is ProgramModel)
+            {
+                e.DragEffects = DragDropEffects.None;
+                return;
+            }
+
+            ViewModel.MoveItem(source, target, position);
+            e.DragEffects = DragDropEffects.Move;
+        }
+
+        private static TreeViewItem? FindParentTreeViewItem(Control? control)
+        {
+            for (var current = control; current != null; current = current.Parent as Control)
+            {
+                if (current is TreeViewItem tvi)
+                {
+                    return tvi;
+                }
+            }
+
+            return null;
+        }
+
+        private IProgramTreeItem? GetDragSource(IDataObject data)
+        {
+            var id = data.Get(ProgramTreeDragFormat) as string;
+            if (string.IsNullOrEmpty(id) || ViewModel == null)
+            {
+                return null;
+            }
+
+            return ViewModel.FindTreeItem(id);
+        }
+
+        private DragDropEffects GetAllowedDragEffect(IProgramTreeItem? source, IProgramTreeItem? target)
+        {
+            if (source == null)
+            {
+                return DragDropEffects.None;
+            }
+
+            if (target == null)
+            {
+                return DragDropEffects.Move;
+            }
+
+            if (ReferenceEquals(source, target))
+            {
+                return DragDropEffects.None;
+            }
+
+            if (source is ProgramModel)
+            {
+                return target is ProgramFolder || target is ProgramModel ? DragDropEffects.Move : DragDropEffects.None;
+            }
+
+            if (source is ProgramFolder sourceFolder && target is ProgramFolder targetFolder)
+            {
+                return ViewModel?.IsDescendantOf(sourceFolder, targetFolder) == true
+                    ? DragDropEffects.None
+                    : DragDropEffects.Move;
+            }
+
+            return DragDropEffects.None;
+        }
+
+        private static DropPosition GetDropPosition(TreeViewItem? targetItem, DragEventArgs e, IProgramTreeItem source, IProgramTreeItem? target)
+        {
+            if (targetItem == null || target is null || (target is not ProgramModel && target is not ProgramFolder))
+            {
+                return DropPosition.Into;
+            }
+
+            var position = e.GetPosition(targetItem);
+            var height = targetItem.Bounds.Height;
+            if (height <= 0 || !double.IsFinite(height))
+            {
+                return DropPosition.Into;
+            }
+
+            if (source is ProgramModel)
+            {
+                // Programs can only be reordered relative to other programs.
+                return position.Y < height / 2.0 ? DropPosition.Before : DropPosition.After;
+            }
+
+            // Folders: top/bottom quarter is a reorder; middle half is a move-into.
+            if (position.Y < height / 4.0)
+            {
+                return DropPosition.Before;
+            }
+
+            if (position.Y > height * 3.0 / 4.0)
+            {
+                return DropPosition.After;
+            }
+
+            return DropPosition.Into;
+        }
+
+        private void ResetTreeDrag(IPointer? pointer)
+        {
+            pointer?.Capture(null);
+            _treeDragPointer = null;
+            _treeDragItem = null;
+            _treeDragStarted = false;
+        }
+
+        #endregion
     }
 }

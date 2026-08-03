@@ -33,7 +33,8 @@
         <Button Content="CSV Template" Command="{Binding SaveTemplateCommand}" Margin="0,0,6,0" />
         <Button Content="Add to Watch" Command="{Binding AddToWatchCommand}" Margin="0,0,6,0" />
         <Button Content="Select Tag" Command="{Binding SelectTagCommand}"
-                IsVisible="{Binding SelectionMode}" />
+                IsVisible="{Binding SelectionMode}" Margin="0,0,6,0" />
+        <Button x:Name="DockToggleButton" Content="Dock" Click="DockToggleButton_Click" />
       </WrapPanel>
     </Border>
 
@@ -44,7 +45,10 @@
           <TreeView Grid.Row="1"
                     ItemsSource="{Binding TreeItems}"
                     SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay}"
-                    DoubleTapped="TagTree_DoubleTapped">
+                    DoubleTapped="TagTree_DoubleTapped"
+                    PointerPressed="TagTree_PointerPressed"
+                    PointerMoved="TagTree_PointerMoved"
+                    PointerReleased="TagTree_PointerReleased">
             <TreeView.ItemTemplate>
               <TreeDataTemplate ItemsSource="{Binding Children}">
                 <StackPanel Orientation="Horizontal" Spacing="4">

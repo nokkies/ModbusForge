@@ -82,6 +82,10 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<IRegisterTemplateStore, RegisterTemplateStore>();
             services.AddSingleton<ITagWindowService, AvaloniaTagWindowService>();
 
+            // Lightweight dock/float host for tool windows
+            services.AddSingleton<AvaloniaDockingHost>();
+            services.AddSingleton<IDockingHost>(sp => sp.GetRequiredService<AvaloniaDockingHost>());
+
             // Trend logging
             services.Configure<LoggingSettings>(_ => { });
             services.AddSingleton<ITrendLogger, TrendLoggingService>();

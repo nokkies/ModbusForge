@@ -12,6 +12,7 @@ using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using ModbusForge.Avalonia.Services;
 using ModbusForge.Helpers;
 using ModbusForge.Models;
 using ModbusForge.Services;
@@ -34,6 +35,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly IUpdateService? _updateService;
         private readonly IWindowService? _windowService;
         private readonly IApplicationLifetime? _applicationLifetime;
+        private readonly IDockingHost? _dockingHost;
         private readonly ITrendLogger? _trendLogger;
         private CancellationTokenSource? _pollCts;
         private readonly object _pollLifecycleLock = new();
@@ -378,7 +380,8 @@ namespace ModbusForge.Avalonia.ViewModels
             VisualNodeEditorViewModel? visualNodeEditorViewModel = null,
             DecodeViewModel? decodeViewModel = null,
             IUnitConfigurationStore? unitConfigurationStore = null,
-            IFileSystem? fileSystem = null)
+            IFileSystem? fileSystem = null,
+            IDockingHost? dockingHost = null)
         {
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -394,6 +397,7 @@ namespace ModbusForge.Avalonia.ViewModels
             _updateService = updateService;
             _windowService = windowService;
             _applicationLifetime = applicationLifetime;
+            _dockingHost = dockingHost;
             _trendLogger = trendLogger;
             TrendViewModel = trendViewModel;
             FrameInspectorViewModel = frameInspectorViewModel;
@@ -451,6 +455,9 @@ namespace ModbusForge.Avalonia.ViewModels
                 SelectedTabIndex = 2;
                 FrameInspectorViewModel?.ImportPcapCommand.Execute(null);
             });
+            OpenTagBrowserCommand = new RelayCommand(() => _dockingHost?.ShowTagBrowser());
+            OpenWatchWindowCommand = new RelayCommand(() => _dockingHost?.ShowWatchWindow());
+            OpenConnectionManagerCommand = new RelayCommand(() => _dockingHost?.ShowConnectionManager());
             ImportUnitIdsCommand = new AsyncRelayCommand(ImportUnitIdsAsync);
             ExportUnitIdsCommand = new AsyncRelayCommand(ExportUnitIdsAsync);
             ImportUnitIdAsCommand = new AsyncRelayCommand(ImportUnitIdAsAsync, CanImportUnitIdAs);
@@ -532,6 +539,9 @@ namespace ModbusForge.Avalonia.ViewModels
         public ICommand OpenTrendsCommand { get; }
         public ICommand OpenFrameInspectorCommand { get; }
         public ICommand OpenPcapCommand { get; }
+        public ICommand OpenTagBrowserCommand { get; }
+        public ICommand OpenWatchWindowCommand { get; }
+        public ICommand OpenConnectionManagerCommand { get; }
         public IAsyncRelayCommand ImportUnitIdsCommand { get; }
         public IAsyncRelayCommand ExportUnitIdsCommand { get; }
         public IAsyncRelayCommand ImportUnitIdAsCommand { get; }

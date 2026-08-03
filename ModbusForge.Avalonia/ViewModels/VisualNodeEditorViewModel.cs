@@ -9,6 +9,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Avalonia;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ModbusForge.Models;
@@ -49,9 +51,55 @@ namespace ModbusForge.Avalonia.ViewModels
         [ObservableProperty]
         private bool _isSelected;
 
+        [ObservableProperty]
+        private IList<Point> _pathPoints = new List<Point>();
+
+        [ObservableProperty]
+        private Geometry? _pathData;
+
+        [ObservableProperty]
+        private IBrush? _lineBrush;
+
+        [ObservableProperty]
+        private PortSide _targetPortSide = PortSide.Left;
+
         public double Length => Math.Sqrt(Math.Pow(ToX - FromX, 2) + Math.Pow(ToY - FromY, 2));
         public double Angle => Math.Atan2(ToY - FromY, ToX - FromX) * 180 / Math.PI;
         public double LineTop => FromY - 1;
+
+        public void UpdatePoints(IList<Point>? points, bool isSelected, PortSide targetPortSide = PortSide.Left)
+        {
+            TargetPortSide = targetPortSide;
+            LineBrush = new SolidColorBrush(Color.Parse(isSelected ? "#1976D2" : "#607D8B"));
+
+            if (points == null || points.Count < 2)
+            {
+                PathPoints = new List<Point>();
+                PathData = null;
+                return;
+            }
+
+            PathPoints = points;
+
+            var figure = new PathFigure
+            {
+                StartPoint = points[0],
+                IsClosed = false,
+                IsFilled = false
+            };
+
+            var segment = new PolyLineSegment();
+            for (var i = 1; i < points.Count; i++)
+            {
+                segment.Points.Add(points[i]);
+            }
+
+            figure.Segments.Add(segment);
+
+            var geometry = new PathGeometry();
+            geometry.Figures.Add(figure);
+            PathData = geometry;
+        }
     }
 
     public sealed class GridLine
@@ -98,6 +146,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private readonly IAvaloniaVisualSimulationService _visualSimulation;
         private readonly IFileDialogService? _fileDialogService;
+        private readonly IMessageBoxService? _messageBoxService;
         private readonly ITagWindowService? _tagWindowService;
 
         private ObservableCollection<VisualNode>? _observedNodes;
@@ -107,6 +156,8 @@ namespace ModbusForge.Avalonia.ViewModels
         private bool _isSwitchingProgram;
         private bool _isUpdatingSelection;
         private bool _isDisposed;
+
+        partial void InitializeProgramTreeCommands();
 
         [ObservableProperty]
         private VisualNodeEditorConfig _config = new();
@@ -147,6 +198,9 @@ namespace ModbusForge.Avalonia.ViewModels
         [ObservableProperty]
         private string _selectedTargetConnector = "Input1";
 
+        [ObservableProperty]
+        private bool _useOrthogonalRouting;
+
         public ObservableCollection<PaletteItem> Palette { get; } = new();
 
         public ObservableCollection<GridLine> GridLines { get; } = new();
@@ -174,12 +228,9 @@ namespace ModbusForge.Avalonia.ViewModels
         public ICommand ZoomInCommand { get; }
         public ICommand ZoomOutCommand { get; }
         public ICommand ResetZoomCommand { get; }
-        public ICommand CreateProgramCommand { get; }
-        public ICommand SelectProgramCommand { get; }
-        public ICommand DeleteProgramCommand { get; }
-        public ICommand DuplicateProgramCommand { get; }
         public ICommand OpenTagBrowserCommand { get; }
         public ICommand OpenWatchWindowCommand { get; }
+        public ICommand AddSelectedNodeToWatchCommand { get; }
 
         public ObservableCollection<VisualNode> Nodes => Config.Nodes;
         public ObservableCollection<NodeConnection> Connections => Config.Connections;
@@ -237,6 +288,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 Config.ZoomLevel = normalized;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(ZoomText));
+                UpdateConnectionLines();
             }
         }
 
@@ -271,11 +323,15 @@ namespace ModbusForge.Avalonia.ViewModels
         public VisualNodeEditorViewModel(
             IAvaloniaVisualSimulationService visualSimulation,
             IFileDialogService? fileDialogService = null,
-            ITagWindowService? tagWindowService = null)
+            IMessageBoxService? messageBoxService = null,
+            ITagWindowService? tagWindowService = null,
+            TagService? tagService = null)
         {
             _visualSimulation = visualSimulation ?? throw new ArgumentNullException(nameof(visualSimulation));
             _fileDialogService = fileDialogService;
+            _messageBoxService = messageBoxService;
             _tagWindowService = tagWindowService;
+            _tagService = tagService;
 
             AddNodeCommand = new RelayCommand(AddNode, () => SelectedPaletteItem != null);
             RemoveNodeCommand = new RelayCommand(RemoveNode, () => SelectedNode != null);
@@ -292,18 +348,17 @@ namespace ModbusForge.Avalonia.ViewModels
             ZoomInCommand = new RelayCommand(ZoomIn);
             ZoomOutCommand = new RelayCommand(ZoomOut);
             ResetZoomCommand = new RelayCommand(ResetZoom);
-            CreateProgramCommand = new RelayCommand(CreateProgram);
-            SelectProgramCommand = new RelayCommand<ProgramModel?>(SelectProgram);
-            DeleteProgramCommand = new RelayCommand<ProgramModel?>(DeleteProgram);
-            DuplicateProgramCommand = new RelayCommand<ProgramModel?>(DuplicateProgram);
+            InitializeProgramTreeCommands();
             OpenTagBrowserCommand = new RelayCommand(() => _tagWindowService?.ShowTagBrowser());
             OpenWatchWindowCommand = new RelayCommand(() => _tagWindowService?.ShowWatchWindow());
+            AddSelectedNodeToWatchCommand = new AsyncRelayCommand(AddSelectedNodeToWatchAsync, () => SelectedNode != null && _tagService != null);
 
             BuildPalette();
 
             var defaultProgram = new ProgramModel { Name = "Main", ExecutionOrder = 0 };
             ProgramTree.Programs.Add(defaultProgram);
             SelectedProgram = defaultProgram;
+            SelectedTreeItem = defaultProgram;
 
             AttachConfigHandlers();
             NormalizeViewSettings();
@@ -713,21 +768,31 @@ namespace ModbusForge.Avalonia.ViewModels
                     continue;
                 }
 
+                var sourcePoint = new Point(source.X + source.Width, source.Y + source.Height / 2.0);
                 var targetY = connection.TargetConnector == "Input2"
                     ? target.Y + target.Height * 0.68
                     : target.Y + target.Height * 0.32;
-                lines.Add(new ConnectionLine
+                var targetPoint = new Point(target.X, targetY);
+
+                var obstacles = Config.Nodes.Where(n => n != source && n != target);
+                var points = UseOrthogonalRouting
+                    ? GetOrthogonalPoints(sourcePoint, targetPoint, source, target, obstacles)
+                    : new List<Point> { sourcePoint, targetPoint };
+
+                var line = new ConnectionLine
                 {
                     ConnectionId = connection.Id,
                     SourceId = source.Id,
                     TargetId = target.Id,
                     TargetConnector = connection.TargetConnector,
                     IsSelected = ReferenceEquals(SelectedConnection, connection),
-                    FromX = source.X + source.Width,
-                    FromY = source.Y + source.Height / 2,
-                    ToX = target.X,
-                    ToY = targetY
-                });
+                    FromX = sourcePoint.X,
+                    FromY = sourcePoint.Y,
+                    ToX = targetPoint.X,
+                    ToY = targetPoint.Y
+                };
+                line.UpdatePoints(points, ReferenceEquals(SelectedConnection, connection), PortSide.Left);
+                lines.Add(line);
             }
 
             ConnectionLines = lines;
@@ -1442,102 +1507,13 @@ namespace ModbusForge.Avalonia.ViewModels
                 ProgramTree = tree;
                 _activeProgram = active;
                 SelectedProgram = active;
+                SelectedTreeItem = active;
                 ClearSelection();
             }
             finally
             {
                 _isSwitchingProgram = false;
             }
-        }
-
-        private void CreateProgram()
-        {
-            var name = string.IsNullOrWhiteSpace(NewProgramName)
-                ? $"Program {ProgramTree.Programs.Count + 1}"
-                : NewProgramName.Trim();
-            var program = new ProgramModel
-            {
-                Name = name,
-                ExecutionOrder = ProgramTree.Programs.Count
-            };
-
-            ProgramTree.Programs.Add(program);
-            NewProgramName = "New Program";
-            SelectedProgram = program;
-        }
-
-        private void DeleteProgram(ProgramModel? program)
-        {
-            if (program == null || ProgramTree.Programs.Count <= 1) return;
-            var wasActive = ReferenceEquals(program, _activeProgram);
-            ProgramTree.Programs.Remove(program);
-
-            if (wasActive)
-            {
-                SelectedProgram = ProgramTree.Programs.FirstOrDefault();
-            }
-
-            StatusText = $"Deleted program {program.Name}";
-        }
-
-        private void DuplicateProgram(ProgramModel? program)
-        {
-            if (program == null) return;
-
-            var duplicate = new ProgramModel
-            {
-                Name = $"{program.Name}_Copy",
-                Description = program.Description,
-                IsEnabled = program.IsEnabled,
-                ExecutionOrder = ProgramTree.Programs.Count
-            };
-            var idMap = new Dictionary<string, string>(StringComparer.Ordinal);
-
-            foreach (var sourceNode in program.Nodes)
-            {
-                var copy = CloneNode(sourceNode);
-                idMap[sourceNode.Id] = copy.Id;
-                duplicate.Nodes.Add(copy);
-            }
-
-            foreach (var sourceConnection in program.Connections)
-            {
-                if (!idMap.TryGetValue(sourceConnection.SourceNodeId, out var sourceId)
-                    || !idMap.TryGetValue(sourceConnection.TargetNodeId, out var targetId))
-                {
-                    continue;
-                }
-
-                duplicate.Connections.Add(new NodeConnection(sourceId, targetId, sourceConnection.TargetConnector)
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    SourceConnector = sourceConnection.SourceConnector,
-                    StartX = sourceConnection.StartX,
-                    StartY = sourceConnection.StartY,
-                    EndX = sourceConnection.EndX,
-                    EndY = sourceConnection.EndY,
-                    IsConnected = sourceConnection.IsConnected
-                });
-            }
-
-            foreach (var sourceConfig in program.ConnectorConfigs)
-            {
-                if (!idMap.TryGetValue(sourceConfig.NodeId, out var nodeId)) continue;
-                duplicate.ConnectorConfigs.Add(new ConnectorConfiguration
-                {
-                    NodeId = nodeId,
-                    ConnectorType = sourceConfig.ConnectorType,
-                    IsConfigured = sourceConfig.IsConfigured,
-                    Area = sourceConfig.Area,
-                    Address = sourceConfig.Address,
-                    Not = sourceConfig.Not,
-                    Tag = sourceConfig.Tag
-                });
-            }
-
-            ProgramTree.Programs.Add(duplicate);
-            SelectedProgram = duplicate;
-            StatusText = $"Duplicated program {program.Name}";
         }
 
         private static VisualNode CloneNode(VisualNode source)
@@ -1565,11 +1541,6 @@ namespace ModbusForge.Avalonia.ViewModels
                 Input2Address = source.Input2Address?.Clone() ?? new PlcAddressReference(),
                 OutputAddress = source.OutputAddress?.Clone() ?? new PlcAddressReference()
             };
-        }
-
-        public void SelectProgram(ProgramModel? program)
-        {
-            if (program != null) SelectedProgram = program;
         }
 
         private void SaveProgramSnapshot(ProgramModel? program)

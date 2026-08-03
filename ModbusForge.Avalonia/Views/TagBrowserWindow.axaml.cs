@@ -1,16 +1,29 @@
 using System;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using ModbusForge.Avalonia.Services;
 using ModbusForge.Avalonia.ViewModels;
 using ModbusForge.Models;
 
 namespace ModbusForge.Avalonia.Views
 {
-    public partial class TagBrowserWindow : Window
+    public partial class TagBrowserWindow : Window, IDockableTool
     {
+        private const string TagDragFormat = "ModbusForge.Avalonia.Tag";
+        private const string TagDragTextPrefix = "MF|Tag|";
+        private const double DragThreshold = 4.0;
+
         private TagBrowserViewModel? _viewModel;
         private bool _initialized;
+        private Point _treeDragStart;
+        private IPointer? _treeDragPointer;
+        private bool _treeDragStarted;
+        private Control? _content;
+        private Button? _dockToggleButton;
+        private Action? _toggleDockCallback;
 
         public TagBrowserWindow()
         {
@@ -27,7 +40,30 @@ namespace ModbusForge.Avalonia.Views
         private void InitializeComponent()
         {
             AvaloniaXamlLoader.Load(this);
+            _content = this.Content as Control;
+            _dockToggleButton = this.FindControl<Button>("DockToggleButton");
         }
+
+        public Action? ToggleDockCallback
+        {
+            get => _toggleDockCallback;
+            set => _toggleDockCallback = value;
+        }
+
+        public void SetDocked(bool isDocked)
+        {
+            if (_dockToggleButton != null)
+            {
+                _dockToggleButton.Content = isDocked ? "Float" : "Dock";
+            }
+        }
+
+        private void DockToggleButton_Click(object? sender, RoutedEventArgs e)
+        {
+            _toggleDockCallback?.Invoke();
+        }
+
+        private Window GetDialogOwner() => TopLevel.GetTopLevel(_content) as Window ?? this;
 
         protected override void OnDataContextChanged(EventArgs e)
         {
@@ -90,7 +126,7 @@ namespace ModbusForge.Avalonia.Views
                     _viewModel.MessageBoxService,
                     e.FilePath);
 
-                var accepted = await dialog.ShowDialog<bool?>(this);
+                var accepted = await dialog.ShowDialog<bool?>(GetDialogOwner());
                 if (accepted == true && dialog.ImportedTemplate != null)
                 {
                     await _viewModel.MergeImportedTemplateAsync(
@@ -113,6 +149,78 @@ namespace ModbusForge.Avalonia.Views
         {
             if (_viewModel?.SelectionMode == true)
                 _viewModel.AcceptSelectedTag();
+        }
+
+        private void TagTree_PointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (sender is not TreeView treeView)
+                return;
+
+            var point = e.GetCurrentPoint(treeView);
+            if (!point.Properties.IsLeftButtonPressed || _viewModel?.SelectedTag == null)
+            {
+                return;
+            }
+
+            _treeDragPointer = e.Pointer;
+            _treeDragStart = e.GetPosition(treeView);
+            _treeDragStarted = false;
+            e.Pointer.Capture(treeView);
+        }
+
+        private async void TagTree_PointerMoved(object? sender, PointerEventArgs e)
+        {
+            if (_viewModel?.SelectedTag == null
+                || _treeDragPointer != e.Pointer
+                || sender is not TreeView treeView)
+            {
+                return;
+            }
+
+            if (!e.GetCurrentPoint(treeView).Properties.IsLeftButtonPressed)
+            {
+                ResetTreeDrag();
+                return;
+            }
+
+            var current = e.GetPosition(treeView);
+            var deltaX = current.X - _treeDragStart.X;
+            var deltaY = current.Y - _treeDragStart.Y;
+            if (_treeDragStarted || Math.Sqrt(deltaX * deltaX + deltaY * deltaY) < DragThreshold)
+            {
+                return;
+            }
+
+            _treeDragStarted = true;
+            var tag = _viewModel.SelectedTag;
+            var data = new DataObject();
+            data.Set(TagDragFormat, tag);
+            data.Set(DataFormats.Text, $"{TagDragTextPrefix}{tag.Id}");
+            e.Pointer.Capture(null);
+
+            try
+            {
+                await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
+            }
+            finally
+            {
+                ResetTreeDrag();
+            }
+        }
+
+        private void TagTree_PointerReleased(object? sender, PointerReleasedEventArgs e)
+        {
+            if (_treeDragPointer == e.Pointer)
+            {
+                ResetTreeDrag();
+            }
+        }
+
+        private void ResetTreeDrag()
+        {
+            _treeDragPointer?.Capture(null);
+            _treeDragPointer = null;
+            _treeDragStarted = false;
         }
     }
 }

@@ -24,6 +24,7 @@
                   SelectedItem="{Binding SelectedUpdateIntervalMs, Mode=TwoWay}"
                   Width="100" />
         <TextBlock Text="ms" VerticalAlignment="Center" Margin="6,0,0,0" />
+        <Button x:Name="DockToggleButton" Content="Dock" Click="DockToggleButton_Click" />
       </WrapPanel>
     </Border>
 
