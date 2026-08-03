@@ -6,8 +6,11 @@
         x:DataType="vm:MainViewModel"
         x:CompileBindings="False"
         Title="ModbusForge"
-        Width="900"
-        Height="700">
+        Width="1556"
+        Height="1073"
+        WindowState="Maximized"
+        Icon="/Assets/logo.png">
+
   <Window.KeyBindings>
     <KeyBinding Gesture="Ctrl+R" Command="{Binding ReadShortcutCommand}" />
     <KeyBinding Gesture="Ctrl+T" Command="{Binding OpenTrendsCommand}" />
@@ -17,5 +20,75 @@
     <KeyBinding Gesture="Ctrl+P" Command="{Binding OpenPreferencesCommand}" />
     <KeyBinding Gesture="Ctrl+Q" Command="{Binding ExitCommand}" />
   </Window.KeyBindings>
-  <views:MainView />
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto">
+    <!-- Title Bar -->
+    <Border Grid.Row="0" Background="#1E1E1E" Padding="16,8">
+      <TextBlock Text="ModbusForge" FontSize="24" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
+    </Border>
+
+    <Menu Grid.Row="1">
+        <MenuItem Header="_File">
+          <MenuItem Header="_Save Project" Command="{Binding SaveProjectCommand}" InputGesture="Ctrl+S" />
+          <MenuItem Header="_Load Project" Command="{Binding LoadProjectCommand}" />
+          <MenuItem Header="Open _Pcap..." Command="{Binding OpenPcapCommand}" />
+          <Separator />
+          <MenuItem Header="_Import Unit IDs..." Command="{Binding ImportUnitIdsCommand}" />
+          <MenuItem Header="_Import Unit ID As..." Command="{Binding ImportUnitIdAsCommand}" />
+          <MenuItem Header="_Export Unit IDs..." Command="{Binding ExportUnitIdsCommand}" />
+          <MenuItem Header="_Export Selected Unit ID..." Command="{Binding ExportUnitIdCommand}" />
+          <MenuItem Header="_Save All..." Command="{Binding SaveAllConfigCommand}" InputGesture="Ctrl+Shift+S" />
+          <Separator />
+          <MenuItem Header="E_xit" Command="{Binding ExitCommand}" InputGesture="Ctrl+Q" />
+        </MenuItem>
+        <MenuItem Header="_Edit">
+          <MenuItem Header="_Read" Command="{Binding ReadShortcutCommand}" InputGesture="Ctrl+R" />
+          <MenuItem Header="_Refresh" Command="{Binding ReadShortcutCommand}" InputGesture="F5" />
+        </MenuItem>
+        <MenuItem Header="_View">
+          <MenuItem Header="_Dark Mode" ToggleType="CheckBox" IsChecked="{Binding IsDarkMode, Mode=TwoWay}" />
+          <MenuItem Header="_Trends" Command="{Binding OpenTrendsCommand}" InputGesture="Ctrl+T" />
+          <MenuItem Header="_Frame Inspector" Command="{Binding OpenFrameInspectorCommand}" />
+          <Separator />
+          <MenuItem Header="_Registers" ToggleType="CheckBox" IsChecked="{Binding IsRegistersTabVisible}" />
+          <MenuItem Header="_Input Registers" ToggleType="CheckBox" IsChecked="{Binding IsInputRegistersTabVisible}" />
+          <MenuItem Header="_Coils" ToggleType="CheckBox" IsChecked="{Binding IsCoilsTabVisible}" />
+          <MenuItem Header="_Discrete Inputs" ToggleType="CheckBox" IsChecked="{Binding IsDiscreteInputsTabVisible}" />
+          <MenuItem Header="_Custom Watch" ToggleType="CheckBox" IsChecked="{Binding IsCustomWatchTabVisible}" />
+          <MenuItem Header="_Simulation" ToggleType="CheckBox" IsChecked="{Binding IsSimulationTabVisible}" />
+          <MenuItem Header="_Decode" ToggleType="CheckBox" IsChecked="{Binding IsDecodeTabVisible}" />
+          <MenuItem Header="_Trend" ToggleType="CheckBox" IsChecked="{Binding IsTrendTabVisible}" />
+          <MenuItem Header="_Console" ToggleType="CheckBox" IsChecked="{Binding IsConsoleTabVisible}" />
+          <MenuItem Header="_Debug" ToggleType="CheckBox" IsChecked="{Binding IsDebugTabVisible}" />
+          <Separator />
+          <MenuItem Header="_Show All" Command="{Binding ShowAllTabsCommand}" />
+          <MenuItem Header="_Reset to Default" Command="{Binding ResetTabsCommand}" />
+        </MenuItem>
+        <MenuItem Header="_Tools">
+          <MenuItem Header="_Preferences" Command="{Binding OpenPreferencesCommand}" InputGesture="Ctrl+P" />
+          <MenuItem Header="_Connection Manager..." Command="{Binding OpenConnectionManagerCommand}" />
+          <MenuItem Header="_Device Scanner..." Click="DeviceScanner_Click" />
+          <MenuItem Header="_Script Editor..." Click="ScriptEditor_Click" InputGesture="Ctrl+E" />
+          <MenuItem Header="_Advanced Functions..." Click="AdvancedFunctions_Click" />
+          <MenuItem Header="_Tag Browser..." Command="{Binding OpenTagBrowserCommand}" />
+          <MenuItem Header="_Watch Window..." Command="{Binding OpenWatchWindowCommand}" />
+          <MenuItem Header="_Frame Inspector..." Command="{Binding OpenFrameInspectorCommand}" />
+          <MenuItem Header="_Check for Updates" Command="{Binding CheckForUpdatesCommand}" />
+        </MenuItem>
+        <MenuItem Header="_Help">
+          <MenuItem Header="_Help" Command="{Binding OpenHelpCommand}" InputGesture="F1" />
+          <MenuItem Header="_Keyboard Shortcuts" Command="{Binding OpenKeyboardShortcutsCommand}" />
+          <MenuItem Header="_Troubleshooting" Command="{Binding OpenTroubleshootingCommand}" />
+          <MenuItem Header="_About ModbusForge" Command="{Binding OpenAboutCommand}" />
+        </MenuItem>
+      </Menu>
+
+    <!-- Main Content -->
+    <views:MainView Grid.Row="2" />
+
+    <!-- Status Bar -->
+    <Border Grid.Row="3" Background="#1E1E1E" Padding="8,4">
+      <TextBlock Text="{Binding StatusMessage}" Foreground="White" VerticalAlignment="Center" />
+    </Border>
+  </Grid>
 </Window>

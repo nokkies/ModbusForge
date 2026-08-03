@@ -11,67 +11,8 @@
     <converters:NavigationIndexConverter x:Key="NavigationIndexConverter" />
   </UserControl.Resources>
 
-  <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
-    <DockPanel Grid.Row="0" LastChildFill="False">
-      <Menu DockPanel.Dock="Top">
-        <MenuItem Header="_File">
-          <MenuItem Header="_Save Project" Command="{Binding SaveProjectCommand}" InputGesture="Ctrl+S" />
-          <MenuItem Header="_Load Project" Command="{Binding LoadProjectCommand}" />
-          <MenuItem Header="Open _Pcap..." Command="{Binding OpenPcapCommand}" />
-          <Separator />
-          <MenuItem Header="_Import Unit IDs..." Command="{Binding ImportUnitIdsCommand}" />
-          <MenuItem Header="_Import Unit ID As..." Command="{Binding ImportUnitIdAsCommand}" />
-          <MenuItem Header="_Export Unit IDs..." Command="{Binding ExportUnitIdsCommand}" />
-          <MenuItem Header="_Export Selected Unit ID..." Command="{Binding ExportUnitIdCommand}" />
-          <MenuItem Header="_Save All..." Command="{Binding SaveAllConfigCommand}" InputGesture="Ctrl+Shift+S" />
-          <Separator />
-          <MenuItem Header="E_xit" Command="{Binding ExitCommand}" InputGesture="Ctrl+Q" />
-        </MenuItem>
-        <MenuItem Header="_Edit">
-          <MenuItem Header="_Read" Command="{Binding ReadShortcutCommand}" InputGesture="Ctrl+R" />
-          <MenuItem Header="_Refresh" Command="{Binding ReadShortcutCommand}" InputGesture="F5" />
-        </MenuItem>
-        <MenuItem Header="_View">
-          <MenuItem Header="_Dark Mode" ToggleType="CheckBox" IsChecked="{Binding IsDarkMode, Mode=TwoWay}" />
-          <MenuItem Header="_Trends" Command="{Binding OpenTrendsCommand}" InputGesture="Ctrl+T" />
-          <MenuItem Header="_Frame Inspector" Command="{Binding OpenFrameInspectorCommand}" />
-          <Separator />
-          <MenuItem Header="_Registers" ToggleType="CheckBox" IsChecked="{Binding IsRegistersTabVisible}" />
-          <MenuItem Header="_Input Registers" ToggleType="CheckBox" IsChecked="{Binding IsInputRegistersTabVisible}" />
-          <MenuItem Header="_Coils" ToggleType="CheckBox" IsChecked="{Binding IsCoilsTabVisible}" />
-          <MenuItem Header="_Discrete Inputs" ToggleType="CheckBox" IsChecked="{Binding IsDiscreteInputsTabVisible}" />
-          <MenuItem Header="_Custom Watch" ToggleType="CheckBox" IsChecked="{Binding IsCustomWatchTabVisible}" />
-          <MenuItem Header="_Simulation" ToggleType="CheckBox" IsChecked="{Binding IsSimulationTabVisible}" />
-          <MenuItem Header="_Decode" ToggleType="CheckBox" IsChecked="{Binding IsDecodeTabVisible}" />
-          <MenuItem Header="_Trend" ToggleType="CheckBox" IsChecked="{Binding IsTrendTabVisible}" />
-          <MenuItem Header="_Console" ToggleType="CheckBox" IsChecked="{Binding IsConsoleTabVisible}" />
-          <MenuItem Header="_Debug" ToggleType="CheckBox" IsChecked="{Binding IsDebugTabVisible}" />
-          <Separator />
-          <MenuItem Header="_Show All" Command="{Binding ShowAllTabsCommand}" />
-          <MenuItem Header="_Reset to Default" Command="{Binding ResetTabsCommand}" />
-        </MenuItem>
-        <MenuItem Header="_Tools">
-          <MenuItem Header="_Preferences" Command="{Binding OpenPreferencesCommand}" InputGesture="Ctrl+P" />
-          <MenuItem Header="_Connection Manager..." Command="{Binding OpenConnectionManagerCommand}" />
-          <MenuItem Header="_Device Scanner..." Click="DeviceScanner_Click" />
-          <MenuItem Header="_Script Editor..." Click="ScriptEditor_Click" InputGesture="Ctrl+E" />
-          <MenuItem Header="_Advanced Functions..." Click="AdvancedFunctions_Click" />
-          <MenuItem Header="_Tag Browser..." Command="{Binding OpenTagBrowserCommand}" />
-          <MenuItem Header="_Watch Window..." Command="{Binding OpenWatchWindowCommand}" />
-          <MenuItem Header="_Frame Inspector..." Command="{Binding OpenFrameInspectorCommand}" />
-          <MenuItem Header="_Check for Updates" Command="{Binding CheckForUpdatesCommand}" />
-        </MenuItem>
-        <MenuItem Header="_Help">
-          <MenuItem Header="_Help" Command="{Binding OpenHelpCommand}" InputGesture="F1" />
-          <MenuItem Header="_Keyboard Shortcuts" Command="{Binding OpenKeyboardShortcutsCommand}" />
-          <MenuItem Header="_Troubleshooting" Command="{Binding OpenTroubleshootingCommand}" />
-          <MenuItem Header="_About ModbusForge" Command="{Binding OpenAboutCommand}" />
-        </MenuItem>
-      </Menu>
-      <TextBlock Text="ModbusForge" FontSize="24" FontWeight="Bold" Margin="0,8,0,8" DockPanel.Dock="Top" />
-    </DockPanel>
-
-    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+  <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,*">
+    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
       <TextBlock VerticalAlignment="Center" Text="Active profile:" />
       <TextBlock VerticalAlignment="Center" Text="{Binding ActiveProfile.DisplayName, FallbackValue='None'}" FontWeight="SemiBold" />
       <TextBlock VerticalAlignment="Center" Text="Mode:" Margin="16,0,0,0" />
@@ -88,7 +29,7 @@
       <ComboBox ItemsSource="{Binding AvailableUnitIds}" SelectedItem="{Binding SelectedUnitId}" Width="100" IsVisible="{Binding ShowServerFields}" />
     </StackPanel>
 
-    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
       <Button Content="Manage Connections" Command="{Binding OpenConnectionManagerCommand}" />
       <Button Content="Device Scanner" Click="DeviceScanner_Click" />
       <Button Content="{Binding ConnectButtonText, FallbackValue='Connect'}" Command="{Binding ConnectCommand}" />
@@ -97,7 +38,7 @@
       <Button Content="Load Project" Command="{Binding LoadProjectCommand}" />
     </StackPanel>
 
-    <Border Grid.Row="3" Background="#12000000" CornerRadius="4" Padding="10" Margin="0,0,0,8">
+    <Border Grid.Row="2" Background="#12000000" CornerRadius="4" Padding="10" Margin="0,0,0,8">
       <StackPanel Orientation="Horizontal" Spacing="8">
         <TextBlock Text="{Binding ConnectionHeader}" FontWeight="SemiBold" />
         <TextBlock Text="●" Foreground="#2E8B57" IsVisible="{Binding IsConnected}" />
@@ -109,7 +50,7 @@
       </StackPanel>
     </Border>
 
-    <Grid Grid.Row="4" ColumnDefinitions="190,*">
+    <Grid Grid.Row="3" ColumnDefinitions="190,*">
       <Border Grid.Column="0" BorderBrush="#40000000" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,12,0">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="4">
@@ -455,13 +396,5 @@
     </TabControl>
   </Grid>
 
-  <Border Grid.Row="5" Background="#12000000" CornerRadius="4" Padding="8" Margin="0,8,0,0">
-    <Grid ColumnDefinitions="Auto,Auto,*,Auto">
-      <TextBlock Grid.Column="0" Text="ModbusForge" FontWeight="SemiBold" />
-      <TextBlock Grid.Column="1" Text="{Binding VersionText}" Margin="12,0,0,0" />
-      <TextBlock Grid.Column="2" Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" Margin="16,0,0,0" />
-      <TextBlock Grid.Column="3" Text="{Binding ConnectionStatusText}" Margin="16,0,0,0" />
-    </Grid>
-  </Border>
-</Grid>
+  </Grid>
 </UserControl>
