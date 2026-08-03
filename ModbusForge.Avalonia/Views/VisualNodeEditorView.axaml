@@ -113,10 +113,10 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="vm:GridLine">
-                <Border Canvas.Left="{Binding Left}" Canvas.Top="{Binding Top}" Width="{Binding Width}" Height="{Binding Height}" Background="#D9DEE7"/>
+                <Border Width="{Binding Width}" Height="{Binding Height}" Background="#D9DEE7"/>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
-          </ItemsControl>
+          <ItemsControl.Styles><Style Selector="ContentPresenter" x:DataType="vm:GridLine"><Setter Property="Canvas.Left" Value="{Binding Left}"/><Setter Property="Canvas.Top" Value="{Binding Top}"/></Style></ItemsControl.Styles></ItemsControl>
 
           <ItemsControl ItemsSource="{Binding ConnectionLines}" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}">
             <ItemsControl.ItemsPanel>
@@ -139,7 +139,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="models:VisualNode">
-                <Border Canvas.Left="{Binding X}" Canvas.Top="{Binding Y}" Width="{Binding Width}" Height="{Binding Height}" BorderBrush="Black" BorderThickness="2" CornerRadius="4" Background="LightBlue" PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
+                <Border Width="{Binding Width}" Height="{Binding Height}" BorderBrush="Black" BorderThickness="2" CornerRadius="4" Background="LightBlue" PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
                   <Canvas Width="{Binding Width}" Height="{Binding Height}" Background="Transparent">
                     <Grid Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" RowDefinitions="Auto,Auto,*" ClipToBounds="True">
                       <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="Bold" HorizontalAlignment="Center"/>
@@ -197,7 +197,7 @@
                 </Border>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
-          </ItemsControl>
+          <ItemsControl.Styles><Style Selector="ContentPresenter" x:DataType="models:VisualNode"><Setter Property="Canvas.Left" Value="{Binding X}"/><Setter Property="Canvas.Top" Value="{Binding Y}"/></Style></ItemsControl.Styles></ItemsControl>
 
           <Line x:Name="TempConnectionLine" Stroke="#999999" StrokeThickness="2" StrokeDashArray="5,5" IsVisible="False" IsHitTestVisible="False"/>
 
