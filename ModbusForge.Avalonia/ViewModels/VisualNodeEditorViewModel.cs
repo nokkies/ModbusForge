@@ -322,15 +322,15 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public VisualNodeEditorViewModel(
             IAvaloniaVisualSimulationService visualSimulation,
+            ITagWindowService tagWindowService,
             IFileDialogService? fileDialogService = null,
             IMessageBoxService? messageBoxService = null,
-            ITagWindowService? tagWindowService = null,
             TagService? tagService = null)
         {
             _visualSimulation = visualSimulation ?? throw new ArgumentNullException(nameof(visualSimulation));
+            _tagWindowService = tagWindowService ?? throw new ArgumentNullException(nameof(tagWindowService));
             _fileDialogService = fileDialogService;
             _messageBoxService = messageBoxService;
-            _tagWindowService = tagWindowService;
             _tagService = tagService;
 
             AddNodeCommand = new RelayCommand(AddNode, () => SelectedPaletteItem != null);

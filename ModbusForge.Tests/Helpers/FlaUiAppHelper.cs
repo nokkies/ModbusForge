@@ -24,6 +24,8 @@ public class FlaUiAppHelper : IDisposable
         _app = Application.Launch(appPath);
     }
 
+    public UIA3Automation Automation => _automation;
+
     public static FlaUiAppHelper LaunchFromProject()
     {
         var solutionDir = GetSolutionDirectory();
