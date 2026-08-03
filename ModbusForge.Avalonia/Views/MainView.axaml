@@ -3,8 +3,13 @@
              xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
              xmlns:views="clr-namespace:ModbusForge.Avalonia.Views"
              xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core"
+             xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters"
              x:Class="ModbusForge.Avalonia.Views.MainView"
              x:DataType="vm:MainViewModel">
+
+  <UserControl.Resources>
+    <converters:NavigationIndexConverter x:Key="NavigationIndexConverter" />
+  </UserControl.Resources>
 
   <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
     <DockPanel Grid.Row="0" LastChildFill="False">
@@ -63,24 +68,24 @@
           <MenuItem Header="_About ModbusForge" Command="{Binding OpenAboutCommand}" />
         </MenuItem>
       </Menu>
-      <TextBlock Text="ModbusForge Avalonia" FontSize="24" FontWeight="Bold" Margin="0,8,0,8" DockPanel.Dock="Top" />
+      <TextBlock Text="ModbusForge" FontSize="24" FontWeight="Bold" Margin="0,8,0,8" DockPanel.Dock="Top" />
     </DockPanel>
 
     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
       <TextBlock VerticalAlignment="Center" Text="Active profile:" />
       <TextBlock VerticalAlignment="Center" Text="{Binding ActiveProfile.DisplayName, FallbackValue='None'}" FontWeight="SemiBold" />
       <TextBlock VerticalAlignment="Center" Text="Mode:" Margin="16,0,0,0" />
-      <ComboBox ItemsSource="{Binding Modes}" SelectedItem="{Binding ActiveProfile.Mode, FallbackValue='Client'}" Width="90" />
+      <ComboBox ItemsSource="{Binding Modes}" SelectedItem="{Binding Mode, FallbackValue='Client'}" Width="100" />
       <TextBlock VerticalAlignment="Center" Text="{Binding AddressLabel}" Margin="16,0,0,0" />
       <TextBox Text="{Binding ActiveProfile.IpAddress, FallbackValue='127.0.0.1'}" Width="120" VerticalAlignment="Center" />
       <TextBlock VerticalAlignment="Center" Text="Port:" Margin="16,0,0,0" />
-      <NumericUpDown Value="{Binding ActiveProfile.Port, FallbackValue=502}" Minimum="1" Maximum="65535" Width="90" />
+      <NumericUpDown Value="{Binding ActiveProfile.Port, FallbackValue=502}" Minimum="1" Maximum="65535" Width="120" Padding="8,0" />
       <TextBlock VerticalAlignment="Center" Text="Unit ID:" Margin="16,0,0,0" IsVisible="{Binding ShowClientFields}" />
-      <NumericUpDown Value="{Binding UnitId}" Minimum="1" Maximum="247" Width="80" IsVisible="{Binding ShowClientFields}" />
+      <NumericUpDown Value="{Binding UnitId}" Minimum="1" Maximum="247" Width="110" Padding="8,0" IsVisible="{Binding ShowClientFields}" />
       <TextBlock VerticalAlignment="Center" Text="Unit ID(s):" Margin="16,0,0,0" IsVisible="{Binding ShowServerFields}" />
       <TextBox Text="{Binding ServerUnitIds, FallbackValue='1'}" Width="120" VerticalAlignment="Center" IsVisible="{Binding ShowServerFields}" ToolTip.Tip="Comma-separated list (e.g. 1, 2, 5-10)" />
       <TextBlock VerticalAlignment="Center" Text="Active ID:" Margin="16,0,0,0" IsVisible="{Binding ShowServerFields}" />
-      <ComboBox ItemsSource="{Binding AvailableUnitIds}" SelectedItem="{Binding SelectedUnitId}" Width="80" IsVisible="{Binding ShowServerFields}" />
+      <ComboBox ItemsSource="{Binding AvailableUnitIds}" SelectedItem="{Binding SelectedUnitId}" Width="100" IsVisible="{Binding ShowServerFields}" />
     </StackPanel>
 
     <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
@@ -109,27 +114,43 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="4">
             <TextBlock Text="Navigation" FontSize="16" FontWeight="SemiBold" Margin="4,2,4,8" />
-            <Button Content="Dashboard" Tag="Dashboard" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
-            <Button Content="Trends" Tag="Trend" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
-            <Button Content="Frame Inspector" Tag="FrameInspector" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
-            <Button Content="MQTT" Tag="Mqtt" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
-            <Button Content="Script Editor" Tag="ScriptEditor" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
-            <Button Content="Signal Generator" Tag="SignalGenerator" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
-            <Button Content="Visual Simulation" Tag="Simulation" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
-            <Separator />
-            <Button Content="Registers" Tag="Registers" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
-            <Button Content="Input Registers" Tag="InputRegisters" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
-            <Button Content="Coils" Tag="Coils" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
-            <Button Content="Discrete Inputs" Tag="DiscreteInputs" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
-            <Button Content="Custom Watch" Tag="CustomWatch" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
-            <Button Content="Decode" Tag="Decode" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
-            <Button Content="Console" Tag="Console" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
-            <Button Content="Debug" Tag="Debug" Click="NavigationButton_Click" HorizontalContentAlignment="Left" />
+            <ListBox x:Name="NavigationList"
+                     BorderThickness="0"
+                     Background="Transparent"
+                     Padding="0"
+                     SelectedIndex="{Binding SelectedTabIndex, Converter={StaticResource NavigationIndexConverter}, Mode=TwoWay}">
+              <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                  <Setter Property="Padding" Value="8,5" />
+                  <Setter Property="HorizontalContentAlignment" Value="Left" />
+                </Style>
+              </ListBox.Styles>
+              <ListBoxItem Content="Dashboard" />
+              <ListBoxItem Content="Trends" />
+              <ListBoxItem Content="Frame Inspector" />
+              <ListBoxItem Content="MQTT" />
+              <ListBoxItem Content="Script Editor" />
+              <ListBoxItem Content="Signal Generator" />
+              <ListBoxItem Content="Visual Simulation" />
+              <ListBoxItem Content="Registers" Margin="0,16,0,0" />
+              <ListBoxItem Content="Input Registers" />
+              <ListBoxItem Content="Coils" />
+              <ListBoxItem Content="Discrete Inputs" />
+              <ListBoxItem Content="Custom Watch" />
+              <ListBoxItem Content="Decode" />
+              <ListBoxItem Content="Console" />
+              <ListBoxItem Content="Debug" />
+            </ListBox>
           </StackPanel>
         </ScrollViewer>
       </Border>
 
       <TabControl x:Name="MainTabControl" Grid.Column="1" SelectedIndex="{Binding SelectedTabIndex}">
+        <TabControl.Styles>
+          <Style Selector="TabControl /template/ ItemsPresenter#PART_ItemsPresenter">
+            <Setter Property="IsVisible" Value="False" />
+          </Style>
+        </TabControl.Styles>
       <TabItem x:Name="DashboardTab" Header="Dashboard">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <Grid Margin="8" RowDefinitions="Auto,Auto,Auto,*">

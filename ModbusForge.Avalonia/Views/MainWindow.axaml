@@ -5,7 +5,7 @@
         x:Class="ModbusForge.Avalonia.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         x:CompileBindings="False"
-        Title="ModbusForge (Avalonia Spike)"
+        Title="ModbusForge"
         Width="900"
         Height="700">
   <Window.KeyBindings>

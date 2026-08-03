@@ -281,7 +281,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public string Mode
         {
-            get => ActiveProfile?.Mode ?? "Client";
+            get => ActiveProfile?.Mode is { } mode && !string.IsNullOrWhiteSpace(mode) ? mode : "Client";
             set
             {
                 if (ActiveProfile != null && ActiveProfile.Mode != value)
@@ -3024,7 +3024,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 {
                     var profile = new ConnectionProfile("Default", snapshot.ServerAddress, snapshot.Port, snapshot.ClientUnitId)
                     {
-                        Mode = snapshot.Mode,
+                        Mode = string.IsNullOrWhiteSpace(snapshot.Mode) ? "Client" : snapshot.Mode,
                         ServerUnitIds = snapshot.ServerUnitId
                     };
                     _connectionManager.AddProfile(profile);

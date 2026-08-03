@@ -20,7 +20,6 @@ namespace ModbusForge.Avalonia.Views
         private DataGrid? _coilsGrid;
         private DataGrid? _inputRegistersGrid;
         private DataGrid? _discreteInputsGrid;
-        private TabControl? _mainTabControl;
 
         public MainView()
         {
@@ -35,7 +34,6 @@ namespace ModbusForge.Avalonia.Views
             _coilsGrid = this.FindControl<DataGrid>("CoilsGrid");
             _inputRegistersGrid = this.FindControl<DataGrid>("InputRegistersGrid");
             _discreteInputsGrid = this.FindControl<DataGrid>("DiscreteInputsGrid");
-            _mainTabControl = this.FindControl<TabControl>("MainTabControl");
         }
 
         protected override void OnAttachedToVisualTree(global::Avalonia.VisualTreeAttachmentEventArgs e)
@@ -51,39 +49,12 @@ namespace ModbusForge.Avalonia.Views
 
         private MainViewModel? ViewModel => DataContext as MainViewModel;
 
-        private void NavigationButton_Click(object? sender, RoutedEventArgs e)
-        {
-            if (sender is not Button { Tag: string tag } || _mainTabControl == null) return;
-
-            var tab = tag switch
-            {
-                "Dashboard" => this.FindControl<TabItem>("DashboardTab"),
-                "Trend" => this.FindControl<TabItem>("TrendTab"),
-                "FrameInspector" => this.FindControl<TabItem>("FrameInspectorTab"),
-                "Mqtt" => this.FindControl<TabItem>("MqttTab"),
-                "ScriptEditor" => this.FindControl<TabItem>("ScriptEditorTab"),
-                "SignalGenerator" => this.FindControl<TabItem>("SignalGeneratorTab"),
-                "Simulation" => this.FindControl<TabItem>("SimulationTab"),
-                "Registers" => this.FindControl<TabItem>("RegistersTab"),
-                "InputRegisters" => this.FindControl<TabItem>("InputRegistersTab"),
-                "Coils" => this.FindControl<TabItem>("CoilsTab"),
-                "DiscreteInputs" => this.FindControl<TabItem>("DiscreteInputsTab"),
-                "CustomWatch" => this.FindControl<TabItem>("CustomWatchTab"),
-                "Decode" => this.FindControl<TabItem>("DecodeTab"),
-                "Console" => this.FindControl<TabItem>("ConsoleTab"),
-                "Debug" => this.FindControl<TabItem>("DebugTab"),
-                _ => null
-            };
-
-            if (tab?.IsVisible == true)
-            {
-                _mainTabControl.SelectedItem = tab;
-            }
-        }
-
         private void ScriptEditor_Click(object? sender, RoutedEventArgs e)
         {
-            NavigationButton_Click(new Button { Tag = "ScriptEditor" }, e);
+            if (ViewModel is not null)
+            {
+                ViewModel.SelectedTabIndex = 4;
+            }
         }
 
         private void HoldingRegistersGrid_CellEditEnded(object? sender, DataGridCellEditEndedEventArgs e)
