@@ -223,6 +223,7 @@ namespace ModbusForge.Avalonia.ViewModels
         public ICommand StopCommand { get; }
         public ICommand SaveCommand { get; }
         public ICommand LoadCommand { get; }
+        public ICommand LoadDemoCommand { get; }
         public ICommand UndoCommand { get; }
         public ICommand RedoCommand { get; }
         public ICommand ZoomInCommand { get; }
@@ -343,6 +344,7 @@ namespace ModbusForge.Avalonia.ViewModels
             StopCommand = new RelayCommand(Stop, () => IsRunning);
             SaveCommand = new AsyncRelayCommand(SaveAsync);
             LoadCommand = new AsyncRelayCommand(LoadAsync);
+            LoadDemoCommand = new RelayCommand(LoadDemo);
             UndoCommand = new RelayCommand(Undo, () => UndoRedo.CanUndo);
             RedoCommand = new RelayCommand(Redo, () => UndoRedo.CanRedo);
             ZoomInCommand = new RelayCommand(ZoomIn);
@@ -1427,6 +1429,33 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 StatusText = $"Load failed: {ex.Message}";
             }
+        }
+
+        private void LoadDemo()
+        {
+            Stop();
+            Config.Nodes.Clear();
+            Config.Connections.Clear();
+            Config.ConnectorConfigs.Clear();
+            ConnectionLines.Clear();
+            SelectedNode = null;
+            SelectedConnection = null;
+
+            var input1 = AddNodeAt(PlcElementType.InputBool, 80, 80);
+            var input2 = AddNodeAt(PlcElementType.InputBool, 80, 240);
+            var and = AddNodeAt(PlcElementType.AND, 320, 160);
+            var output = AddNodeAt(PlcElementType.OutputBool, 560, 160);
+
+            if (input1 != null && input2 != null && and != null && output != null)
+            {
+                Config.Connections.Add(new NodeConnection(input1.Id, and.Id, "Input1"));
+                Config.Connections.Add(new NodeConnection(input2.Id, and.Id, "Input2"));
+                Config.Connections.Add(new NodeConnection(and.Id, output.Id, "Input1"));
+            }
+
+            RefreshConnectionLines();
+            NotifyUndoRedoCommands();
+            StatusText = "Demo loaded";
         }
 
         private static IEnumerable<ProgramModel> EnumeratePrograms(ProgramFolder folder)

@@ -1,92 +1,93 @@
-<UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
-             xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core"
-             xmlns:shapes="using:Avalonia.Controls.Shapes"
-             xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters"
-             x:Class="ModbusForge.Avalonia.Views.VisualNodeEditorView"
-             x:DataType="vm:VisualNodeEditorViewModel"
-             Focusable="True">
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels" xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core" xmlns:shapes="using:Avalonia.Controls.Shapes" xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters" x:Class="ModbusForge.Avalonia.Views.VisualNodeEditorView" x:DataType="vm:VisualNodeEditorViewModel" Focusable="True">
 
-  <Grid ColumnDefinitions="220,*,300">
-    <!-- Palette -->
-    <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="1" Padding="8" Margin="0,0,8,0">
+  <Grid ColumnDefinitions="220,*,300" RowDefinitions="Auto,*">
+    <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8" Grid.Column="0" Grid.ColumnSpan="3">
+        <Button Content="Add Node" Command="{Binding AddNodeCommand}"/>
+        <Button Content="Remove Node" Command="{Binding RemoveNodeCommand}"/>
+        <Button Content="{Binding ConnectButtonText}" Command="{Binding AddConnectionCommand}"/>
+        <Button Content="Disconnect" Command="{Binding RemoveConnectionCommand}"/>
+        <ComboBox ItemsSource="{Binding TargetConnectorOptions}" SelectedItem="{Binding SelectedTargetConnector}" Width="78" ToolTip.Tip="Target connector for connect mode"/>
+        <TextBlock Text="{Binding ConnectionSourceText}" VerticalAlignment="Center" Margin="4,0,4,0"/>
+        <Button Content="Auto layout" Command="{Binding AutoLayoutCommand}"/>
+        <Button Content="Undo" Command="{Binding UndoCommand}"/>
+        <Button Content="Redo" Command="{Binding RedoCommand}"/>
+        <Button Content="Run" Command="{Binding RunCommand}"/>
+        <Button Content="Stop" Command="{Binding StopCommand}"/>
+        <Button Content="Save" Command="{Binding SaveCommand}"/>
+        <Button Content="Load" Command="{Binding LoadCommand}"/>
+        <Button Content="−" Command="{Binding ZoomOutCommand}" ToolTip.Tip="Zoom out"/>
+        <TextBlock Text="{Binding ZoomText}" VerticalAlignment="Center" MinWidth="45" TextAlignment="Center"/>
+        <Button Content="+" Command="{Binding ZoomInCommand}" ToolTip.Tip="Zoom in"/>
+        <Button Content="100%" Command="{Binding ResetZoomCommand}"/>
+        <Button Content="Tag Browser" Command="{Binding OpenTagBrowserCommand}"/>
+        <Button Content="Watch" Command="{Binding OpenWatchWindowCommand}"/>
+        <CheckBox Content="Snap" IsChecked="{Binding SnapToGrid}" VerticalAlignment="Center"/>
+        <NumericUpDown Value="{Binding GridSize}" Minimum="4" Maximum="200" Increment="4" Width="72" ToolTip.Tip="Grid size"/>
+        <CheckBox Content="Grid" IsChecked="{Binding ShowGrid}" VerticalAlignment="Center"/>
+        <CheckBox Content="Live values" IsChecked="{Binding ShowLiveValues}" VerticalAlignment="Center"/>
+        <CheckBox Content="Connectors" IsChecked="{Binding ShowConnectors}" VerticalAlignment="Center"/>
+        <CheckBox Content="Ortho" IsChecked="{Binding UseOrthogonalRouting}" VerticalAlignment="Center" ToolTip.Tip="Use orthogonal connection routing"/>
+        <Button Content="Add to Watch" Command="{Binding AddSelectedNodeToWatchCommand}" IsEnabled="{Binding SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+        <TextBlock Text="{Binding SelectedNodeCount, StringFormat='Selected: {0}'}" VerticalAlignment="Center" Margin="4,0,0,0"/>
+        <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="Bold" Margin="8,0,0,0"/>
+      <Button Content="Load Demo" Command="{Binding LoadDemoCommand}"/></WrapPanel>
+
+      <!-- Palette -->
+    <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="1" Padding="8" Margin="0,0,8,0" Grid.Row="1">
       <Grid RowDefinitions="Auto,*,Auto,210">
-        <TextBlock Grid.Row="0" Text="Palette" FontWeight="Bold" Margin="0,0,0,8" />
-        <ListBox Grid.Row="1" ItemsSource="{Binding Palette}" SelectedItem="{Binding SelectedPaletteItem}"
-                 PointerPressed="Palette_PointerPressed" PointerMoved="Palette_PointerMoved"
-                 PointerReleased="Palette_PointerReleased">
+        <TextBlock Grid.Row="0" Text="Palette" FontWeight="Bold" Margin="0,0,0,8"/>
+        <ListBox Grid.Row="1" ItemsSource="{Binding Palette}" SelectedItem="{Binding SelectedPaletteItem}" PointerPressed="Palette_PointerPressed" PointerMoved="Palette_PointerMoved" PointerReleased="Palette_PointerReleased">
           <ListBox.ItemTemplate>
             <DataTemplate DataType="vm:PaletteItem">
               <StackPanel>
-                <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" />
-                <TextBlock Text="{Binding Category}" FontSize="11" Opacity="0.7" />
+                <TextBlock Text="{Binding DisplayName}" FontWeight="Bold"/>
+                <TextBlock Text="{Binding Category}" FontSize="11" Opacity="0.7"/>
               </StackPanel>
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
 
-        <TextBlock Grid.Row="2" Text="Programs (POUs)" FontWeight="Bold" Margin="0,8,0,4" />
+        <TextBlock Grid.Row="2" Text="Programs (POUs)" FontWeight="Bold" Margin="0,8,0,4"/>
         <Grid Grid.Row="3" RowDefinitions="Auto,*">
           <StackPanel Grid.Row="0" Spacing="4">
-            <TextBox Text="{Binding NewProgramName, UpdateSourceTrigger=PropertyChanged}" Watermark="Program/Folder name" />
+            <TextBox Text="{Binding NewProgramName, UpdateSourceTrigger=PropertyChanged}" Watermark="Program/Folder name"/>
             <StackPanel Orientation="Horizontal" Spacing="4">
-              <Button Content="Create" Command="{Binding CreateProgramCommand}" />
-              <Button Content="Create Folder" Command="{Binding CreateFolderCommand}" />
-              <Button Content="Rename" Command="{Binding RenameItemCommand}"
-                      CommandParameter="{Binding SelectedTreeItem}" />
+              <Button Content="Create" Command="{Binding CreateProgramCommand}"/>
+              <Button Content="Create Folder" Command="{Binding CreateFolderCommand}"/>
+              <Button Content="Rename" Command="{Binding RenameItemCommand}" CommandParameter="{Binding SelectedTreeItem}"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="4">
-              <Button Content="Duplicate" Command="{Binding DuplicateProgramCommand}"
-                      CommandParameter="{Binding SelectedTreeItem}" />
-              <Button Content="Delete" Command="{Binding DeleteItemCommand}"
-                      CommandParameter="{Binding SelectedTreeItem}" />
+              <Button Content="Duplicate" Command="{Binding DuplicateProgramCommand}" CommandParameter="{Binding SelectedTreeItem}"/>
+              <Button Content="Delete" Command="{Binding DeleteItemCommand}" CommandParameter="{Binding SelectedTreeItem}"/>
             </StackPanel>
           </StackPanel>
-          <TreeView x:Name="ProgramTreeView" Grid.Row="1"
-                    ItemsSource="{Binding ProgramTree.Items}"
-                    SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay}"
-                    DragDrop.AllowDrop="True"
-                    DragDrop.DragOver="TreeView_DragOver"
-                    DragDrop.Drop="TreeView_Drop">
+          <TreeView x:Name="ProgramTreeView" Grid.Row="1" ItemsSource="{Binding ProgramTree.Items}" SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay}" DragDrop.AllowDrop="True" DragDrop.DragOver="TreeView_DragOver" DragDrop.Drop="TreeView_Drop">
             <TreeView.Styles>
               <Style Selector="TreeViewItem">
-                <Setter Property="IsExpanded" Value="True" />
+                <Setter Property="IsExpanded" Value="True"/>
               </Style>
             </TreeView.Styles>
             <TreeView.DataTemplates>
               <TreeDataTemplate DataType="models:ProgramFolder" ItemsSource="{Binding Items}">
                 <Grid DoubleTapped="TreeItem_DoubleTapped" Background="Transparent">
-                  <StackPanel x:Name="ViewPanel" Orientation="Horizontal" Spacing="4"
-                              IsVisible="{Binding IsRenaming, Converter={x:Static converters:ColorConverters.InverseBoolean}}">
-                    <TextBlock Text="" FontSize="14" VerticalAlignment="Center" />
-                    <TextBlock Text="[Folder]" FontWeight="Bold" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                  <StackPanel x:Name="ViewPanel" Orientation="Horizontal" Spacing="4" IsVisible="{Binding IsRenaming, Converter={x:Static converters:ColorConverters.InverseBoolean}}">
+                    <TextBlock Text="" FontSize="14" VerticalAlignment="Center"/>
+                    <TextBlock Text="[Folder]" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
                   </StackPanel>
-                  <TextBox x:Name="RenameBox"
-                           Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                           IsVisible="{Binding IsRenaming}"
-                           Watermark="Folder name"
-                           LostFocus="RenameBox_LostFocus"
-                           KeyDown="RenameBox_KeyDown" />
+                  <TextBox x:Name="RenameBox" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" IsVisible="{Binding IsRenaming}" Watermark="Folder name" LostFocus="RenameBox_LostFocus" KeyDown="RenameBox_KeyDown"/>
                 </Grid>
               </TreeDataTemplate>
               <DataTemplate DataType="models:ProgramModel">
                 <Grid DoubleTapped="TreeItem_DoubleTapped" Background="Transparent">
-                  <StackPanel x:Name="ViewPanel" Orientation="Horizontal" Spacing="4"
-                              IsVisible="{Binding IsRenaming, Converter={x:Static converters:ColorConverters.InverseBoolean}}">
-                    <TextBlock Text="" FontSize="12" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
-                    <TextBlock Text=" (" Foreground="#888" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding Nodes.Count}" Foreground="#888" VerticalAlignment="Center" />
-                    <TextBlock Text=" nodes)" Foreground="#888" VerticalAlignment="Center" />
+                  <StackPanel x:Name="ViewPanel" Orientation="Horizontal" Spacing="4" IsVisible="{Binding IsRenaming, Converter={x:Static converters:ColorConverters.InverseBoolean}}">
+                    <TextBlock Text="" FontSize="12" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                    <TextBlock Text=" (" Foreground="#888" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Nodes.Count}" Foreground="#888" VerticalAlignment="Center"/>
+                    <TextBlock Text=" nodes)" Foreground="#888" VerticalAlignment="Center"/>
                   </StackPanel>
-                  <TextBox x:Name="RenameBox"
-                           Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                           IsVisible="{Binding IsRenaming}"
-                           Watermark="Program name"
-                           LostFocus="RenameBox_LostFocus"
-                           KeyDown="RenameBox_KeyDown" />
+                  <TextBox x:Name="RenameBox" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" IsVisible="{Binding IsRenaming}" Watermark="Program name" LostFocus="RenameBox_LostFocus" KeyDown="RenameBox_KeyDown"/>
                 </Grid>
               </DataTemplate>
             </TreeView.DataTemplates>
@@ -96,131 +97,23 @@
     </Border>
 
     <!-- Main editor -->
-    <Grid Grid.Column="1" RowDefinitions="Auto,*,120,170">
-      <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-        <Button Content="Add Node" Command="{Binding AddNodeCommand}" />
-        <Button Content="Remove Node" Command="{Binding RemoveNodeCommand}" />
-        <Button Content="{Binding ConnectButtonText}" Command="{Binding AddConnectionCommand}" />
-        <Button Content="Disconnect" Command="{Binding RemoveConnectionCommand}" />
-        <ComboBox ItemsSource="{Binding TargetConnectorOptions}" SelectedItem="{Binding SelectedTargetConnector}"
-                  Width="78" ToolTip.Tip="Target connector for connect mode" />
-        <TextBlock Text="{Binding ConnectionSourceText}" VerticalAlignment="Center" Margin="4,0,4,0" />
-        <Button Content="Auto layout" Command="{Binding AutoLayoutCommand}" />
-        <Button Content="Undo" Command="{Binding UndoCommand}" />
-        <Button Content="Redo" Command="{Binding RedoCommand}" />
-        <Button Content="Run" Command="{Binding RunCommand}" />
-        <Button Content="Stop" Command="{Binding StopCommand}" />
-        <Button Content="Save" Command="{Binding SaveCommand}" />
-        <Button Content="Load" Command="{Binding LoadCommand}" />
-        <Button Content="−" Command="{Binding ZoomOutCommand}" ToolTip.Tip="Zoom out" />
-        <TextBlock Text="{Binding ZoomText}" VerticalAlignment="Center" MinWidth="45" TextAlignment="Center" />
-        <Button Content="+" Command="{Binding ZoomInCommand}" ToolTip.Tip="Zoom in" />
-        <Button Content="100%" Command="{Binding ResetZoomCommand}" />
-        <Button Content="Tag Browser" Command="{Binding OpenTagBrowserCommand}" />
-        <Button Content="Watch" Command="{Binding OpenWatchWindowCommand}" />
-        <CheckBox Content="Snap" IsChecked="{Binding SnapToGrid}" VerticalAlignment="Center" />
-        <NumericUpDown Value="{Binding GridSize}" Minimum="4" Maximum="200" Increment="4" Width="72" ToolTip.Tip="Grid size" />
-        <CheckBox Content="Grid" IsChecked="{Binding ShowGrid}" VerticalAlignment="Center" />
-        <CheckBox Content="Live values" IsChecked="{Binding ShowLiveValues}" VerticalAlignment="Center" />
-        <CheckBox Content="Connectors" IsChecked="{Binding ShowConnectors}" VerticalAlignment="Center" />
-        <CheckBox Content="Ortho" IsChecked="{Binding UseOrthogonalRouting}" VerticalAlignment="Center" ToolTip.Tip="Use orthogonal connection routing" />
-        <Button Content="Add to Watch" Command="{Binding AddSelectedNodeToWatchCommand}" IsEnabled="{Binding SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}" />
-        <TextBlock Text="{Binding SelectedNodeCount, StringFormat='Selected: {0}'}" VerticalAlignment="Center" Margin="4,0,0,0" />
-        <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="Bold" Margin="8,0,0,0" />
-      </WrapPanel>
-
-      <DataGrid Grid.Row="1" ItemsSource="{Binding Config.Nodes}" SelectedItem="{Binding SelectedNode}"
-                AutoGenerateColumns="False" GridLinesVisibility="All" Margin="0,0,0,8">
-        <DataGrid.Columns>
-          <DataGridTextColumn Header="Name" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="120" />
-          <DataGridTextColumn Header="Type" Binding="{Binding ElementType}" Width="120" IsReadOnly="True" />
-          <DataGridTextColumn Header="X" Binding="{Binding X}" Width="70" />
-          <DataGridTextColumn Header="Y" Binding="{Binding Y}" Width="70" />
-          <DataGridTextColumn Header="Width" Binding="{Binding Width}" Width="70" />
-          <DataGridTextColumn Header="Height" Binding="{Binding Height}" Width="70" />
-          <DataGridTextColumn Header="Address" Binding="{Binding Input1Address.Address, FallbackValue=''}" Width="80" />
-          <DataGridTextColumn Header="Preset" Binding="{Binding TimerPresetMs}" Width="80" />
-          <DataGridTextColumn Header="Live value" Binding="{Binding CurrentValueDouble, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}" Width="90" />
-        </DataGrid.Columns>
-      </DataGrid>
-
-      <DataGrid Grid.Row="2" ItemsSource="{Binding Config.Connections}" SelectedItem="{Binding SelectedConnection}"
-                AutoGenerateColumns="False" GridLinesVisibility="All" Margin="0,0,0,8">
-        <DataGrid.Columns>
-          <DataGridTextColumn Header="Source" Binding="{Binding SourceNodeId}" Width="*" />
-          <DataGridTextColumn Header="Target" Binding="{Binding TargetNodeId}" Width="*" />
-          <DataGridTextColumn Header="Target port" Binding="{Binding TargetConnector}" Width="90" />
-        </DataGrid.Columns>
-      </DataGrid>
-
-      <!-- Selected node properties -->
-      <Border Grid.Row="3" BorderBrush="Gray" BorderThickness="1" Padding="8"
-              IsVisible="{Binding SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}">
-        <ScrollViewer>
-          <StackPanel Spacing="4" DataContext="{Binding SelectedNode}">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <TextBlock Text="Name:" VerticalAlignment="Center" Width="80" />
-              <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="150" />
-              <CheckBox Content="Enabled" IsChecked="{Binding IsEnabled}" VerticalAlignment="Center" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <TextBlock Text="X:" VerticalAlignment="Center" Width="80" />
-              <NumericUpDown Value="{Binding X}" Minimum="0" Maximum="2000" Width="100" />
-              <TextBlock Text="Y:" VerticalAlignment="Center" Margin="8,0,0,0" />
-              <NumericUpDown Value="{Binding Y}" Minimum="0" Maximum="2000" Width="100" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <TextBlock Text="Live value:" VerticalAlignment="Center" Width="80" />
-              <TextBox Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                       Width="100" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" />
-              <TextBlock Text="(writes to configured address)" FontSize="10" Opacity="0.65" VerticalAlignment="Center" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <TextBlock Text="Waveform:" VerticalAlignment="Center" Width="80" />
-              <TextBox Text="{Binding Waveform, UpdateSourceTrigger=PropertyChanged}" Width="100" />
-              <TextBlock Text="Period ms:" VerticalAlignment="Center" Margin="8,0,0,0" />
-              <NumericUpDown Value="{Binding PeriodMs}" Minimum="0" Maximum="60000" Width="100" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <TextBlock Text="Amplitude:" VerticalAlignment="Center" Width="80" />
-              <NumericUpDown Value="{Binding Amplitude}" Minimum="-100000" Maximum="100000" Width="100" />
-              <TextBlock Text="Offset:" VerticalAlignment="Center" Margin="8,0,0,0" />
-              <NumericUpDown Value="{Binding Offset}" Minimum="-100000" Maximum="100000" Width="100" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <TextBlock Text="Preset:" VerticalAlignment="Center" Width="80" />
-              <NumericUpDown Value="{Binding TimerPresetMs}" Minimum="0" Maximum="100000" Width="100" />
-              <TextBlock Text="Compare:" VerticalAlignment="Center" Margin="8,0,0,0" />
-              <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Width="100" />
-            </StackPanel>
-          </StackPanel>
-        </ScrollViewer>
-      </Border>
-    </Grid>
-
     <!-- Preview canvas -->
-    <Border Grid.Column="2" BorderBrush="Gray" BorderThickness="1" Margin="8,0,0,0">
+    <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="1" Margin="0" Grid.Row="1">
       <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-        <Canvas x:Name="NodeCanvas" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}"
-                Background="#F5F5F5" PointerPressed="Canvas_PointerPressed"
-                PointerMoved="Canvas_PointerMoved" PointerReleased="Canvas_PointerReleased"
-                PointerCaptureLost="Canvas_PointerCaptureLost"
-                DragDrop.AllowDrop="True" RenderTransformOrigin="0,0">
+        <Canvas x:Name="NodeCanvas" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}" Background="#F5F5F5" PointerPressed="Canvas_PointerPressed" PointerMoved="Canvas_PointerMoved" PointerReleased="Canvas_PointerReleased" PointerCaptureLost="Canvas_PointerCaptureLost" DragDrop.AllowDrop="True" RenderTransformOrigin="0,0">
           <Canvas.RenderTransform>
-            <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}" />
+            <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
           </Canvas.RenderTransform>
 
-          <ItemsControl ItemsSource="{Binding GridLines}" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}"
-                        IsVisible="{Binding ShowGrid}" IsHitTestVisible="False">
+          <ItemsControl ItemsSource="{Binding GridLines}" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}" IsVisible="{Binding ShowGrid}" IsHitTestVisible="False">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
-                <Canvas />
+                <Canvas/>
               </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="vm:GridLine">
-                <Border Canvas.Left="{Binding Left}" Canvas.Top="{Binding Top}"
-                        Width="{Binding Width}" Height="{Binding Height}" Background="#D9DEE7" />
+                <Border Canvas.Left="{Binding Left}" Canvas.Top="{Binding Top}" Width="{Binding Width}" Height="{Binding Height}" Background="#D9DEE7"/>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -228,13 +121,12 @@
           <ItemsControl ItemsSource="{Binding ConnectionLines}" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
-                <Canvas />
+                <Canvas/>
               </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="vm:ConnectionLine">
-                <Path Data="{Binding PathData}" Stroke="{Binding LineBrush}" StrokeThickness="4"
-                      Cursor="Hand" PointerPressed="ConnectionLine_PointerPressed" />
+                <Path Data="{Binding PathData}" Stroke="{Binding LineBrush}" StrokeThickness="4" Cursor="Hand" PointerPressed="ConnectionLine_PointerPressed"/>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -242,70 +134,61 @@
           <ItemsControl ItemsSource="{Binding Config.Nodes}" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
-                <Canvas />
+                <Canvas/>
               </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="models:VisualNode">
-                <Border Canvas.Left="{Binding X}" Canvas.Top="{Binding Y}" Width="{Binding Width}" Height="{Binding Height}"
-                        BorderBrush="Black" BorderThickness="2" CornerRadius="4" Background="LightBlue"
-                        PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved"
-                        PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
+                <Border Canvas.Left="{Binding X}" Canvas.Top="{Binding Y}" Width="{Binding Width}" Height="{Binding Height}" BorderBrush="Black" BorderThickness="2" CornerRadius="4" Background="LightBlue" PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
                   <Canvas Width="{Binding Width}" Height="{Binding Height}" Background="Transparent">
                     <Grid Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" RowDefinitions="Auto,Auto,*" ClipToBounds="True">
-                      <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="Bold" HorizontalAlignment="Center" />
-                      <TextBlock Grid.Row="1" Text="{Binding ElementType}" FontSize="10" HorizontalAlignment="Center" />
-                      <TextBox Grid.Row="2" Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                               IsVisible="{Binding ShowLiveValues}" HorizontalContentAlignment="Center"
-                               GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" />
+                      <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="Bold" HorizontalAlignment="Center"/>
+                      <TextBlock Grid.Row="1" Text="{Binding ElementType}" FontSize="10" HorizontalAlignment="Center"/>
+                      <TextBox Grid.Row="2" Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsVisible="{Binding ShowLiveValues}" HorizontalContentAlignment="Center" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus"/>
                     </Grid>
 
-                    <Canvas Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}"
-                            IsVisible="{Binding $parent[UserControl].((vm:VisualNodeEditorViewModel)DataContext).ShowConnectors, FallbackValue=True}">
-                      <Ellipse Classes="Input1Port" Width="10" Height="10" Fill="#2196F3" Stroke="#1565C0" StrokeThickness="1.5"
-                               Cursor="Hand" ToolTip.Tip="Input 1" PointerPressed="Port_PointerPressed">
+                    <Canvas Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" IsVisible="{Binding $parent[UserControl].((vm:VisualNodeEditorViewModel)DataContext).ShowConnectors, FallbackValue=True}">
+                      <Ellipse Classes="Input1Port" Width="10" Height="10" Fill="#2196F3" Stroke="#1565C0" StrokeThickness="1.5" Cursor="Hand" ToolTip.Tip="Input 1" PointerPressed="Port_PointerPressed">
                         <Canvas.Left>
                           <MultiBinding Converter="{x:Static converters:NodePortPositionConverter.Instance}" ConverterParameter="Input1X">
-                            <Binding Path="Width" />
-                            <Binding Path="Height" />
+                            <Binding Path="Width"/>
+                            <Binding Path="Height"/>
                           </MultiBinding>
                         </Canvas.Left>
                         <Canvas.Top>
                           <MultiBinding Converter="{x:Static converters:NodePortPositionConverter.Instance}" ConverterParameter="Input1Y">
-                            <Binding Path="Width" />
-                            <Binding Path="Height" />
+                            <Binding Path="Width"/>
+                            <Binding Path="Height"/>
                           </MultiBinding>
                         </Canvas.Top>
                       </Ellipse>
 
-                      <Ellipse Classes="Input2Port" Width="10" Height="10" Fill="#2196F3" Stroke="#1565C0" StrokeThickness="1.5"
-                               Cursor="Hand" ToolTip.Tip="Input 2" IsVisible="{Binding HasSecondInput}" PointerPressed="Port_PointerPressed">
+                      <Ellipse Classes="Input2Port" Width="10" Height="10" Fill="#2196F3" Stroke="#1565C0" StrokeThickness="1.5" Cursor="Hand" ToolTip.Tip="Input 2" IsVisible="{Binding HasSecondInput}" PointerPressed="Port_PointerPressed">
                         <Canvas.Left>
                           <MultiBinding Converter="{x:Static converters:NodePortPositionConverter.Instance}" ConverterParameter="Input2X">
-                            <Binding Path="Width" />
-                            <Binding Path="Height" />
+                            <Binding Path="Width"/>
+                            <Binding Path="Height"/>
                           </MultiBinding>
                         </Canvas.Left>
                         <Canvas.Top>
                           <MultiBinding Converter="{x:Static converters:NodePortPositionConverter.Instance}" ConverterParameter="Input2Y">
-                            <Binding Path="Width" />
-                            <Binding Path="Height" />
+                            <Binding Path="Width"/>
+                            <Binding Path="Height"/>
                           </MultiBinding>
                         </Canvas.Top>
                       </Ellipse>
 
-                      <Ellipse Classes="OutputPort" Width="10" Height="10" Fill="#FF9800" Stroke="#E65100" StrokeThickness="1.5"
-                               Cursor="Hand" ToolTip.Tip="Output" IsVisible="{Binding HasOutput}" PointerPressed="Port_PointerPressed">
+                      <Ellipse Classes="OutputPort" Width="10" Height="10" Fill="#FF9800" Stroke="#E65100" StrokeThickness="1.5" Cursor="Hand" ToolTip.Tip="Output" IsVisible="{Binding HasOutput}" PointerPressed="Port_PointerPressed">
                         <Canvas.Left>
                           <MultiBinding Converter="{x:Static converters:NodePortPositionConverter.Instance}" ConverterParameter="OutputX">
-                            <Binding Path="Width" />
-                            <Binding Path="Height" />
+                            <Binding Path="Width"/>
+                            <Binding Path="Height"/>
                           </MultiBinding>
                         </Canvas.Left>
                         <Canvas.Top>
                           <MultiBinding Converter="{x:Static converters:NodePortPositionConverter.Instance}" ConverterParameter="OutputY">
-                            <Binding Path="Width" />
-                            <Binding Path="Height" />
+                            <Binding Path="Width"/>
+                            <Binding Path="Height"/>
                           </MultiBinding>
                         </Canvas.Top>
                       </Ellipse>
@@ -316,25 +199,77 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
 
-          <Line x:Name="TempConnectionLine"
-                Stroke="#999999" StrokeThickness="2" StrokeDashArray="5,5"
-                IsVisible="False" IsHitTestVisible="False" />
+          <Line x:Name="TempConnectionLine" Stroke="#999999" StrokeThickness="2" StrokeDashArray="5,5" IsVisible="False" IsHitTestVisible="False"/>
 
-          <shapes:Rectangle x:Name="MarqueeRectangle"
-                            Canvas.Left="{Binding MarqueeX}"
-                            Canvas.Top="{Binding MarqueeY}"
-                            Width="{Binding MarqueeWidth}"
-                            Height="{Binding MarqueeHeight}"
-                            Fill="#1E007ACC"
-                            Stroke="#007ACC"
-                            StrokeThickness="1"
-                            StrokeDashArray="4,4"
-                            StrokeLineCap="Flat"
-                            IsVisible="{Binding MarqueeIsVisible}"
-                            IsHitTestVisible="False"
-                            ZIndex="1000" />
+          <shapes:Rectangle x:Name="MarqueeRectangle" Canvas.Left="{Binding MarqueeX}" Canvas.Top="{Binding MarqueeY}" Width="{Binding MarqueeWidth}" Height="{Binding MarqueeHeight}" Fill="#1E007ACC" Stroke="#007ACC" StrokeThickness="1" StrokeDashArray="4,4" StrokeLineCap="Flat" IsVisible="{Binding MarqueeIsVisible}" IsHitTestVisible="False" ZIndex="1000"/>
         </Canvas>
       </ScrollViewer>
     </Border>
-  </Grid>
+  <Grid Grid.Column="2" RowDefinitions="*,120,170" Grid.Row="1" Margin="8,0,0,0">
+      <DataGrid Grid.Row="0" ItemsSource="{Binding Config.Nodes}" SelectedItem="{Binding SelectedNode}" AutoGenerateColumns="False" GridLinesVisibility="All" Margin="0,0,0,8">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Name" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="120"/>
+          <DataGridTextColumn Header="Type" Binding="{Binding ElementType}" Width="120" IsReadOnly="True"/>
+          <DataGridTextColumn Header="X" Binding="{Binding X}" Width="70"/>
+          <DataGridTextColumn Header="Y" Binding="{Binding Y}" Width="70"/>
+          <DataGridTextColumn Header="Width" Binding="{Binding Width}" Width="70"/>
+          <DataGridTextColumn Header="Height" Binding="{Binding Height}" Width="70"/>
+          <DataGridTextColumn Header="Address" Binding="{Binding Input1Address.Address, FallbackValue=''}" Width="80"/>
+          <DataGridTextColumn Header="Preset" Binding="{Binding TimerPresetMs}" Width="80"/>
+          <DataGridTextColumn Header="Live value" Binding="{Binding CurrentValueDouble, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:F2}'}" Width="90"/>
+        </DataGrid.Columns>
+      </DataGrid>
+
+      <DataGrid Grid.Row="1" ItemsSource="{Binding Config.Connections}" SelectedItem="{Binding SelectedConnection}" AutoGenerateColumns="False" GridLinesVisibility="All" Margin="0,0,0,8">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Source" Binding="{Binding SourceNodeId}" Width="*"/>
+          <DataGridTextColumn Header="Target" Binding="{Binding TargetNodeId}" Width="*"/>
+          <DataGridTextColumn Header="Target port" Binding="{Binding TargetConnector}" Width="90"/>
+        </DataGrid.Columns>
+      </DataGrid>
+
+      <!-- Selected node properties -->
+      <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="1" Padding="8" IsVisible="{Binding SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <ScrollViewer>
+          <StackPanel Spacing="4" DataContext="{Binding SelectedNode}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Name:" VerticalAlignment="Center" Width="80"/>
+              <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="150"/>
+              <CheckBox Content="Enabled" IsChecked="{Binding IsEnabled}" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="X:" VerticalAlignment="Center" Width="80"/>
+              <NumericUpDown Value="{Binding X}" Minimum="0" Maximum="2000" Width="100"/>
+              <TextBlock Text="Y:" VerticalAlignment="Center" Margin="8,0,0,0"/>
+              <NumericUpDown Value="{Binding Y}" Minimum="0" Maximum="2000" Width="100"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Live value:" VerticalAlignment="Center" Width="80"/>
+              <TextBox Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="100" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus"/>
+              <TextBlock Text="(writes to configured address)" FontSize="10" Opacity="0.65" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Waveform:" VerticalAlignment="Center" Width="80"/>
+              <TextBox Text="{Binding Waveform, UpdateSourceTrigger=PropertyChanged}" Width="100"/>
+              <TextBlock Text="Period ms:" VerticalAlignment="Center" Margin="8,0,0,0"/>
+              <NumericUpDown Value="{Binding PeriodMs}" Minimum="0" Maximum="60000" Width="100"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Amplitude:" VerticalAlignment="Center" Width="80"/>
+              <NumericUpDown Value="{Binding Amplitude}" Minimum="-100000" Maximum="100000" Width="100"/>
+              <TextBlock Text="Offset:" VerticalAlignment="Center" Margin="8,0,0,0"/>
+              <NumericUpDown Value="{Binding Offset}" Minimum="-100000" Maximum="100000" Width="100"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Preset:" VerticalAlignment="Center" Width="80"/>
+              <NumericUpDown Value="{Binding TimerPresetMs}" Minimum="0" Maximum="100000" Width="100"/>
+              <TextBlock Text="Compare:" VerticalAlignment="Center" Margin="8,0,0,0"/>
+              <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Width="100"/>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+
+    </Grid>
 </UserControl>
