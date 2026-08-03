@@ -2,31 +2,46 @@
 # Build artifacts
 bin/
 obj/
-*.dll
 *.exe
-*.pdb
+*.dll
 *.so
 *.dylib
-*.o
-*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
 
 # Dependencies
 packages/
 node_modules/
-vendor/
+.nuget/
 
-# Logs
+# Logs and temp files
 *.log
+*.tmp
+*.temp
+*.cache
 
 # OS generated files
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # User-specific files
 .vs/
+.vscode/
 .idea/
 *.userprefs
 
 # Configuration files
-appsettings.Production.json
+*.user
+*.userosscache
+*.suo
+*.csproj.user
+
+# Output directories
+Debug/
+Release/
+x64/
+x86/
 ```

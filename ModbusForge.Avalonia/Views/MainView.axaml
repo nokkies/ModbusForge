@@ -9,42 +9,77 @@
 
   <UserControl.Resources>
     <converters:NavigationIndexConverter x:Key="NavigationIndexConverter" />
+    
+    <!-- Navigation Item Style -->
+    <Style x:Key="NavigationItemStyle" Selector="ListBoxItem">
+      <Setter Property="Padding" Value="12,8"/>
+      <Setter Property="Margin" Value="4,2"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="HorizontalContentAlignment" Value="Left"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"/>
+          <BrushTransition Property="Background" Duration="0:0:0.15"/>
+        </Transitions>
+      </Setter>
+      <Style Setter="Background" Value="#2D2D30"/>
+      <Style Selector="^:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#3E3E42"/>
+      </Style>
+      <Style Selector="^:selected /template/ ContentPresenter">
+        <Setter Property="Background" Value="#007ACC"/>
+      </Style>
+    </Style>
   </UserControl.Resources>
 
-  <Grid>
+  <Grid Background="#252526">
     <!-- Main Content: Navigation + TabControl -->
-    <Grid ColumnDefinitions="190,*">
+    <Grid ColumnDefinitions="200,*">
       <!-- Navigation Sidebar -->
-      <Border Grid.Column="0" BorderBrush="#40000000" BorderThickness="1" CornerRadius="6" Padding="8" Margin="8">
+      <Border Grid.Column="0" Background="#2D2D30" CornerRadius="8,0,0,8" Margin="0,8,0,8">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-          <StackPanel Spacing="4">
-            <TextBlock Text="Navigation" FontSize="16" FontWeight="SemiBold" Margin="4,2,4,8" />
+          <StackPanel Spacing="2">
+            <TextBlock Text="⚡ Navigation" FontSize="14" FontWeight="SemiBold" Foreground="#B0B0B0" Margin="16,12,16,8"/>
             <ListBox x:Name="NavigationList"
                      BorderThickness="0"
                      Background="Transparent"
-                     Padding="0"
+                     Padding="8,0"
                      SelectedIndex="{Binding SelectedTabIndex, Converter={StaticResource NavigationIndexConverter}, Mode=TwoWay}">
               <ListBox.Styles>
                 <Style Selector="ListBoxItem">
-                  <Setter Property="Padding" Value="8,5" />
-                  <Setter Property="HorizontalContentAlignment" Value="Left" />
+                  <Setter Property="Padding" Value="12,8"/>
+                  <Setter Property="Margin" Value="0,2"/>
+                  <Setter Property="CornerRadius" Value="6"/>
+                  <Setter Property="Background" Value="Transparent"/>
+                  <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                  <Setter Property="Foreground" Value="#CCCCCC"/>
+                  <Style Selector="^:pointerover">
+                    <Setter Property="Background" Value="#3E3E42"/>
+                    <Setter Property="Foreground" Value="White"/>
+                  </Style>
+                  <Style Selector="^:selected">
+                    <Setter Property="Background" Value="#007ACC"/>
+                    <Setter Property="Foreground" Value="White"/>
+                  </Style>
                 </Style>
               </ListBox.Styles>
-              <ListBoxItem Content="Dashboard" />
-              <ListBoxItem Content="Trends" />
-              <ListBoxItem Content="Frame Inspector" />
-              <ListBoxItem Content="MQTT" />
-              <ListBoxItem Content="Script Editor" />
-              <ListBoxItem Content="Signal Generator" />
-              <ListBoxItem Content="Visual Simulation" />
-              <ListBoxItem Content="Registers" Margin="0,16,0,0" />
-              <ListBoxItem Content="Input Registers" />
-              <ListBoxItem Content="Coils" />
-              <ListBoxItem Content="Discrete Inputs" />
-              <ListBoxItem Content="Custom Watch" />
-              <ListBoxItem Content="Decode" />
-              <ListBoxItem Content="Console" />
-              <ListBoxItem Content="Debug" />
+              <ListBoxItem Content="📊 Dashboard"/>
+              <ListBoxItem Content="📈 Trends"/>
+              <ListBoxItem Content="🔍 Frame Inspector"/>
+              <ListBoxItem Content="☁️ MQTT"/>
+              <ListBoxItem Content="📝 Script Editor"/>
+              <ListBoxItem Content="📡 Signal Generator"/>
+              <ListBoxItem Content="🎮 Visual Simulation"/>
+              <ListBoxItem Content="" Margin="0,8,0,4"/>
+              <ListBoxItem Content="📋 Registers" Margin="0,8,0,0"/>
+              <ListBoxItem Content="📥 Input Registers"/>
+              <ListBoxItem Content="⚡ Coils"/>
+              <ListBoxItem Content="🔌 Discrete Inputs"/>
+              <ListBoxItem Content="👁️ Custom Watch"/>
+              <ListBoxItem Content="🔓 Decode"/>
+              <ListBoxItem Content="💻 Console"/>
+              <ListBoxItem Content="🐛 Debug"/>
             </ListBox>
           </StackPanel>
         </ScrollViewer>

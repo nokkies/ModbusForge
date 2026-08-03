@@ -13,7 +13,8 @@
         Width="1556"
         Height="1073"
         WindowState="Maximized"
-        Icon="/Assets/logo.png">
+        Icon="/Assets/logo.png"
+        Background="#1E1E1E">
   
   <Window.KeyBindings>
     <KeyBinding Gesture="Ctrl+R" Command="{Binding ReadShortcutCommand}" />
@@ -26,13 +27,28 @@
   </Window.KeyBindings>
 
   <Grid RowDefinitions="Auto,Auto,*,Auto">
-    <!-- Title Bar -->
-    <Border Grid.Row="0" Background="#1E1E1E" Padding="16,8">
-      <TextBlock Text="ModbusForge" FontSize="24" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
+    <!-- Title Bar with Gradient -->
+    <Border Grid.Row="0" Padding="16,10">
+      <Border.Background>
+        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+          <GradientStop Offset="0.0" Color="#2D2D30"/>
+          <GradientStop Offset="1.0" Color="#1E1E1E"/>
+        </LinearGradientBrush>
+      </Border.Background>
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <Image Grid.Column="0" Source="/Assets/logo.png" Width="32" Height="32" Margin="0,0,12,0"/>
+        <TextBlock Grid.Column="1" Text="ModbusForge" FontSize="24" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+          <TextBlock Text="{Binding ConnectionStatusText}" Foreground="#B0B0B0" VerticalAlignment="Center"/>
+          <Ellipse Width="12" Height="12" Fill="#2E8B57" IsVisible="{Binding IsConnected}"/>
+          <Ellipse Width="12" Height="12" Fill="#C62828" IsVisible="{Binding IsConnectionErrorVisible}"/>
+          <Ellipse Width="12" Height="12" Fill="#777777" IsVisible="{Binding IsDisconnected}"/>
+        </StackPanel>
+      </Grid>
     </Border>
 
     <!-- Menu Bar -->
-    <Menu Grid.Row="1">
+    <Menu Grid.Row="1" Background="#252526">
       <MenuItem Header="_File">
         <MenuItem Header="_Save Project" Command="{Binding SaveProjectCommand}" InputGesture="Ctrl+S" />
         <MenuItem Header="_Load Project" Command="{Binding LoadProjectCommand}" />
@@ -89,13 +105,24 @@
     </Menu>
 
     <!-- Main Content with Docking -->
-    <dock:DockPanel Grid.Row="2" LastChildFill="True">
-      <views:MainView dock:DockPanel.Dock="Left" dock:DockPanel.Width="190" />
+    <dock:DockPanel Grid.Row="2" LastChildFill="True" Background="#252526">
+      <views:MainView dock:DockPanel.Dock="Left" dock:DockPanel.Width="200" />
     </dock:DockPanel>
 
     <!-- Status Bar -->
-    <Border Grid.Row="3" Background="#1E1E1E" Padding="8,4">
-      <TextBlock Text="{Binding StatusMessage}" Foreground="White" VerticalAlignment="Center" />
+    <Border Grid.Row="3" Padding="10,6">
+      <Border.Background>
+        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+          <GradientStop Offset="0.0" Color="#007ACC"/>
+          <GradientStop Offset="1.0" Color="#005A9E"/>
+        </LinearGradientBrush>
+      </Border.Background>
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" Foreground="White" VerticalAlignment="Center" FontSize="13"/>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+          <TextBlock Text="📊 Modbus TCP/IP Tool" Foreground="#B0B0B0" VerticalAlignment="Center" FontSize="12"/>
+        </StackPanel>
+      </Grid>
     </Border>
   </Grid>
 </Window>

@@ -1,8 +1,63 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="ModbusForge.Avalonia.App"
-             RequestedThemeVariant="Light">
+             RequestedThemeVariant="Dark">
   <Application.Styles>
     <FluentTheme />
+    <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml"/>
+    
+    <!-- Custom Theme Resources -->
+    <ResourceDictionary>
+      <!-- Brand Colors -->
+      <Color x:Key="BrandPrimaryColor">#3498DB</Color>
+      <Color x:Key="BrandSecondaryColor">#2ECC71</Color>
+      <Color x:Key="BrandAccentColor">#E74C3C</Color>
+      <Color x:Key="BackgroundColor">#1E1E1E</Color>
+      <Color x:Key="SurfaceColor">#2D2D30</Color>
+      <Color x:Key="BorderColor">#3E3E42</Color>
+      
+      <!-- Theme Brushes -->
+      <SolidColorBrush x:Key="BrandPrimaryBrush" Color="{StaticResource BrandPrimaryColor}"/>
+      <SolidColorBrush x:Key="BrandSecondaryBrush" Color="{StaticResource BrandSecondaryColor}"/>
+      <SolidColorBrush x:Key="BrandAccentBrush" Color="{StaticResource BrandAccentColor}"/>
+      <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
+      <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}"/>
+      <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+      
+      <!-- Status Colors -->
+      <Color x:Key="SuccessColor">#2E8B57</Color>
+      <Color x:Key="ErrorColor">#C62828</Color>
+      <Color x:Key="WarningColor">#FFA500</Color>
+      <Color x:Key="InfoColor">#4682B4</Color>
+      
+      <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}"/>
+      <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ErrorColor}"/>
+      <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>
+      <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource InfoColor}"/>
+      
+      <!-- Typography -->
+      <FontFamily x:Key="DefaultFont">Segoe UI, Arial, sans-serif</FontFamily>
+      <sys:Double x:Key="SmallFontSize">11</sys:Double>
+      <sys:Double x:Key="NormalFontSize">13</sys:Double>
+      <sys:Double x:Key="MediumFontSize">16</sys:Double>
+      <sys:Double x:Key="LargeFontSize">20</sys:Double>
+      <sys:Double x:Key="TitleFontSize">24</sys:Double>
+      
+      <!-- Spacing -->
+      <Thickness x:Key="SmallMargin">4,4,4,4</Thickness>
+      <Thickness x:Key="NormalMargin">8,8,8,8</Thickness>
+      <Thickness x:Key="MediumMargin">12,12,12,12</Thickness>
+      <Thickness x:Key="LargeMargin">16,16,16,16</Thickness>
+      
+      <!-- Control Styling -->
+      <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
+      <CornerRadius x:Key="LargeCornerRadius">12</CornerRadius>
+      <sys:Double x:Key="ControlHeight">32</sys:Double>
+      <sys:Double x:Key="ControlPadding">12,8</sys:Double>
+      
+      <!-- Effects -->
+      <DropShadowEffect x:Key="CardShadow" BlurRadius="8" ShadowDepth="2" Opacity="0.3" Color="#000000"/>
+      <DropShadowEffect x:Key="ButtonShadow" BlurRadius="4" ShadowDepth="1" Opacity="0.2" Color="#000000"/>
+    </ResourceDictionary>
   </Application.Styles>
 </Application>
