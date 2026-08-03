@@ -1,0 +1,92 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+        x:Class="ModbusForge.Avalonia.Views.AdvancedFunctionsWindow"
+        x:DataType="vm:AdvancedFunctionsViewModel"
+        Title="Advanced Functions"
+        Width="720"
+        Height="700"
+        MinWidth="620"
+        MinHeight="580"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0" Background="#2B579A" Padding="20,16">
+      <StackPanel Spacing="4">
+        <TextBlock Text="Advanced Functions" FontSize="20" FontWeight="SemiBold" Foreground="White" />
+        <TextBlock Text="{Binding UnitId, StringFormat='FC22 / FC23 / FC43 on Unit ID {0}'}" Foreground="#E8F0FA" />
+      </StackPanel>
+    </Border>
+
+    <ScrollViewer Grid.Row="1" Margin="16,16,16,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="12">
+        <Border BorderBrush="#C8C8C8" BorderThickness="1" Padding="12" CornerRadius="4">
+          <StackPanel Spacing="8">
+            <TextBlock Text="FC22 - Mask Write Register" FontWeight="SemiBold" FontSize="15" />
+            <TextBlock Text="result = (current AND mask) OR (or mask AND NOT and mask)" Foreground="#666666" TextWrapping="Wrap" />
+            <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*">
+              <TextBlock Text="Address:" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <NumericUpDown Grid.Column="1" Value="{Binding MaskWriteAddress}" Minimum="1" Maximum="65535" Increment="1" FormatString="0" />
+              <TextBlock Grid.Column="2" Text="AND mask:" VerticalAlignment="Center" Margin="12,0,8,0" />
+              <NumericUpDown Grid.Column="3" Value="{Binding AndMask}" Minimum="0" Maximum="65535" Increment="1" FormatString="0" />
+              <TextBlock Grid.Column="4" Text="OR mask:" VerticalAlignment="Center" Margin="12,0,8,0" />
+              <NumericUpDown Grid.Column="5" Value="{Binding OrMask}" Minimum="0" Maximum="65535" Increment="1" FormatString="0" />
+            </Grid>
+            <Button Content="Mask Write" Width="130" HorizontalAlignment="Left" Command="{Binding MaskWriteCommand}" />
+          </StackPanel>
+        </Border>
+
+        <Border BorderBrush="#C8C8C8" BorderThickness="1" Padding="12" CornerRadius="4">
+          <StackPanel Spacing="8">
+            <TextBlock Text="FC23 - Read/Write Multiple Registers" FontWeight="SemiBold" FontSize="15" />
+            <TextBlock Text="The write is performed before the read, in a single transaction." Foreground="#666666" TextWrapping="Wrap" />
+            <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*">
+              <TextBlock Text="Read address:" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <NumericUpDown Grid.Column="1" Value="{Binding ReadAddress}" Minimum="1" Maximum="65535" Increment="1" FormatString="0" />
+              <TextBlock Grid.Column="2" Text="Count:" VerticalAlignment="Center" Margin="12,0,8,0" />
+              <NumericUpDown Grid.Column="3" Value="{Binding ReadCount}" Minimum="1" Maximum="125" Increment="1" FormatString="0" />
+              <TextBlock Grid.Column="4" Text="Write address:" VerticalAlignment="Center" Margin="12,0,8,0" />
+              <NumericUpDown Grid.Column="5" Value="{Binding WriteAddress}" Minimum="1" Maximum="65535" Increment="1" FormatString="0" />
+            </Grid>
+            <TextBlock Text="Values to write (comma, semicolon, or space separated; use 0x for hexadecimal):" TextWrapping="Wrap" />
+            <TextBox Text="{Binding WriteValues, UpdateSourceTrigger=PropertyChanged}" Watermark="0, 0" />
+            <Button Content="Read/Write" Width="130" HorizontalAlignment="Left" Command="{Binding ReadWriteMultipleCommand}" />
+          </StackPanel>
+        </Border>
+
+        <Border BorderBrush="#C8C8C8" BorderThickness="1" Padding="12" CornerRadius="4">
+          <StackPanel Spacing="8">
+            <TextBlock Text="FC43 - Read Device Identification" FontWeight="SemiBold" FontSize="15" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Category:" VerticalAlignment="Center" />
+              <ComboBox Width="140" ItemsSource="{Binding DeviceIdCategories}" SelectedItem="{Binding DeviceIdCategory, Mode=TwoWay}" />
+              <Button Content="Read Identification" Width="160" Command="{Binding ReadDeviceIdentificationCommand}" />
+            </StackPanel>
+            <DataGrid ItemsSource="{Binding DeviceIdentificationItems}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      HeadersVisibility="Column"
+                      GridLinesVisibility="Horizontal"
+                      Height="190">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="ID" Binding="{Binding ObjectId}" Width="60" />
+                <DataGridTextColumn Header="Object" Binding="{Binding Name}" Width="170" />
+                <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+
+    <Border Grid.Row="2" Background="#F2F2F2" Padding="16,10">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Spacing="6" VerticalAlignment="Center">
+          <ProgressBar Height="6" IsVisible="{Binding IsBusy}" IsIndeterminate="{Binding IsBusy}" />
+          <TextBlock Text="{Binding Status}" TextWrapping="Wrap" />
+        </StackPanel>
+        <Button Grid.Column="1" Content="Close" Width="90" VerticalAlignment="Center" Click="CloseButton_Click" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

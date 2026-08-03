@@ -1,0 +1,55 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+        x:Class="ModbusForge.Avalonia.Views.WatchWindow"
+        x:DataType="vm:WatchViewModel"
+        x:CompileBindings="False"
+        Title="Watch Window - Real-time Monitoring"
+        Width="820"
+        Height="520"
+        MinWidth="650"
+        MinHeight="380"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0" BorderBrush="Gray" BorderThickness="0,0,0,1" Padding="8">
+      <WrapPanel Orientation="Horizontal" ItemHeight="34">
+        <Button Content="Add Tag" Command="{Binding AddTagCommand}" Margin="0,0,6,0" />
+        <Button Content="Remove" Command="{Binding RemoveCommand}" Margin="0,0,6,0" />
+        <Button Content="Clear All" Command="{Binding ClearAllCommand}" Margin="0,0,12,0" />
+        <Button Content="Start" Command="{Binding StartCommand}" Margin="0,0,6,0" />
+        <Button Content="Stop" Command="{Binding StopCommand}" Margin="0,0,18,0" />
+        <TextBlock Text="Update:" VerticalAlignment="Center" Margin="0,0,6,0" />
+        <ComboBox ItemsSource="{Binding UpdateIntervalOptions}"
+                  SelectedItem="{Binding SelectedUpdateIntervalMs, Mode=TwoWay}"
+                  Width="100" />
+        <TextBlock Text="ms" VerticalAlignment="Center" Margin="6,0,0,0" />
+      </WrapPanel>
+    </Border>
+
+    <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1" Margin="8">
+      <DataGrid ItemsSource="{Binding WatchEntries}"
+                SelectedItem="{Binding SelectedEntry, Mode=TwoWay}"
+                AutoGenerateColumns="False"
+                IsReadOnly="True"
+                HeadersVisibility="Column"
+                GridLinesVisibility="All">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Group" Binding="{Binding TagGroup}" Width="130" />
+          <DataGridTextColumn Header="Tag Name" Binding="{Binding TagName}" Width="170" />
+          <DataGridTextColumn Header="Value" Binding="{Binding FormattedValue}" Width="140" />
+          <DataGridTextColumn Header="Last Updated" Binding="{Binding LastUpdated, StringFormat='{}{0:HH:mm:ss.fff}'}" Width="120" />
+          <DataGridCheckBoxColumn Header="Stale" Binding="{Binding IsStale}" Width="60" />
+          <DataGridTextColumn Header="Alarm" Binding="{Binding AlarmMessage}" Width="*" />
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="0,1,0,0" Padding="8,6">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" />
+        <TextBlock Grid.Column="1" Text="{Binding EntryCountText}" Margin="16,0,0,0" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

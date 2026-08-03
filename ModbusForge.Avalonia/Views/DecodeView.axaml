@@ -1,0 +1,106 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+             x:Class="ModbusForge.Avalonia.Views.DecodeView"
+             x:DataType="vm:DecodeViewModel">
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="Enter" Command="{Binding ReadNowCommand}" />
+  </UserControl.KeyBindings>
+
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Grid Grid.Row="0" ColumnDefinitions="Auto,150,Auto,100,Auto,*" Margin="0,0,0,8">
+      <TextBlock Grid.Column="0" Text="Area:" VerticalAlignment="Center" />
+      <ComboBox Grid.Column="1"
+                ItemsSource="{Binding AreaOptions}"
+                SelectedItem="{Binding Area, Mode=TwoWay}" />
+      <TextBlock Grid.Column="2" Text="Address:" VerticalAlignment="Center" />
+      <TextBox Grid.Column="3"
+               Text="{Binding AddressInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+      <Button Grid.Column="4" Content="{Binding ReadButtonText}" Command="{Binding ReadNowCommand}" MinWidth="90" />
+    </Grid>
+
+    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto">
+        <Border Grid.Column="0" BorderBrush="#50000000" BorderThickness="1" CornerRadius="4" Padding="8">
+          <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="155,*,*,*,*">
+            <TextBlock Grid.Row="0" Grid.ColumnSpan="5" Text="16-bit (first word)" FontWeight="Bold" Margin="0,0,0,4" />
+
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="None" FontWeight="Bold" />
+            <TextBlock Grid.Row="1" Grid.Column="2" Text="Swap Bytes" FontWeight="Bold" />
+            <TextBlock Grid.Row="1" Grid.Column="3" Text="Swap Words" FontWeight="Bold" />
+            <TextBlock Grid.Row="1" Grid.Column="4" Text="Swap B+W" FontWeight="Bold" />
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Raw (hex):" VerticalAlignment="Center" />
+            <TextBox Grid.Row="2" Grid.Column="1" IsReadOnly="True" Text="{Binding Raw16HexNone}" />
+            <TextBox Grid.Row="2" Grid.Column="2" IsReadOnly="True" Text="{Binding Raw16HexSwapB}" />
+            <TextBox Grid.Row="2" Grid.Column="3" IsReadOnly="True" Text="{Binding Raw16HexSwapW}" />
+            <TextBox Grid.Row="2" Grid.Column="4" IsReadOnly="True" Text="{Binding Raw16HexSwapBW}" />
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="UInt16:" VerticalAlignment="Center" />
+            <TextBox Grid.Row="3" Grid.Column="1" IsReadOnly="True" Text="{Binding Uint16TextNone}" />
+            <TextBox Grid.Row="3" Grid.Column="2" IsReadOnly="True" Text="{Binding Uint16TextSwapB}" />
+            <TextBox Grid.Row="3" Grid.Column="3" IsReadOnly="True" Text="{Binding Uint16TextSwapW}" />
+            <TextBox Grid.Row="3" Grid.Column="4" IsReadOnly="True" Text="{Binding Uint16TextSwapBW}" />
+
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Int16:" VerticalAlignment="Center" />
+            <TextBox Grid.Row="4" Grid.Column="1" IsReadOnly="True" Text="{Binding Int16TextNone}" />
+            <TextBox Grid.Row="4" Grid.Column="2" IsReadOnly="True" Text="{Binding Int16TextSwapB}" />
+            <TextBox Grid.Row="4" Grid.Column="3" IsReadOnly="True" Text="{Binding Int16TextSwapW}" />
+            <TextBox Grid.Row="4" Grid.Column="4" IsReadOnly="True" Text="{Binding Int16TextSwapBW}" />
+
+            <TextBlock Grid.Row="5" Grid.Column="0" Text="ASCII(2):" VerticalAlignment="Center" />
+            <TextBox Grid.Row="5" Grid.Column="1" IsReadOnly="True" Text="{Binding Ascii2TextNone}" />
+            <TextBox Grid.Row="5" Grid.Column="2" IsReadOnly="True" Text="{Binding Ascii2TextSwapB}" />
+            <TextBox Grid.Row="5" Grid.Column="3" IsReadOnly="True" Text="{Binding Ascii2TextSwapW}" />
+            <TextBox Grid.Row="5" Grid.Column="4" IsReadOnly="True" Text="{Binding Ascii2TextSwapBW}" />
+          </Grid>
+        </Border>
+
+        <Border Grid.Column="1" BorderBrush="#50000000" BorderThickness="1" CornerRadius="4" Padding="8">
+          <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="155,*,*,*,*">
+            <TextBlock Grid.Row="0" Grid.ColumnSpan="5" Text="32-bit (two words)" FontWeight="Bold" Margin="0,0,0,4" />
+
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="None" FontWeight="Bold" />
+            <TextBlock Grid.Row="1" Grid.Column="2" Text="Swap Bytes" FontWeight="Bold" />
+            <TextBlock Grid.Row="1" Grid.Column="3" Text="Swap Words" FontWeight="Bold" />
+            <TextBlock Grid.Row="1" Grid.Column="4" Text="Swap B+W" FontWeight="Bold" />
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Raw (hex):" VerticalAlignment="Center" />
+            <TextBox Grid.Row="2" Grid.Column="1" IsReadOnly="True" Text="{Binding Raw32HexNone}" />
+            <TextBox Grid.Row="2" Grid.Column="2" IsReadOnly="True" Text="{Binding Raw32HexSwapB}" />
+            <TextBox Grid.Row="2" Grid.Column="3" IsReadOnly="True" Text="{Binding Raw32HexSwapW}" />
+            <TextBox Grid.Row="2" Grid.Column="4" IsReadOnly="True" Text="{Binding Raw32HexSwapBW}" />
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="UInt32:" VerticalAlignment="Center" />
+            <TextBox Grid.Row="3" Grid.Column="1" IsReadOnly="True" Text="{Binding Uint32TextNone}" />
+            <TextBox Grid.Row="3" Grid.Column="2" IsReadOnly="True" Text="{Binding Uint32TextSwapB}" />
+            <TextBox Grid.Row="3" Grid.Column="3" IsReadOnly="True" Text="{Binding Uint32TextSwapW}" />
+            <TextBox Grid.Row="3" Grid.Column="4" IsReadOnly="True" Text="{Binding Uint32TextSwapBW}" />
+
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Int32:" VerticalAlignment="Center" />
+            <TextBox Grid.Row="4" Grid.Column="1" IsReadOnly="True" Text="{Binding Int32TextNone}" />
+            <TextBox Grid.Row="4" Grid.Column="2" IsReadOnly="True" Text="{Binding Int32TextSwapB}" />
+            <TextBox Grid.Row="4" Grid.Column="3" IsReadOnly="True" Text="{Binding Int32TextSwapW}" />
+            <TextBox Grid.Row="4" Grid.Column="4" IsReadOnly="True" Text="{Binding Int32TextSwapBW}" />
+
+            <TextBlock Grid.Row="5" Grid.Column="0" Text="Float32:" VerticalAlignment="Center" />
+            <TextBox Grid.Row="5" Grid.Column="1" IsReadOnly="True" Text="{Binding Float32TextNone}" />
+            <TextBox Grid.Row="5" Grid.Column="2" IsReadOnly="True" Text="{Binding Float32TextSwapB}" />
+            <TextBox Grid.Row="5" Grid.Column="3" IsReadOnly="True" Text="{Binding Float32TextSwapW}" />
+            <TextBox Grid.Row="5" Grid.Column="4" IsReadOnly="True" Text="{Binding Float32TextSwapBW}" />
+
+            <TextBlock Grid.Row="6" Grid.Column="0" Text="ASCII(4):" VerticalAlignment="Center" />
+            <TextBox Grid.Row="6" Grid.Column="1" IsReadOnly="True" Text="{Binding Ascii4TextNone}" />
+            <TextBox Grid.Row="6" Grid.Column="2" IsReadOnly="True" Text="{Binding Ascii4TextSwapB}" />
+            <TextBox Grid.Row="6" Grid.Column="3" IsReadOnly="True" Text="{Binding Ascii4TextSwapW}" />
+            <TextBox Grid.Row="6" Grid.Column="4" IsReadOnly="True" Text="{Binding Ascii4TextSwapBW}" />
+          </Grid>
+        </Border>
+      </Grid>
+    </ScrollViewer>
+
+    <Border Grid.Row="2" Background="#12000000" CornerRadius="4" Padding="6" Margin="0,8,0,0">
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" />
+    </Border>
+  </Grid>
+</UserControl>

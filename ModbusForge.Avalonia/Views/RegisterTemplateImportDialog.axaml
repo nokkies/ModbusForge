@@ -1,0 +1,65 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ModbusForge.Avalonia.Views.RegisterTemplateImportDialog"
+        x:CompileBindings="False"
+        Title="Import Register Template"
+        Width="1100"
+        Height="680"
+        MinWidth="800"
+        MinHeight="480"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto,Auto">
+    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,10">
+      <TextBlock Grid.Column="0" Text="File:" VerticalAlignment="Center" Margin="0,0,8,0" />
+      <TextBox Grid.Column="1" x:Name="FilePathBox" IsReadOnly="True" />
+      <Button Grid.Column="2" Content="Browse..." Click="Browse_Click" Margin="8,0,0,0" />
+    </Grid>
+
+    <WrapPanel Grid.Row="1" Orientation="Horizontal" ItemHeight="34" Margin="0,0,0,10">
+      <TextBlock Text="Addressing:" VerticalAlignment="Center" Margin="0,0,8,0" />
+      <ComboBox x:Name="AddressingCombo" Width="250" SelectedIndex="0" SelectionChanged="Addressing_Changed" Margin="0,0,18,0">
+        <ComboBoxItem Content="0-based (protocol address)" />
+        <ComboBoxItem Content="1-based (address - 1)" />
+        <ComboBoxItem Content="Modicon (40001 / 30001 / 10001)" />
+      </ComboBox>
+      <TextBlock Text="Template name:" VerticalAlignment="Center" Margin="0,0,8,0" />
+      <TextBox x:Name="TemplateNameBox" Width="210" Margin="0,0,18,0" />
+      <CheckBox x:Name="SaveTemplateCheck" Content="Save to templates folder" IsChecked="True" VerticalAlignment="Center" />
+    </WrapPanel>
+
+    <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="1">
+      <DataGrid x:Name="PreviewGrid"
+                AutoGenerateColumns="False"
+                IsReadOnly="True"
+                HeadersVisibility="Column"
+                GridLinesVisibility="Horizontal">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Row" Binding="{Binding RowNumber}" Width="55" />
+          <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="75" />
+          <DataGridTextColumn Header="Tag Name" Binding="{Binding TagName}" Width="180" />
+          <DataGridTextColumn Header="Area" Binding="{Binding RegisterType}" Width="115" />
+          <DataGridTextColumn Header="Source Addr" Binding="{Binding RawAddress}" Width="90" />
+          <DataGridTextColumn Header="Addr" Binding="{Binding Address}" Width="60" />
+          <DataGridTextColumn Header="Bit" Binding="{Binding Bit}" Width="45" />
+          <DataGridTextColumn Header="Type" Binding="{Binding DataType}" Width="75" />
+          <DataGridTextColumn Header="Words" Binding="{Binding Length}" Width="60" />
+          <DataGridTextColumn Header="Order" Binding="{Binding WordOrder}" Width="90" />
+          <DataGridTextColumn Header="Scale" Binding="{Binding Scale}" Width="65" />
+          <DataGridTextColumn Header="Offset" Binding="{Binding Offset}" Width="65" />
+          <DataGridTextColumn Header="Unit" Binding="{Binding Unit}" Width="70" />
+          <DataGridTextColumn Header="Access" Binding="{Binding Access}" Width="80" />
+          <DataGridTextColumn Header="Enum" Binding="{Binding Enum}" Width="130" />
+          <DataGridTextColumn Header="Issues" Binding="{Binding Issues}" Width="*" />
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <TextBlock Grid.Row="3" x:Name="SummaryText" TextWrapping="Wrap" Margin="0,10,0,0" />
+
+    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
+      <Button x:Name="ImportButton" Content="Import" Width="100" Click="Import_Click" IsDefault="True" IsEnabled="False" />
+      <Button Content="Cancel" Width="100" Click="Cancel_Click" IsCancel="True" />
+    </StackPanel>
+  </Grid>
+</Window>

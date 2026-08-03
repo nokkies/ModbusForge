@@ -426,6 +426,41 @@ namespace ModbusForge.Avalonia.Views
             }
         }
 
+        private void AdvancedFunctions_Click(object? sender, RoutedEventArgs e)
+        {
+            var app = global::Avalonia.Application.Current as App;
+            var vm = ViewModel;
+            if (app?.Services == null || vm?.ActiveService == null)
+            {
+                if (vm != null) vm.StatusMessage = "Connect a profile before opening Advanced Functions.";
+                return;
+            }
+
+            var window = new AdvancedFunctionsWindow(
+                new AdvancedFunctionsViewModel(
+                    vm.ActiveService,
+                    vm.EffectiveUnitId,
+                    app.Services.GetRequiredService<ILogger<AdvancedFunctionsViewModel>>()));
+
+            var topLevel = global::Avalonia.Controls.TopLevel.GetTopLevel(this);
+            if (topLevel is global::Avalonia.Controls.Window owner)
+                _ = window.ShowDialog(owner);
+            else
+                window.Show();
+        }
+
+        private void TagBrowser_Click(object? sender, RoutedEventArgs e)
+        {
+            var app = global::Avalonia.Application.Current as App;
+            app?.Services?.GetRequiredService<ITagWindowService>().ShowTagBrowser();
+        }
+
+        private void WatchWindow_Click(object? sender, RoutedEventArgs e)
+        {
+            var app = global::Avalonia.Application.Current as App;
+            app?.Services?.GetRequiredService<ITagWindowService>().ShowWatchWindow();
+        }
+
         private void DeviceScanner_Click(object? sender, RoutedEventArgs e)
         {
             var app = global::Avalonia.Application.Current as App;

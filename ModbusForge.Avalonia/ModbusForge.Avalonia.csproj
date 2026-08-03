@@ -7,9 +7,9 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <RootNamespace>ModbusForge.Avalonia</RootNamespace>
     <AssemblyName>ModbusForge.Avalonia</AssemblyName>
-    <Version>2026.7.14</Version>
-    <AssemblyVersion>2026.7.14</AssemblyVersion>
-    <FileVersion>2026.7.14</FileVersion>
+    <Version>2026.7.25</Version>
+    <AssemblyVersion>2026.7.25</AssemblyVersion>
+    <FileVersion>2026.7.25</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,0 +1,127 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+        x:Class="ModbusForge.Avalonia.Views.TagBrowserWindow"
+        x:DataType="vm:TagBrowserViewModel"
+        x:CompileBindings="False"
+        Title="Tag Browser - Symbolic Addressing"
+        Width="1100"
+        Height="720"
+        MinWidth="850"
+        MinHeight="520"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0" BorderBrush="Gray" BorderThickness="0,0,0,1" Padding="8">
+      <WrapPanel Orientation="Horizontal" ItemHeight="34">
+        <TextBlock Text="New group:" VerticalAlignment="Center" Margin="0,0,6,0" />
+        <TextBox Text="{Binding NewGroupName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 Watermark="Group name"
+                 Width="150"
+                 Margin="0,0,6,0" />
+        <Button Content="Add Group" Command="{Binding NewGroupCommand}" Margin="0,0,12,0" />
+        <TextBlock Text="New tag:" VerticalAlignment="Center" Margin="0,0,6,0" />
+        <TextBox Text="{Binding NewTagName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 Watermark="Tag name"
+                 Width="150"
+                 Margin="0,0,6,0" />
+        <Button Content="Add Tag" Command="{Binding NewTagCommand}" Margin="0,0,12,0" />
+        <Button Content="Delete" Command="{Binding DeleteCommand}" Margin="0,0,6,0" />
+        <Button Content="Import" Command="{Binding ImportCommand}" Margin="0,0,6,0" />
+        <Button Content="Export" Command="{Binding ExportCommand}" Margin="0,0,6,0" />
+        <Button Content="Import Template" Command="{Binding ImportTemplateCommand}" Margin="0,0,6,0" />
+        <Button Content="CSV Template" Command="{Binding SaveTemplateCommand}" Margin="0,0,6,0" />
+        <Button Content="Add to Watch" Command="{Binding AddToWatchCommand}" Margin="0,0,6,0" />
+        <Button Content="Select Tag" Command="{Binding SelectTagCommand}"
+                IsVisible="{Binding SelectionMode}" />
+      </WrapPanel>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="300,*,360" Margin="8">
+      <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="1" Padding="6" Margin="0,0,8,0">
+        <Grid RowDefinitions="Auto,*">
+          <TextBlock Grid.Row="0" Text="Groups and Tags" FontWeight="SemiBold" Margin="4,2,4,8" />
+          <TreeView Grid.Row="1"
+                    ItemsSource="{Binding TreeItems}"
+                    SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay}"
+                    DoubleTapped="TagTree_DoubleTapped">
+            <TreeView.ItemTemplate>
+              <TreeDataTemplate ItemsSource="{Binding Children}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding CountText}" Foreground="Gray" />
+                  <TextBlock Text="{Binding AddressText}" Foreground="Gray" FontSize="11" />
+                </StackPanel>
+              </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+          </TreeView>
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="1" Padding="12" Margin="0,0,8,0"
+              IsVisible="{Binding HasSelectedTag}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Tag Properties" FontSize="16" FontWeight="SemiBold" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+              <TextBlock Grid.Row="0" Text="Name:" VerticalAlignment="Center" Margin="0,0,8,8" />
+              <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding EditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+              <TextBlock Grid.Row="1" Text="Group:" VerticalAlignment="Center" Margin="0,0,8,8" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding EditGroupName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                       Watermark="Group name" Margin="0,0,0,8" />
+              <TextBlock Grid.Row="2" Text="Description:" VerticalAlignment="Top" Margin="0,4,8,8" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding EditDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                       AcceptsReturn="True" TextWrapping="Wrap" MinHeight="52" Margin="0,0,0,8" />
+              <TextBlock Grid.Row="3" Text="Area:" VerticalAlignment="Center" Margin="0,0,8,8" />
+              <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding AreaOptions}" SelectedItem="{Binding EditArea, Mode=TwoWay}" Margin="0,0,0,8" />
+              <TextBlock Grid.Row="4" Text="Address:" VerticalAlignment="Center" Margin="0,0,8,8" />
+              <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding EditAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+              <TextBlock Grid.Row="5" Text="Data type:" VerticalAlignment="Center" Margin="0,0,8,8" />
+              <ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding DataTypeOptions}" SelectedItem="{Binding EditDataType, Mode=TwoWay}" Margin="0,0,0,8" />
+              <TextBlock Grid.Row="6" Text="Scale:" VerticalAlignment="Center" Margin="0,0,8,8" />
+              <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding EditScale, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+              <TextBlock Grid.Row="7" Text="Offset:" VerticalAlignment="Center" Margin="0,0,8,8" />
+              <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding EditOffset, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+              <TextBlock Grid.Row="8" Text="Units:" VerticalAlignment="Center" Margin="0,0,8,8" />
+              <TextBox Grid.Row="8" Grid.Column="1" Text="{Binding EditUnits, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+              <CheckBox Grid.Row="9" Grid.ColumnSpan="2" Content="Enable alarms" IsChecked="{Binding EditAlarmEnabled, Mode=TwoWay}" Margin="0,0,0,8" />
+              <TextBlock Grid.Row="10" Text="High limit:" VerticalAlignment="Center" Margin="0,0,8,8" />
+              <TextBox Grid.Row="10" Grid.Column="1" Text="{Binding EditAlarmHigh, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+              <TextBlock Grid.Row="11" Text="Low limit:" VerticalAlignment="Center" Margin="0,0,8,8" />
+              <TextBox Grid.Row="11" Grid.Column="1" Text="{Binding EditAlarmLow, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+              <TextBlock Grid.Row="12" Text="Raw value:" VerticalAlignment="Center" Margin="0,0,8,8" />
+              <TextBlock Grid.Row="12" Grid.Column="1" Text="{Binding CurrentRawValue}" FontWeight="SemiBold" Margin="0,0,0,8" />
+              <TextBlock Grid.Row="13" Text="Scaled value:" VerticalAlignment="Center" Margin="0,0,8,8" />
+              <TextBlock Grid.Row="13" Grid.Column="1" Text="{Binding CurrentScaledValue}" FontWeight="SemiBold" Margin="0,0,0,8" />
+              <TextBlock Grid.Row="14" Grid.ColumnSpan="2" Text="Tag updates are applied to the shared Core tag model." Foreground="Gray" TextWrapping="Wrap" />
+            </Grid>
+            <Button Content="Save Changes" Command="{Binding SaveChangesCommand}" HorizontalAlignment="Right" />
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+
+      <Border Grid.Column="2" BorderBrush="Gray" BorderThickness="1" Padding="12"
+              IsVisible="{Binding HasSelectedGroup}">
+        <StackPanel Spacing="10">
+          <TextBlock Text="Group Properties" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Text="Rename the selected group or choose how its contents are handled when deleted."
+                     TextWrapping="Wrap" Foreground="Gray" />
+          <TextBox Text="{Binding GroupNameForRename, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+          <Button Content="Rename Group" Command="{Binding RenameGroupCommand}" HorizontalAlignment="Left" />
+          <Separator />
+          <TextBlock Text="Group deletion mode" FontWeight="SemiBold" />
+          <ComboBox ItemsSource="{Binding GroupDeletionModes}" SelectedItem="{Binding SelectedDeletionMode, Mode=TwoWay}" />
+          <TextBlock Text="Move to parent keeps tags and child groups. Move to default flattens the selected group. Cascade delete removes affected tags."
+                     TextWrapping="Wrap" Foreground="Gray" />
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="0,1,0,0" Padding="8,6">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" />
+        <TextBlock Grid.Column="1" Text="{Binding TagCountSummary}" Margin="16,0,0,0" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

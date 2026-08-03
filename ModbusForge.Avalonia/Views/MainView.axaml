@@ -15,7 +15,9 @@
           <MenuItem Header="Open _Pcap..." Command="{Binding OpenPcapCommand}" />
           <Separator />
           <MenuItem Header="_Import Unit IDs..." Command="{Binding ImportUnitIdsCommand}" />
+          <MenuItem Header="_Import Unit ID As..." Command="{Binding ImportUnitIdAsCommand}" />
           <MenuItem Header="_Export Unit IDs..." Command="{Binding ExportUnitIdsCommand}" />
+          <MenuItem Header="_Export Selected Unit ID..." Command="{Binding ExportUnitIdCommand}" />
           <MenuItem Header="_Save All..." Command="{Binding SaveAllConfigCommand}" InputGesture="Ctrl+Shift+S" />
           <Separator />
           <MenuItem Header="E_xit" Command="{Binding ExitCommand}" InputGesture="Ctrl+Q" />
@@ -35,7 +37,7 @@
           <MenuItem Header="_Discrete Inputs" ToggleType="CheckBox" IsChecked="{Binding IsDiscreteInputsTabVisible}" />
           <MenuItem Header="_Custom Watch" ToggleType="CheckBox" IsChecked="{Binding IsCustomWatchTabVisible}" />
           <MenuItem Header="_Simulation" ToggleType="CheckBox" IsChecked="{Binding IsSimulationTabVisible}" />
-          <MenuItem Header="_Decode (not yet ported)" ToggleType="CheckBox" IsChecked="{Binding IsDecodeTabVisible}" />
+          <MenuItem Header="_Decode" ToggleType="CheckBox" IsChecked="{Binding IsDecodeTabVisible}" />
           <MenuItem Header="_Trend" ToggleType="CheckBox" IsChecked="{Binding IsTrendTabVisible}" />
           <MenuItem Header="_Console" ToggleType="CheckBox" IsChecked="{Binding IsConsoleTabVisible}" />
           <MenuItem Header="_Debug" ToggleType="CheckBox" IsChecked="{Binding IsDebugTabVisible}" />
@@ -48,7 +50,9 @@
           <MenuItem Header="_Connection Manager..." Click="ManageConnections_Click" />
           <MenuItem Header="_Device Scanner..." Click="DeviceScanner_Click" />
           <MenuItem Header="_Script Editor..." Click="ScriptEditor_Click" InputGesture="Ctrl+E" />
-          <MenuItem Header="_Advanced Functions (not yet ported)" IsEnabled="False" />
+          <MenuItem Header="_Advanced Functions..." Click="AdvancedFunctions_Click" />
+          <MenuItem Header="_Tag Browser..." Click="TagBrowser_Click" />
+          <MenuItem Header="_Watch Window..." Click="WatchWindow_Click" />
           <MenuItem Header="_Frame Inspector..." Command="{Binding OpenFrameInspectorCommand}" />
           <MenuItem Header="_Check for Updates" Command="{Binding CheckForUpdatesCommand}" />
         </MenuItem>
@@ -357,6 +361,7 @@
             <Button Content="Add" Command="{Binding AddCustomEntryCommand}" />
             <Button Content="Remove" Command="{Binding RemoveCustomEntryCommand}" />
             <Button Content="Read Selected" Command="{Binding ReadCustomEntryCommand}" />
+            <Button Content="Read All" Command="{Binding ReadAllCustomNowCommand}" />
             <Button Content="Write Selected" Command="{Binding WriteCustomEntryCommand}" />
             <Button Content="Save Custom" Command="{Binding SaveCustomCommand}" />
             <Button Content="Load Custom" Command="{Binding LoadCustomCommand}" />
@@ -375,23 +380,32 @@
               <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="80" />
               <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="120" IsReadOnly="True" />
               <DataGridTextColumn Header="Write Value" Binding="{Binding WriteValue}" Width="120" />
-              <DataGridCheckBoxColumn Header="Continuous" Binding="{Binding Continuous}" Width="90" />
-              <DataGridTextColumn Header="Period (ms)" Binding="{Binding PeriodMs}" Width="90" />
-              <DataGridCheckBoxColumn Header="Monitor" Binding="{Binding Monitor}" Width="80" />
+              <DataGridCheckBoxColumn Header="Continuous Write" Binding="{Binding Continuous}" Width="110" />
+              <DataGridTextColumn Header="Write Period (ms)" Binding="{Binding PeriodMs}" Width="110" />
+              <DataGridCheckBoxColumn Header="Read" Binding="{Binding Monitor}" Width="70" />
               <DataGridTextColumn Header="Read Period (ms)" Binding="{Binding ReadPeriodMs}" Width="110" />
               <DataGridCheckBoxColumn Header="Trend" Binding="{Binding Trend}" Width="70" />
+              <DataGridTemplateColumn Header="Actions" Width="Auto">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="models:CustomEntry">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                      <Button Content="Write"
+                              Command="{Binding $parent[DataGrid].((vm:MainViewModel)DataContext).WriteCustomNowCommand}"
+                              CommandParameter="{Binding}" />
+                      <Button Content="Read"
+                              Command="{Binding $parent[DataGrid].((vm:MainViewModel)DataContext).ReadCustomNowCommand}"
+                              CommandParameter="{Binding}" />
+                    </StackPanel>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
             </DataGrid.Columns>
           </DataGrid>
         </Grid>
       </TabItem>
 
       <TabItem x:Name="DecodeTab" Header="Decode" IsVisible="{Binding IsDecodeTabVisible}">
-        <Border BorderBrush="#40000000" BorderThickness="1" Padding="16">
-          <StackPanel Spacing="8">
-            <TextBlock Text="Decode" FontSize="20" FontWeight="SemiBold" />
-            <TextBlock Text="The decoder view is planned for a later Avalonia parity milestone." TextWrapping="Wrap" />
-          </StackPanel>
-        </Border>
+        <views:DecodeView DataContext="{Binding DecodeViewModel}" />
       </TabItem>
 
       <TabItem x:Name="ConsoleTab" Header="Console" IsVisible="{Binding IsConsoleTabVisible}">

@@ -59,8 +59,9 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<IValidationService, ValidationService>();
             services.AddSingleton<IConnectionManager, ConnectionManager>();
 
-            // File system & file dialogs
+            // File system, file dialogs, and per-Unit ID workspace state
             services.AddSingleton<IFileSystem, FileSystem>();
+            services.AddSingleton<IUnitConfigurationStore, UnitConfigurationStore>();
 
             // Settings, help, update check and window service
             services.AddSingleton<ISettingsService, SettingsService>();
@@ -74,8 +75,12 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<IModbusDeviceProbe, ModbusDeviceProbe>();
             services.AddSingleton<IDeviceScannerService, DeviceScannerService>();
 
-            // Custom entries
+            // Custom entries and tag tools
             services.AddSingleton<ICustomEntryService, CustomEntryService>();
+            services.AddSingleton<TagService>();
+            services.AddSingleton<IRegisterTemplateImportService, RegisterTemplateImportService>();
+            services.AddSingleton<IRegisterTemplateStore, RegisterTemplateStore>();
+            services.AddSingleton<ITagWindowService, AvaloniaTagWindowService>();
 
             // Trend logging
             services.Configure<LoggingSettings>(_ => { });
@@ -95,9 +100,10 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<VisualNodeEditorViewModel>();
 
             // ViewModels
-            services.AddSingleton<MainViewModel>();
             services.AddSingleton<TrendViewModel>();
+            services.AddSingleton<DecodeViewModel>();
             services.AddSingleton<MqttViewModel>();
+            services.AddSingleton<MainViewModel>();
 
             return services.BuildServiceProvider();
         }
