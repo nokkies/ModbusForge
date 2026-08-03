@@ -22,7 +22,8 @@ The baseline reset occurred at `2026.7.1`. The `v2026.7.2`–`v2026.7.11` tags s
 | `2026.7.12` | [x] | Avalonia per-area registers (Start/Count, monitoring, inline edit, per-area R/W, Quick Write). |
 | `2026.7.13` | [x] | Avalonia shell navigation, status bar, View toggles, Diagnostics, File/Tools menu parity, and Debug/Console tabs. |
 | `2026.7.14` | [x] | Avalonia Dashboard tab with connection status, quick actions, and recent profile summary. |
-| `2026.7.25` | [~] | Swarm parity batch: polling, Custom Watch, Trends, Decode, Advanced Functions, project state, visual editor foundation, and tool windows. |
+| `2026.7.25` | [x] | Swarm parity batch: polling, Custom Watch, Trends, Decode, Advanced Functions, project state, visual editor foundation, and tool windows. |
+| `2026.8.1` | [x] | Final parity batch: AvalonDock-style floating tool windows, marquee selection, visible connector ports/wire editing, full POU folder management, advanced graph routing, and deep Tag Browser/Watch integration. |
 
 The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milestone tracking and should not be treated as real shipped versions. Avalonia parity work will be versioned from `2026.7.12` onward.
 
@@ -39,7 +40,7 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ---
 
-## Main Shell & Navigation — [~] Partial (2026.7.14 Dashboard shipped)
+## Main Shell & Navigation — [x] 2026.8.1 shipped
 
 | Feature | WPF | Avalonia | Target |
 |---------|-----|----------|--------|
@@ -49,7 +50,7 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 | Debug / Console tabs | Yes | Yes | 2026.7.13 |
 | Connection bar styled card, status indicator, Diagnostics button | Yes | Yes | 2026.7.13 |
 | Main menu: Open Pcap, Import/Export Unit IDs, Save All, Trend export | Yes | Core items | 2026.7.13 |
-| Full AvalonDock docking with 11 documents | Yes | Simple TabControl | Future / evaluate |
+| Full AvalonDock docking with 11 documents | Yes | Lightweight tear-off/dock manager (`AvaloniaDockingHost`) | 2026.8.1 |
 | DataGrid context menus (Quick Write, Add to Watch, etc.) | Yes | Yes | 2026.7.12 |
 | Dashboard tab | Yes | Yes (core dashboard) | 2026.7.14 |
 
@@ -66,6 +67,10 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 - [x] Add Dashboard tab with connection status, quick actions, and recent profiles.
 - [x] Add DataGrid context menus for Quick Write, Add to Custom Watch, Add to Trend, Copy (shipped with 2026.7.12).
 - [x] Evaluate layout parity; retain the cross-platform sidebar plus TabControl while deferring full AvalonDock docking.
+
+### 2026.8.1 shipped subtasks
+- [x] Add `AvaloniaDockingHost` tear-off/dock manager for Tag Browser, Watch, and Connection Manager.
+- [x] Wire tool windows to float and re-dock into the main TabControl.
 
 ---
 
@@ -179,17 +184,20 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ---
 
-## Visual Simulation — [~] Partial
+## Visual Simulation — [x] 2026.8.1 shipped
 
 | Feature | WPF | Avalonia | Target |
 |---------|-----|----------|--------|
 | Node palette | Yes | Yes | 2026.7.22 |
-| Drag-drop canvas | Yes | Basic node drop/drag | 2026.7.22 |
-| POU tree (programs) | Yes | Basic program tree | 2026.7.22 |
+| Drag-drop canvas | Yes | Yes | 2026.7.22 |
+| POU tree (programs) | Yes | Yes (hierarchical folders) | 2026.8.1 |
 | Run/stop | Yes | Yes | — |
 | Save/load simulation | Yes | Yes (backward-compatible extension) | 2026.7.22 |
-| Live values, auto layout, snap, zoom, undo/redo | Yes | Yes (core controls) | 2026.7.23 |
-| Tag Browser / Watch integration | Yes | Tool windows available; editor integration deferred | Future / evaluate |
+| Live values, auto layout, snap, zoom, undo/redo | Yes | Yes | 2026.7.23 |
+| Marquee selection | Yes | Yes | 2026.8.1 |
+| Visible connector ports / wire editing | Yes | Yes | 2026.8.1 |
+| Advanced graph routing | Yes | Yes (orthogonal / straight toggle) | 2026.8.1 |
+| Tag Browser / Watch integration | Yes | Yes (drag/drop and Add to Watch) | 2026.8.1 |
 
 ### 2026.7.22 shipped subtasks
 - [x] Implement basic palette drag/drop and node dragging for the Visual Node Editor.
@@ -198,7 +206,16 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ### 2026.7.23 shipped subtasks
 - [x] Add live values panel, auto layout, snap to grid, zoom, and undo/redo.
-- [x] Add standalone Avalonia Tag Browser and Watch Window tools; deep editor integration remains a follow-up.
+- [x] Add standalone Avalonia Tag Browser and Watch Window tools.
+
+### 2026.8.1 shipped subtasks
+- [x] Implement marquee/rubber-band selection on the node canvas.
+- [x] Add visible input/output connector ports on nodes.
+- [x] Add drag-from-port-to-port wire creation and temporary connection line.
+- [x] Add connection line selection and orthogonal routing toggle.
+- [x] Implement full POU folder management (create, rename, delete, drag/drop, hierarchical tree).
+- [x] Add drag/drop from Tag Browser onto node inputs and empty canvas.
+- [x] Add "Add to Watch" for selected nodes and Watch Window integration.
 
 ---
 
@@ -233,9 +250,10 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 ## Release / Packaging
 
 - [x] Bumped to `2026.7.25` after the swarm parity batch passed build and tests.
+- [x] Bumped to `2026.8.1` after the final parity batch passed build and tests.
 - [ ] No `v*` tags or GitHub Releases until parity is reached (per `AGENTS.md`).
 - [ ] Keep `release.yml` on `workflow_dispatch` only until then.
-- [ ] When the next feature block is done and tested, bump to the next available CalVer and commit. `v*` tags can be added after parity is complete.
+- [ ] `v*` tags and GitHub Releases can be added after the `2026.8.1` parity milestone is smoke-tested.
 
 ---
 
@@ -244,4 +262,5 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 - WPF is the source of truth.
 - Every feature must be verified end-to-end before it is marked `[x]`.
 - Core improvements (fixing `ModbusServerService` bounds, etc.) can ship independently but do not count as Avalonia parity.
-- Remaining deliberate parity gaps after the 2026.7.25 batch: full AvalonDock-style floating documents, visible connector-port/wire editing, marquee selection, full POU folder management, advanced graph routing, and deep Visual Simulation integration with Tag Browser/Watch.
+- Avalonia functional parity with the WPF baseline has been reached as of `2026.8.1`.
+- Remaining differences are implementation-specific (e.g. lightweight custom docking instead of Dirkster.AvalonDock) and do not affect functional parity.
