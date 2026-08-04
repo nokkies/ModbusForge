@@ -232,6 +232,10 @@ namespace ModbusForge.Avalonia.ViewModels
         public ICommand OpenTagBrowserCommand { get; }
         public ICommand OpenWatchWindowCommand { get; }
         public ICommand AddSelectedNodeToWatchCommand { get; }
+        public ICommand AlignLeftCommand { get; }
+        public ICommand AlignTopCommand { get; }
+        public ICommand DistributeHorizontallyCommand { get; }
+        public ICommand ClearAllCommand { get; }
 
         public ObservableCollection<VisualNode> Nodes => Config.Nodes;
         public ObservableCollection<NodeConnection> Connections => Config.Connections;
@@ -354,6 +358,10 @@ namespace ModbusForge.Avalonia.ViewModels
             OpenTagBrowserCommand = new RelayCommand(() => _tagWindowService?.ShowTagBrowser());
             OpenWatchWindowCommand = new RelayCommand(() => _tagWindowService?.ShowWatchWindow());
             AddSelectedNodeToWatchCommand = new AsyncRelayCommand(AddSelectedNodeToWatchAsync, () => SelectedNode != null && _tagService != null);
+            AlignLeftCommand = new RelayCommand(AlignLeft, () => SelectedNodes.Count >= 2);
+            AlignTopCommand = new RelayCommand(AlignTop, () => SelectedNodes.Count >= 2);
+            DistributeHorizontallyCommand = new RelayCommand(DistributeHorizontally, () => SelectedNodes.Count >= 3);
+            ClearAllCommand = new RelayCommand(ClearAll);
 
             BuildPalette();
 
@@ -1241,6 +1249,55 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void ResetZoom() => ZoomLevel = 1.0;
 
+        private void AlignLeft()
+        {
+            var selection = SelectedNodes.ToList();
+            if (selection.Count < 2) return;
+            var minX = selection.Min(n => n.X);
+            foreach (var node in selection)
+            {
+                SetNodePosition(node, minX, node.Y);
+            }
+            StatusText = "Aligned left.";
+        }
+
+        private void AlignTop()
+        {
+            var selection = SelectedNodes.ToList();
+            if (selection.Count < 2) return;
+            var minY = selection.Min(n => n.Y);
+            foreach (var node in selection)
+            {
+                SetNodePosition(node, node.X, minY);
+            }
+            StatusText = "Aligned top.";
+        }
+
+        private void DistributeHorizontally()
+        {
+            var selection = SelectedNodes.ToList();
+            if (selection.Count < 3) return;
+            var sorted = selection.OrderBy(n => n.X).ToList();
+            var startX = sorted.First().X;
+            var endX = sorted.Last().X;
+            var step = (endX - startX) / (sorted.Count - 1);
+            for (var i = 0; i < sorted.Count; i++)
+            {
+                var node = sorted[i];
+                SetNodePosition(node, startX + i * step, node.Y);
+            }
+            StatusText = "Distributed horizontally.";
+        }
+
+        private void ClearAll()
+        {
+            Config.Nodes.Clear();
+            Config.Connections.Clear();
+            Config.ConnectorConfigs.Clear();
+            ClearSelection();
+            StatusText = "Cleared all nodes and connections.";
+        }
+
         private void AutoLayout()
         {
             var nodes = Config.Nodes.ToList();
@@ -1601,6 +1658,9 @@ namespace ModbusForge.Avalonia.ViewModels
             ((IRelayCommand)RemoveNodeCommand).NotifyCanExecuteChanged();
             ((IRelayCommand)AddConnectionCommand).NotifyCanExecuteChanged();
             ((IRelayCommand)RemoveConnectionCommand).NotifyCanExecuteChanged();
+            ((IRelayCommand)AlignLeftCommand).NotifyCanExecuteChanged();
+            ((IRelayCommand)AlignTopCommand).NotifyCanExecuteChanged();
+            ((IRelayCommand)DistributeHorizontallyCommand).NotifyCanExecuteChanged();
         }
 
         private void NotifyUndoRedoCommands()

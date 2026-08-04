@@ -1,5 +1,13 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels" xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core" xmlns:shapes="using:Avalonia.Controls.Shapes" xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters" x:Class="ModbusForge.Avalonia.Views.VisualNodeEditorView" x:DataType="vm:VisualNodeEditorViewModel" Focusable="True">
 
+  <UserControl.Styles>
+    <Style Selector="Border.selected">
+      <Setter Property="BorderBrush" Value="#1976D2"/>
+      <Setter Property="BorderThickness" Value="3"/>
+      <Setter Property="Background" Value="#BBDEFB"/>
+    </Style>
+  </UserControl.Styles>
+
   <Grid ColumnDefinitions="220,*,300" RowDefinitions="Auto,*">
     <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8" Grid.Column="0" Grid.ColumnSpan="3">
         <Button Content="Add Node" Command="{Binding AddNodeCommand}"/>
@@ -9,6 +17,10 @@
         <ComboBox ItemsSource="{Binding TargetConnectorOptions}" SelectedItem="{Binding SelectedTargetConnector}" Width="78" ToolTip.Tip="Target connector for connect mode"/>
         <TextBlock Text="{Binding ConnectionSourceText}" VerticalAlignment="Center" Margin="4,0,4,0"/>
         <Button Content="Auto layout" Command="{Binding AutoLayoutCommand}"/>
+        <Button Content="Align L" Command="{Binding AlignLeftCommand}" ToolTip.Tip="Align selected nodes left" Padding="6,4"/>
+        <Button Content="Align T" Command="{Binding AlignTopCommand}" ToolTip.Tip="Align selected nodes top" Padding="6,4"/>
+        <Button Content="Distrib H" Command="{Binding DistributeHorizontallyCommand}" ToolTip.Tip="Distribute selected nodes horizontally" Padding="6,4"/>
+        <Button Content="Clear All" Command="{Binding ClearAllCommand}" ToolTip.Tip="Remove all nodes and connections" Padding="6,4"/>
         <Button Content="Undo" Command="{Binding UndoCommand}"/>
         <Button Content="Redo" Command="{Binding RedoCommand}"/>
         <Button Content="Run" Command="{Binding RunCommand}"/>
@@ -22,7 +34,13 @@
         <Button Content="Tag Browser" Command="{Binding OpenTagBrowserCommand}"/>
         <Button Content="Watch" Command="{Binding OpenWatchWindowCommand}"/>
         <CheckBox Content="Snap" IsChecked="{Binding SnapToGrid}" VerticalAlignment="Center"/>
-        <NumericUpDown Value="{Binding GridSize}" Minimum="4" Maximum="200" Increment="4" Width="72" ToolTip.Tip="Grid size"/>
+        <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" ToolTip.Tip="Grid size">
+          <NumericUpDown Value="{Binding GridSize}" Minimum="4" Maximum="200" Increment="4" ShowButtonSpinner="False" AllowSpin="False" Width="44" VerticalAlignment="Center" TextAlignment="Center" Padding="2,0"/>
+          <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
+            <RepeatButton Content="^" FontSize="10" Padding="0" Width="14" Height="13" Click="IncreaseGridSize_Click"/>
+            <RepeatButton Content="v" FontSize="10" Padding="0" Width="14" Height="13" Click="DecreaseGridSize_Click"/>
+          </StackPanel>
+        </StackPanel>
         <CheckBox Content="Grid" IsChecked="{Binding ShowGrid}" VerticalAlignment="Center"/>
         <CheckBox Content="Live values" IsChecked="{Binding ShowLiveValues}" VerticalAlignment="Center"/>
         <CheckBox Content="Connectors" IsChecked="{Binding ShowConnectors}" VerticalAlignment="Center"/>
@@ -118,19 +136,6 @@
             </ItemsControl.ItemTemplate>
           <ItemsControl.Styles><Style Selector="ContentPresenter" x:DataType="vm:GridLine"><Setter Property="Canvas.Left" Value="{Binding Left}"/><Setter Property="Canvas.Top" Value="{Binding Top}"/></Style></ItemsControl.Styles></ItemsControl>
 
-          <ItemsControl ItemsSource="{Binding ConnectionLines}" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <Canvas/>
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate DataType="vm:ConnectionLine">
-                <Path Data="{Binding PathData}" Stroke="{Binding LineBrush}" StrokeThickness="4" Cursor="Hand" PointerPressed="ConnectionLine_PointerPressed"/>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-
           <ItemsControl ItemsSource="{Binding Config.Nodes}" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
@@ -139,7 +144,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="models:VisualNode">
-                <Border Width="{Binding Width}" Height="{Binding Height}" BorderBrush="Black" BorderThickness="2" CornerRadius="4" Background="LightBlue" PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
+                <Border Width="{Binding Width}" Height="{Binding Height}" BorderBrush="Black" BorderThickness="2" CornerRadius="4" Background="LightBlue" Classes.selected="{Binding IsSelected}" PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
                   <Canvas Width="{Binding Width}" Height="{Binding Height}" Background="Transparent">
                     <Grid Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" RowDefinitions="Auto,Auto,*" ClipToBounds="True">
                       <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="Bold" HorizontalAlignment="Center"/>
@@ -198,6 +203,19 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           <ItemsControl.Styles><Style Selector="ContentPresenter" x:DataType="models:VisualNode"><Setter Property="Canvas.Left" Value="{Binding X}"/><Setter Property="Canvas.Top" Value="{Binding Y}"/></Style></ItemsControl.Styles></ItemsControl>
+
+          <ItemsControl ItemsSource="{Binding ConnectionLines}" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}" ZIndex="10">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <Canvas/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:ConnectionLine">
+                <Path Data="{Binding PathData}" Stroke="{Binding LineBrush}" StrokeThickness="4" Cursor="Hand" PointerPressed="ConnectionLine_PointerPressed"/>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
 
           <Line x:Name="TempConnectionLine" Stroke="#999999" StrokeThickness="2" StrokeDashArray="5,5" IsVisible="False" IsHitTestVisible="False"/>
 

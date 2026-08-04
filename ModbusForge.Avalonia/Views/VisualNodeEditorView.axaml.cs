@@ -869,6 +869,18 @@ namespace ModbusForge.Avalonia.Views
             }
         }
 
+        private void IncreaseGridSize_Click(object? sender, RoutedEventArgs e)
+        {
+            if (ViewModel == null) return;
+            ViewModel.GridSize += 4;
+        }
+
+        private void DecreaseGridSize_Click(object? sender, RoutedEventArgs e)
+        {
+            if (ViewModel == null) return;
+            ViewModel.GridSize -= 4;
+        }
+
         private void View_KeyDown(object? sender, KeyEventArgs e)
         {
             if (ViewModel == null) return;
