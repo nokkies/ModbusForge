@@ -1,5 +1,23 @@
 # ModbusForge Avalonia Migration Fix Plan - EXECUTION CHECKLIST
 
+## Progress Update (2026-08-05)
+
+- **MainWindow / App launch** — working. `MainWindow.axaml` hosts the shell and `MainView`.
+- **Visual Node Editor canvas** — working:
+  - Nodes render with correct positions and sizes.
+  - Node drag and drop works.
+  - Marquee selection works.
+  - Grid and connection lines render.
+  - Zoom and pan work via `ScrollViewer` + `ScaleTransform`.
+  - Undo/redo wired.
+  - Right-side property panel / `DataGrid`s present.
+- **Pending** (next focus):
+  - Node resize handles.
+  - Connection drag from output/input ports.
+  - Bezier or improved orthogonal connection routing.
+  - Context menus.
+  - Docking system, theming, and missing dialogs.
+
 ## Executive Summary
 
 The Avalonia UI port (ModbusForge.Avalonia) has significant gaps compared to the working WPF version (ModbusForge v6.1.0). This document provides **actionable tasks** organized by priority.

@@ -22,6 +22,7 @@ namespace ModbusForge.Avalonia.Views
         private const double PortHitTolerance = 24.0;
 
         private Canvas? _nodeCanvas;
+        private ScrollViewer? _canvasScrollViewer;
         private IReadOnlyList<VisualNode> _draggedNodes = Array.Empty<VisualNode>();
         private Dictionary<VisualNode, (double X, double Y)> _dragStartPositions = new();
         private Point _dragStartPoint;
@@ -36,6 +37,10 @@ namespace ModbusForge.Avalonia.Views
         private bool _isMarqueeActive;
         private Point _marqueeStartPoint;
         private IPointer? _marqueePointer;
+
+        private bool _isPanning;
+        private Point _panStartPoint;
+        private Vector _panStartOffset;
 
         private bool _isConnecting;
         private VisualNode? _connectionSourceNode;
@@ -56,6 +61,7 @@ namespace ModbusForge.Avalonia.Views
         {
             InitializeComponent();
             _nodeCanvas = this.FindControl<Canvas>("NodeCanvas");
+            _canvasScrollViewer = this.FindControl<ScrollViewer>("CanvasScrollViewer");
             _tempConnectionLine = this.FindControl<Line>("TempConnectionLine");
             _programTreeView = this.FindControl<TreeView>("ProgramTreeView");
             AddHandler(KeyDownEvent, View_KeyDown, RoutingStrategies.Tunnel);
@@ -79,7 +85,33 @@ namespace ModbusForge.Avalonia.Views
 
         private void Canvas_PointerPressed(object? sender, PointerPressedEventArgs e)
         {
-            if (e.Source != sender || ViewModel == null || _nodeCanvas == null)
+            if (ViewModel == null || _nodeCanvas == null)
+            {
+                return;
+            }
+
+            var point = e.GetCurrentPoint(_nodeCanvas);
+
+            // Middle-mouse pan (works over empty canvas or nodes)
+            if (point.Properties.IsMiddleButtonPressed)
+            {
+                if (_isConnecting)
+                {
+                    CancelConnectionDrag();
+                    ViewModel.SelectedConnection = null;
+                }
+
+                _isPanning = true;
+                _panStartPoint = _canvasScrollViewer != null ? e.GetPosition(_canvasScrollViewer) : e.GetPosition(_nodeCanvas);
+                _panStartOffset = _canvasScrollViewer?.Offset ?? new Vector(0, 0);
+                _panStartPoint = e.GetPosition(_canvasScrollViewer);
+                e.Pointer.Capture(_nodeCanvas);
+                _nodeCanvas.Cursor = new Cursor(StandardCursorType.Hand);
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Source != sender)
             {
                 return;
             }
@@ -99,7 +131,6 @@ namespace ModbusForge.Avalonia.Views
 
             ViewModel.SelectedConnection = null;
 
-            var point = e.GetCurrentPoint(_nodeCanvas);
             if (!point.Properties.IsLeftButtonPressed)
             {
                 ViewModel.ClearSelection();
@@ -123,6 +154,21 @@ namespace ModbusForge.Avalonia.Views
 
         private void Canvas_PointerMoved(object? sender, PointerEventArgs e)
         {
+            if (_isPanning && _canvasScrollViewer != null)
+            {
+                if (!e.GetCurrentPoint(_nodeCanvas).Properties.IsMiddleButtonPressed)
+                {
+                    FinishPan(e.Pointer);
+                    return;
+                }
+
+                var current = e.GetPosition(_canvasScrollViewer);
+                var delta = new Point(_panStartPoint.X - current.X, _panStartPoint.Y - current.Y);
+                _canvasScrollViewer.Offset = _panStartOffset + new Vector(delta.X, delta.Y);
+                e.Handled = true;
+                return;
+            }
+
             if (_isConnecting && _connectionSourceNode != null && _connectionPointer == e.Pointer
                 && _tempConnectionLine != null && _nodeCanvas != null && ViewModel != null)
             {
@@ -156,6 +202,13 @@ namespace ModbusForge.Avalonia.Views
 
         private void Canvas_PointerReleased(object? sender, PointerReleasedEventArgs e)
         {
+            if (_isPanning)
+            {
+                FinishPan(e.Pointer);
+                e.Handled = true;
+                return;
+            }
+
             if (_isConnecting)
             {
                 TryCompleteConnection(e);
@@ -175,6 +228,11 @@ namespace ModbusForge.Avalonia.Views
 
         private void Canvas_PointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
         {
+            if (_isPanning)
+            {
+                FinishPan(null);
+            }
+
             if (_isMarqueeActive)
             {
                 FinishMarquee(null);
@@ -368,6 +426,53 @@ namespace ModbusForge.Avalonia.Views
             _marqueePointer = null;
             ViewModel.EndMarquee();
             pointer?.Capture(null);
+        }
+
+        private void FinishPan(IPointer? pointer)
+        {
+            _isPanning = false;
+            if (_nodeCanvas != null)
+            {
+                _nodeCanvas.Cursor = Cursor.Default;
+            }
+
+            pointer?.Capture(null);
+        }
+
+        private void CanvasScrollViewer_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
+        {
+            if (ViewModel == null || _canvasScrollViewer == null || _nodeCanvas == null)
+            {
+                return;
+            }
+
+            if ((e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control)
+            {
+                var delta = e.Delta.Y > 0 ? 0.1 : -0.1;
+                var oldZoom = ViewModel.ZoomLevel;
+                var newZoom = Math.Clamp(Math.Round(oldZoom + delta, 2), 0.25, 4.0);
+
+                if (Math.Abs(newZoom - oldZoom) > 0.001)
+                {
+                    var canvasPos = e.GetPosition(_nodeCanvas);
+                    var viewportPos = e.GetPosition(_canvasScrollViewer);
+
+                    _canvasScrollViewer.Offset = new Vector(
+                        canvasPos.X - (viewportPos.X / newZoom),
+                        canvasPos.Y - (viewportPos.Y / newZoom));
+
+                    ViewModel.ZoomLevel = newZoom;
+                }
+
+                e.Handled = true;
+            }
+            else if ((e.KeyModifiers & KeyModifiers.Shift) == KeyModifiers.Shift)
+            {
+                _canvasScrollViewer.Offset = new Vector(
+                    _canvasScrollViewer.Offset.X - e.Delta.Y,
+                    _canvasScrollViewer.Offset.Y);
+                e.Handled = true;
+            }
         }
 
         private void Canvas_DragOver(object? sender, DragEventArgs e)
