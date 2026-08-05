@@ -498,6 +498,8 @@ namespace ModbusForge.Avalonia.ViewModels
                 {
                     Mode = "Server";
                 }
+
+                RefreshAvailableUnitIds();
             }
 
             if (!_unitConfigurationStore.TryGetConfiguration(_unitConfigurationStore.SelectedUnitId, out _))
@@ -1311,6 +1313,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 OnPropertyChanged(nameof(ConnectionHeader));
                 OnPropertyChanged(nameof(AddressLabel));
                 OnPropertyChanged(nameof(EffectiveUnitId));
+                RefreshAvailableUnitIds();
                 ExportUnitIdCommand.NotifyCanExecuteChanged();
                 ImportUnitIdAsCommand.NotifyCanExecuteChanged();
             }
@@ -1318,6 +1321,7 @@ namespace ModbusForge.Avalonia.ViewModels
             if (e.PropertyName == nameof(ConnectionProfile.ServerUnitIds))
             {
                 OnPropertyChanged(nameof(ServerUnitIds));
+                RefreshAvailableUnitIds();
             }
         }
 
@@ -1377,7 +1381,7 @@ namespace ModbusForge.Avalonia.ViewModels
             WriteCustomNowCommand.NotifyCanExecuteChanged();
             ReadAllCustomNowCommand.NotifyCanExecuteChanged();
 
-            _unitConfigurationStore.PopulateAvailableUnitIds(Array.Empty<byte>());
+            RefreshAvailableUnitIds();
 
             ResetMonitorFailures();
             HasConnectionError = false;
@@ -1435,6 +1439,54 @@ namespace ModbusForge.Avalonia.ViewModels
             _trendLogger?.Stop();
             StopPolling();
             StopCustomWatchMonitoring();
+        }
+
+        private void RefreshAvailableUnitIds()
+        {
+            if (ActiveProfile is null || !IsServerMode)
+            {
+                _unitConfigurationStore.PopulateAvailableUnitIds(Array.Empty<byte>());
+                return;
+            }
+
+            var ids = ParseUnitIdString(ActiveProfile.ServerUnitIds);
+            _unitConfigurationStore.PopulateAvailableUnitIds(ids);
+
+            foreach (var id in ids)
+            {
+                _unitConfigurationStore.GetOrCreateConfiguration(id);
+            }
+        }
+
+        private static List<byte> ParseUnitIdString(string? input)
+        {
+            var result = new List<byte>();
+            if (string.IsNullOrWhiteSpace(input)) return result;
+
+            var parts = input.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var part in parts)
+            {
+                var trimmed = part.Trim();
+                if (trimmed.Contains('-'))
+                {
+                    var range = trimmed.Split('-');
+                    if (range.Length == 2 && byte.TryParse(range[0].Trim(), out byte start) && byte.TryParse(range[1].Trim(), out byte end))
+                    {
+                        for (int i = Math.Min(start, end); i <= Math.Max(start, end); i++)
+                        {
+                            if (i >= 1 && i <= 247 && !result.Contains((byte)i))
+                                result.Add((byte)i);
+                        }
+                    }
+                }
+                else if (byte.TryParse(trimmed, out byte id))
+                {
+                    if (id >= 1 && id <= 247 && !result.Contains(id))
+                        result.Add(id);
+                }
+            }
+
+            return result;
         }
 
         private async Task ConnectAsync()
