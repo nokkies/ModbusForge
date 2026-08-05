@@ -364,6 +364,13 @@ namespace ModbusForge.Avalonia.Views
                 return;
             }
 
+            if (e.GetCurrentPoint(path).Properties.IsRightButtonPressed)
+            {
+                ShowConnectionContextMenu(path, line);
+                e.Handled = true;
+                return;
+            }
+
             ViewModel.SelectConnection(line.ConnectionId);
             e.Handled = true;
         }
@@ -801,6 +808,14 @@ namespace ModbusForge.Avalonia.Views
             }
 
             var point = e.GetCurrentPoint(border);
+            if (point.Properties.IsRightButtonPressed && border.DataContext is VisualNode rightNode)
+            {
+                ViewModel.SelectNode(rightNode, false);
+                ShowNodeContextMenu(border, rightNode);
+                e.Handled = true;
+                return;
+            }
+
             if (!point.Properties.IsLeftButtonPressed || border.DataContext is not VisualNode node)
             {
                 return;
@@ -1287,6 +1302,69 @@ namespace ModbusForge.Avalonia.Views
             _treeDragPointer = null;
             _treeDragItem = null;
             _treeDragStarted = false;
+        }
+
+        #endregion
+
+        #region Context Menus
+
+        private void ShowNodeContextMenu(Border border, VisualNode node)
+        {
+            var menu = new ContextMenu { Placement = PlacementMode.Pointer };
+
+            var deleteItem = new MenuItem
+            {
+                Header = "Delete",
+                Icon = new TextBlock { Text = "×", FontSize = 12 }
+            };
+            deleteItem.Click += (_, _) =>
+            {
+                ViewModel?.SelectNode(node, false);
+                ViewModel?.RemoveNodeCommand.Execute(null);
+            };
+            menu.Items.Add(deleteItem);
+
+            if (node.ElementType == PlcElementType.SignalGenerator)
+            {
+                var configItem = new MenuItem
+                {
+                    Header = "Configure Waveform...",
+                    Icon = new TextBlock { Text = "…", FontSize = 12 }
+                };
+                configItem.Click += (_, _) =>
+                {
+                    ViewModel?.SelectNode(node, false);
+                    if (ViewModel != null)
+                    {
+                        ViewModel.SelectedWaveform = node.Waveform ?? "Ramp";
+                        ViewModel.WaveformPeriodMs = node.PeriodMs;
+                        ViewModel.WaveformAmplitude = node.Amplitude;
+                        ViewModel.WaveformOffset = node.Offset;
+                    }
+                };
+                menu.Items.Insert(0, configItem);
+            }
+
+            menu.Open(border);
+        }
+
+        private void ShowConnectionContextMenu(Path path, ConnectionLine line)
+        {
+            var menu = new ContextMenu { Placement = PlacementMode.Pointer };
+
+            var deleteItem = new MenuItem
+            {
+                Header = "Delete Connection",
+                Icon = new TextBlock { Text = "×", FontSize = 12 }
+            };
+            deleteItem.Click += (_, _) =>
+            {
+                ViewModel?.SelectConnection(line.ConnectionId);
+                ViewModel?.RemoveConnectionCommand.Execute(null);
+            };
+            menu.Items.Add(deleteItem);
+
+            menu.Open(path);
         }
 
         #endregion
