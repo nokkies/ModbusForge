@@ -281,7 +281,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public string Mode
         {
-            get => ActiveProfile?.Mode is { } mode && !string.IsNullOrWhiteSpace(mode) ? mode : "Client";
+            get => ActiveProfile?.Mode is { } mode && !string.IsNullOrWhiteSpace(mode) ? mode : "Server";
             set
             {
                 if (ActiveProfile != null && ActiveProfile.Mode != value)
