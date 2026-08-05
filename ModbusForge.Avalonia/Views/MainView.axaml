@@ -27,13 +27,16 @@
       <TextBox Text="{Binding ServerUnitIds, FallbackValue='1'}" Width="120" VerticalAlignment="Center" IsVisible="{Binding ShowServerFields}" ToolTip.Tip="Comma-separated list (e.g. 1, 2, 5-10)" />
       <TextBlock VerticalAlignment="Center" Text="Active ID:" Margin="16,0,0,0" IsVisible="{Binding ShowServerFields}" />
       <ComboBox ItemsSource="{Binding AvailableUnitIds}" SelectedItem="{Binding SelectedUnitId}" Width="100" IsVisible="{Binding ShowServerFields}" />
+      <Button Content="{Binding ToggleConnectionButtonText, FallbackValue='Connect'}" Command="{Binding ToggleConnectionCommand}" Width="100" VerticalAlignment="Center" />
+      <Menu VerticalAlignment="Center" Padding="0">
+        <MenuItem Header="..." Padding="8,4" Cursor="Hand">
+          <MenuItem Header="Manage Connections" Command="{Binding OpenConnectionManagerCommand}" />
+          <MenuItem Header="Device Scanner" Click="DeviceScanner_Click" />
+        </MenuItem>
+      </Menu>
     </StackPanel>
 
     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-      <Button Content="Manage Connections" Command="{Binding OpenConnectionManagerCommand}" />
-      <Button Content="Device Scanner" Click="DeviceScanner_Click" />
-      <Button Content="{Binding ConnectButtonText, FallbackValue='Connect'}" Command="{Binding ConnectCommand}" />
-      <Button Content="Disconnect" Command="{Binding DisconnectCommand}" />
       <Button Content="Save Project" Command="{Binding SaveProjectCommand}" />
       <Button Content="Load Project" Command="{Binding LoadProjectCommand}" />
     </StackPanel>

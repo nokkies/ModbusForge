@@ -72,6 +72,7 @@ namespace ModbusForge.Avalonia.ViewModels
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
         [NotifyCanExecuteChangedFor(nameof(DisconnectCommand))]
+        [NotifyCanExecuteChangedFor(nameof(ToggleConnectionCommand))]
         [NotifyCanExecuteChangedFor(nameof(ReadCommand))]
         [NotifyCanExecuteChangedFor(nameof(WriteCommand))]
         [NotifyCanExecuteChangedFor(nameof(ReadCustomEntryCommand))]
@@ -306,6 +307,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public string ConnectButtonText => IsServerMode ? "Start Server" : "Connect";
 
+        public string ToggleConnectionButtonText => IsConnected ? "Disconnect" : ConnectButtonText;
+
         public string ConnectionHeader => IsServerMode ? "Modbus Connection (Server)" : "Modbus Connection (Client)";
 
         public string AddressLabel => IsServerMode ? "Interface:" : "Server:";
@@ -418,6 +421,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
             ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => CanConnect());
             DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => CanDisconnect());
+            ToggleConnectionCommand = new AsyncRelayCommand(ToggleConnectionAsync, () => ActiveProfile != null && !IsBusy);
             ReadCommand = new AsyncRelayCommand(ReadAsync, () => CanRead());
             WriteCommand = new AsyncRelayCommand(WriteAsync, () => CanWrite());
             ReadHoldingRegistersCommand = new AsyncRelayCommand(ReadHoldingRegistersAsync, () => CanRead(PlcArea.HoldingRegister));
@@ -514,6 +518,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public IAsyncRelayCommand ConnectCommand { get; }
         public IAsyncRelayCommand DisconnectCommand { get; }
+        public IAsyncRelayCommand ToggleConnectionCommand { get; }
         public IAsyncRelayCommand ReadCommand { get; }
         public IAsyncRelayCommand WriteCommand { get; }
         public IAsyncRelayCommand ReadHoldingRegistersCommand { get; }
@@ -903,6 +908,7 @@ namespace ModbusForge.Avalonia.ViewModels
         partial void OnIsBusyChanged(bool value)
         {
             OnPropertyChanged(nameof(DebugSummary));
+            ToggleConnectionCommand.NotifyCanExecuteChanged();
             ReadHoldingRegistersCommand.NotifyCanExecuteChanged();
             ReadInputRegistersCommand.NotifyCanExecuteChanged();
             ReadCoilsCommand.NotifyCanExecuteChanged();
@@ -1250,11 +1256,13 @@ namespace ModbusForge.Avalonia.ViewModels
                 OnPropertyChanged(nameof(DebugSummary));
                 OnPropertyChanged(nameof(CanConnect));
                 OnPropertyChanged(nameof(CanDisconnect));
+                OnPropertyChanged(nameof(ToggleConnectionButtonText));
                 OnPropertyChanged(nameof(CanRead));
                 OnPropertyChanged(nameof(CanWrite));
                 OnPropertyChanged(nameof(CanReadCustomEntry));
                 OnPropertyChanged(nameof(CanWriteCustomEntry));
                 ConnectCommand.NotifyCanExecuteChanged();
+                ToggleConnectionCommand.NotifyCanExecuteChanged();
                 DisconnectCommand.NotifyCanExecuteChanged();
                 ReadCommand.NotifyCanExecuteChanged();
                 WriteCommand.NotifyCanExecuteChanged();
@@ -1299,6 +1307,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 OnPropertyChanged(nameof(ShowClientFields));
                 OnPropertyChanged(nameof(ShowServerFields));
                 OnPropertyChanged(nameof(ConnectButtonText));
+                OnPropertyChanged(nameof(ToggleConnectionButtonText));
                 OnPropertyChanged(nameof(ConnectionHeader));
                 OnPropertyChanged(nameof(AddressLabel));
                 OnPropertyChanged(nameof(EffectiveUnitId));
@@ -1467,6 +1476,14 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 IsBusy = false;
             }
+        }
+
+        private async Task ToggleConnectionAsync()
+        {
+            if (IsConnected)
+                await DisconnectAsync();
+            else
+                await ConnectAsync();
         }
 
         private async Task ReadAsync()
