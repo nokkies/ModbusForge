@@ -65,9 +65,9 @@ public class AvaloniaSmokeTests : IDisposable
         var mainWindow = _app.GetMainWindowOrThrow();
         mainWindow.Focus();
 
-        var simButton = _app.FindElementByName(mainWindow, "Visual Simulation");
+        var simButton = _app.FindElementByName(mainWindow, "Simulation");
         Assert.NotNull(simButton);
-        _output.WriteLine("Found Visual Simulation navigation button.");
+        _output.WriteLine("Found Simulation navigation button.");
 
         simButton!.AsButton().Click();
         Thread.Sleep(500);
@@ -89,14 +89,14 @@ public class AvaloniaSmokeTests : IDisposable
         var mainWindow = _app.GetMainWindowOrThrow();
         mainWindow.Focus();
 
-        var simButton = _app.FindElementByName(mainWindow, "Visual Simulation");
+        var simButton = _app.FindElementByName(mainWindow, "Simulation");
         Assert.NotNull(simButton);
         simButton!.AsButton().Click();
         Thread.Sleep(500);
 
         var tagBrowserButton = _app.WaitForElementByName(mainWindow, "Tag Browser");
         Assert.NotNull(tagBrowserButton);
-        _output.WriteLine("Found Tag Browser button on Visual Node Editor toolbar.");
+        _output.WriteLine("Found Tag Browser button on Simulation toolbar.");
 
         // Use the Invoke pattern to ensure the button's command is executed.
         if (tagBrowserButton.Patterns.Invoke.IsSupported)

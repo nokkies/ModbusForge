@@ -72,7 +72,7 @@
               <ListBoxItem Content="MQTT" />
               <ListBoxItem Content="Script Editor" />
               <ListBoxItem Content="Signal Generator" />
-              <ListBoxItem Content="Visual Simulation" />
+              <ListBoxItem Content="Simulation" />
               <ListBoxItem Content="Registers" Margin="0,16,0,0" />
               <ListBoxItem Content="Input Registers" />
               <ListBoxItem Content="Coils" />
@@ -159,7 +159,7 @@
         <views:SignalGeneratorView DataContext="{Binding SignalGeneratorViewModel}" />
       </TabItem>
 
-      <TabItem x:Name="SimulationTab" Header="Visual Simulation" IsVisible="{Binding IsSimulationTabVisible}">
+      <TabItem x:Name="SimulationTab" Header="Simulation" IsVisible="{Binding IsSimulationTabVisible}">
         <views:VisualNodeEditorView DataContext="{Binding VisualNodeEditorViewModel}" />
       </TabItem>
 

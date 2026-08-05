@@ -20,7 +20,7 @@ namespace ModbusForge.Avalonia.Converters
             3,  // MQTT
             4,  // Script Editor
             5,  // Signal Generator
-            6,  // Visual Simulation
+            6,  // Simulation
             7,  // Holding Registers
             9,  // Input Registers
             8,  // Coils
