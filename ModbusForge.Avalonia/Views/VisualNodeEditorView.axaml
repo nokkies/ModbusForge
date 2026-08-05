@@ -23,6 +23,23 @@
       <Setter Property="VerticalAlignment" Value="Center"/>
       <Setter Property="Margin" Value="0,0,4,0"/>
     </Style>
+    <Style Selector="NumericUpDown.nodeValue">
+      <Setter Property="ShowButtonSpinner" Value="False"/>
+      <Setter Property="AllowSpin" Value="True"/>
+      <Setter Property="Height" Value="20"/>
+      <Setter Property="Padding" Value="2,0"/>
+      <Setter Property="FontSize" Value="9"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="TextAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="RepeatButton.nodeSpinner">
+      <Setter Property="FontSize" Value="8"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Width" Value="12"/>
+      <Setter Property="Height" Value="10"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    </Style>
   </UserControl.Styles>
 
   <Grid ColumnDefinitions="220,*,300" RowDefinitions="Auto,*">
@@ -234,12 +251,24 @@
                       <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="3" Margin="0,0,0,2"
                                   IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Input,InputBool,InputInt,Output,OutputBool,OutputInt'}">
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Input,InputBool,InputInt'}">
-                          <ComboBox ItemsSource="{x:Static models:VisualNode.PlcAreaOptions}" SelectedItem="{Binding Input1Address.Area}" Width="90" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center"/>
-                          <NumericUpDown Value="{Binding Input1Address.Address}" Minimum="0" Maximum="65535" Increment="1" Width="70" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center" HorizontalAlignment="Center" FormatString="0"/>
+                          <ComboBox ItemsSource="{x:Static models:VisualNode.PlcAreaOptions}" SelectedItem="{Binding Input1Address.Area}" Width="90" Height="20" FontSize="9" Padding="2,0" VerticalContentAlignment="Center"/>
+                          <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                            <NumericUpDown Value="{Binding Input1Address.Address}" Minimum="0" Maximum="65535" Increment="1" Width="45" Classes="nodeValue" FormatString="0"/>
+                            <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
+                              <RepeatButton Content="^" Click="IncreaseValue_Click" Classes="nodeSpinner"/>
+                              <RepeatButton Content="v" Click="DecreaseValue_Click" Classes="nodeSpinner"/>
+                            </StackPanel>
+                          </StackPanel>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Output,OutputBool,OutputInt'}">
-                          <ComboBox ItemsSource="{x:Static models:VisualNode.PlcAreaOptions}" SelectedItem="{Binding OutputAddress.Area}" Width="90" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center"/>
-                          <NumericUpDown Value="{Binding OutputAddress.Address}" Minimum="0" Maximum="65535" Increment="1" Width="70" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center" HorizontalAlignment="Center" FormatString="0"/>
+                          <ComboBox ItemsSource="{x:Static models:VisualNode.PlcAreaOptions}" SelectedItem="{Binding OutputAddress.Area}" Width="90" Height="20" FontSize="9" Padding="2,0" VerticalContentAlignment="Center"/>
+                          <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                            <NumericUpDown Value="{Binding OutputAddress.Address}" Minimum="0" Maximum="65535" Increment="1" Width="45" Classes="nodeValue" FormatString="0"/>
+                            <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
+                              <RepeatButton Content="^" Click="IncreaseValue_Click" Classes="nodeSpinner"/>
+                              <RepeatButton Content="v" Click="DecreaseValue_Click" Classes="nodeSpinner"/>
+                            </StackPanel>
+                          </StackPanel>
                         </StackPanel>
                       </StackPanel>
 
@@ -249,19 +278,43 @@
                                   IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP,CTU,CTD,CTC,COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE,MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV,RS'}">
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP'}">
                           <TextBlock Text="ms:" FontSize="9" VerticalAlignment="Center"/>
-                          <NumericUpDown Value="{Binding TimerPresetMs}" Minimum="0" Maximum="100000" Increment="1" Width="70" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center" HorizontalAlignment="Center"/>
+                          <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                            <NumericUpDown Value="{Binding TimerPresetMs}" Minimum="0" Maximum="100000" Increment="1" Width="50" Classes="nodeValue"/>
+                            <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
+                              <RepeatButton Content="^" Click="IncreaseValue_Click" Classes="nodeSpinner"/>
+                              <RepeatButton Content="v" Click="DecreaseValue_Click" Classes="nodeSpinner"/>
+                            </StackPanel>
+                          </StackPanel>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='CTU,CTD,CTC'}">
                           <TextBlock Text="Pre:" FontSize="9" VerticalAlignment="Center"/>
-                          <NumericUpDown Value="{Binding CounterPreset}" Minimum="0" Maximum="100000" Increment="1" Width="70" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center" HorizontalAlignment="Center"/>
+                          <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                            <NumericUpDown Value="{Binding CounterPreset}" Minimum="0" Maximum="100000" Increment="1" Width="50" Classes="nodeValue"/>
+                            <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
+                              <RepeatButton Content="^" Click="IncreaseValue_Click" Classes="nodeSpinner"/>
+                              <RepeatButton Content="v" Click="DecreaseValue_Click" Classes="nodeSpinner"/>
+                            </StackPanel>
+                          </StackPanel>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE'}">
                           <TextBlock Text="Val:" FontSize="9" VerticalAlignment="Center"/>
-                          <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Increment="1" Width="70" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center" HorizontalAlignment="Center"/>
+                          <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                            <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Increment="1" Width="50" Classes="nodeValue"/>
+                            <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
+                              <RepeatButton Content="^" Click="IncreaseValue_Click" Classes="nodeSpinner"/>
+                              <RepeatButton Content="v" Click="DecreaseValue_Click" Classes="nodeSpinner"/>
+                            </StackPanel>
+                          </StackPanel>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV'}">
                           <TextBlock Text="Const:" FontSize="9" VerticalAlignment="Center" ToolTip.Tip="Constant used when Input2 is not connected"/>
-                          <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Increment="1" Width="70" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center" HorizontalAlignment="Center"/>
+                          <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                            <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Increment="1" Width="50" Classes="nodeValue"/>
+                            <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
+                              <RepeatButton Content="^" Click="IncreaseValue_Click" Classes="nodeSpinner"/>
+                              <RepeatButton Content="v" Click="DecreaseValue_Click" Classes="nodeSpinner"/>
+                            </StackPanel>
+                          </StackPanel>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='RS'}">
                           <TextBlock Text="Set Dom:" FontSize="9" VerticalAlignment="Center"/>

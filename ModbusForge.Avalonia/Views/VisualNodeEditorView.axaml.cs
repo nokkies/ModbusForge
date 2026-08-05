@@ -968,6 +968,54 @@ namespace ModbusForge.Avalonia.Views
             ViewModel.GridSize -= 4;
         }
 
+        private void IncreaseValue_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not Control control) return;
+            if (FindSiblingNumericUpDown(control) is not NumericUpDown nud) return;
+            if (nud.Value is not { } value) return;
+
+            var newValue = value + nud.Increment;
+            if (nud.Maximum is { } max) newValue = Math.Min(newValue, max);
+            nud.Value = newValue;
+        }
+
+        private void DecreaseValue_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not Control control) return;
+            if (FindSiblingNumericUpDown(control) is not NumericUpDown nud) return;
+            if (nud.Value is not { } value) return;
+
+            var newValue = value - nud.Increment;
+            if (nud.Minimum is { } min) newValue = Math.Max(newValue, min);
+            nud.Value = newValue;
+        }
+
+        private static NumericUpDown? FindSiblingNumericUpDown(Control control)
+        {
+            if (control.Parent is not Panel panel) return null;
+
+            foreach (var child in panel.Children)
+            {
+                if (child is NumericUpDown direct) return direct;
+                if (child is Panel childPanel)
+                {
+                    foreach (var grandChild in childPanel.Children)
+                    {
+                        if (grandChild is NumericUpDown nested) return nested;
+                        if (grandChild is Panel grandPanel)
+                        {
+                            foreach (var great in grandPanel.Children)
+                            {
+                                if (great is NumericUpDown deep) return deep;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+
         private void View_KeyDown(object? sender, KeyEventArgs e)
         {
             if (ViewModel == null) return;
