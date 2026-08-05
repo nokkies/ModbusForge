@@ -49,6 +49,17 @@ namespace ModbusForge.Avalonia.Views
 
         private MainViewModel? ViewModel => DataContext as MainViewModel;
 
+        private void ActiveUnitIdComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ComboBox combo && combo.SelectedItem is byte id)
+            {
+                if (ViewModel is not null && ViewModel.SelectedUnitId != id)
+                {
+                    ViewModel.SelectedUnitId = id;
+                }
+            }
+        }
+
         private void ScriptEditor_Click(object? sender, RoutedEventArgs e)
         {
             if (ViewModel is not null)
