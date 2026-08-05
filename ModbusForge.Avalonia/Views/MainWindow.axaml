@@ -73,12 +73,13 @@
           <MenuItem Header="_Tag Browser..." Command="{Binding OpenTagBrowserCommand}" />
           <MenuItem Header="_Watch Window..." Command="{Binding OpenWatchWindowCommand}" />
           <MenuItem Header="_Frame Inspector..." Command="{Binding OpenFrameInspectorCommand}" />
-          <MenuItem Header="_Check for Updates" Command="{Binding CheckForUpdatesCommand}" />
         </MenuItem>
         <MenuItem Header="_Help">
           <MenuItem Header="_Help" Command="{Binding OpenHelpCommand}" InputGesture="F1" />
           <MenuItem Header="_Keyboard Shortcuts" Command="{Binding OpenKeyboardShortcutsCommand}" />
           <MenuItem Header="_Troubleshooting" Command="{Binding OpenTroubleshootingCommand}" />
+          <Separator />
+          <MenuItem Header="_Check for Updates" Command="{Binding CheckForUpdatesCommand}" />
           <MenuItem Header="_About ModbusForge" Command="{Binding OpenAboutCommand}" />
         </MenuItem>
       </Menu>
