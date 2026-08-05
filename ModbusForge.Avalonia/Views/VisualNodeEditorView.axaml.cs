@@ -1331,15 +1331,25 @@ namespace ModbusForge.Avalonia.Views
                     Header = "Configure Waveform...",
                     Icon = new TextBlock { Text = "…", FontSize = 12 }
                 };
-                configItem.Click += (_, _) =>
+                configItem.Click += async (_, _) =>
                 {
                     ViewModel?.SelectNode(node, false);
-                    if (ViewModel != null)
+
+                    var window = new SignalGeneratorConfigWindow
                     {
-                        ViewModel.SelectedWaveform = node.Waveform ?? "Ramp";
-                        ViewModel.WaveformPeriodMs = node.PeriodMs;
-                        ViewModel.WaveformAmplitude = node.Amplitude;
-                        ViewModel.WaveformOffset = node.Offset;
+                        DataContext = new SignalGeneratorConfigViewModel(node)
+                    };
+
+                    if (this.VisualRoot is Window owner)
+                    {
+                        var result = await window.ShowDialog<bool?>(owner);
+                        if (result == true && window.DataContext is SignalGeneratorConfigViewModel vm)
+                        {
+                            node.Waveform = vm.Waveform;
+                            node.PeriodMs = vm.PeriodMs;
+                            node.Amplitude = vm.Amplitude;
+                            node.Offset = vm.Offset;
+                        }
                     }
                 };
                 menu.Items.Insert(0, configItem);

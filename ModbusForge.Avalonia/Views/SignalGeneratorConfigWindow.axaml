@@ -1,0 +1,35 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+        x:Class="ModbusForge.Avalonia.Views.SignalGeneratorConfigWindow"
+        x:DataType="vm:SignalGeneratorConfigViewModel"
+        Title="Configure Signal Generator"
+        Width="300"
+        Height="260"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+  <Grid Margin="15" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto"/>
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+
+    <TextBlock Text="Waveform:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,10" FontWeight="SemiBold" FontSize="11"/>
+    <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Waveforms}" SelectedItem="{Binding Waveform}" Margin="0,0,0,10" Padding="5"/>
+
+    <TextBlock Text="Period (ms):" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,10" FontWeight="SemiBold" FontSize="11"/>
+    <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding PeriodMs}" Minimum="1" Maximum="60000" Increment="1" Margin="0,0,0,10" Padding="2,0" VerticalContentAlignment="Center"/>
+
+    <TextBlock Text="Height/Amp:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,10" FontWeight="SemiBold" FontSize="11"/>
+    <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding Amplitude}" Minimum="-100000" Maximum="100000" Increment="1" Margin="0,0,0,10" Padding="2,0" VerticalContentAlignment="Center"/>
+
+    <TextBlock Text="Offset:" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,15" FontWeight="SemiBold" FontSize="11"/>
+    <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding Offset}" Minimum="-100000" Maximum="100000" Increment="1" Margin="0,0,0,15" Padding="2,0" VerticalContentAlignment="Center"/>
+
+    <StackPanel Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="Save" Width="80" Height="24" Command="{Binding SaveCommand}" IsDefault="True"/>
+      <Button Content="Cancel" Width="80" Height="24" Command="{Binding CancelCommand}" IsCancel="True"/>
+    </StackPanel>
+  </Grid>
+</Window>
