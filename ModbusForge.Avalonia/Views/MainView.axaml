@@ -5,7 +5,8 @@
              xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core"
              xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters"
              x:Class="ModbusForge.Avalonia.Views.MainView"
-             x:DataType="vm:MainViewModel">
+             x:DataType="vm:MainViewModel"
+             x:CompileBindings="False">
 
   <UserControl.Resources>
     <converters:NavigationIndexConverter x:Key="NavigationIndexConverter" />

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Net;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -396,6 +398,58 @@ namespace ModbusForge.Avalonia.Tests
             public void SaveProfiles() { }
 
             public void LoadProfiles() { }
+        }
+
+        [Fact]
+        public async Task ReadHoldingRegistersCommand_populates_grid_from_local_server()
+        {
+            var port = GetFreePort();
+            var profile = new ConnectionProfile("Test Server", "127.0.0.1", port, 1)
+            {
+                Mode = "Server",
+                ServerUnitIds = "1"
+            };
+
+            var connectionManager = new ConnectionManager(
+                NullLogger<ConnectionManager>.Instance,
+                NullLoggerFactory.Instance);
+            connectionManager.Profiles.Add(profile);
+            connectionManager.SetActiveProfile(profile);
+
+            using var vm = new MainViewModel(
+                connectionManager,
+                NullLogger<MainViewModel>.Instance,
+                new SyncDispatcher());
+
+            // Start the server
+            await vm.ToggleConnectionCommand.ExecuteAsync(null);
+            Assert.True(vm.IsConnected);
+            Assert.True(vm.ReadHoldingRegistersCommand.CanExecute(null));
+            Assert.True(vm.ReadInputRegistersCommand.CanExecute(null));
+            Assert.True(vm.ReadCoilsCommand.CanExecute(null));
+            Assert.True(vm.ReadDiscreteInputsCommand.CanExecute(null));
+
+            // Read 20 holding registers starting at 0
+            vm.HoldingRegisterStart = 0;
+            vm.HoldingRegisterCount = 20;
+            await vm.ReadHoldingRegistersCommand.ExecuteAsync(null);
+
+            Assert.Equal(20, vm.HoldingRegisters.Count);
+            Assert.Equal(0, vm.HoldingRegisters[0].Address);
+            Assert.Equal("0", vm.HoldingRegisters[0].ValueText);
+            Assert.Equal(1, vm.HoldingRegisters[1].Address);
+            Assert.Equal("10", vm.HoldingRegisters[1].ValueText);
+
+            await vm.ToggleConnectionCommand.ExecuteAsync(null);
+        }
+
+        private static int GetFreePort()
+        {
+            using var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            listener.Stop();
+            return port;
         }
 
         private sealed class ThrowingModbusService : IModbusService
