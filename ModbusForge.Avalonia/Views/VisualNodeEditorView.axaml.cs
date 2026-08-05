@@ -1017,6 +1017,12 @@ namespace ModbusForge.Avalonia.Views
                     e.Handled = true;
                 }
             }
+
+            if ((e.Key == Key.Delete || e.Key == Key.Back) && e.Source is not TextBox)
+            {
+                ViewModel.RemoveNodeCommand.Execute(null);
+                e.Handled = true;
+            }
         }
 
         #region POU Tree Rename
