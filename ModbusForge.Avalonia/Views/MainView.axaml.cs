@@ -9,6 +9,8 @@ using ModbusForge.Avalonia.Services;
 using ModbusForge.Avalonia.ViewModels;
 using ModbusForge.Models;
 using ModbusForge.Services;
+using System;
+using System.ComponentModel;
 using System.Globalization;
 using System.Threading.Tasks;
 
@@ -21,9 +23,12 @@ namespace ModbusForge.Avalonia.Views
         private DataGrid? _inputRegistersGrid;
         private DataGrid? _discreteInputsGrid;
 
+        private MainViewModel? _subscribedViewModel;
+
         public MainView()
         {
             InitializeComponent();
+            DataContextChanged += OnDataContextChanged;
         }
 
         private void InitializeComponent()
@@ -40,11 +45,75 @@ namespace ModbusForge.Avalonia.Views
         {
             base.OnAttachedToVisualTree(e);
 
+            HookViewModel();
+
             if (global::Avalonia.Application.Current is App app)
             {
                 var host = app.Services?.GetService<AvaloniaDockingHost>();
                 host?.SetMainView(this);
             }
+        }
+
+        protected override void OnDetachedFromVisualTree(global::Avalonia.VisualTreeAttachmentEventArgs e)
+        {
+            UnhookViewModel();
+            base.OnDetachedFromVisualTree(e);
+        }
+
+        private void OnDataContextChanged(object? sender, EventArgs e)
+        {
+            UnhookViewModel();
+            HookViewModel();
+        }
+
+        private void HookViewModel()
+        {
+            if (DataContext is not MainViewModel vm) return;
+
+            _subscribedViewModel = vm;
+            _subscribedViewModel.PropertyChanged += OnViewModelPropertyChanged;
+            UpdateAllGridItemsSources();
+        }
+
+        private void UnhookViewModel()
+        {
+            if (_subscribedViewModel is null) return;
+
+            _subscribedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            _subscribedViewModel = null;
+        }
+
+        private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            var vm = _subscribedViewModel;
+            if (vm is null) return;
+
+            switch (e.PropertyName)
+            {
+                case nameof(MainViewModel.HoldingRegisters):
+                    _holdingRegistersGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.HoldingRegisters);
+                    break;
+                case nameof(MainViewModel.InputRegisters):
+                    _inputRegistersGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.InputRegisters);
+                    break;
+                case nameof(MainViewModel.Coils):
+                    _coilsGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.Coils);
+                    break;
+                case nameof(MainViewModel.DiscreteInputs):
+                    _discreteInputsGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.DiscreteInputs);
+                    break;
+            }
+        }
+
+        private void UpdateAllGridItemsSources()
+        {
+            var vm = _subscribedViewModel;
+            if (vm is null) return;
+
+            _holdingRegistersGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.HoldingRegisters);
+            _inputRegistersGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.InputRegisters);
+            _coilsGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.Coils);
+            _discreteInputsGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.DiscreteInputs);
         }
 
         private MainViewModel? ViewModel => DataContext as MainViewModel;

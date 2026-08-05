@@ -169,10 +169,12 @@
             <NumericUpDown Value="{Binding HoldingMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
-          <DataGrid x:Name="HoldingRegistersGrid" Grid.Row="1" ItemsSource="{Binding HoldingRegisters}"
+          <DataGrid x:Name="HoldingRegistersGrid" Grid.Row="1"
                     AutoGenerateColumns="False"
                     IsReadOnly="False"
                     GridLinesVisibility="All"
+                    VerticalAlignment="Stretch"
+                    HorizontalAlignment="Stretch"
                     CellEditEnded="HoldingRegistersGrid_CellEditEnded">
             <DataGrid.ContextMenu>
               <ContextMenu>
@@ -208,10 +210,12 @@
             <NumericUpDown Value="{Binding CoilsMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
-          <DataGrid x:Name="CoilsGrid" Grid.Row="1" ItemsSource="{Binding Coils}"
+          <DataGrid x:Name="CoilsGrid" Grid.Row="1"
                     AutoGenerateColumns="False"
                     IsReadOnly="False"
                     GridLinesVisibility="All"
+                    VerticalAlignment="Stretch"
+                    HorizontalAlignment="Stretch"
                     CellEditEnded="CoilsGrid_CellEditEnded">
             <DataGrid.ContextMenu>
               <ContextMenu>
@@ -248,10 +252,12 @@
             <NumericUpDown Value="{Binding InputRegistersMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
-          <DataGrid x:Name="InputRegistersGrid" Grid.Row="1" ItemsSource="{Binding InputRegisters}"
+          <DataGrid x:Name="InputRegistersGrid" Grid.Row="1"
                     AutoGenerateColumns="False"
                     IsReadOnly="True"
-                    GridLinesVisibility="All">
+                    GridLinesVisibility="All"
+                    VerticalAlignment="Stretch"
+                    HorizontalAlignment="Stretch">
             <DataGrid.ContextMenu>
               <ContextMenu>
                 <MenuItem Header="Add to Custom Watch" Click="InputRegisters_AddToCustom_Click" />
@@ -285,10 +291,12 @@
             <NumericUpDown Value="{Binding DiscreteInputsMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
-          <DataGrid x:Name="DiscreteInputsGrid" Grid.Row="1" ItemsSource="{Binding DiscreteInputs}"
+          <DataGrid x:Name="DiscreteInputsGrid" Grid.Row="1"
                     AutoGenerateColumns="False"
                     IsReadOnly="True"
-                    GridLinesVisibility="All">
+                    GridLinesVisibility="All"
+                    VerticalAlignment="Stretch"
+                    HorizontalAlignment="Stretch">
             <DataGrid.ContextMenu>
               <ContextMenu>
                 <MenuItem Header="Add to Custom Watch" Click="DiscreteInputs_AddToCustom_Click" />
