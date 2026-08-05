@@ -193,6 +193,21 @@ namespace ModbusForge.Avalonia.ViewModels
         private string _searchText = string.Empty;
 
         [ObservableProperty]
+        private string _selectedWaveform = "Ramp";
+
+        [ObservableProperty]
+        private int _waveformPeriodMs = 1000;
+
+        [ObservableProperty]
+        private double _waveformAmplitude = 100;
+
+        [ObservableProperty]
+        private double _waveformOffset;
+
+        public static IReadOnlyList<string> WaveformOptions { get; } =
+            new[] { "Ramp", "Sine", "Triangle", "Square" };
+
+        [ObservableProperty]
         private bool _isConnectMode;
 
         [ObservableProperty]
@@ -235,6 +250,12 @@ namespace ModbusForge.Avalonia.ViewModels
         public ICommand ZoomInCommand { get; }
         public ICommand ZoomOutCommand { get; }
         public ICommand ResetZoomCommand { get; }
+        public ICommand ApplyWaveformCommand { get; }
+        public ICommand EnableNodeCommand { get; }
+        public ICommand DisableNodeCommand { get; }
+        public ICommand ResetValuesCommand { get; }
+        public ICommand RandomizeValuesCommand { get; }
+        public ICommand ExportConfigCommand { get; }
         public ICommand OpenTagBrowserCommand { get; }
         public ICommand OpenWatchWindowCommand { get; }
         public ICommand AddSelectedNodeToWatchCommand { get; }
@@ -380,6 +401,12 @@ namespace ModbusForge.Avalonia.ViewModels
             AlignTopCommand = new RelayCommand(AlignTop, () => SelectedNodes.Count >= 2);
             DistributeHorizontallyCommand = new RelayCommand(DistributeHorizontally, () => SelectedNodes.Count >= 3);
             ClearAllCommand = new RelayCommand(ClearAll);
+            ApplyWaveformCommand = new RelayCommand(ApplyWaveform, () => SelectedNode != null);
+            EnableNodeCommand = new RelayCommand(EnableNode, () => SelectedNode != null && !SelectedNode.IsEnabled);
+            DisableNodeCommand = new RelayCommand(DisableNode, () => SelectedNode != null && SelectedNode.IsEnabled);
+            ResetValuesCommand = new RelayCommand(ResetValues, () => Config.Nodes.Count > 0);
+            RandomizeValuesCommand = new RelayCommand(RandomizeValues, () => Config.Nodes.Count > 0);
+            ExportConfigCommand = new AsyncRelayCommand(ExportConfigAsync);
 
             BuildPalette();
 
@@ -1422,6 +1449,88 @@ namespace ModbusForge.Avalonia.ViewModels
             NotifyUndoRedoCommands();
             RefreshConnectionLines();
             StatusText = "Redid last edit";
+        }
+
+        private void ApplyWaveform()
+        {
+            if (SelectedNode == null) return;
+
+            var command = new EditorCommand(
+                () =>
+                {
+                    SelectedNode.Waveform = SelectedWaveform;
+                    SelectedNode.PeriodMs = WaveformPeriodMs;
+                    SelectedNode.Amplitude = WaveformAmplitude;
+                    SelectedNode.Offset = WaveformOffset;
+                },
+                () =>
+                {
+                    // No-op undo for now; properties are mutable.
+                });
+
+            command.Execute();
+            UndoRedo.Push(command);
+            StatusText = $"Applied {SelectedWaveform} waveform to {SelectedNode.Name}";
+        }
+
+        private void EnableNode()
+        {
+            if (SelectedNode == null) return;
+            SelectedNode.IsEnabled = true;
+        }
+
+        private void DisableNode()
+        {
+            if (SelectedNode == null) return;
+            SelectedNode.IsEnabled = false;
+        }
+
+        private void ResetValues()
+        {
+            foreach (var node in Config.Nodes)
+            {
+                node.CurrentValueDouble = 0;
+            }
+
+            StatusText = "All live values reset";
+        }
+
+        private void RandomizeValues()
+        {
+            var random = new Random();
+            foreach (var node in Config.Nodes)
+            {
+                node.CurrentValueDouble = random.NextDouble() * 100;
+            }
+
+            StatusText = "All live values randomized";
+        }
+
+        private async Task ExportConfigAsync()
+        {
+            if (_fileDialogService == null)
+            {
+                StatusText = "Export not available";
+                return;
+            }
+
+            var path = await _fileDialogService.ShowSaveFileDialogAsync(
+                "Export visual node configuration",
+                "JSON files|*.json|All files|*.*",
+                "config.json");
+
+            if (string.IsNullOrWhiteSpace(path)) return;
+
+            try
+            {
+                var json = JsonSerializer.Serialize(Config, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(path, json);
+                StatusText = $"Exported configuration to {path}";
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"Export failed: {ex.Message}";
+            }
         }
 
         private void ZoomIn() => ZoomLevel += ZoomStep;
