@@ -54,7 +54,7 @@ public class ConnectionManager : IConnectionManager
         // Add default profile if none exist
         if (Profiles.Count == 0)
         {
-            AddProfile(new ConnectionProfile("Default", "127.0.0.1", 502, 1));
+            AddProfile(new ConnectionProfile("Default", "127.0.0.1", 502, 1) { Mode = "Server" });
         }
     }
 

@@ -25,7 +25,7 @@ namespace ModbusForge.Avalonia.Tests
                 loggerFactory,
                 null);
 
-            var profile = new ConnectionProfile("Test", "127.0.0.1", port, 1);
+            var profile = new ConnectionProfile("Test", "127.0.0.1", port, 1) { Mode = "Client" };
             connectionManager.AddProfile(profile);
             connectionManager.SetActiveProfile(profile);
 

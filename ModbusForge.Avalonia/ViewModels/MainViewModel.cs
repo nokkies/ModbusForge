@@ -490,8 +490,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 }
 
                 // Default to Server mode so the user can press Start without changing the Mode combo.
-                if (string.IsNullOrWhiteSpace(ActiveProfile.Mode) ||
-                    !string.Equals(ActiveProfile.Mode, "Server", StringComparison.OrdinalIgnoreCase))
+                if (string.IsNullOrWhiteSpace(ActiveProfile.Mode))
                 {
                     Mode = "Server";
                 }

@@ -352,6 +352,10 @@ namespace ModbusForge.Services
             {
                 if (visualNode.Input1Address?.Address >= 0)
                     node.InputBindings["Input1"] = visualNode.Input1Address;
+
+                // Input2 can also come from a bound Modbus address when no wire is connected.
+                if (visualNode.Input2Address?.Address >= 0)
+                    node.InputBindings["Input2"] = visualNode.Input2Address;
             }
 
             if (IsOutputSink(visualNode.ElementType) && visualNode.OutputAddress?.Address >= 0)

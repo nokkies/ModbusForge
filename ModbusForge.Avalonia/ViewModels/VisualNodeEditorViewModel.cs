@@ -327,6 +327,17 @@ namespace ModbusForge.Avalonia.ViewModels
                     node.ShowLiveValues = value;
                 }
 
+                if (value)
+                {
+                    _visualSimulation.Start(Config);
+                    IsRunning = true;
+                }
+                else
+                {
+                    _visualSimulation.Stop();
+                    IsRunning = false;
+                }
+
                 OnPropertyChanged();
             }
         }
@@ -381,6 +392,12 @@ namespace ModbusForge.Avalonia.ViewModels
             NormalizeViewSettings();
             RefreshConnectionLines();
             RefreshGridLines();
+
+            if (Config.ShowLiveValues)
+            {
+                _visualSimulation.Start(Config);
+                IsRunning = true;
+            }
         }
 
         partial void OnConfigChanged(VisualNodeEditorConfig value)
@@ -401,6 +418,23 @@ namespace ModbusForge.Avalonia.ViewModels
             CancelConnection(false);
             RefreshConnectionLines();
             RefreshGridLines();
+
+            foreach (var node in Config.Nodes)
+            {
+                node.ShowLiveValues = Config.ShowLiveValues;
+            }
+
+            if (Config.ShowLiveValues && !IsRunning)
+            {
+                _visualSimulation.Start(Config);
+                IsRunning = true;
+            }
+            else if (!Config.ShowLiveValues && IsRunning)
+            {
+                _visualSimulation.Stop();
+                IsRunning = false;
+            }
+
             ((IRelayCommand)AutoLayoutCommand).NotifyCanExecuteChanged();
         }
 
@@ -1062,35 +1096,102 @@ namespace ModbusForge.Avalonia.ViewModels
             return node;
         }
 
-        private static void InitializeNodeDefaults(VisualNode node)
+        private static readonly PlcArea BoolIoArea = PlcArea.Coil;
+        private static readonly PlcArea IntIoArea = PlcArea.HoldingRegister;
+
+        private void InitializeNodeDefaults(VisualNode node)
         {
             switch (node.ElementType)
             {
                 case PlcElementType.Input:
-                case PlcElementType.InputBool:
-                case PlcElementType.InputInt:
                     node.Input1Address = new PlcAddressReference
                     {
-                        Area = node.ElementType == PlcElementType.InputInt ? PlcArea.HoldingRegister : PlcArea.Coil,
+                        Area = BoolIoArea,
                         Address = -1
                     };
                     break;
+                case PlcElementType.InputBool:
+                    node.Input1Address = new PlcAddressReference
+                    {
+                        Area = BoolIoArea,
+                        Address = GetNextAvailableAddress(BoolIoArea)
+                    };
+                    node.OutputAddress = new PlcAddressReference
+                    {
+                        Area = BoolIoArea,
+                        Address = node.Input1Address.Address
+                    };
+                    break;
+                case PlcElementType.InputInt:
+                    node.Input1Address = new PlcAddressReference
+                    {
+                        Area = IntIoArea,
+                        Address = GetNextAvailableAddress(IntIoArea)
+                    };
+                    node.OutputAddress = new PlcAddressReference
+                    {
+                        Area = IntIoArea,
+                        Address = node.Input1Address.Address
+                    };
+                    break;
                 case PlcElementType.Output:
+                    node.OutputAddress = new PlcAddressReference
+                    {
+                        Area = BoolIoArea,
+                        Address = -1
+                    };
+                    break;
                 case PlcElementType.OutputBool:
+                    node.OutputAddress = new PlcAddressReference
+                    {
+                        Area = BoolIoArea,
+                        Address = GetNextAvailableAddress(BoolIoArea)
+                    };
+                    break;
                 case PlcElementType.OutputInt:
                     node.OutputAddress = new PlcAddressReference
                     {
-                        Area = node.ElementType == PlcElementType.OutputInt ? PlcArea.HoldingRegister : PlcArea.Coil,
-                        Address = -1
+                        Area = IntIoArea,
+                        Address = GetNextAvailableAddress(IntIoArea)
                     };
                     break;
                 case PlcElementType.MATH_ADD:
                 case PlcElementType.MATH_SUB:
                 case PlcElementType.MATH_MUL:
                 case PlcElementType.MATH_DIV:
-                    node.Input2Address = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = -1 };
+                    node.Input2Address = new PlcAddressReference { Area = IntIoArea, Address = -1 };
+                    node.OutputAddress = new PlcAddressReference
+                    {
+                        Area = IntIoArea,
+                        Address = GetNextAvailableAddress(IntIoArea)
+                    };
+                    break;
+                case PlcElementType.COMPARE_EQ:
+                case PlcElementType.COMPARE_NE:
+                case PlcElementType.COMPARE_GT:
+                case PlcElementType.COMPARE_LT:
+                case PlcElementType.COMPARE_GE:
+                case PlcElementType.COMPARE_LE:
+                    node.Input2Address = new PlcAddressReference { Area = IntIoArea, Address = -1 };
                     break;
             }
+        }
+
+        private int GetNextAvailableAddress(PlcArea area)
+        {
+            var existing = Config?.Nodes
+                .SelectMany(n => new[] { n.Input1Address, n.Input2Address, n.OutputAddress })
+                .Where(a => a?.Area == area && a.Address >= 0)
+                .Select(a => a!.Address)
+                .ToList() ?? new List<int>();
+
+            int next = 1;
+            while (existing.Contains(next))
+            {
+                next++;
+            }
+
+            return next;
         }
 
         private void RemoveNode()
