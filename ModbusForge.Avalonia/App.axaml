@@ -7,5 +7,10 @@
     <Style Selector="Window">
       <Setter Property="Icon" Value="/Assets/logo.png" />
     </Style>
+    <Style Selector="NumericUpDown">
+      <Setter Property="ShowButtonSpinner" Value="False" />
+      <Setter Property="AllowSpin" Value="True" />
+      <Setter Property="Padding" Value="4,0" />
+    </Style>
   </Application.Styles>
 </Application>
