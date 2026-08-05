@@ -12,6 +12,7 @@ using ModbusForge.Services;
 using System;
 using System.ComponentModel;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace ModbusForge.Avalonia.Views
@@ -152,6 +153,13 @@ namespace ModbusForge.Avalonia.Views
             {
                 ViewModel.SelectedTabIndex = 4;
             }
+        }
+
+        private void HoldingRegistersGrid_Loaded(object? sender, RoutedEventArgs e)
+        {
+            var grid = sender as DataGrid;
+            var count = (grid?.ItemsSource as System.Collections.IEnumerable)?.Cast<object>().Count() ?? -1;
+            ViewModel?.DebugMessages.Add($"Holding grid loaded; items={count}");
         }
 
         private void HoldingRegistersGrid_CellEditEnded(object? sender, DataGridCellEditEndedEventArgs e)

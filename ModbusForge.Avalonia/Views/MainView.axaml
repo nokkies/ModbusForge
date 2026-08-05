@@ -175,6 +175,7 @@
                     GridLinesVisibility="All"
                     VerticalAlignment="Stretch"
                     HorizontalAlignment="Stretch"
+                    Loaded="HoldingRegistersGrid_Loaded"
                     CellEditEnded="HoldingRegistersGrid_CellEditEnded">
             <DataGrid.ContextMenu>
               <ContextMenu>
