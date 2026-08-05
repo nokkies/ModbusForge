@@ -219,11 +219,35 @@
               <DataTemplate DataType="models:VisualNode">
                 <Border Width="{Binding Width}" Height="{Binding Height}" Classes="node" views:VisualNodeBehavior.IsSelected="{Binding IsSelected}" CornerRadius="4" PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
                   <Canvas Width="{Binding Width}" Height="{Binding Height}" Background="Transparent">
-                    <Grid Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" RowDefinitions="Auto,Auto,Auto,*" ClipToBounds="True">
-                      <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="Bold" HorizontalAlignment="Center"/>
-                      <TextBlock Grid.Row="1" Text="{Binding ElementType}" FontSize="10" HorizontalAlignment="Center"/>
+                    <Grid Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" RowDefinitions="Auto,Auto,Auto,*,Auto" ClipToBounds="True">
+                      <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="Bold" HorizontalAlignment="Center" FontSize="11" TextTrimming="CharacterEllipsis" Margin="4,2,4,0" ToolTip.Tip="{Binding Name}"/>
+                      <TextBlock Grid.Row="1" Text="{Binding ElementType}" FontSize="10" HorizontalAlignment="Center" Opacity="0.8" Margin="0,0,0,2"/>
                       <TextBlock Grid.Row="2" Text="{Binding AddressDisplay}" FontSize="9" Opacity="0.7" HorizontalAlignment="Center" IsVisible="{Binding AddressDisplay, Converter={x:Static converters:StringToBoolConverter.Instance}}" Margin="0,0,0,2"/>
-                      <TextBox Grid.Row="3" Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={x:Static converters:DoubleToStringConverter.Instance}}" IsVisible="{Binding ShowLiveValues}" HorizontalContentAlignment="Center" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" KeyDown="LiveValue_KeyDown" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
+                      <TextBox Grid.Row="3" Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={x:Static converters:DoubleToStringConverter.Instance}}" IsVisible="{Binding ShowLiveValues}" HorizontalContentAlignment="Center" VerticalAlignment="Center" Height="22" FontSize="10" Padding="2,0" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" KeyDown="LiveValue_KeyDown" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
+
+                      <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Spacing="3" Margin="0,0,0,4"
+                                  IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP,CTU,CTD,CTC,COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE,MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV,RS'}">
+                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP'}">
+                          <TextBlock Text="ms:" FontSize="9" VerticalAlignment="Center"/>
+                          <NumericUpDown Value="{Binding TimerPresetMs}" Minimum="0" Maximum="100000" Increment="1" Width="70" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='CTU,CTD,CTC'}">
+                          <TextBlock Text="Pre:" FontSize="9" VerticalAlignment="Center"/>
+                          <NumericUpDown Value="{Binding CounterPreset}" Minimum="0" Maximum="100000" Increment="1" Width="70" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE'}">
+                          <TextBlock Text="Val:" FontSize="9" VerticalAlignment="Center"/>
+                          <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Increment="1" Width="70" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV'}">
+                          <TextBlock Text="Const:" FontSize="9" VerticalAlignment="Center" ToolTip.Tip="Constant used when Input2 is not connected"/>
+                          <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Increment="1" Width="70" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='RS'}">
+                          <TextBlock Text="Set Dom:" FontSize="9" VerticalAlignment="Center"/>
+                          <CheckBox IsChecked="{Binding SetDominant}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                      </StackPanel>
                     </Grid>
 
                     <Canvas Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" IsVisible="{Binding $parent[UserControl].((vm:VisualNodeEditorViewModel)DataContext).ShowConnectors, FallbackValue=True}">
