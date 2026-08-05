@@ -218,6 +218,13 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="models:VisualNode">
                 <Border Width="{Binding Width}" Height="{Binding Height}" Classes="node" views:VisualNodeBehavior.IsSelected="{Binding IsSelected}" CornerRadius="4" PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
+                  <Border.Background>
+                    <MultiBinding Converter="{x:Static converters:NodeStateBrushConverter.Instance}">
+                      <Binding Path="ShowLiveValues"/>
+                      <Binding Path="CurrentValue"/>
+                      <Binding Path="ElementType"/>
+                    </MultiBinding>
+                  </Border.Background>
                   <Canvas Width="{Binding Width}" Height="{Binding Height}" Background="Transparent">
                     <Grid Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" ClipToBounds="True">
                       <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="Bold" HorizontalAlignment="Center" FontSize="11" TextTrimming="CharacterEllipsis" Margin="4,2,4,0" ToolTip.Tip="{Binding Name}"/>
