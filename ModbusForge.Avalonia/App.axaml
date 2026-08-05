@@ -4,5 +4,8 @@
              RequestedThemeVariant="Light">
   <Application.Styles>
     <FluentTheme />
+    <Style Selector="Window">
+      <Setter Property="Icon" Value="/Assets/logo.png" />
+    </Style>
   </Application.Styles>
 </Application>
