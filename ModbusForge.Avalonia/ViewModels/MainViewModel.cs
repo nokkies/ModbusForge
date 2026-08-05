@@ -199,13 +199,17 @@ namespace ModbusForge.Avalonia.ViewModels
         [NotifyCanExecuteChangedFor(nameof(WriteCustomEntryCommand))]
         private CustomEntry? _selectedCustomEntry;
 
-        public ObservableCollection<RegisterEntry> HoldingRegisters { get; } = new();
+        [ObservableProperty]
+        private ObservableCollection<RegisterEntry> _holdingRegisters = new();
 
-        public ObservableCollection<RegisterEntry> InputRegisters { get; } = new();
+        [ObservableProperty]
+        private ObservableCollection<RegisterEntry> _inputRegisters = new();
 
-        public ObservableCollection<CoilEntry> Coils { get; } = new();
+        [ObservableProperty]
+        private ObservableCollection<CoilEntry> _coils = new();
 
-        public ObservableCollection<CoilEntry> DiscreteInputs { get; } = new();
+        [ObservableProperty]
+        private ObservableCollection<CoilEntry> _discreteInputs = new();
 
         public ObservableCollection<RegisterEntry> Registers => HoldingRegisters;
 
@@ -1933,8 +1937,7 @@ namespace ModbusForge.Avalonia.ViewModels
                             ?? throw new InvalidOperationException("Read returned no response.");
                         await _dispatcher.InvokeAsync(() =>
                         {
-                            ApplyRegisterValues(
-                                HoldingRegisters,
+                            HoldingRegisters = ApplyRegisterValues(
                                 start,
                                 holding,
                                 RegistersGlobalType,
@@ -1950,8 +1953,7 @@ namespace ModbusForge.Avalonia.ViewModels
                             ?? throw new InvalidOperationException("Read returned no response.");
                         await _dispatcher.InvokeAsync(() =>
                         {
-                            ApplyRegisterValues(
-                                InputRegisters,
+                            InputRegisters = ApplyRegisterValues(
                                 start,
                                 input,
                                 InputRegistersGlobalType,
@@ -1967,7 +1969,7 @@ namespace ModbusForge.Avalonia.ViewModels
                             ?? throw new InvalidOperationException("Read returned no response.");
                         await _dispatcher.InvokeAsync(() =>
                         {
-                            ApplyCoilValues(Coils, start, coils);
+                            Coils = ApplyCoilValues(start, coils);
                             StatusMessage = $"Read {coils.Length} coils";
                         });
                         break;
@@ -1977,7 +1979,7 @@ namespace ModbusForge.Avalonia.ViewModels
                             ?? throw new InvalidOperationException("Read returned no response.");
                         await _dispatcher.InvokeAsync(() =>
                         {
-                            ApplyCoilValues(DiscreteInputs, start, discrete);
+                            DiscreteInputs = ApplyCoilValues(start, discrete);
                             StatusMessage = $"Read {discrete.Length} discrete inputs";
                         });
                         break;
@@ -2093,8 +2095,7 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
-        private void ApplyRegisterValues(
-            ObservableCollection<RegisterEntry> target,
+        private ObservableCollection<RegisterEntry> ApplyRegisterValues(
             int start,
             ushort[] values,
             string globalType,
@@ -2102,7 +2103,7 @@ namespace ModbusForge.Avalonia.ViewModels
             bool swapWords,
             IEnumerable<RegisterMetadata>? metadata = null)
         {
-            target.Clear();
+            var target = new ObservableCollection<RegisterEntry>();
             var metadataByAddress = metadata?.ToDictionary(item => item.Address)
                                     ?? new Dictionary<int, RegisterMetadata>();
 
@@ -2169,11 +2170,13 @@ namespace ModbusForge.Avalonia.ViewModels
                         break;
                 }
             }
+
+            return target;
         }
 
-        private void ApplyCoilValues(ObservableCollection<CoilEntry> target, int start, bool[] values)
+        private ObservableCollection<CoilEntry> ApplyCoilValues(int start, bool[] values)
         {
-            target.Clear();
+            var target = new ObservableCollection<CoilEntry>();
             for (int i = 0; i < values.Length; i++)
             {
                 target.Add(new CoilEntry
@@ -2182,6 +2185,8 @@ namespace ModbusForge.Avalonia.ViewModels
                     State = values[i]
                 });
             }
+
+            return target;
         }
 
         #region Custom Watch
