@@ -165,7 +165,9 @@ namespace ModbusForge.Models
 
         public string ParameterDisplay => NodeDescriptors.Get(ElementType).GetParameterDisplay(this);
 
-        public bool HasOutput => ElementType != PlcElementType.Input;
+        public bool HasOutput => ElementType != PlcElementType.Input
+            && ElementType != PlcElementType.InputBool
+            && ElementType != PlcElementType.InputInt;
 
         // Cached handler so we can unsubscribe from the previous PlcAddressReference instance.
         private PropertyChangedEventHandler? _addressPropertyChangedHandler;
