@@ -737,7 +737,7 @@ namespace ModbusForge.Avalonia.Views
 
         private void Node_PointerPressed(object? sender, PointerPressedEventArgs e)
         {
-            if (sender is not Border border || e.Source is TextBox || ViewModel == null)
+            if (sender is not Border border || ViewModel == null)
             {
                 return;
             }
@@ -755,6 +755,12 @@ namespace ModbusForge.Avalonia.Views
             if (wasConnectMode || (extendsSelection && wasSelected && !node.IsSelected))
             {
                 e.Handled = true;
+                return;
+            }
+
+            // If the user clicked the live-value TextBox, let it get focus but keep the node selected.
+            if (e.Source is TextBox)
+            {
                 return;
             }
 
