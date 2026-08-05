@@ -662,7 +662,7 @@ namespace ModbusForge.Avalonia.ViewModels
         /// </summary>
         public void SelectNode(VisualNode node, bool extendSelection = false)
         {
-            if (!Config.Nodes.Contains(node)) return;
+            if (node == null || !Config.Nodes.Contains(node)) return;
 
             if (IsConnectMode)
             {
@@ -685,6 +685,7 @@ namespace ModbusForge.Avalonia.ViewModels
             if (!extendSelection)
             {
                 selection.Clear();
+                selection.Add(node);
             }
             else if (selection.Contains(node))
             {

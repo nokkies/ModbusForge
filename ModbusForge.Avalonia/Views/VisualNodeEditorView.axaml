@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels" xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core" xmlns:shapes="using:Avalonia.Controls.Shapes" xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters" x:Class="ModbusForge.Avalonia.Views.VisualNodeEditorView" x:DataType="vm:VisualNodeEditorViewModel" Focusable="True">
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels" xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core" xmlns:shapes="using:Avalonia.Controls.Shapes" xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters" xmlns:views="clr-namespace:ModbusForge.Avalonia.Views" x:Class="ModbusForge.Avalonia.Views.VisualNodeEditorView" x:DataType="vm:VisualNodeEditorViewModel" Focusable="True">
 
   <UserControl.Styles>
     <Style Selector="Border.node">
@@ -6,11 +6,7 @@
       <Setter Property="BorderThickness" Value="2"/>
       <Setter Property="Background" Value="LightBlue"/>
     </Style>
-    <Style Selector="Border.node.selected">
-      <Setter Property="BorderBrush" Value="#1976D2"/>
-      <Setter Property="BorderThickness" Value="3"/>
-      <Setter Property="Background" Value="#BBDEFB"/>
-    </Style>
+
     <Style Selector="Border.ToolGroup">
       <Setter Property="BorderBrush" Value="#C0C0C0"/>
       <Setter Property="BorderThickness" Value="1"/>
@@ -117,7 +113,7 @@
       <Border Classes="ToolGroup">
         <StackPanel Orientation="Horizontal" Spacing="2">
           <TextBlock Text="Status" Classes="ToolGroupHeader"/>
-          <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="Bold" MinWidth="120" TextTrimming="CharacterEllipsis" MaxWidth="260"/>
+          <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="Bold" MinWidth="120" MaxWidth="260" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusText}"/>
         </StackPanel>
       </Border>
     </WrapPanel>
@@ -216,7 +212,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="models:VisualNode">
-                <Border Width="{Binding Width}" Height="{Binding Height}" Classes="node" Classes.selected="{Binding IsSelected}" CornerRadius="4" PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
+                <Border Width="{Binding Width}" Height="{Binding Height}" Classes="node" views:VisualNodeBehavior.IsSelected="{Binding IsSelected}" CornerRadius="4" PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
                   <Canvas Width="{Binding Width}" Height="{Binding Height}" Background="Transparent">
                     <Grid Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" RowDefinitions="Auto,Auto,*" ClipToBounds="True">
                       <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="Bold" HorizontalAlignment="Center"/>

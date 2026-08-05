@@ -777,7 +777,7 @@ namespace ModbusForge.Avalonia.Views
 
         private void Node_PointerPressed(object? sender, PointerPressedEventArgs e)
         {
-            if (sender is not Border border || ViewModel == null)
+            if (ViewModel == null || sender is not Border border)
             {
                 return;
             }
