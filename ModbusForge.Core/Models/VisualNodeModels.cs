@@ -339,7 +339,7 @@ namespace ModbusForge.Models
         private double _zoomLevel = 1.0;
         
         [ObservableProperty]
-        private bool _showLiveValues = false;
+        private bool _showLiveValues = true;
         
         [ObservableProperty]
         private bool _showGrid = true;

@@ -120,9 +120,14 @@
 
       <!-- Palette -->
     <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="1" Padding="8" Margin="0,0,8,0" Grid.Row="1">
-      <Grid RowDefinitions="Auto,*,Auto,210">
-        <TextBlock Grid.Row="0" Text="Palette" FontWeight="Bold" Margin="0,0,0,8"/>
-        <ListBox Grid.Row="1" ItemsSource="{Binding Palette}" SelectedItem="{Binding SelectedPaletteItem}" PointerPressed="Palette_PointerPressed" PointerMoved="Palette_PointerMoved" PointerReleased="Palette_PointerReleased">
+      <Grid RowDefinitions="Auto,Auto,*,Auto,210">
+        <TextBlock Grid.Row="0" Text="Palette" FontWeight="Bold" Margin="0,0,0,4"/>
+        <TextBox Grid.Row="1" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Watermark="Search nodes..." Margin="0,0,0,8">
+          <TextBox.InnerRightContent>
+            <Button Content="x" Padding="4,0" Command="{Binding ClearSearchCommand}" ToolTip.Tip="Clear search" IsVisible="{Binding SearchText, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+          </TextBox.InnerRightContent>
+        </TextBox>
+        <ListBox Grid.Row="2" ItemsSource="{Binding FilteredPalette}" SelectedItem="{Binding SelectedPaletteItem}" PointerPressed="Palette_PointerPressed" PointerMoved="Palette_PointerMoved" PointerReleased="Palette_PointerReleased" DoubleTapped="Palette_DoubleTapped">
           <ListBox.ItemTemplate>
             <DataTemplate DataType="vm:PaletteItem">
               <StackPanel>
@@ -133,8 +138,8 @@
           </ListBox.ItemTemplate>
         </ListBox>
 
-        <TextBlock Grid.Row="2" Text="Programs (POUs)" FontWeight="Bold" Margin="0,8,0,4"/>
-        <Grid Grid.Row="3" RowDefinitions="Auto,*">
+        <TextBlock Grid.Row="3" Text="Programs (POUs)" FontWeight="Bold" Margin="0,8,0,4"/>
+        <Grid Grid.Row="4" RowDefinitions="Auto,*">
           <StackPanel Grid.Row="0" Spacing="4">
             <TextBox Text="{Binding NewProgramName, UpdateSourceTrigger=PropertyChanged}" Watermark="Program/Folder name"/>
             <StackPanel Orientation="Horizontal" Spacing="4">
@@ -334,22 +339,24 @@
               <TextBox Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="100" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus"/>
               <TextBlock Text="(writes to configured address)" FontSize="10" Opacity="0.65" VerticalAlignment="Center"/>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='SignalGenerator'}">
               <TextBlock Text="Waveform:" VerticalAlignment="Center" Width="80"/>
               <TextBox Text="{Binding Waveform, UpdateSourceTrigger=PropertyChanged}" Width="100"/>
               <TextBlock Text="Period ms:" VerticalAlignment="Center" Margin="8,0,0,0"/>
               <NumericUpDown Value="{Binding PeriodMs}" Minimum="0" Maximum="60000" Width="100"/>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='SignalGenerator'}">
               <TextBlock Text="Amplitude:" VerticalAlignment="Center" Width="80"/>
               <NumericUpDown Value="{Binding Amplitude}" Minimum="-100000" Maximum="100000" Width="100"/>
               <TextBlock Text="Offset:" VerticalAlignment="Center" Margin="8,0,0,0"/>
               <NumericUpDown Value="{Binding Offset}" Minimum="-100000" Maximum="100000" Width="100"/>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP,CTU,CTD,CTC,SignalGenerator'}">
               <TextBlock Text="Preset:" VerticalAlignment="Center" Width="80"/>
               <NumericUpDown Value="{Binding TimerPresetMs}" Minimum="0" Maximum="100000" Width="100"/>
-              <TextBlock Text="Compare:" VerticalAlignment="Center" Margin="8,0,0,0"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE,MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV,SignalGenerator'}">
+              <TextBlock Text="Compare:" VerticalAlignment="Center" Width="80"/>
               <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Width="100"/>
             </StackPanel>
           </StackPanel>

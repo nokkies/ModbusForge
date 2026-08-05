@@ -488,6 +488,13 @@ namespace ModbusForge.Avalonia.ViewModels
                 {
                     _unitConfigurationStore.SelectedUnitId = ActiveProfile.UnitId;
                 }
+
+                // Default to Server mode so the user can press Start without changing the Mode combo.
+                if (string.IsNullOrWhiteSpace(ActiveProfile.Mode) ||
+                    !string.Equals(ActiveProfile.Mode, "Server", StringComparison.OrdinalIgnoreCase))
+                {
+                    Mode = "Server";
+                }
             }
 
             if (!_unitConfigurationStore.TryGetConfiguration(_unitConfigurationStore.SelectedUnitId, out _))

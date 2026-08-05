@@ -643,6 +643,24 @@ namespace ModbusForge.Avalonia.Views
             }
         }
 
+        private void Palette_DoubleTapped(object? sender, TappedEventArgs e)
+        {
+            if (ViewModel == null || sender is not ListBox listBox)
+            {
+                return;
+            }
+
+            var item = FindPaletteItem(e.Source);
+            if (item == null)
+            {
+                return;
+            }
+
+            ViewModel.SelectedPaletteItem = item;
+            ViewModel.AddNode();
+            e.Handled = true;
+        }
+
         private static PaletteItem? FindPaletteItem(object? source)
         {
             for (var control = source as Control; control != null; control = control.Parent as Control)

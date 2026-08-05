@@ -190,6 +190,9 @@ namespace ModbusForge.Avalonia.ViewModels
         private string _newProgramName = "New Program";
 
         [ObservableProperty]
+        private string _searchText = string.Empty;
+
+        [ObservableProperty]
         private bool _isConnectMode;
 
         [ObservableProperty]
@@ -203,6 +206,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public ObservableCollection<PaletteItem> Palette { get; } = new();
 
+        public ObservableCollection<PaletteItem> FilteredPalette { get; } = new();
+
         public ObservableCollection<GridLine> GridLines { get; } = new();
 
         public ObservableCollection<VisualNode> SelectedNodes { get; } = new();
@@ -214,6 +219,7 @@ namespace ModbusForge.Avalonia.ViewModels
         public UndoRedoService UndoRedo { get; } = new();
 
         public ICommand AddNodeCommand { get; }
+        public ICommand ClearSearchCommand { get; }
         public ICommand RemoveNodeCommand { get; }
         public ICommand AddConnectionCommand { get; }
         public ICommand RemoveConnectionCommand { get; }
@@ -339,6 +345,7 @@ namespace ModbusForge.Avalonia.ViewModels
             _tagService = tagService;
 
             AddNodeCommand = new RelayCommand(AddNode, () => SelectedPaletteItem != null);
+            ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
             RemoveNodeCommand = new RelayCommand(RemoveNode, () => SelectedNode != null);
             AddConnectionCommand = new RelayCommand(BeginOrCompleteConnection, () => SelectedNode != null || IsConnectMode);
             RemoveConnectionCommand = new RelayCommand(RemoveConnection, () => SelectedConnection != null);
@@ -502,6 +509,30 @@ namespace ModbusForge.Avalonia.ViewModels
                     DisplayName = descriptor.PaletteName,
                     Category = descriptor.Category
                 });
+            }
+
+            RefreshFilteredPalette();
+        }
+
+        partial void OnSearchTextChanged(string value)
+        {
+            RefreshFilteredPalette();
+        }
+
+        private void RefreshFilteredPalette()
+        {
+            var filter = SearchText?.Trim() ?? string.Empty;
+            var isEmpty = string.IsNullOrEmpty(filter);
+
+            FilteredPalette.Clear();
+            foreach (var item in Palette)
+            {
+                if (isEmpty ||
+                    item.DisplayName.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+                    item.Category.Contains(filter, StringComparison.OrdinalIgnoreCase))
+                {
+                    FilteredPalette.Add(item);
+                }
             }
         }
 
@@ -914,13 +945,61 @@ namespace ModbusForge.Avalonia.ViewModels
             RefreshConnectionLines();
         }
 
-        private void AddNode()
+        public void AddNode()
         {
             if (SelectedPaletteItem == null) return;
 
-            var x = 100 + Config.Nodes.Count * 40;
-            var y = 100 + Config.Nodes.Count * 30;
+            var (x, y) = FindFreeNodePosition();
             AddNodeAt(SelectedPaletteItem, x, y);
+        }
+
+        public (double X, double Y) FindFreeNodePosition()
+        {
+            const double startX = 100;
+            const double startY = 100;
+            const double stepX = 40;
+            const double stepY = 30;
+            const int maxCols = 25;
+
+            var defaultNodeSize = (Width: 160.0, Height: 80.0);
+
+            for (int row = 0; row < 100; row++)
+            {
+                for (int col = 0; col < maxCols; col++)
+                {
+                    var x = startX + col * stepX;
+                    var y = startY + row * stepY;
+                    var testRect = new Rect(x, y, defaultNodeSize.Width, defaultNodeSize.Height);
+
+                    bool overlaps = false;
+                    foreach (var node in Config.Nodes)
+                    {
+                        if (!double.IsFinite(node.X) || !double.IsFinite(node.Y))
+                        {
+                            continue;
+                        }
+
+                        var nodeWidth = double.IsFinite(node.Width) ? node.Width : defaultNodeSize.Width;
+                        var nodeHeight = double.IsFinite(node.Height) ? node.Height : defaultNodeSize.Height;
+                        var nodeRect = new Rect(node.X, node.Y, nodeWidth, nodeHeight);
+
+                        if (nodeRect.Intersects(testRect))
+                        {
+                            overlaps = true;
+                            break;
+                        }
+                    }
+
+                    if (!overlaps)
+                    {
+                        return (x, y);
+                    }
+                }
+            }
+
+            // Fallback if the grid is full.
+            var count = Config.Nodes.Count;
+            return (startX + count * stepX, startY + count * stepY);
         }
 
         public VisualNode? AddNodeAt(double x, double y)
