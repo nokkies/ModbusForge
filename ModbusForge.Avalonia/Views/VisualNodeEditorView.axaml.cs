@@ -8,6 +8,7 @@ using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.VisualTree;
 using ModbusForge.Avalonia.ViewModels;
 using ModbusForge.Models;
 
@@ -67,6 +68,7 @@ namespace ModbusForge.Avalonia.Views
             AddHandler(KeyDownEvent, View_KeyDown, RoutingStrategies.Tunnel);
             _nodeCanvas?.AddHandler(DragDrop.DragOverEvent, Canvas_DragOver, RoutingStrategies.Bubble);
             _nodeCanvas?.AddHandler(DragDrop.DropEvent, Canvas_Drop, RoutingStrategies.Bubble);
+            _nodeCanvas?.AddHandler(PointerPressedEvent, NodeCanvas_PreviewPointerPressed, RoutingStrategies.Tunnel);
 
             if (_programTreeView != null)
             {
@@ -81,6 +83,44 @@ namespace ModbusForge.Avalonia.Views
         private void InitializeComponent()
         {
             AvaloniaXamlLoader.Load(this);
+        }
+
+        private void NodeCanvas_PreviewPointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (ViewModel == null || _nodeCanvas == null)
+            {
+                return;
+            }
+
+            var point = e.GetCurrentPoint(_nodeCanvas);
+            if (!point.Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            var source = e.Source as Visual;
+            if (source == null)
+            {
+                return;
+            }
+
+            // Skip when clicking on a connection port (Port_PointerPressed handles those in bubble).
+            if (source is Ellipse ellipse && (ellipse.Classes.Contains("Input1Port") || ellipse.Classes.Contains("Input2Port") || ellipse.Classes.Contains("OutputPort")))
+            {
+                return;
+            }
+
+            var border = source is Border b ? b : source.GetVisualAncestors().OfType<Border>().FirstOrDefault();
+            if (border == null || border.DataContext is not VisualNode node)
+            {
+                return;
+            }
+
+            // The Border's own bubble handler will normally handle selection, but if the click
+            // originates on a child that marks the event handled (e.g. the live-value TextBox),
+            // the Border bubble never fires. Select the node here during the tunnel phase.
+            var extendSelection = (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Shift)) != 0;
+            ViewModel.SelectNode(node, extendSelection);
         }
 
         private void Canvas_PointerPressed(object? sender, PointerPressedEventArgs e)
