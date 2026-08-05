@@ -88,17 +88,36 @@ namespace ModbusForge.Avalonia.ViewModels
                 IsFilled = false
             };
 
-            var segment = new PolyLineSegment();
-            for (var i = 1; i < points.Count; i++)
+            if (points.Count == 2)
             {
-                segment.Points.Add(points[i]);
+                var (c1, c2) = ComputeBezierControlPoints(points[0], points[1]);
+                figure.Segments.Add(new BezierSegment
+                {
+                    Point1 = c1,
+                    Point2 = c2,
+                    Point3 = points[1]
+                });
             }
+            else
+            {
+                var segment = new PolyLineSegment();
+                for (var i = 1; i < points.Count; i++)
+                {
+                    segment.Points.Add(points[i]);
+                }
 
-            figure.Segments.Add(segment);
+                figure.Segments.Add(segment);
+            }
 
             var geometry = new PathGeometry();
             geometry.Figures.Add(figure);
             PathData = geometry;
+        }
+
+        private static (Point C1, Point C2) ComputeBezierControlPoints(Point start, Point end)
+        {
+            double dx = Math.Max(40, Math.Abs(end.X - start.X) * 0.5);
+            return (new Point(start.X + dx, start.Y), new Point(end.X - dx, end.Y));
         }
     }
 
