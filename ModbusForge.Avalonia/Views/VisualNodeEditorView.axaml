@@ -1,7 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels" xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core" xmlns:shapes="using:Avalonia.Controls.Shapes" xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters" x:Class="ModbusForge.Avalonia.Views.VisualNodeEditorView" x:DataType="vm:VisualNodeEditorViewModel" Focusable="True">
 
   <UserControl.Styles>
-    <Style Selector="Border.selected">
+    <Style Selector="Border.node">
+      <Setter Property="BorderBrush" Value="Black"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="Background" Value="LightBlue"/>
+    </Style>
+    <Style Selector="Border.node.selected">
       <Setter Property="BorderBrush" Value="#1976D2"/>
       <Setter Property="BorderThickness" Value="3"/>
       <Setter Property="Background" Value="#BBDEFB"/>
@@ -10,136 +15,112 @@
       <Setter Property="BorderBrush" Value="#C0C0C0"/>
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="CornerRadius" Value="4"/>
-      <Setter Property="Padding" Value="6,3"/>
+      <Setter Property="Padding" Value="4,2"/>
       <Setter Property="Background" Value="#F8F8F8"/>
       <Setter Property="Margin" Value="2,0"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
     <Style Selector="TextBlock.ToolGroupHeader">
-      <Setter Property="FontSize" Value="10"/>
+      <Setter Property="FontSize" Value="9"/>
       <Setter Property="FontWeight" Value="Bold"/>
       <Setter Property="Foreground" Value="#505050"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="Margin" Value="0,0,4,0"/>
     </Style>
   </UserControl.Styles>
 
   <Grid ColumnDefinitions="220,*,300" RowDefinitions="Auto,*">
-    <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Vertical" Spacing="4" Margin="0,0,0,8">
-      <!-- Action row -->
-      <WrapPanel Orientation="Horizontal">
-        <Border Classes="ToolGroup" VerticalAlignment="Center">
-          <StackPanel Orientation="Vertical" Spacing="2">
-            <TextBlock Text="Nodes" Classes="ToolGroupHeader"/>
-            <StackPanel Orientation="Horizontal" Spacing="2">
-              <Button Content="Add" Command="{Binding AddNodeCommand}" ToolTip.Tip="Add a node"/>
-              <Button Content="Remove" Command="{Binding RemoveNodeCommand}"/>
-              <Button Content="{Binding ConnectButtonText}" Command="{Binding AddConnectionCommand}" Padding="4,2"/>
-              <Button Content="Disconnect" Command="{Binding RemoveConnectionCommand}"/>
-              <Button Content="Clear" Command="{Binding ClearAllCommand}" ToolTip.Tip="Remove all nodes and connections"/>
+    <WrapPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,0,0,4">
+      <Border Classes="ToolGroup">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+          <TextBlock Text="Nodes" Classes="ToolGroupHeader"/>
+          <Button Content="Add" Command="{Binding AddNodeCommand}" ToolTip.Tip="Add a node"/>
+          <Button Content="Remove" Command="{Binding RemoveNodeCommand}"/>
+          <Button Content="{Binding ConnectButtonText}" Command="{Binding AddConnectionCommand}" Padding="4,2"/>
+          <Button Content="Disconnect" Command="{Binding RemoveConnectionCommand}"/>
+          <Button Content="Clear" Command="{Binding ClearAllCommand}" ToolTip.Tip="Remove all nodes and connections"/>
+        </StackPanel>
+      </Border>
+      <Border Classes="ToolGroup">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+          <TextBlock Text="Connect" Classes="ToolGroupHeader"/>
+          <ComboBox ItemsSource="{Binding TargetConnectorOptions}" SelectedItem="{Binding SelectedTargetConnector}" Width="70" ToolTip.Tip="Target connector for connect mode" VerticalAlignment="Center" Padding="4,0"/>
+          <TextBlock Text="{Binding ConnectionSourceText}" VerticalAlignment="Center" Margin="2,0" FontSize="11" MaxWidth="120" TextTrimming="CharacterEllipsis"/>
+        </StackPanel>
+      </Border>
+      <Border Classes="ToolGroup">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+          <TextBlock Text="Layout" Classes="ToolGroupHeader"/>
+          <Button Content="Auto" Command="{Binding AutoLayoutCommand}" ToolTip.Tip="Auto layout nodes"/>
+          <Button Content="Align L" Command="{Binding AlignLeftCommand}" ToolTip.Tip="Align selected nodes left"/>
+          <Button Content="Align T" Command="{Binding AlignTopCommand}" ToolTip.Tip="Align selected nodes top"/>
+          <Button Content="Distrib H" Command="{Binding DistributeHorizontallyCommand}" ToolTip.Tip="Distribute selected nodes horizontally"/>
+        </StackPanel>
+      </Border>
+      <Border Classes="ToolGroup">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+          <TextBlock Text="Edit" Classes="ToolGroupHeader"/>
+          <Button Content="Undo" Command="{Binding UndoCommand}"/>
+          <Button Content="Redo" Command="{Binding RedoCommand}"/>
+        </StackPanel>
+      </Border>
+      <Border Classes="ToolGroup">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+          <TextBlock Text="Sim" Classes="ToolGroupHeader"/>
+          <Button Content="Run" Command="{Binding RunCommand}"/>
+          <Button Content="Stop" Command="{Binding StopCommand}"/>
+          <Button Content="Save" Command="{Binding SaveCommand}"/>
+          <Button Content="Load" Command="{Binding LoadCommand}"/>
+          <Button Content="Demo" Command="{Binding LoadDemoCommand}" ToolTip.Tip="Load demo program"/>
+        </StackPanel>
+      </Border>
+      <Border Classes="ToolGroup">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+          <TextBlock Text="View" Classes="ToolGroupHeader"/>
+          <Button Content="Tag" Command="{Binding OpenTagBrowserCommand}" ToolTip.Tip="Open tag browser"/>
+          <Button Content="Watch" Command="{Binding OpenWatchWindowCommand}" ToolTip.Tip="Open watch window"/>
+          <Button Content="−" Command="{Binding ZoomOutCommand}" ToolTip.Tip="Zoom out" Padding="4,2"/>
+          <TextBlock Text="{Binding ZoomText}" VerticalAlignment="Center" MinWidth="36" TextAlignment="Center"/>
+          <Button Content="+" Command="{Binding ZoomInCommand}" ToolTip.Tip="Zoom in" Padding="4,2"/>
+          <Button Content="100%" Command="{Binding ResetZoomCommand}" Padding="4,2"/>
+        </StackPanel>
+      </Border>
+      <Border Classes="ToolGroup">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+          <TextBlock Text="Grid" Classes="ToolGroupHeader"/>
+          <CheckBox Content="Snap" IsChecked="{Binding SnapToGrid}" VerticalAlignment="Center"/>
+          <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" ToolTip.Tip="Grid size">
+            <NumericUpDown Value="{Binding GridSize}" Minimum="4" Maximum="200" Increment="4" ShowButtonSpinner="False" AllowSpin="False" Width="40" VerticalAlignment="Center" TextAlignment="Center" Padding="2,0"/>
+            <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
+              <RepeatButton Content="^" FontSize="8" Padding="0" Width="12" Height="12" Click="IncreaseGridSize_Click" ToolTip.Tip="Increase grid size"/>
+              <RepeatButton Content="v" FontSize="8" Padding="0" Width="12" Height="12" Click="DecreaseGridSize_Click" ToolTip.Tip="Decrease grid size"/>
             </StackPanel>
           </StackPanel>
-        </Border>
-        <Border Classes="ToolGroup" VerticalAlignment="Center">
-          <StackPanel Orientation="Vertical" Spacing="2">
-            <TextBlock Text="Connect" Classes="ToolGroupHeader"/>
-            <StackPanel Orientation="Horizontal" Spacing="2">
-              <ComboBox ItemsSource="{Binding TargetConnectorOptions}" SelectedItem="{Binding SelectedTargetConnector}" Width="70" ToolTip.Tip="Target connector for connect mode" VerticalAlignment="Center" Padding="4,0"/>
-              <TextBlock Text="{Binding ConnectionSourceText}" VerticalAlignment="Center" Margin="2,0" FontSize="11" MaxWidth="120" TextTrimming="CharacterEllipsis"/>
-            </StackPanel>
-          </StackPanel>
-        </Border>
-        <Border Classes="ToolGroup" VerticalAlignment="Center">
-          <StackPanel Orientation="Vertical" Spacing="2">
-            <TextBlock Text="Layout" Classes="ToolGroupHeader"/>
-            <StackPanel Orientation="Horizontal" Spacing="2">
-              <Button Content="Auto" Command="{Binding AutoLayoutCommand}" ToolTip.Tip="Auto layout nodes"/>
-              <Button Content="Align L" Command="{Binding AlignLeftCommand}" ToolTip.Tip="Align selected nodes left"/>
-              <Button Content="Align T" Command="{Binding AlignTopCommand}" ToolTip.Tip="Align selected nodes top"/>
-              <Button Content="Distrib H" Command="{Binding DistributeHorizontallyCommand}" ToolTip.Tip="Distribute selected nodes horizontally"/>
-            </StackPanel>
-          </StackPanel>
-        </Border>
-        <Border Classes="ToolGroup" VerticalAlignment="Center">
-          <StackPanel Orientation="Vertical" Spacing="2">
-            <TextBlock Text="Edit" Classes="ToolGroupHeader"/>
-            <StackPanel Orientation="Horizontal" Spacing="2">
-              <Button Content="Undo" Command="{Binding UndoCommand}"/>
-              <Button Content="Redo" Command="{Binding RedoCommand}"/>
-            </StackPanel>
-          </StackPanel>
-        </Border>
-        <Border Classes="ToolGroup" VerticalAlignment="Center">
-          <StackPanel Orientation="Vertical" Spacing="2">
-            <TextBlock Text="Simulate" Classes="ToolGroupHeader"/>
-            <StackPanel Orientation="Horizontal" Spacing="2">
-              <Button Content="Run" Command="{Binding RunCommand}"/>
-              <Button Content="Stop" Command="{Binding StopCommand}"/>
-              <Button Content="Save" Command="{Binding SaveCommand}"/>
-              <Button Content="Load" Command="{Binding LoadCommand}"/>
-            </StackPanel>
-          </StackPanel>
-        </Border>
-        <Border Classes="ToolGroup" VerticalAlignment="Center">
-          <StackPanel Orientation="Vertical" Spacing="2">
-            <TextBlock Text="View" Classes="ToolGroupHeader"/>
-            <StackPanel Orientation="Horizontal" Spacing="2">
-              <Button Content="Tag Browser" Command="{Binding OpenTagBrowserCommand}"/>
-              <Button Content="Watch" Command="{Binding OpenWatchWindowCommand}"/>
-              <Button Content="−" Command="{Binding ZoomOutCommand}" ToolTip.Tip="Zoom out" Padding="4,2"/>
-              <TextBlock Text="{Binding ZoomText}" VerticalAlignment="Center" MinWidth="40" TextAlignment="Center"/>
-              <Button Content="+" Command="{Binding ZoomInCommand}" ToolTip.Tip="Zoom in" Padding="4,2"/>
-              <Button Content="100%" Command="{Binding ResetZoomCommand}" Padding="4,2"/>
-            </StackPanel>
-          </StackPanel>
-        </Border>
-      </WrapPanel>
-
-      <!-- Options / status row -->
-      <WrapPanel Orientation="Horizontal">
-        <Border Classes="ToolGroup" VerticalAlignment="Center">
-          <StackPanel Orientation="Vertical" Spacing="2">
-            <TextBlock Text="Grid" Classes="ToolGroupHeader"/>
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <CheckBox Content="Snap" IsChecked="{Binding SnapToGrid}" VerticalAlignment="Center"/>
-              <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" ToolTip.Tip="Grid size">
-                <NumericUpDown Value="{Binding GridSize}" Minimum="4" Maximum="200" Increment="4" ShowButtonSpinner="False" AllowSpin="False" Width="40" VerticalAlignment="Center" TextAlignment="Center" Padding="2,0"/>
-                <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
-                  <RepeatButton Content="^" FontSize="8" Padding="0" Width="12" Height="12" Click="IncreaseGridSize_Click" ToolTip.Tip="Increase grid size"/>
-                  <RepeatButton Content="v" FontSize="8" Padding="0" Width="12" Height="12" Click="DecreaseGridSize_Click" ToolTip.Tip="Decrease grid size"/>
-                </StackPanel>
-              </StackPanel>
-              <CheckBox Content="Show" IsChecked="{Binding ShowGrid}" VerticalAlignment="Center"/>
-            </StackPanel>
-          </StackPanel>
-        </Border>
-        <Border Classes="ToolGroup" VerticalAlignment="Center">
-          <StackPanel Orientation="Vertical" Spacing="2">
-            <TextBlock Text="Display" Classes="ToolGroupHeader"/>
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <CheckBox Content="Live values" IsChecked="{Binding ShowLiveValues}" VerticalAlignment="Center"/>
-              <CheckBox Content="Connectors" IsChecked="{Binding ShowConnectors}" VerticalAlignment="Center"/>
-              <CheckBox Content="Ortho" IsChecked="{Binding UseOrthogonalRouting}" VerticalAlignment="Center" ToolTip.Tip="Use orthogonal connection routing"/>
-            </StackPanel>
-          </StackPanel>
-        </Border>
-        <Border Classes="ToolGroup" VerticalAlignment="Center">
-          <StackPanel Orientation="Vertical" Spacing="2">
-            <TextBlock Text="Selection" Classes="ToolGroupHeader"/>
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <Button Content="Add to Watch" Command="{Binding AddSelectedNodeToWatchCommand}" IsEnabled="{Binding SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-              <TextBlock Text="{Binding SelectedNodeCount, StringFormat='Selected: {0}'}" VerticalAlignment="Center" Margin="4,0,0,0" MinWidth="60"/>
-            </StackPanel>
-          </StackPanel>
-        </Border>
-        <Border Classes="ToolGroup" VerticalAlignment="Center">
-          <StackPanel Orientation="Vertical" Spacing="2">
-            <TextBlock Text="Status" Classes="ToolGroupHeader"/>
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="Bold" MinWidth="120" TextTrimming="CharacterEllipsis" MaxWidth="260"/>
-            </StackPanel>
-          </StackPanel>
-        </Border>
-        <Button Content="Load Demo" Command="{Binding LoadDemoCommand}" VerticalAlignment="Center" Margin="0,12,0,0"/>
-      </WrapPanel>
-    </StackPanel>
+          <CheckBox Content="Show" IsChecked="{Binding ShowGrid}" VerticalAlignment="Center"/>
+        </StackPanel>
+      </Border>
+      <Border Classes="ToolGroup">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+          <TextBlock Text="Show" Classes="ToolGroupHeader"/>
+          <CheckBox Content="Live" IsChecked="{Binding ShowLiveValues}" VerticalAlignment="Center" ToolTip.Tip="Show live values"/>
+          <CheckBox Content="Con" IsChecked="{Binding ShowConnectors}" VerticalAlignment="Center" ToolTip.Tip="Show connectors"/>
+          <CheckBox Content="Ortho" IsChecked="{Binding UseOrthogonalRouting}" VerticalAlignment="Center" ToolTip.Tip="Use orthogonal connection routing"/>
+        </StackPanel>
+      </Border>
+      <Border Classes="ToolGroup">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+          <TextBlock Text="Sel" Classes="ToolGroupHeader"/>
+          <Button Content="Watch" Command="{Binding AddSelectedNodeToWatchCommand}" IsEnabled="{Binding SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}" ToolTip.Tip="Add selected node to watch"/>
+          <TextBlock Text="{Binding SelectedNodeCount, StringFormat='Selected: {0}'}" VerticalAlignment="Center" Margin="4,0,0,0" MinWidth="60"/>
+        </StackPanel>
+      </Border>
+      <Border Classes="ToolGroup">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+          <TextBlock Text="Status" Classes="ToolGroupHeader"/>
+          <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="Bold" MinWidth="120" TextTrimming="CharacterEllipsis" MaxWidth="260"/>
+        </StackPanel>
+      </Border>
+    </WrapPanel>
 
       <!-- Palette -->
     <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="1" Padding="8" Margin="0,0,8,0" Grid.Row="1">
@@ -235,7 +216,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="models:VisualNode">
-                <Border Width="{Binding Width}" Height="{Binding Height}" BorderBrush="Black" BorderThickness="2" CornerRadius="4" Background="LightBlue" Classes.selected="{Binding IsSelected}" PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
+                <Border Width="{Binding Width}" Height="{Binding Height}" Classes="node" Classes.selected="{Binding IsSelected}" CornerRadius="4" PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
                   <Canvas Width="{Binding Width}" Height="{Binding Height}" Background="Transparent">
                     <Grid Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" RowDefinitions="Auto,Auto,*" ClipToBounds="True">
                       <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="Bold" HorizontalAlignment="Center"/>
