@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels" xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core" xmlns:shapes="using:Avalonia.Controls.Shapes" xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters" xmlns:views="clr-namespace:ModbusForge.Avalonia.Views" x:Class="ModbusForge.Avalonia.Views.VisualNodeEditorView" x:DataType="vm:VisualNodeEditorViewModel" Focusable="True">
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels" xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core" xmlns:shapes="using:Avalonia.Controls.Shapes" xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters" xmlns:views="clr-namespace:ModbusForge.Avalonia.Views" xmlns:behaviors="clr-namespace:ModbusForge.Avalonia.Behaviors" x:Class="ModbusForge.Avalonia.Views.VisualNodeEditorView" x:DataType="vm:VisualNodeEditorViewModel" Focusable="True">
 
   <UserControl.Styles>
     <Style Selector="Border.node">
@@ -217,7 +217,7 @@
                     <Grid Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" RowDefinitions="Auto,Auto,*" ClipToBounds="True">
                       <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="Bold" HorizontalAlignment="Center"/>
                       <TextBlock Grid.Row="1" Text="{Binding ElementType}" FontSize="10" HorizontalAlignment="Center"/>
-                      <TextBox Grid.Row="2" Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsVisible="{Binding ShowLiveValues}" HorizontalContentAlignment="Center" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus"/>
+                      <TextBox Grid.Row="2" Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={x:Static converters:DoubleToStringConverter.Instance}}" IsVisible="{Binding ShowLiveValues}" HorizontalContentAlignment="Center" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" KeyDown="LiveValue_KeyDown" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
                     </Grid>
 
                     <Canvas Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" IsVisible="{Binding $parent[UserControl].((vm:VisualNodeEditorViewModel)DataContext).ShowConnectors, FallbackValue=True}">

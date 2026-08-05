@@ -915,6 +915,14 @@ namespace ModbusForge.Avalonia.Views
             }
         }
 
+        private void LiveValue_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter && sender is TextBox textBox)
+            {
+                Focus();
+            }
+        }
+
         private void IncreaseGridSize_Click(object? sender, RoutedEventArgs e)
         {
             if (ViewModel == null) return;
