@@ -264,6 +264,8 @@ public class ConnectionManager : IConnectionManager
                     IpAddress = p.IpAddress,
                     Port = p.Port,
                     UnitId = p.UnitId,
+                    Mode = p.Mode,
+                    ServerUnitIds = p.ServerUnitIds,
                     Transport = p.Transport,
                     ComPort = p.ComPort,
                     BaudRate = p.BaudRate,
@@ -308,6 +310,8 @@ public class ConnectionManager : IConnectionManager
                         IpAddress = dto.IpAddress,
                         Port = dto.Port,
                         UnitId = dto.UnitId,
+                        Mode = string.IsNullOrWhiteSpace(dto.Mode) ? "Server" : dto.Mode,
+                        ServerUnitIds = string.IsNullOrWhiteSpace(dto.ServerUnitIds) ? "1" : dto.ServerUnitIds,
                         Transport = dto.Transport,
                         ComPort = dto.ComPort,
                         BaudRate = dto.BaudRate,
@@ -345,6 +349,8 @@ public class ConnectionManager : IConnectionManager
         public string IpAddress { get; set; } = string.Empty;
         public int Port { get; set; }
         public byte UnitId { get; set; }
+        public string Mode { get; set; } = string.Empty;
+        public string ServerUnitIds { get; set; } = string.Empty;
         public TransportType Transport { get; set; } = TransportType.Tcp;
         public string ComPort { get; set; } = "COM1";
         public int BaudRate { get; set; } = 9600;
