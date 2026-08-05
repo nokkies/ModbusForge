@@ -39,6 +39,8 @@ namespace ModbusForge.Avalonia.Views
             _coilsGrid = this.FindControl<DataGrid>("CoilsGrid");
             _inputRegistersGrid = this.FindControl<DataGrid>("InputRegistersGrid");
             _discreteInputsGrid = this.FindControl<DataGrid>("DiscreteInputsGrid");
+
+            AttachGridItemSourceHandlers();
         }
 
         protected override void OnAttachedToVisualTree(global::Avalonia.VisualTreeAttachmentEventArgs e)
@@ -117,6 +119,21 @@ namespace ModbusForge.Avalonia.Views
         }
 
         private MainViewModel? ViewModel => DataContext as MainViewModel;
+
+        private void AttachGridItemSourceHandlers()
+        {
+            if (_holdingRegistersGrid is not null)
+                _holdingRegistersGrid.AttachedToVisualTree += (s, e) => _holdingRegistersGrid.ItemsSource = ViewModel?.HoldingRegisters;
+
+            if (_coilsGrid is not null)
+                _coilsGrid.AttachedToVisualTree += (s, e) => _coilsGrid.ItemsSource = ViewModel?.Coils;
+
+            if (_inputRegistersGrid is not null)
+                _inputRegistersGrid.AttachedToVisualTree += (s, e) => _inputRegistersGrid.ItemsSource = ViewModel?.InputRegisters;
+
+            if (_discreteInputsGrid is not null)
+                _discreteInputsGrid.AttachedToVisualTree += (s, e) => _discreteInputsGrid.ItemsSource = ViewModel?.DiscreteInputs;
+        }
 
         private void ActiveUnitIdComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
