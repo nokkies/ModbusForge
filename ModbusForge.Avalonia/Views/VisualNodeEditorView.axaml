@@ -219,13 +219,26 @@
               <DataTemplate DataType="models:VisualNode">
                 <Border Width="{Binding Width}" Height="{Binding Height}" Classes="node" views:VisualNodeBehavior.IsSelected="{Binding IsSelected}" CornerRadius="4" PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
                   <Canvas Width="{Binding Width}" Height="{Binding Height}" Background="Transparent">
-                    <Grid Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" RowDefinitions="Auto,Auto,Auto,*,Auto" ClipToBounds="True">
+                    <Grid Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" ClipToBounds="True">
                       <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="Bold" HorizontalAlignment="Center" FontSize="11" TextTrimming="CharacterEllipsis" Margin="4,2,4,0" ToolTip.Tip="{Binding Name}"/>
                       <TextBlock Grid.Row="1" Text="{Binding ElementType}" FontSize="10" HorizontalAlignment="Center" Opacity="0.8" Margin="0,0,0,2"/>
                       <TextBlock Grid.Row="2" Text="{Binding AddressDisplay}" FontSize="9" Opacity="0.7" HorizontalAlignment="Center" IsVisible="{Binding AddressDisplay, Converter={x:Static converters:StringToBoolConverter.Instance}}" Margin="0,0,0,2"/>
-                      <TextBox Grid.Row="3" Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={x:Static converters:DoubleToStringConverter.Instance}}" IsVisible="{Binding ShowLiveValues}" HorizontalContentAlignment="Center" VerticalAlignment="Center" Height="22" FontSize="10" Padding="2,0" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" KeyDown="LiveValue_KeyDown" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
 
-                      <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Spacing="3" Margin="0,0,0,4"
+                      <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="3" Margin="0,0,0,2"
+                                  IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Input,InputBool,InputInt,Output,OutputBool,OutputInt'}">
+                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Input,InputBool,InputInt'}">
+                          <ComboBox ItemsSource="{x:Static models:VisualNode.PlcAreaOptions}" SelectedItem="{Binding Input1Address.Area}" Width="90" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center"/>
+                          <NumericUpDown Value="{Binding Input1Address.Address}" Minimum="0" Maximum="65535" Increment="1" Width="70" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center" HorizontalAlignment="Center" FormatString="0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Output,OutputBool,OutputInt'}">
+                          <ComboBox ItemsSource="{x:Static models:VisualNode.PlcAreaOptions}" SelectedItem="{Binding OutputAddress.Area}" Width="90" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center"/>
+                          <NumericUpDown Value="{Binding OutputAddress.Address}" Minimum="0" Maximum="65535" Increment="1" Width="70" Height="22" FontSize="9" Padding="2,0" VerticalContentAlignment="Center" HorizontalAlignment="Center" FormatString="0"/>
+                        </StackPanel>
+                      </StackPanel>
+
+                      <TextBox Grid.Row="4" Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={x:Static converters:DoubleToStringConverter.Instance}}" IsVisible="{Binding ShowLiveValues}" HorizontalContentAlignment="Center" VerticalAlignment="Center" Height="22" FontSize="10" Padding="2,0" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" KeyDown="LiveValue_KeyDown" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
+
+                      <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Spacing="3" Margin="0,0,0,4"
                                   IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP,CTU,CTD,CTC,COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE,MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV,RS'}">
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP'}">
                           <TextBlock Text="ms:" FontSize="9" VerticalAlignment="Center"/>

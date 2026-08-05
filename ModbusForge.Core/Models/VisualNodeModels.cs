@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Text.Json.Serialization;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -11,6 +13,12 @@ namespace ModbusForge.Models
     /// </summary>
     public partial class VisualNode : ObservableObject
     {
+        /// <summary>
+        /// Available Modbus areas for the inline I/O address editor.
+        /// </summary>
+        public static IReadOnlyList<PlcArea> PlcAreaOptions { get; } =
+            Enum.GetValues(typeof(PlcArea)).Cast<PlcArea>().ToList();
+
         [ObservableProperty]
         private string _id = Guid.NewGuid().ToString();
         
