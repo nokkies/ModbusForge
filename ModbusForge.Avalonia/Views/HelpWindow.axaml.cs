@@ -1,22 +1,20 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using ModbusForge.Avalonia.ViewModels;
 
 namespace ModbusForge.Avalonia.Views
 {
     public partial class HelpWindow : Window
     {
-        public string HelpText { get; set; } = "Help content not available.";
-
         public HelpWindow()
         {
             InitializeComponent();
-            DataContext = this;
         }
 
-        public HelpWindow(string helpText) : this()
+        public HelpWindow(HelpViewModel viewModel) : this()
         {
-            HelpText = helpText;
+            DataContext = viewModel;
         }
 
         private void InitializeComponent()

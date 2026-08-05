@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using ModbusForge.Avalonia.ViewModels;
 using ModbusForge.Avalonia.Views;
 using ModbusForge.Services;
@@ -44,12 +45,16 @@ namespace ModbusForge.Avalonia.Services
 
         public void ShowHelp(string? topic = null)
         {
-            var helpService = _serviceProvider.GetService<IHelpContentService>();
-            var text = topic is not null && helpService is not null
-                ? helpService.GetHelpContent(topic) ?? "Help content not available."
-                : "Welcome to ModbusForge. Use the tabs to connect, read, write, and visualize Modbus data.";
+            var helpService = _serviceProvider.GetRequiredService<IHelpContentService>();
+            var logger = _serviceProvider.GetRequiredService<ILogger<HelpViewModel>>();
+            var viewModel = new HelpViewModel(helpService, logger);
 
-            var window = new HelpWindow(text);
+            if (!string.IsNullOrWhiteSpace(topic))
+            {
+                viewModel.NavigateCommand.Execute(topic);
+            }
+
+            var window = new HelpWindow(viewModel);
             window.Show();
         }
 

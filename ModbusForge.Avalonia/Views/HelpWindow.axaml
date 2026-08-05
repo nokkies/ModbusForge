@@ -1,25 +1,52 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:views="clr-namespace:ModbusForge.Avalonia.Views"
+        xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
         x:Class="ModbusForge.Avalonia.Views.HelpWindow"
-        x:DataType="views:HelpWindow"
-        x:CompileBindings="False"
+        x:DataType="vm:HelpViewModel"
         Title="Help"
-        Width="600"
-        Height="500"
+        Width="800"
+        Height="600"
         WindowStartupLocation="CenterOwner">
 
   <Grid RowDefinitions="Auto,*,Auto">
-    <Border Grid.Row="0" Background="DodgerBlue" Padding="20,16">
-      <TextBlock Text="Help" FontSize="20" FontWeight="Bold" Foreground="White" />
+    <Border Grid.Row="0" Background="DodgerBlue" Padding="16,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="ModbusForge Help" FontSize="20" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+        <TextBox Grid.Column="1" Width="220" Watermark="Search topics..." Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Padding="6,2"/>
+      </Grid>
     </Border>
 
-    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="16">
-      <TextBlock Text="{Binding HelpText}" TextWrapping="Wrap" />
-    </ScrollViewer>
+    <Grid Grid.Row="1" ColumnDefinitions="220,*">
+      <Border Grid.Column="0" Background="#F0F0F0" BorderBrush="#D0D0D0" BorderThickness="0,0,1,0" Padding="8">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <ItemsControl ItemsSource="{Binding HelpTopics}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:HelpTopic">
+                <Button Content="{Binding Title}"
+                        Command="{Binding $parent[Window].((vm:HelpViewModel)DataContext).NavigateCommand}"
+                        CommandParameter="{Binding TopicId}"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Padding="8,6"
+                        Margin="0,2"/>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Border>
 
-    <Border Grid.Row="2" Background="LightGray" Padding="16">
-      <Button Content="Close" HorizontalAlignment="Right" Click="Close_Click" />
+      <Border Grid.Column="1" Background="White" Padding="16">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <TextBlock Text="{Binding HelpContent}" TextWrapping="Wrap" FontSize="13" LineHeight="22"/>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="2" Background="LightGray" Padding="12">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="Press F1 for context-sensitive help" VerticalAlignment="Center" FontSize="12" Opacity="0.7"/>
+        <Button Grid.Column="1" Content="Close" HorizontalAlignment="Right" Click="Close_Click" Width="80"/>
+      </Grid>
     </Border>
   </Grid>
 </Window>
