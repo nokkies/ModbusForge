@@ -227,7 +227,7 @@ namespace ModbusForge.Core.Simulation.Engine
 
         private static ISimulationValue? ReadDataStore(DataStore? dataStore, PlcAddressReference address, SimulationDataType targetType)
         {
-            if (dataStore == null || address.Address < 0)
+            if (dataStore == null || address.Address <= 0)
                 return null;
 
             var index = ToDataStoreIndex(address.Address);
@@ -249,7 +249,7 @@ namespace ModbusForge.Core.Simulation.Engine
 
         private void WriteDataStore(DataStore dataStore, PlcAddressReference address, ISimulationValue value)
         {
-            if (address.Address < 0) return;
+            if (address.Address <= 0) return;
 
             var index = ToDataStoreIndex(address.Address);
             var finalValue = address.Not ? Invert(value) : value;
@@ -327,12 +327,12 @@ namespace ModbusForge.Core.Simulation.Engine
         }
 
         /// <summary>
-        /// Converts a 1-based Modbus display address to a 0-based DataStore index.
-        /// Address 0 is treated as the first element to allow direct protocol addressing.
+        /// Returns the 1-based Modbus display address as the DataStore index.
+        /// The NModbus4 data collections are 1-based and reject index 0.
         /// </summary>
         private static int ToDataStoreIndex(int displayAddress)
         {
-            return displayAddress > 0 ? displayAddress - 1 : 0;
+            return displayAddress;
         }
     }
 }

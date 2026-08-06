@@ -430,6 +430,11 @@ namespace ModbusForge.Avalonia.ViewModels
             ScriptEditorViewModel = scriptEditorViewModel;
             SignalGeneratorViewModel = signalGeneratorViewModel;
             VisualNodeEditorViewModel = visualNodeEditorViewModel;
+            if (VisualNodeEditorViewModel != null)
+            {
+                VisualNodeEditorViewModel.PropertyChanged += OnVisualNodeEditorViewModelPropertyChanged;
+            }
+
             DecodeViewModel = decodeViewModel;
             if (DecodeViewModel != null)
             {
@@ -741,6 +746,20 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
+        private void OnVisualNodeEditorViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(VisualNodeEditorViewModel.StatusText) &&
+                VisualNodeEditorViewModel is not null)
+            {
+                var message = VisualNodeEditorViewModel.StatusText;
+                if (!string.IsNullOrWhiteSpace(message))
+                {
+                    AppendConsoleMessage(message);
+                    AppendDebugMessage($"{DateTime.Now:HH:mm:ss.fff} {message}");
+                }
+            }
+        }
+
         public void ShowAllTabs()
         {
             IsRegistersTabVisible = true;
@@ -934,9 +953,19 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
+        partial void OnActiveProfileChanged(ConnectionProfile? value)
+        {
+            RefreshConnectionDependentProperties();
+            ConnectCommand.NotifyCanExecuteChanged();
+            DisconnectCommand.NotifyCanExecuteChanged();
+            ToggleConnectionCommand.NotifyCanExecuteChanged();
+        }
+
         partial void OnIsBusyChanged(bool value)
         {
             OnPropertyChanged(nameof(DebugSummary));
+            ConnectCommand.NotifyCanExecuteChanged();
+            DisconnectCommand.NotifyCanExecuteChanged();
             ToggleConnectionCommand.NotifyCanExecuteChanged();
             ReadHoldingRegistersCommand.NotifyCanExecuteChanged();
             ReadInputRegistersCommand.NotifyCanExecuteChanged();
@@ -949,6 +978,36 @@ namespace ModbusForge.Avalonia.ViewModels
             ReadAllCustomNowCommand.NotifyCanExecuteChanged();
             ExportUnitIdCommand.NotifyCanExecuteChanged();
             ImportUnitIdAsCommand.NotifyCanExecuteChanged();
+        }
+
+        private void RefreshConnectionDependentProperties()
+        {
+            if (ActiveProfile is null) return;
+
+            RefreshAvailableUnitIds();
+            SyncCurrentUnitConfiguration();
+
+            OnPropertyChanged(nameof(ActiveService));
+            OnPropertyChanged(nameof(UnitId));
+            OnPropertyChanged(nameof(Mode));
+            OnPropertyChanged(nameof(ModeIndex));
+            OnPropertyChanged(nameof(IsServerMode));
+            OnPropertyChanged(nameof(ShowClientFields));
+            OnPropertyChanged(nameof(ShowServerFields));
+            OnPropertyChanged(nameof(ConnectButtonText));
+            OnPropertyChanged(nameof(ToggleConnectionButtonText));
+            OnPropertyChanged(nameof(ConnectionHeader));
+            OnPropertyChanged(nameof(AddressLabel));
+            OnPropertyChanged(nameof(ServerUnitIds));
+            OnPropertyChanged(nameof(AvailableUnitIds));
+            OnPropertyChanged(nameof(SelectedUnitId));
+            OnPropertyChanged(nameof(EffectiveUnitId));
+            OnPropertyChanged(nameof(CanConnect));
+            OnPropertyChanged(nameof(CanDisconnect));
+            OnPropertyChanged(nameof(CanRead));
+            OnPropertyChanged(nameof(CanWrite));
+            OnPropertyChanged(nameof(CanReadCustomEntry));
+            OnPropertyChanged(nameof(CanWriteCustomEntry));
         }
 
         private bool CanConnect() => ActiveProfile is { IsConnected: false } && !IsBusy;
@@ -1374,34 +1433,9 @@ namespace ModbusForge.Avalonia.ViewModels
 
             OnPropertyChanged(nameof(ActiveProfile));
             OnPropertyChanged(nameof(DashboardSelectedProfile));
-            OnPropertyChanged(nameof(ActiveService));
-            OnPropertyChanged(nameof(UnitId));
-            OnPropertyChanged(nameof(Mode));
-            OnPropertyChanged(nameof(IsServerMode));
-            OnPropertyChanged(nameof(ShowClientFields));
-            OnPropertyChanged(nameof(ShowServerFields));
-            OnPropertyChanged(nameof(ConnectButtonText));
-            OnPropertyChanged(nameof(ConnectionHeader));
-            OnPropertyChanged(nameof(AddressLabel));
-            OnPropertyChanged(nameof(ServerUnitIds));
-            OnPropertyChanged(nameof(AvailableUnitIds));
-            OnPropertyChanged(nameof(SelectedUnitId));
-            OnPropertyChanged(nameof(CanConnect));
-            OnPropertyChanged(nameof(CanDisconnect));
-            OnPropertyChanged(nameof(CanRead));
-            OnPropertyChanged(nameof(CanWrite));
-            OnPropertyChanged(nameof(CanReadCustomEntry));
-            OnPropertyChanged(nameof(CanWriteCustomEntry));
-            ConnectCommand.NotifyCanExecuteChanged();
-            DisconnectCommand.NotifyCanExecuteChanged();
+            RefreshConnectionDependentProperties();
             ReadCommand.NotifyCanExecuteChanged();
             WriteCommand.NotifyCanExecuteChanged();
-            ReadHoldingRegistersCommand.NotifyCanExecuteChanged();
-            ReadInputRegistersCommand.NotifyCanExecuteChanged();
-            ReadCoilsCommand.NotifyCanExecuteChanged();
-            ReadDiscreteInputsCommand.NotifyCanExecuteChanged();
-            WriteHoldingRegisterCommand.NotifyCanExecuteChanged();
-            WriteCoilCommand.NotifyCanExecuteChanged();
             ReadCustomEntryCommand.NotifyCanExecuteChanged();
             WriteCustomEntryCommand.NotifyCanExecuteChanged();
             ReadCustomNowCommand.NotifyCanExecuteChanged();
@@ -1564,6 +1598,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private async Task ToggleConnectionAsync()
         {
+            _logger.LogInformation("ToggleConnectionAsync invoked");
             if (IsConnected)
                 await DisconnectAsync();
             else

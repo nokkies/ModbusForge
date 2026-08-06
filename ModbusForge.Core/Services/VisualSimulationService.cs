@@ -235,34 +235,34 @@ namespace ModbusForge.Services
                 ? node.Input1Address
                 : node.OutputAddress;
 
-            if (address == null || address.Address < 0)
+            if (address == null || address.Address <= 0)
             {
                 _logger.LogDebug("WriteNodeValue skipped: node {NodeId} has no configured address", nodeId);
                 return;
             }
 
             var dataStore = GetEffectiveDataStore();
-            var index = address.Address > 0 ? address.Address - 1 : 0;
+            var modbusAddress = address.Address;
             switch (address.Area)
             {
                 case PlcArea.HoldingRegister:
-                    if (index < dataStore.HoldingRegisters.Count)
-                        dataStore.HoldingRegisters[index] = ToClampedUInt16(value);
+                    if (modbusAddress < dataStore.HoldingRegisters.Count)
+                        dataStore.HoldingRegisters[modbusAddress] = ToClampedUInt16(value);
                     break;
 
                 case PlcArea.InputRegister:
-                    if (index < dataStore.InputRegisters.Count)
-                        dataStore.InputRegisters[index] = ToClampedUInt16(value);
+                    if (modbusAddress < dataStore.InputRegisters.Count)
+                        dataStore.InputRegisters[modbusAddress] = ToClampedUInt16(value);
                     break;
 
                 case PlcArea.Coil:
-                    if (index < dataStore.CoilDiscretes.Count)
-                        dataStore.CoilDiscretes[index] = Math.Abs(value) > 0.0001;
+                    if (modbusAddress < dataStore.CoilDiscretes.Count)
+                        dataStore.CoilDiscretes[modbusAddress] = Math.Abs(value) > 0.0001;
                     break;
 
                 case PlcArea.DiscreteInput:
-                    if (index < dataStore.InputDiscretes.Count)
-                        dataStore.InputDiscretes[index] = Math.Abs(value) > 0.0001;
+                    if (modbusAddress < dataStore.InputDiscretes.Count)
+                        dataStore.InputDiscretes[modbusAddress] = Math.Abs(value) > 0.0001;
                     break;
             }
         }

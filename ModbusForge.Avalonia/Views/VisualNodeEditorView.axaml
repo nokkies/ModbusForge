@@ -32,14 +32,6 @@
       <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="TextAlignment" Value="Center"/>
     </Style>
-    <Style Selector="RepeatButton.nodeSpinner">
-      <Setter Property="FontSize" Value="8"/>
-      <Setter Property="Padding" Value="0"/>
-      <Setter Property="Width" Value="12"/>
-      <Setter Property="Height" Value="10"/>
-      <Setter Property="VerticalContentAlignment" Value="Center"/>
-      <Setter Property="HorizontalContentAlignment" Value="Center"/>
-    </Style>
   </UserControl.Styles>
 
   <Grid ColumnDefinitions="220,*,300" RowDefinitions="Auto,*">
@@ -130,7 +122,17 @@
       <Border Classes="ToolGroup">
         <StackPanel Orientation="Horizontal" Spacing="2">
           <TextBlock Text="Status" Classes="ToolGroupHeader"/>
-          <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="Bold" MinWidth="120" MaxWidth="260" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusText}"/>
+          <TextBox Text="{Binding StatusText, Mode=OneWay}"
+                   IsReadOnly="True"
+                   IsTabStop="False"
+                   BorderThickness="0"
+                   Background="Transparent"
+                   VerticalAlignment="Center"
+                   FontWeight="Bold"
+                   MinWidth="120"
+                   MaxWidth="600"
+                   TextWrapping="Wrap"
+                   AcceptsReturn="True" />
         </StackPanel>
       </Border>
     </WrapPanel>
@@ -254,20 +256,14 @@
                           <ComboBox ItemsSource="{x:Static models:VisualNode.PlcAreaOptions}" SelectedItem="{Binding Input1Address.Area}" Width="90" Height="20" FontSize="9" Padding="2,0" VerticalContentAlignment="Center"/>
                           <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
                             <NumericUpDown Value="{Binding Input1Address.Address}" Minimum="0" Maximum="65535" Increment="1" Width="45" Classes="nodeValue" FormatString="0"/>
-                            <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
-                              <RepeatButton Content="^" Click="IncreaseValue_Click" Classes="nodeSpinner"/>
-                              <RepeatButton Content="v" Click="DecreaseValue_Click" Classes="nodeSpinner"/>
-                            </StackPanel>
+
                           </StackPanel>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Output,OutputBool,OutputInt'}">
                           <ComboBox ItemsSource="{x:Static models:VisualNode.PlcAreaOptions}" SelectedItem="{Binding OutputAddress.Area}" Width="90" Height="20" FontSize="9" Padding="2,0" VerticalContentAlignment="Center"/>
                           <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
                             <NumericUpDown Value="{Binding OutputAddress.Address}" Minimum="0" Maximum="65535" Increment="1" Width="45" Classes="nodeValue" FormatString="0"/>
-                            <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
-                              <RepeatButton Content="^" Click="IncreaseValue_Click" Classes="nodeSpinner"/>
-                              <RepeatButton Content="v" Click="DecreaseValue_Click" Classes="nodeSpinner"/>
-                            </StackPanel>
+
                           </StackPanel>
                         </StackPanel>
                       </StackPanel>
@@ -280,40 +276,28 @@
                           <TextBlock Text="ms:" FontSize="9" VerticalAlignment="Center"/>
                           <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
                             <NumericUpDown Value="{Binding TimerPresetMs}" Minimum="0" Maximum="100000" Increment="1" Width="50" Classes="nodeValue"/>
-                            <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
-                              <RepeatButton Content="^" Click="IncreaseValue_Click" Classes="nodeSpinner"/>
-                              <RepeatButton Content="v" Click="DecreaseValue_Click" Classes="nodeSpinner"/>
-                            </StackPanel>
+
                           </StackPanel>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='CTU,CTD,CTC'}">
                           <TextBlock Text="Pre:" FontSize="9" VerticalAlignment="Center"/>
                           <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
                             <NumericUpDown Value="{Binding CounterPreset}" Minimum="0" Maximum="100000" Increment="1" Width="50" Classes="nodeValue"/>
-                            <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
-                              <RepeatButton Content="^" Click="IncreaseValue_Click" Classes="nodeSpinner"/>
-                              <RepeatButton Content="v" Click="DecreaseValue_Click" Classes="nodeSpinner"/>
-                            </StackPanel>
+
                           </StackPanel>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE'}">
                           <TextBlock Text="Val:" FontSize="9" VerticalAlignment="Center"/>
                           <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
                             <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Increment="1" Width="50" Classes="nodeValue"/>
-                            <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
-                              <RepeatButton Content="^" Click="IncreaseValue_Click" Classes="nodeSpinner"/>
-                              <RepeatButton Content="v" Click="DecreaseValue_Click" Classes="nodeSpinner"/>
-                            </StackPanel>
+
                           </StackPanel>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV'}">
                           <TextBlock Text="Const:" FontSize="9" VerticalAlignment="Center" ToolTip.Tip="Constant used when Input2 is not connected"/>
                           <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
                             <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Increment="1" Width="50" Classes="nodeValue"/>
-                            <StackPanel Orientation="Vertical" Spacing="0" VerticalAlignment="Center">
-                              <RepeatButton Content="^" Click="IncreaseValue_Click" Classes="nodeSpinner"/>
-                              <RepeatButton Content="v" Click="DecreaseValue_Click" Classes="nodeSpinner"/>
-                            </StackPanel>
+
                           </StackPanel>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='RS'}">

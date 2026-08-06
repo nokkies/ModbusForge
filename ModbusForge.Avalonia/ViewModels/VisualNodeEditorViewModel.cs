@@ -769,7 +769,7 @@ namespace ModbusForge.Avalonia.ViewModels
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Live value write failed for node {NodeId} with value {Value}", node.Id, value);
-                StatusText = $"Live value write failed ({ex.GetType().Name}): {ex.Message}";
+                StatusText = ex.ToString();
             }
         }
 
