@@ -141,13 +141,6 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 - **Custom and project save/load**: Save/load custom entry JSON files and full project `.mfp`/`.json` files that restore connection profiles, active profile, register area, and custom entries.
 - **Headless `--custom`**: `ModbusForge.Headless` now accepts `--custom <path>` to run a custom watch JSON file from the command line.
 
-### 2026.7.4 — Avalonia Core Register Operations
-
-- **All four Modbus areas in Avalonia**: Holding registers, input registers, coils, and discrete inputs are now available as tabs with read, continuous read, and write support.
-- **Unit ID switching**: The active Unit ID can be changed directly from the main view and is used for the next read/write.
-- **Data type formatting**: Registers support `uint`, `int`, `real`, and `string` display with optional byte/word swapping.
-- **Single-point writes**: Holding register and coil single writes are available through the new `Write` button.
-
 ### 2026.7.3 — Avalonia Foundations
 
 - **Default startup project**: `ModbusForge.Avalonia` is now first in `ModbusForge.sln`.
