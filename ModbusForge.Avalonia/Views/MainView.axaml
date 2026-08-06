@@ -17,7 +17,7 @@
       <TextBlock VerticalAlignment="Center" Text="Active profile:" />
       <TextBlock VerticalAlignment="Center" Text="{Binding ActiveProfile.DisplayName, FallbackValue='None'}" FontWeight="SemiBold" />
       <TextBlock VerticalAlignment="Center" Text="Mode:" Margin="16,0,0,0" />
-      <ComboBox ItemsSource="{Binding Modes}" SelectedItem="{Binding Mode, FallbackValue='Client'}" Width="100" />
+      <ComboBox ItemsSource="{Binding Modes}" SelectedIndex="{Binding ModeIndex, Mode=TwoWay}" Width="100" />
       <TextBlock VerticalAlignment="Center" Text="{Binding AddressLabel}" Margin="16,0,0,0" />
       <TextBox Text="{Binding ActiveProfile.IpAddress, FallbackValue='127.0.0.1'}" Width="120" VerticalAlignment="Center" />
       <TextBlock VerticalAlignment="Center" Text="Port:" Margin="16,0,0,0" />
@@ -190,7 +190,13 @@
             <DataGrid.Columns>
               <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" IsReadOnly="True" />
               <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="120" />
-              <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="80" IsReadOnly="True" />
+              <DataGridTemplateColumn Header="Type" Width="80" IsReadOnly="True">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <ComboBox ItemsSource="{Binding DataContext.RegisterTypes, RelativeSource={RelativeSource FindAncestor, AncestorType=DataGrid}}" SelectedItem="{Binding Type}" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
               <DataGridCheckBoxColumn Header="Swap Bytes" Binding="{Binding SwapBytes}" Width="100" IsReadOnly="True" />
               <DataGridCheckBoxColumn Header="Swap Words" Binding="{Binding SwapWords}" Width="100" IsReadOnly="True" />
             </DataGrid.Columns>
@@ -271,7 +277,13 @@
             <DataGrid.Columns>
               <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" IsReadOnly="True" />
               <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="120" IsReadOnly="True" />
-              <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="80" IsReadOnly="True" />
+              <DataGridTemplateColumn Header="Type" Width="80" IsReadOnly="True">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <ComboBox ItemsSource="{Binding DataContext.RegisterTypes, RelativeSource={RelativeSource FindAncestor, AncestorType=DataGrid}}" SelectedItem="{Binding Type}" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
               <DataGridCheckBoxColumn Header="Swap Bytes" Binding="{Binding SwapBytes}" Width="100" IsReadOnly="True" />
               <DataGridCheckBoxColumn Header="Swap Words" Binding="{Binding SwapWords}" Width="100" IsReadOnly="True" />
             </DataGrid.Columns>
@@ -336,8 +348,30 @@
             <DataGrid.Columns>
               <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="120" />
               <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
-              <DataGridTextColumn Header="Area" Binding="{Binding Area}" Width="120" />
-              <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="80" />
+              <DataGridTemplateColumn Header="Area" Width="120">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <ComboBox ItemsSource="{Binding DataContext.CustomAreas, RelativeSource={RelativeSource FindAncestor, AncestorType=DataGrid}}" SelectedItem="{Binding Area, Mode=TwoWay}" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+                <DataGridTemplateColumn.CellEditingTemplate>
+                  <DataTemplate>
+                    <ComboBox ItemsSource="{Binding DataContext.CustomAreas, RelativeSource={RelativeSource FindAncestor, AncestorType=DataGrid}}" SelectedItem="{Binding Area, Mode=TwoWay}" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellEditingTemplate>
+              </DataGridTemplateColumn>
+              <DataGridTemplateColumn Header="Type" Width="80">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <ComboBox ItemsSource="{Binding DataContext.RegisterTypes, RelativeSource={RelativeSource FindAncestor, AncestorType=DataGrid}}" SelectedItem="{Binding Type, Mode=TwoWay}" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+                <DataGridTemplateColumn.CellEditingTemplate>
+                  <DataTemplate>
+                    <ComboBox ItemsSource="{Binding DataContext.RegisterTypes, RelativeSource={RelativeSource FindAncestor, AncestorType=DataGrid}}" SelectedItem="{Binding Type, Mode=TwoWay}" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellEditingTemplate>
+              </DataGridTemplateColumn>
               <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="120" IsReadOnly="True" />
               <DataGridTextColumn Header="Write Value" Binding="{Binding WriteValue}" Width="120" />
               <DataGridCheckBoxColumn Header="Continuous Write" Binding="{Binding Continuous}" Width="110" />

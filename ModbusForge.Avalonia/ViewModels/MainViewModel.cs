@@ -250,7 +250,24 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public IReadOnlyList<string> CustomAreas { get; } = new[] { "HoldingRegister", "InputRegister", "Coil", "DiscreteInput" };
 
-        public IReadOnlyList<string> Modes { get; } = new[] { "Client", "Server" };
+        public List<string> Modes { get; } = new() { "Client", "Server" };
+
+        /// <summary>
+        /// Index of the current <see cref="Mode"/> in <see cref="Modes"/>.
+        /// Using an index binding instead of SelectedItem avoids a race when the
+        /// ComboBox ItemsSource is populated after the selection binding is applied.
+        /// </summary>
+        public int ModeIndex
+        {
+            get => Modes.IndexOf(Mode);
+            set
+            {
+                if (value >= 0 && value < Modes.Count)
+                {
+                    Mode = Modes[value];
+                }
+            }
+        }
 
         /// <summary>
         /// The available server Unit IDs are owned by the shared store. The property is
@@ -286,13 +303,14 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public string Mode
         {
-            get => ActiveProfile?.Mode is { } mode && !string.IsNullOrWhiteSpace(mode) ? mode : "Server";
+            get => ActiveProfile?.Mode is { } mode && !string.IsNullOrWhiteSpace(mode) ? mode : "Client";
             set
             {
                 if (ActiveProfile != null && ActiveProfile.Mode != value)
                 {
                     ActiveProfile.Mode = value;
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(ModeIndex));
                     OnPropertyChanged(nameof(IsServerMode));
                     OnPropertyChanged(nameof(ConnectButtonText));
                     OnPropertyChanged(nameof(ConnectionHeader));
@@ -521,6 +539,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
             // Force the top toolbar dropdowns to refresh once the DataContext is attached.
             OnPropertyChanged(nameof(Mode));
+            OnPropertyChanged(nameof(ModeIndex));
             OnPropertyChanged(nameof(SelectedUnitId));
 
             ShowAllTabs();

@@ -13,6 +13,8 @@ using Avalonia;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using ModbusForge.Models;
 using ModbusForge.Services;
 using ModbusForge.Services.EditorCommands;
@@ -167,6 +169,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly IFileDialogService? _fileDialogService;
         private readonly IMessageBoxService? _messageBoxService;
         private readonly ITagWindowService? _tagWindowService;
+        private readonly ILogger<VisualNodeEditorViewModel> _logger;
 
         private ObservableCollection<VisualNode>? _observedNodes;
         private ObservableCollection<NodeConnection>? _observedConnections;
@@ -387,13 +390,15 @@ namespace ModbusForge.Avalonia.ViewModels
             ITagWindowService tagWindowService,
             IFileDialogService? fileDialogService = null,
             IMessageBoxService? messageBoxService = null,
-            TagService? tagService = null)
+            TagService? tagService = null,
+            ILogger<VisualNodeEditorViewModel>? logger = null)
         {
             _visualSimulation = visualSimulation ?? throw new ArgumentNullException(nameof(visualSimulation));
             _tagWindowService = tagWindowService ?? throw new ArgumentNullException(nameof(tagWindowService));
             _fileDialogService = fileDialogService;
             _messageBoxService = messageBoxService;
             _tagService = tagService;
+            _logger = logger ?? NullLogger<VisualNodeEditorViewModel>.Instance;
 
             AddNodeCommand = new RelayCommand(AddNode, () => SelectedPaletteItem != null);
             ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
@@ -763,7 +768,8 @@ namespace ModbusForge.Avalonia.ViewModels
             }
             catch (Exception ex)
             {
-                StatusText = $"Live value write failed: {ex.Message}";
+                _logger.LogError(ex, "Live value write failed for node {NodeId} with value {Value}", node.Id, value);
+                StatusText = $"Live value write failed ({ex.GetType().Name}): {ex.Message}";
             }
         }
 
