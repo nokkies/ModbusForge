@@ -14,7 +14,7 @@
 
   <UserControl.Styles>
     <Style Selector="NumericUpDown.compact /template/ TextBox">
-      <Setter Property="Padding" Value="2,0" />
+      <Setter Property="Padding" Value="4,0" />
       <Setter Property="MinHeight" Value="0" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="FontSize" Value="10" />
@@ -30,9 +30,9 @@
       <TextBlock VerticalAlignment="Center" Text="{Binding AddressLabel}" Margin="16,0,0,0" />
       <TextBox Text="{Binding ActiveProfile.IpAddress, FallbackValue='127.0.0.1'}" Width="120" Height="24" MinHeight="0" Padding="4,0" FontSize="10" VerticalAlignment="Center" VerticalContentAlignment="Center" />
       <TextBlock VerticalAlignment="Center" Text="Port:" Margin="16,0,0,0" />
-      <NumericUpDown Classes="compact" Value="{Binding ActiveProfile.Port, FallbackValue=502}" Minimum="1" Maximum="65535" Width="120" Height="24" MinHeight="0" Padding="0" FontSize="10" VerticalAlignment="Center" ShowButtonSpinner="False" />
+      <NumericUpDown Classes="compact" Value="{Binding ActiveProfile.Port, FallbackValue=502}" Minimum="1" Maximum="65535" Width="120" Height="24" MinHeight="0" Padding="0" FontSize="10" VerticalAlignment="Center" BorderThickness="0" Background="Transparent" CornerRadius="0" ShowButtonSpinner="False" />
       <TextBlock VerticalAlignment="Center" Text="Unit ID:" Margin="16,0,0,0" IsVisible="{Binding ShowClientFields}" />
-      <NumericUpDown Classes="compact" Value="{Binding UnitId}" Minimum="1" Maximum="247" Width="110" Height="24" MinHeight="0" Padding="0" FontSize="10" VerticalAlignment="Center" IsVisible="{Binding ShowClientFields}" ShowButtonSpinner="False" />
+      <NumericUpDown Classes="compact" Value="{Binding UnitId}" Minimum="1" Maximum="247" Width="110" Height="24" MinHeight="0" Padding="0" FontSize="10" VerticalAlignment="Center" BorderThickness="0" Background="Transparent" CornerRadius="0" IsVisible="{Binding ShowClientFields}" ShowButtonSpinner="False" />
       <TextBlock VerticalAlignment="Center" Text="Unit ID(s):" Margin="16,0,0,0" IsVisible="{Binding ShowServerFields}" />
       <TextBox Text="{Binding ServerUnitIds, FallbackValue='1'}" Width="120" Height="24" MinHeight="0" Padding="4,0" FontSize="10" VerticalAlignment="Center" VerticalContentAlignment="Center" IsVisible="{Binding ShowServerFields}" ToolTip.Tip="Comma-separated list (e.g. 1, 2, 5-10)" />
       <TextBlock VerticalAlignment="Center" Text="Active ID:" Margin="16,0,0,0" IsVisible="{Binding ShowServerFields}" />
@@ -42,7 +42,7 @@
                 SelectionChanged="ActiveUnitIdComboBox_SelectionChanged"
                 Width="100" Height="24" MinHeight="0" FontSize="10" VerticalAlignment="Center" VerticalContentAlignment="Center"
                 IsVisible="{Binding ShowServerFields}" />
-      <Button Content="{Binding ToggleConnectionButtonText, FallbackValue='Connect'}" Command="{Binding ToggleConnectionCommand}" Width="100" Height="24" MinHeight="0" Padding="8,0" FontSize="10" VerticalAlignment="Center" />
+      <Button Content="{Binding ToggleConnectionButtonText, FallbackValue='Connect'}" Command="{Binding ToggleConnectionCommand}" Width="100" Height="24" MinHeight="0" Padding="8,0" FontSize="10" VerticalAlignment="Center" VerticalContentAlignment="Center" />
       <TextBlock Text="●" Foreground="#2E8B57" IsVisible="{Binding IsConnected}" VerticalAlignment="Center" FontSize="14" ToolTip.Tip="{Binding ConnectionStatusText}" />
       <TextBlock Text="●" Foreground="#C62828" IsVisible="{Binding IsConnectionErrorVisible}" VerticalAlignment="Center" FontSize="14" ToolTip.Tip="{Binding ConnectionStatusText}" />
       <TextBlock Text="○" Foreground="#777777" IsVisible="{Binding IsDisconnected}" VerticalAlignment="Center" FontSize="14" ToolTip.Tip="{Binding ConnectionStatusText}" />
