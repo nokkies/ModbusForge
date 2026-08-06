@@ -54,8 +54,8 @@ public class AvaloniaSmokeTests : IDisposable
         var mainWindow = _app.GetMainWindowOrThrow();
         Assert.Contains("ModbusForge", mainWindow.Title, StringComparison.OrdinalIgnoreCase);
 
-        var connectionHeader = _app.WaitForElementByName(mainWindow, "Modbus Connection (Client)");
-        Assert.NotNull(connectionHeader);
+        var dashboardHeader = _app.WaitForElementByName(mainWindow, "Dashboard");
+        Assert.NotNull(dashboardHeader);
         _output.WriteLine($"Avalonia main window title: {mainWindow.Title}; MainViewModel DataContext bound.");
     }
 

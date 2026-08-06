@@ -82,7 +82,7 @@
       <Border Classes="ToolGroup">
         <StackPanel Orientation="Horizontal" Spacing="2">
           <TextBlock Text="View" Classes="ToolGroupHeader"/>
-          <Button Content="Tag" Command="{Binding OpenTagBrowserCommand}" ToolTip.Tip="Open tag browser"/>
+          <Button Content="Tag" AutomationProperties.Name="Tag Browser" Command="{Binding OpenTagBrowserCommand}" ToolTip.Tip="Open tag browser"/>
           <Button Content="Watch" Command="{Binding OpenWatchWindowCommand}" ToolTip.Tip="Open watch window"/>
           <Button Content="−" Command="{Binding ZoomOutCommand}" ToolTip.Tip="Zoom out" Padding="4,2"/>
           <TextBlock Text="{Binding ZoomText}" VerticalAlignment="Center" MinWidth="36" TextAlignment="Center"/>

@@ -125,7 +125,7 @@ public class HelpSystemSmokeTests : IDisposable
         var title = mainWindow.Title;
 
         Assert.Contains("ModbusForge", title, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("5.8", title, StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(@"ModbusForge v\d+(\.\d+)+", title);
 
         _output.WriteLine($"Main window title: {title}");
     }
