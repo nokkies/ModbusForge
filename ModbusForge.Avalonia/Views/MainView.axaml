@@ -12,6 +12,14 @@
     <converters:NavigationIndexConverter x:Key="NavigationIndexConverter" />
   </UserControl.Resources>
 
+  <UserControl.Styles>
+    <Style Selector="NumericUpDown.compact /template/ TextBox">
+      <Setter Property="Padding" Value="2,0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+  </UserControl.Styles>
+
   <Grid Margin="16" RowDefinitions="Auto,*">
     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
       <TextBlock VerticalAlignment="Center" Text="Active profile:" />
@@ -21,9 +29,9 @@
       <TextBlock VerticalAlignment="Center" Text="{Binding AddressLabel}" Margin="16,0,0,0" />
       <TextBox Text="{Binding ActiveProfile.IpAddress, FallbackValue='127.0.0.1'}" Width="120" Height="24" MinHeight="0" Padding="4,0" VerticalAlignment="Center" VerticalContentAlignment="Center" />
       <TextBlock VerticalAlignment="Center" Text="Port:" Margin="16,0,0,0" />
-      <NumericUpDown Value="{Binding ActiveProfile.Port, FallbackValue=502}" Minimum="1" Maximum="65535" Width="120" Height="24" MinHeight="0" Padding="2,0" VerticalAlignment="Center" VerticalContentAlignment="Center" ShowButtonSpinner="False" />
+      <NumericUpDown Classes="compact" Value="{Binding ActiveProfile.Port, FallbackValue=502}" Minimum="1" Maximum="65535" Width="120" Height="24" MinHeight="0" Padding="0" VerticalAlignment="Center" ShowButtonSpinner="False" />
       <TextBlock VerticalAlignment="Center" Text="Unit ID:" Margin="16,0,0,0" IsVisible="{Binding ShowClientFields}" />
-      <NumericUpDown Value="{Binding UnitId}" Minimum="1" Maximum="247" Width="110" Height="24" MinHeight="0" Padding="2,0" VerticalAlignment="Center" VerticalContentAlignment="Center" IsVisible="{Binding ShowClientFields}" ShowButtonSpinner="False" />
+      <NumericUpDown Classes="compact" Value="{Binding UnitId}" Minimum="1" Maximum="247" Width="110" Height="24" MinHeight="0" Padding="0" VerticalAlignment="Center" IsVisible="{Binding ShowClientFields}" ShowButtonSpinner="False" />
       <TextBlock VerticalAlignment="Center" Text="Unit ID(s):" Margin="16,0,0,0" IsVisible="{Binding ShowServerFields}" />
       <TextBox Text="{Binding ServerUnitIds, FallbackValue='1'}" Width="120" Height="24" MinHeight="0" Padding="4,0" VerticalAlignment="Center" VerticalContentAlignment="Center" IsVisible="{Binding ShowServerFields}" ToolTip.Tip="Comma-separated list (e.g. 1, 2, 5-10)" />
       <TextBlock VerticalAlignment="Center" Text="Active ID:" Margin="16,0,0,0" IsVisible="{Binding ShowServerFields}" />
