@@ -34,6 +34,9 @@ foreach ($profile in $profiles) {
     $publishDir = Join-Path (Join-Path (Join-Path $repoRoot 'publish') 'avalonia') $profile
     Write-Output "Published to $publishDir"
 
+    # Strip debug symbols from the published package; single-file bundles don't need them.
+    Get-ChildItem -Path $publishDir -Filter '*.pdb' -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
+
     # Package the output
     $version = (Get-Content (Join-Path $repoRoot 'ModbusForge.Avalonia\ModbusForge.Avalonia.csproj') | Select-String '<Version>(.*)</Version>').Matches[0].Groups[1].Value
     $packageDir = Join-Path $repoRoot 'packages'

@@ -7,6 +7,7 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <RootNamespace>ModbusForge.Avalonia</RootNamespace>
     <AssemblyName>ModbusForge.Avalonia</AssemblyName>
+    <ApplicationIcon>..\ModbusForge\Resources\ModbusForge.ico</ApplicationIcon>
     <Version>2026.8.1</Version>
     <AssemblyVersion>2026.8.1</AssemblyVersion>
     <FileVersion>2026.8.1</FileVersion>
