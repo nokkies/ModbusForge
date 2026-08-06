@@ -1176,6 +1176,7 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             OnPropertyChanged(nameof(AvailableUnitIds));
             OnPropertyChanged(nameof(UnitConfigurations));
+            OnPropertyChanged(nameof(SelectedUnitId));
         }
 
         /// <summary>
@@ -1400,6 +1401,8 @@ namespace ModbusForge.Avalonia.ViewModels
                 OnPropertyChanged(nameof(AddressLabel));
                 OnPropertyChanged(nameof(EffectiveUnitId));
                 RefreshAvailableUnitIds();
+                OnPropertyChanged(nameof(AvailableUnitIds));
+                OnPropertyChanged(nameof(SelectedUnitId));
                 ExportUnitIdCommand.NotifyCanExecuteChanged();
                 ImportUnitIdAsCommand.NotifyCanExecuteChanged();
             }
