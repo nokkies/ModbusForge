@@ -21,12 +21,12 @@ public class AvaloniaSmokeTests : IDisposable
         _output = output;
 
         var solutionDir = FlaUiAppHelper.GetSolutionDirectory();
-        var appPath = Path.Combine(solutionDir, "ModbusForge.Avalonia", "bin", "Debug", "net8.0", "ModbusForge.Avalonia.exe");
+        var appPath = Path.Combine(solutionDir, "ModbusForge.Avalonia", "bin", "Debug", "net8.0", "ModbusForge.exe");
 
         if (!File.Exists(appPath))
         {
             var fallbackPath = new[] { "Release", "Debug" }
-                .Select(c => Path.Combine(solutionDir, "ModbusForge.Avalonia", "bin", c, "net8.0", "ModbusForge.Avalonia.exe"))
+                .Select(c => Path.Combine(solutionDir, "ModbusForge.Avalonia", "bin", c, "net8.0", "ModbusForge.exe"))
                 .FirstOrDefault(File.Exists);
 
             appPath = fallbackPath ?? appPath;
@@ -34,7 +34,7 @@ public class AvaloniaSmokeTests : IDisposable
 
         if (!File.Exists(appPath))
         {
-            throw new FileNotFoundException($"ModbusForge.Avalonia.exe not found at {appPath}. Build the Avalonia project first.");
+            throw new FileNotFoundException($"ModbusForge.exe not found at {appPath}. Build the Avalonia project first.");
         }
 
         _output.WriteLine($"Launching Avalonia app from: {appPath}");

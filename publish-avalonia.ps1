@@ -46,6 +46,29 @@ foreach ($profile in $profiles) {
         $zipPath = Join-Path $packageDir "ModbusForge-$version-win-x64-avalonia.zip"
         Compress-Archive -Path "$publishDir\*" -DestinationPath $zipPath -Force
         Write-Output "Created $zipPath"
+
+        $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+        $issPath = Join-Path $repoRoot 'setup\ModbusForge.Avalonia.iss'
+
+        if (Test-Path $iscc) {
+            Write-Output "Building Windows installer with Inno Setup..."
+            & $iscc /dAppVersion=$version $issPath
+
+            if ($LASTEXITCODE -ne 0) {
+                throw "Inno Setup compiler failed"
+            }
+
+            $installerSource = Join-Path $repoRoot "installers\ModbusForge-$version-setup.exe"
+            $installerDest = Join-Path $packageDir "ModbusForge-$version-setup.exe"
+
+            if (Test-Path $installerSource) {
+                Copy-Item -Path $installerSource -Destination $installerDest -Force
+                Write-Output "Created $installerDest"
+            }
+        }
+        else {
+            Write-Warning "Inno Setup compiler not found at $iscc; skipping installer build"
+        }
     }
     elseif ($profile -eq 'linux-x64') {
         $tarName = "ModbusForge-$version-linux-x64-avalonia.tar.gz"

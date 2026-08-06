@@ -1,7 +1,8 @@
-; ModbusForge Avalonia Inno Setup Script
+; ModbusForge Inno Setup Script
+; See https://jrsoftware.org/isinfo.php for documentation
 
 #ifndef AppVersion
-  #define AppVersion "2026.7.12"
+  #define AppVersion "2026.8.1"
 #endif
 
 [Setup]
@@ -10,11 +11,11 @@ AppVersion={#AppVersion}
 AppPublisher=ModbusForge
 DefaultDirName={autopf}\ModbusForge
 DefaultGroupName=ModbusForge
-UninstallDisplayIcon={app}\ModbusForge.Avalonia.exe
+UninstallDisplayIcon={app}\ModbusForge.exe
 CloseApplications=force
 
 WizardStyle=modern
-OutputBaseFilename=ModbusForge-Avalonia-{#AppVersion}-setup
+OutputBaseFilename=ModbusForge-{#AppVersion}-setup
 OutputDir=..\installers
 Compression=lzma2
 SolidCompression=yes
@@ -29,8 +30,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "..\publish\avalonia\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\ModbusForge"; Filename: "{app}\ModbusForge.Avalonia.exe"
-Name: "{autodesktop}\ModbusForge"; Filename: "{app}\ModbusForge.Avalonia.exe"; Tasks: desktopicon
+Name: "{group}\ModbusForge"; Filename: "{app}\ModbusForge.exe"
+Name: "{autodesktop}\ModbusForge"; Filename: "{app}\ModbusForge.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\ModbusForge.Avalonia.exe"; Description: "{cm:LaunchProgram,ModbusForge}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\ModbusForge.exe"; Description: "{cm:LaunchProgram,ModbusForge}"; Flags: nowait postinstall skipifsilent
