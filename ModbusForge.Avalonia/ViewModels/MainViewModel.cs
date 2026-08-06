@@ -109,7 +109,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ReadHoldingRegistersCommand))]
-        private int _holdingRegisterStart = 0;
+        private int _holdingRegisterStart = 1;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ReadHoldingRegistersCommand))]
@@ -132,7 +132,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ReadInputRegistersCommand))]
-        private int _inputRegisterStart = 0;
+        private int _inputRegisterStart = 1;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ReadInputRegistersCommand))]
@@ -155,7 +155,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ReadCoilsCommand))]
-        private int _coilStart = 0;
+        private int _coilStart = 1;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ReadCoilsCommand))]
@@ -169,7 +169,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ReadDiscreteInputsCommand))]
-        private int _discreteInputStart = 0;
+        private int _discreteInputStart = 1;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ReadDiscreteInputsCommand))]
@@ -518,6 +518,10 @@ namespace ModbusForge.Avalonia.ViewModels
             StatusMessage = ActiveProfile != null
                 ? $"Active profile: {ActiveProfile.DisplayName}"
                 : "No active connection profile";
+
+            // Force the top toolbar dropdowns to refresh once the DataContext is attached.
+            OnPropertyChanged(nameof(Mode));
+            OnPropertyChanged(nameof(SelectedUnitId));
 
             ShowAllTabs();
         }
@@ -1185,20 +1189,20 @@ namespace ModbusForge.Avalonia.ViewModels
             _isApplyingUnitConfiguration = true;
             try
             {
-                HoldingRegisterStart = settings.RegisterStart;
-                HoldingRegisterCount = settings.RegisterCount;
+                HoldingRegisterStart = Math.Max(1, settings.RegisterStart);
+                HoldingRegisterCount = Math.Max(1, settings.RegisterCount);
                 RegistersGlobalType = settings.RegistersGlobalType ?? "uint";
                 RegistersSwapBytes = settings.RegistersSwapBytes;
                 RegistersSwapWords = settings.RegistersSwapWords;
-                InputRegisterStart = settings.InputRegisterStart;
-                InputRegisterCount = settings.InputRegisterCount;
+                InputRegisterStart = Math.Max(1, settings.InputRegisterStart);
+                InputRegisterCount = Math.Max(1, settings.InputRegisterCount);
                 InputRegistersGlobalType = settings.InputRegistersGlobalType ?? "uint";
                 InputRegistersSwapBytes = settings.InputRegistersSwapBytes;
                 InputRegistersSwapWords = settings.InputRegistersSwapWords;
-                CoilStart = settings.CoilStart;
-                CoilCount = settings.CoilCount;
-                DiscreteInputStart = settings.DiscreteInputStart;
-                DiscreteInputCount = settings.DiscreteInputCount;
+                CoilStart = Math.Max(1, settings.CoilStart);
+                CoilCount = Math.Max(1, settings.CoilCount);
+                DiscreteInputStart = Math.Max(1, settings.DiscreteInputStart);
+                DiscreteInputCount = Math.Max(1, settings.DiscreteInputCount);
                 HoldingMonitorEnabled = monitoring.HoldingMonitorEnabled;
                 HoldingMonitorPeriodMs = monitoring.HoldingMonitorPeriodMs;
                 InputRegistersMonitorEnabled = monitoring.InputRegistersMonitorEnabled;
@@ -1459,6 +1463,11 @@ namespace ModbusForge.Avalonia.ViewModels
             foreach (var id in ids)
             {
                 _unitConfigurationStore.GetOrCreateConfiguration(id);
+            }
+
+            if (ids.Count > 0 && (SelectedUnitId == 0 || !ids.Contains(SelectedUnitId)))
+            {
+                SelectedUnitId = ids[0];
             }
         }
 
@@ -2207,8 +2216,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     area = last.Area ?? "HoldingRegister";
                     name = GenerateNextName(last.Name);
 
-                    int increment = type.Equals("uint", StringComparison.OrdinalIgnoreCase) ||
-                                     type.Equals("real", StringComparison.OrdinalIgnoreCase)
+                    int increment = IsMultiRegisterType(type)
                         ? MultiRegisterTypeIncrement
                         : SingleRegisterTypeIncrement;
                     nextAddress = Math.Max(1, last.Address + increment);
@@ -2234,6 +2242,12 @@ namespace ModbusForge.Avalonia.ViewModels
                 StatusMessage = $"Added custom entry {name}.";
             });
         }
+
+        private static bool IsMultiRegisterType(string type) =>
+            type.Equals("real", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("float", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("dword", StringComparison.OrdinalIgnoreCase) ||
+            type.Equals("dint", StringComparison.OrdinalIgnoreCase);
 
         private async Task RemoveCustomEntryAsync()
         {

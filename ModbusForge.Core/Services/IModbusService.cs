@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Modbus.Data;
 using ModbusForge.Models;
 
 namespace ModbusForge.Services
@@ -107,5 +108,11 @@ namespace ModbusForge.Services
         /// does not support the function.
         /// </summary>
         Task<DeviceIdentification?> ReadDeviceIdentificationAsync(byte unitId, byte objectId = DeviceIdObject.VendorName, DeviceIdCategory category = DeviceIdCategory.Basic);
+
+        /// <summary>
+        /// Returns the server's local data store when the service is running in server mode.
+        /// Client implementations and unstarted services return null.
+        /// </summary>
+        DataStore? GetDataStore() => null;
     }
 }

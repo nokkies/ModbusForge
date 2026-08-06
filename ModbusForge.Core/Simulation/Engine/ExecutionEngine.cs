@@ -230,12 +230,13 @@ namespace ModbusForge.Core.Simulation.Engine
             if (dataStore == null || address.Address < 0)
                 return null;
 
+            var index = ToDataStoreIndex(address.Address);
             object? raw = address.Area switch
             {
-                PlcArea.Coil => address.Address < dataStore.CoilDiscretes.Count && dataStore.CoilDiscretes[address.Address],
-                PlcArea.DiscreteInput => address.Address < dataStore.InputDiscretes.Count && dataStore.InputDiscretes[address.Address],
-                PlcArea.HoldingRegister => address.Address < dataStore.HoldingRegisters.Count ? (object)dataStore.HoldingRegisters[address.Address] : null,
-                PlcArea.InputRegister => address.Address < dataStore.InputRegisters.Count ? (object)dataStore.InputRegisters[address.Address] : null,
+                PlcArea.Coil => index < dataStore.CoilDiscretes.Count && dataStore.CoilDiscretes[index],
+                PlcArea.DiscreteInput => index < dataStore.InputDiscretes.Count && dataStore.InputDiscretes[index],
+                PlcArea.HoldingRegister => index < dataStore.HoldingRegisters.Count ? (object)dataStore.HoldingRegisters[index] : null,
+                PlcArea.InputRegister => index < dataStore.InputRegisters.Count ? (object)dataStore.InputRegisters[index] : null,
                 _ => null
             };
 
@@ -250,55 +251,56 @@ namespace ModbusForge.Core.Simulation.Engine
         {
             if (address.Address < 0) return;
 
+            var index = ToDataStoreIndex(address.Address);
             var finalValue = address.Not ? Invert(value) : value;
 
             switch (address.Area)
             {
                 case PlcArea.HoldingRegister:
-                    if (address.Address < dataStore.HoldingRegisters.Count)
+                    if (index < dataStore.HoldingRegisters.Count)
                     {
-                        var oldValue = dataStore.HoldingRegisters[address.Address];
+                        var oldValue = dataStore.HoldingRegisters[index];
                         var newValue = ToUInt16(finalValue);
                         if (oldValue != newValue)
                         {
-                            dataStore.HoldingRegisters[address.Address] = newValue;
-                            _consoleLoggerService?.Log($"Simulation wrote holding register {address.Address}: {oldValue} -> {newValue}");
+                            dataStore.HoldingRegisters[index] = newValue;
+                            _consoleLoggerService?.Log($"Simulation wrote holding register {address.Address} (index {index}): {oldValue} -> {newValue}");
                         }
                     }
                     break;
                 case PlcArea.InputRegister:
-                    if (address.Address < dataStore.InputRegisters.Count)
+                    if (index < dataStore.InputRegisters.Count)
                     {
-                        var oldValue = dataStore.InputRegisters[address.Address];
+                        var oldValue = dataStore.InputRegisters[index];
                         var newValue = ToUInt16(finalValue);
                         if (oldValue != newValue)
                         {
-                            dataStore.InputRegisters[address.Address] = newValue;
-                            _consoleLoggerService?.Log($"Simulation wrote input register {address.Address}: {oldValue} -> {newValue}");
+                            dataStore.InputRegisters[index] = newValue;
+                            _consoleLoggerService?.Log($"Simulation wrote input register {address.Address} (index {index}): {oldValue} -> {newValue}");
                         }
                     }
                     break;
                 case PlcArea.Coil:
-                    if (address.Address < dataStore.CoilDiscretes.Count)
+                    if (index < dataStore.CoilDiscretes.Count)
                     {
-                        var oldValue = dataStore.CoilDiscretes[address.Address];
+                        var oldValue = dataStore.CoilDiscretes[index];
                         var newValue = finalValue.AsBool();
                         if (oldValue != newValue)
                         {
-                            dataStore.CoilDiscretes[address.Address] = newValue;
-                            _consoleLoggerService?.Log($"Simulation wrote coil {address.Address}: {(oldValue ? 1 : 0)} -> {(newValue ? 1 : 0)}");
+                            dataStore.CoilDiscretes[index] = newValue;
+                            _consoleLoggerService?.Log($"Simulation wrote coil {address.Address} (index {index}): {(oldValue ? 1 : 0)} -> {(newValue ? 1 : 0)}");
                         }
                     }
                     break;
                 case PlcArea.DiscreteInput:
-                    if (address.Address < dataStore.InputDiscretes.Count)
+                    if (index < dataStore.InputDiscretes.Count)
                     {
-                        var oldValue = dataStore.InputDiscretes[address.Address];
+                        var oldValue = dataStore.InputDiscretes[index];
                         var newValue = finalValue.AsBool();
                         if (oldValue != newValue)
                         {
-                            dataStore.InputDiscretes[address.Address] = newValue;
-                            _consoleLoggerService?.Log($"Simulation wrote discrete input {address.Address}: {(oldValue ? 1 : 0)} -> {(newValue ? 1 : 0)}");
+                            dataStore.InputDiscretes[index] = newValue;
+                            _consoleLoggerService?.Log($"Simulation wrote discrete input {address.Address} (index {index}): {(oldValue ? 1 : 0)} -> {(newValue ? 1 : 0)}");
                         }
                     }
                     break;
@@ -322,6 +324,15 @@ namespace ModbusForge.Core.Simulation.Engine
 
             var clamped = Math.Clamp(Math.Round(value.AsReal()), 0, ushort.MaxValue);
             return (ushort)clamped;
+        }
+
+        /// <summary>
+        /// Converts a 1-based Modbus display address to a 0-based DataStore index.
+        /// Address 0 is treated as the first element to allow direct protocol addressing.
+        /// </summary>
+        private static int ToDataStoreIndex(int displayAddress)
+        {
+            return displayAddress > 0 ? displayAddress - 1 : 0;
         }
     }
 }

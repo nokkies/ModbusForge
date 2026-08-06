@@ -44,6 +44,7 @@ namespace ModbusForge.Services
     {
         private readonly ILogger<AvaloniaVisualSimulationService> _logger;
         private readonly IConsoleLoggerService? _consoleLoggerService;
+        private readonly IConnectionManager? _connectionManager;
         private readonly FunctionBlockCatalog _catalog;
         private readonly ExecutionEngine _engine;
         private readonly Timer _timer;
@@ -58,10 +59,12 @@ namespace ModbusForge.Services
 
         public AvaloniaVisualSimulationService(
             ILogger<AvaloniaVisualSimulationService>? logger = null,
-            IConsoleLoggerService? consoleLoggerService = null)
+            IConsoleLoggerService? consoleLoggerService = null,
+            IConnectionManager? connectionManager = null)
         {
             _logger = logger ?? NullLogger<AvaloniaVisualSimulationService>.Instance;
             _consoleLoggerService = consoleLoggerService;
+            _connectionManager = connectionManager;
             _catalog = CreateCatalog();
             _engine = new ExecutionEngine(_catalog, null, _consoleLoggerService);
             _dataStore = DataStoreFactory.CreateDefaultDataStore();
@@ -165,7 +168,7 @@ namespace ModbusForge.Services
             if (_config?.Nodes == null || !IsRunning) return;
 
             EnsureGraphLoaded();
-            _engine.Execute(_dataStore);
+            _engine.Execute(GetEffectiveDataStore());
 
             var now = DateTime.UtcNow;
 
@@ -238,28 +241,44 @@ namespace ModbusForge.Services
                 return;
             }
 
+            var dataStore = GetEffectiveDataStore();
+            var index = address.Address > 0 ? address.Address - 1 : 0;
             switch (address.Area)
             {
                 case PlcArea.HoldingRegister:
-                    if (address.Address < _dataStore.HoldingRegisters.Count)
-                        _dataStore.HoldingRegisters[address.Address] = ToClampedUInt16(value);
+                    if (index < dataStore.HoldingRegisters.Count)
+                        dataStore.HoldingRegisters[index] = ToClampedUInt16(value);
                     break;
 
                 case PlcArea.InputRegister:
-                    if (address.Address < _dataStore.InputRegisters.Count)
-                        _dataStore.InputRegisters[address.Address] = ToClampedUInt16(value);
+                    if (index < dataStore.InputRegisters.Count)
+                        dataStore.InputRegisters[index] = ToClampedUInt16(value);
                     break;
 
                 case PlcArea.Coil:
-                    if (address.Address < _dataStore.CoilDiscretes.Count)
-                        _dataStore.CoilDiscretes[address.Address] = Math.Abs(value) > 0.0001;
+                    if (index < dataStore.CoilDiscretes.Count)
+                        dataStore.CoilDiscretes[index] = Math.Abs(value) > 0.0001;
                     break;
 
                 case PlcArea.DiscreteInput:
-                    if (address.Address < _dataStore.InputDiscretes.Count)
-                        _dataStore.InputDiscretes[address.Address] = Math.Abs(value) > 0.0001;
+                    if (index < dataStore.InputDiscretes.Count)
+                        dataStore.InputDiscretes[index] = Math.Abs(value) > 0.0001;
                     break;
             }
+        }
+
+        /// <summary>
+        /// Returns the active Modbus server's data store when available, otherwise the
+        /// fallback local data store used for offline simulation.
+        /// </summary>
+        private DataStore GetEffectiveDataStore()
+        {
+            if (_connectionManager?.ActiveService is { } service)
+            {
+                return service.GetDataStore() ?? _dataStore;
+            }
+
+            return _dataStore;
         }
 
         private static ushort ToClampedUInt16(double value)

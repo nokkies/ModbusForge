@@ -165,9 +165,7 @@ namespace ModbusForge.Models
 
         public string ParameterDisplay => NodeDescriptors.Get(ElementType).GetParameterDisplay(this);
 
-        public bool HasOutput => ElementType != PlcElementType.Input
-            && ElementType != PlcElementType.InputBool
-            && ElementType != PlcElementType.InputInt;
+        public bool HasOutput => !NodeDescriptors.Get(ElementType).IsOutput;
 
         // Cached handler so we can unsubscribe from the previous PlcAddressReference instance.
         private PropertyChangedEventHandler? _addressPropertyChangedHandler;
@@ -178,6 +176,7 @@ namespace ModbusForge.Models
         {
             OnPropertyChanged(nameof(DisplayName));
             OnPropertyChanged(nameof(AddressDisplay));
+            OnPropertyChanged(nameof(HasOutput));
             OnPropertyChanged(nameof(HasSecondInput));
             OnPropertyChanged(nameof(HasParameters));
             OnPropertyChanged(nameof(ParameterDisplay));

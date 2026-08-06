@@ -15,7 +15,7 @@ namespace ModbusForge.Avalonia.Tests
     public sealed class MainViewModelParityTests
     {
         [Fact]
-        public async Task Custom_entries_increment_uint_and_real_addresses_by_two()
+        public async Task Custom_entries_increment_by_one_for_single_register_types_and_by_two_for_multi_register_types()
         {
             var manager = new FakeConnectionManager();
             var vm = new MainViewModel(
@@ -27,16 +27,19 @@ namespace ModbusForge.Avalonia.Tests
             Assert.Equal(1, vm.CustomEntries[0].Address);
             Assert.Equal("uint", vm.CustomEntries[0].Type);
 
+            // uint is a single-register type, so it advances by 1.
             await vm.AddCustomEntryCommand.ExecuteAsync(null);
-            Assert.Equal(3, vm.CustomEntries[1].Address);
+            Assert.Equal(2, vm.CustomEntries[1].Address);
 
+            // real is a multi-register (32-bit) type, so it advances by 2.
             vm.CustomEntries[1].Type = "real";
             await vm.AddCustomEntryCommand.ExecuteAsync(null);
-            Assert.Equal(5, vm.CustomEntries[2].Address);
+            Assert.Equal(4, vm.CustomEntries[2].Address);
 
+            // int is single-register, so it advances by 1.
             vm.CustomEntries[2].Type = "int";
             await vm.AddCustomEntryCommand.ExecuteAsync(null);
-            Assert.Equal(6, vm.CustomEntries[3].Address);
+            Assert.Equal(5, vm.CustomEntries[3].Address);
 
             vm.Dispose();
         }
