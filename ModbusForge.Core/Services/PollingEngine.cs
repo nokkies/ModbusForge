@@ -25,6 +25,7 @@ namespace ModbusForge.Services
         private readonly CancellationTokenSource _cts = new();
 
         private Task? _worker;
+        private bool _disposed;
 
         public PollingEngine(
             IModbusService clientService,
@@ -47,6 +48,8 @@ namespace ModbusForge.Services
 
         public void Start(CancellationToken cancellationToken = default)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
             if (_worker is not null)
                 return;
 
@@ -61,6 +64,17 @@ namespace ModbusForge.Services
             _worker?.Wait(TimeSpan.FromSeconds(5));
             _worker = null;
             _logger.LogInformation("Polling engine stopped");
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            Stop();
+            _cts.Dispose();
+            _resultChannel.Writer.TryComplete();
+            _disposed = true;
         }
 
         public void Enqueue(PollingCommand command)

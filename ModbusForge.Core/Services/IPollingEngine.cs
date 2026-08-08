@@ -10,7 +10,7 @@ namespace ModbusForge.Services
     /// Decoupled background polling engine that executes Modbus I/O off the UI thread
     /// and surfaces results through <see cref="System.Threading.Channels"/>.
     /// </summary>
-    public interface IPollingEngine
+    public interface IPollingEngine : IDisposable
     {
         /// <summary>
         /// Starts the engine worker.
