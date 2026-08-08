@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Threading;
@@ -57,8 +58,8 @@ namespace ModbusForge.Services
         private DateTime _lastUpdate;
 
         // Cache for node values to avoid excessive UI updates
-        private readonly Dictionary<string, bool> _nodeValueCache = new();
-        private readonly Dictionary<string, DateTime> _lastNodeUpdate = new();
+        private readonly ConcurrentDictionary<string, bool> _nodeValueCache = new();
+        private readonly ConcurrentDictionary<string, DateTime> _lastNodeUpdate = new();
 
         // Graph shape cache (rebuilt when the graph or its parameters change)
         private int _lastGraphHash;

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -52,8 +53,8 @@ namespace ModbusForge.Services
 
         private VisualNodeEditorConfig? _config;
         private int _lastGraphHash;
-        private readonly Dictionary<string, bool> _nodeValueCache = new();
-        private readonly Dictionary<string, DateTime> _lastNodeUpdate = new();
+        private readonly ConcurrentDictionary<string, bool> _nodeValueCache = new();
+        private readonly ConcurrentDictionary<string, DateTime> _lastNodeUpdate = new();
 
         public bool IsRunning { get; private set; }
 
