@@ -511,11 +511,10 @@ namespace ModbusForge.Services
             var sw = System.Diagnostics.Stopwatch.StartNew();
 
             // Step 1: Test raw TCP connection
-            TcpClient? testClient = null;
+            using var testClient = new TcpClient();
             try
             {
                 _logger.LogInformation($"Diagnostics: Testing TCP connection to {ipAddress}:{port}");
-                testClient = new TcpClient();
                 
                 // Use async connect with timeout
                 var connectTask = testClient.ConnectAsync(ipAddress, port);
@@ -553,8 +552,8 @@ namespace ModbusForge.Services
             {
                 sw.Restart();
                 _logger.LogInformation($"Diagnostics: Testing Modbus protocol with Unit ID {unitId}");
-                
-                var master = ModbusIpMaster.CreateIp(testClient);
+
+                using var master = ModbusIpMaster.CreateIp(testClient);
                 master.Transport.ReadTimeout = 5000;
                 master.Transport.WriteTimeout = 5000;
 
@@ -593,18 +592,12 @@ namespace ModbusForge.Services
                     result.ModbusError = "Modbus timeout - device accepted TCP but did not respond to Modbus request. Check Unit ID or device may not support Modbus TCP.";
                     _logger.LogWarning($"Diagnostics: Modbus timeout");
                 }
-
-                master.Dispose();
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 result.ModbusResponding = false;
                 result.ModbusError = ex.Message;
                 _logger.LogWarning($"Diagnostics: Modbus test failed - {ex.Message}");
-            }
-            finally
-            {
-                testClient?.Close();
             }
 
             return result;
