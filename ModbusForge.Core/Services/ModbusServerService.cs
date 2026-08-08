@@ -217,7 +217,10 @@ namespace ModbusForge.Services
                 var ds = GetDataStore(unitId);
                 if (ds == null || registerAddress < 0 || registerAddress >= ds.HoldingRegisters.Count)
                     throw new ArgumentOutOfRangeException(nameof(registerAddress));
-                ds.HoldingRegisters[(ushort)registerAddress] = value;
+                lock (ds)
+                {
+                    ds.HoldingRegisters[(ushort)registerAddress] = value;
+                }
                 _consoleLoggerService?.Log($"Server wrote holding register {registerAddress} = {value} (Unit ID: {unitId})");
             }).ConfigureAwait(false);
         }
@@ -231,9 +234,12 @@ namespace ModbusForge.Services
                 if (ds == null || startAddress < 0 || startAddress + values.Length > ds.HoldingRegisters.Count)
                     throw new ArgumentOutOfRangeException(nameof(startAddress));
 
-                for (int i = 0; i < values.Length; i++)
+                lock (ds)
                 {
-                    ds.HoldingRegisters[(ushort)(startAddress + i)] = values[i];
+                    for (int i = 0; i < values.Length; i++)
+                    {
+                        ds.HoldingRegisters[(ushort)(startAddress + i)] = values[i];
+                    }
                 }
                 _consoleLoggerService?.Log($"Server wrote holding registers {startAddress}..{startAddress + values.Length - 1} (Unit ID: {unitId})");
             }).ConfigureAwait(false);
@@ -256,8 +262,11 @@ namespace ModbusForge.Services
                 if (startAddress < 0 || count < 0 || startAddress + count > collection.Count)
                     throw new ArgumentOutOfRangeException(nameof(startAddress), $"{resourceName} range out of bounds");
                 var result = new T[count];
-                for (int i = 0; i < count; i++)
-                    result[i] = collection[(ushort)(startAddress + i)];
+                lock (ds)
+                {
+                    for (int i = 0; i < count; i++)
+                        result[i] = collection[(ushort)(startAddress + i)];
+                }
                 return result;
             }).ConfigureAwait(false);
         }
@@ -270,7 +279,10 @@ namespace ModbusForge.Services
                 var ds = GetDataStore(unitId);
                 if (ds == null || coilAddress < 0 || coilAddress >= ds.CoilDiscretes.Count)
                     throw new ArgumentOutOfRangeException(nameof(coilAddress));
-                ds.CoilDiscretes[(ushort)coilAddress] = value;
+                lock (ds)
+                {
+                    ds.CoilDiscretes[(ushort)coilAddress] = value;
+                }
                 _consoleLoggerService?.Log($"Server wrote coil {coilAddress} = {(value ? 1 : 0)} (Unit ID: {unitId})");
             });
         }
@@ -284,9 +296,13 @@ namespace ModbusForge.Services
                 if (ds == null || registerAddress < 0 || registerAddress >= ds.HoldingRegisters.Count)
                     throw new ArgumentOutOfRangeException(nameof(registerAddress));
 
-                ushort current = ds.HoldingRegisters[(ushort)registerAddress];
-                ushort result = (ushort)((current & andMask) | (orMask & ~andMask));
-                ds.HoldingRegisters[(ushort)registerAddress] = result;
+                ushort result;
+                lock (ds)
+                {
+                    ushort current = ds.HoldingRegisters[(ushort)registerAddress];
+                    result = (ushort)((current & andMask) | (orMask & ~andMask));
+                    ds.HoldingRegisters[(ushort)registerAddress] = result;
+                }
                 _consoleLoggerService?.Log($"Server mask wrote holding register {registerAddress} = {result} (Unit ID: {unitId})");
                 return result;
             }).ConfigureAwait(false);
@@ -306,13 +322,16 @@ namespace ModbusForge.Services
                 if (readStartAddress < 1 || readCount < 1 || readStartAddress + readCount - 1 >= ds.HoldingRegisters.Count)
                     throw new ArgumentOutOfRangeException(nameof(readStartAddress));
 
-                // Per the specification the write is performed before the read.
-                for (int i = 0; i < writeValues.Length; i++)
-                    ds.HoldingRegisters[(ushort)(writeStartAddress + i)] = writeValues[i];
-
                 var result = new ushort[readCount];
-                for (int i = 0; i < readCount; i++)
-                    result[i] = ds.HoldingRegisters[(ushort)(readStartAddress + i)];
+                lock (ds)
+                {
+                    // Per the specification the write is performed before the read.
+                    for (int i = 0; i < writeValues.Length; i++)
+                        ds.HoldingRegisters[(ushort)(writeStartAddress + i)] = writeValues[i];
+
+                    for (int i = 0; i < readCount; i++)
+                        result[i] = ds.HoldingRegisters[(ushort)(readStartAddress + i)];
+                }
 
                 _consoleLoggerService?.Log(
                     $"Server read/write registers: wrote {writeValues.Length} at {writeStartAddress}, read {readCount} at {readStartAddress} (Unit ID: {unitId})");

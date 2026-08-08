@@ -169,7 +169,12 @@ namespace ModbusForge.Services
             if (_config?.Nodes == null || !IsRunning) return;
 
             EnsureGraphLoaded();
-            _engine.Execute(GetEffectiveDataStore());
+
+            var dataStore = GetEffectiveDataStore();
+            lock (dataStore)
+            {
+                _engine.Execute(dataStore);
+            }
 
             var now = DateTime.UtcNow;
 
@@ -244,27 +249,30 @@ namespace ModbusForge.Services
 
             var dataStore = GetEffectiveDataStore();
             var modbusAddress = address.Address;
-            switch (address.Area)
+            lock (dataStore)
             {
-                case PlcArea.HoldingRegister:
-                    if (modbusAddress < dataStore.HoldingRegisters.Count)
-                        dataStore.HoldingRegisters[modbusAddress] = ToClampedUInt16(value);
-                    break;
+                switch (address.Area)
+                {
+                    case PlcArea.HoldingRegister:
+                        if (modbusAddress < dataStore.HoldingRegisters.Count)
+                            dataStore.HoldingRegisters[modbusAddress] = ToClampedUInt16(value);
+                        break;
 
-                case PlcArea.InputRegister:
-                    if (modbusAddress < dataStore.InputRegisters.Count)
-                        dataStore.InputRegisters[modbusAddress] = ToClampedUInt16(value);
-                    break;
+                    case PlcArea.InputRegister:
+                        if (modbusAddress < dataStore.InputRegisters.Count)
+                            dataStore.InputRegisters[modbusAddress] = ToClampedUInt16(value);
+                        break;
 
-                case PlcArea.Coil:
-                    if (modbusAddress < dataStore.CoilDiscretes.Count)
-                        dataStore.CoilDiscretes[modbusAddress] = Math.Abs(value) > 0.0001;
-                    break;
+                    case PlcArea.Coil:
+                        if (modbusAddress < dataStore.CoilDiscretes.Count)
+                            dataStore.CoilDiscretes[modbusAddress] = Math.Abs(value) > 0.0001;
+                        break;
 
-                case PlcArea.DiscreteInput:
-                    if (modbusAddress < dataStore.InputDiscretes.Count)
-                        dataStore.InputDiscretes[modbusAddress] = Math.Abs(value) > 0.0001;
-                    break;
+                    case PlcArea.DiscreteInput:
+                        if (modbusAddress < dataStore.InputDiscretes.Count)
+                            dataStore.InputDiscretes[modbusAddress] = Math.Abs(value) > 0.0001;
+                        break;
+                }
             }
         }
 

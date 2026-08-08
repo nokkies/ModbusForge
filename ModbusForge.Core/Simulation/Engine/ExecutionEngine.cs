@@ -65,6 +65,11 @@ namespace ModbusForge.Core.Simulation.Engine
                 _nodes.Count, _connections.Count);
         }
 
+        /// <summary>
+        /// Executes the simulation graph, reading and writing the supplied <see cref="DataStore"/>.
+        /// The caller is responsible for synchronizing access to <paramref name="dataStore"/>
+        /// (for example by locking on the DataStore instance) before calling this method.
+        /// </summary>
         public void Execute(DataStore? dataStore = null)
         {
             if (_executionOrder.Count == 0)
@@ -225,6 +230,9 @@ namespace ModbusForge.Core.Simulation.Engine
             }
         }
 
+        /// <summary>
+        /// Reads a value from the DataStore. The caller must hold a lock on <paramref name="dataStore"/>.
+        /// </summary>
         private static ISimulationValue? ReadDataStore(DataStore? dataStore, PlcAddressReference address, SimulationDataType targetType)
         {
             if (dataStore == null || address.Address <= 0)
@@ -247,6 +255,9 @@ namespace ModbusForge.Core.Simulation.Engine
             return address.Not ? Invert(value) : value;
         }
 
+        /// <summary>
+        /// Writes a value to the DataStore. The caller must hold a lock on <paramref name="dataStore"/>.
+        /// </summary>
         private void WriteDataStore(DataStore dataStore, PlcAddressReference address, ISimulationValue value)
         {
             if (address.Address <= 0) return;

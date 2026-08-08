@@ -203,7 +203,10 @@ namespace ModbusForge.Services
 
             EnsureGraphLoaded();
 
-            _engine.Execute(dataStore);
+            lock (dataStore)
+            {
+                _engine.Execute(dataStore);
+            }
 
             // Update UI-visible properties and internal caches.
             foreach (var node in _nodes)
@@ -292,12 +295,14 @@ namespace ModbusForge.Services
                 return;
             }
 
-            switch (address.Area)
+            lock (dataStore)
             {
-                case PlcArea.HoldingRegister:
-                    if (address.Address < dataStore.HoldingRegisters.Count)
-                    {
-                        var oldValue = dataStore.HoldingRegisters[address.Address];
+                switch (address.Area)
+                {
+                    case PlcArea.HoldingRegister:
+                        if (address.Address < dataStore.HoldingRegisters.Count)
+                        {
+                            var oldValue = dataStore.HoldingRegisters[address.Address];
                         var newValue = ToClampedUInt16(value);
                         if (oldValue != newValue)
                         {
@@ -349,6 +354,7 @@ namespace ModbusForge.Services
                         }
                     }
                     break;
+                }
             }
         }
 

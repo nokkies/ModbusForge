@@ -219,21 +219,33 @@ namespace ModbusForge.Services
 
             try
             {
-                return fc switch
+                byte[]? response;
+                if (fc == 0x2B)
                 {
-                    1 => ReadBits(pdu, ds.CoilDiscretes, fc),
-                    2 => ReadBits(pdu, ds.InputDiscretes, fc),
-                    3 => ReadRegisters(pdu, ds.HoldingRegisters, fc),
-                    4 => ReadRegisters(pdu, ds.InputRegisters, fc),
-                    5 => WriteSingleCoil(pdu, ds),
-                    6 => WriteSingleRegister(pdu, ds),
-                    15 => WriteMultipleCoils(pdu, ds),
-                    16 => WriteMultipleRegisters(pdu, ds),
-                    22 => MaskWriteRegister(pdu, ds),
-                    23 => ReadWriteMultipleRegisters(pdu, ds),
-                    0x2B => ReadDeviceIdentification(pdu),
-                    _ => ExceptionResponse(fc, 1) // Illegal function
-                };
+                    response = ReadDeviceIdentification(pdu);
+                }
+                else
+                {
+                    lock (ds)
+                    {
+                        response = fc switch
+                        {
+                            1 => ReadBits(pdu, ds.CoilDiscretes, fc),
+                            2 => ReadBits(pdu, ds.InputDiscretes, fc),
+                            3 => ReadRegisters(pdu, ds.HoldingRegisters, fc),
+                            4 => ReadRegisters(pdu, ds.InputRegisters, fc),
+                            5 => WriteSingleCoil(pdu, ds),
+                            6 => WriteSingleRegister(pdu, ds),
+                            15 => WriteMultipleCoils(pdu, ds),
+                            16 => WriteMultipleRegisters(pdu, ds),
+                            22 => MaskWriteRegister(pdu, ds),
+                            23 => ReadWriteMultipleRegisters(pdu, ds),
+                            _ => ExceptionResponse(fc, 1) // Illegal function
+                        };
+                    }
+                }
+
+                return response;
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
