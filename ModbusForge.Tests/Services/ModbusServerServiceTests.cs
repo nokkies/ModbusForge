@@ -90,12 +90,12 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
-        public async Task WriteSingleRegisterAsync_ZeroAddress_Throws()
+        public async Task WriteSingleRegisterAsync_NegativeAddress_Throws()
         {
             await _serverService.ConnectAsync("127.0.0.1", _testPort, "1");
 
             await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-                _serverService.WriteSingleRegisterAsync(1, 0, 42));
+                _serverService.WriteSingleRegisterAsync(1, -1, 42));
         }
     }
 }
