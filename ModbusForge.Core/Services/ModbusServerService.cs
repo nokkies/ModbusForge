@@ -215,7 +215,7 @@ namespace ModbusForge.Services
             await Task.Run(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null || registerAddress < 0 || registerAddress >= ds.HoldingRegisters.Count)
+                if (ds == null || registerAddress < 1 || registerAddress >= ds.HoldingRegisters.Count)
                     throw new ArgumentOutOfRangeException(nameof(registerAddress));
                 lock (ds)
                 {
@@ -231,7 +231,7 @@ namespace ModbusForge.Services
             await Task.Run(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null || startAddress < 0 || startAddress + values.Length > ds.HoldingRegisters.Count)
+                if (ds == null || startAddress < 1 || startAddress + values.Length > ds.HoldingRegisters.Count)
                     throw new ArgumentOutOfRangeException(nameof(startAddress));
 
                 lock (ds)
@@ -259,7 +259,7 @@ namespace ModbusForge.Services
                 var ds = GetDataStore(unitId) ?? GetDataStore(_primaryUnitId);
                 if (ds == null) throw new InvalidOperationException("Data store not initialized");
                 var collection = collectionSelector(ds);
-                if (startAddress < 0 || count < 0 || startAddress + count > collection.Count)
+                if (startAddress < 1 || count < 0 || startAddress + count > collection.Count)
                     throw new ArgumentOutOfRangeException(nameof(startAddress), $"{resourceName} range out of bounds");
                 var result = new T[count];
                 lock (ds)
@@ -277,7 +277,7 @@ namespace ModbusForge.Services
             return Task.Run(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null || coilAddress < 0 || coilAddress >= ds.CoilDiscretes.Count)
+                if (ds == null || coilAddress < 1 || coilAddress >= ds.CoilDiscretes.Count)
                     throw new ArgumentOutOfRangeException(nameof(coilAddress));
                 lock (ds)
                 {
@@ -293,7 +293,7 @@ namespace ModbusForge.Services
             return await Task.Run<ushort?>(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null || registerAddress < 0 || registerAddress >= ds.HoldingRegisters.Count)
+                if (ds == null || registerAddress < 1 || registerAddress >= ds.HoldingRegisters.Count)
                     throw new ArgumentOutOfRangeException(nameof(registerAddress));
 
                 ushort result;

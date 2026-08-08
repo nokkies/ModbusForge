@@ -88,5 +88,14 @@ namespace ModbusForge.Tests.Services
             Assert.True(disconnectTask.IsCompleted);
             Assert.False(_serverService.IsConnected);
         }
+
+        [Fact]
+        public async Task WriteSingleRegisterAsync_ZeroAddress_Throws()
+        {
+            await _serverService.ConnectAsync("127.0.0.1", _testPort, "1");
+
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+                _serverService.WriteSingleRegisterAsync(1, 0, 42));
+        }
     }
 }

@@ -6,9 +6,9 @@
     <Nullable>enable</Nullable>
     <RootNamespace>ModbusForge</RootNamespace>
     <AssemblyName>ModbusForge.Core</AssemblyName>
-    <Version>2026.8.7</Version>
-    <AssemblyVersion>2026.8.7</AssemblyVersion>
-    <FileVersion>2026.8.7</FileVersion>
+    <Version>2026.8.8</Version>
+    <AssemblyVersion>2026.8.8</AssemblyVersion>
+    <FileVersion>2026.8.8</FileVersion>
     <LangVersion>12.0</LangVersion>
   </PropertyGroup>
 
