@@ -1,4 +1,5 @@
 using System;
+using ModbusForge.Models;
 
 namespace ModbusForge.Services
 {
@@ -13,6 +14,12 @@ namespace ModbusForge.Services
         public const int MaxStartAddress = ushort.MaxValue;
         public const int MinCount = 1;
         public const int MaxCount = 125; // Modbus protocol maximum for read holding registers
+
+        // Modbus protocol per-function limits.
+        private const int MaxReadCoils = 2000;
+        private const int MaxWriteCoils = 1968;
+        private const int MaxReadRegisters = 125;
+        private const int MaxWriteRegisters = 123;
 
         public bool IsValidUnitId(byte unitId) => unitId >= MinUnitId && unitId <= MaxUnitId;
 
@@ -30,6 +37,32 @@ namespace ModbusForge.Services
             long end = (long)startAddress + count - 1;
             return end >= MinStartAddress && end <= MaxStartAddress;
         }
+
+        public bool IsValidCount(int count, PlcArea area, bool isWrite = false)
+        {
+            if (count < MinCount)
+                return false;
+
+            var max = GetMaxCount(area, isWrite);
+            return count <= max;
+        }
+
+        public bool IsValidRange(int startAddress, int count, PlcArea area, bool isWrite = false)
+        {
+            if (!IsValidStartAddress(startAddress) || !IsValidCount(count, area, isWrite))
+                return false;
+
+            long end = (long)startAddress + count - 1;
+            return end >= MinStartAddress && end <= MaxStartAddress;
+        }
+
+        private static int GetMaxCount(PlcArea area, bool isWrite) => area switch
+        {
+            PlcArea.Coil => isWrite ? MaxWriteCoils : MaxReadCoils,
+            PlcArea.DiscreteInput => MaxReadCoils,
+            PlcArea.HoldingRegister or PlcArea.InputRegister => isWrite ? MaxWriteRegisters : MaxReadRegisters,
+            _ => MaxCount
+        };
 
         public static void ValidateOrThrow(byte unitId, int startAddress, int count)
         {

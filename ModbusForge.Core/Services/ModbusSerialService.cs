@@ -173,7 +173,7 @@ namespace ModbusForge.Services
 
         public virtual async Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count)
         {
-            ValidateRead(unitId, startAddress, count);
+            ValidateRead(unitId, startAddress, count, PlcArea.HoldingRegister);
             return await ExecuteReadAsync(
                 unitId,
                 startAddress,
@@ -184,7 +184,7 @@ namespace ModbusForge.Services
 
         public virtual async Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
         {
-            ValidateRead(unitId, startAddress, count);
+            ValidateRead(unitId, startAddress, count, PlcArea.InputRegister);
             return await ExecuteReadAsync(
                 unitId,
                 startAddress,
@@ -195,7 +195,7 @@ namespace ModbusForge.Services
 
         public virtual async Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
         {
-            ValidateRead(unitId, startAddress, count);
+            ValidateRead(unitId, startAddress, count, PlcArea.DiscreteInput);
             return await ExecuteReadAsync(
                 unitId,
                 startAddress,
@@ -206,7 +206,7 @@ namespace ModbusForge.Services
 
         public virtual async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
         {
-            ValidateRead(unitId, startAddress, count);
+            ValidateRead(unitId, startAddress, count, PlcArea.Coil);
             return await ExecuteReadAsync(
                 unitId,
                 startAddress,
@@ -229,7 +229,7 @@ namespace ModbusForge.Services
         public virtual async Task WriteRegistersAsync(byte unitId, int startAddress, ushort[] values)
         {
             ArgumentNullException.ThrowIfNull(values);
-            ValidateRead(unitId, startAddress, values.Length);
+            ValidateRead(unitId, startAddress, values.Length, PlcArea.HoldingRegister, isWrite: true);
             await ExecuteWriteAsync(
                 unitId,
                 startAddress,
@@ -270,8 +270,8 @@ namespace ModbusForge.Services
         public virtual async Task<ushort[]?> ReadWriteMultipleRegistersAsync(byte unitId, int readStartAddress, int readCount, int writeStartAddress, ushort[] writeValues)
         {
             ArgumentNullException.ThrowIfNull(writeValues);
-            ValidateRead(unitId, readStartAddress, readCount);
-            ValidateRead(unitId, writeStartAddress, writeValues.Length);
+            ValidateRead(unitId, readStartAddress, readCount, PlcArea.HoldingRegister);
+            ValidateRead(unitId, writeStartAddress, writeValues.Length, PlcArea.HoldingRegister, isWrite: true);
 
             return await ExecuteMasterAsync<ushort[]?>(
                 $"Reading {readCount} registers at {readStartAddress} and writing {writeValues.Length} registers at {writeStartAddress}",
@@ -395,12 +395,12 @@ namespace ModbusForge.Services
         private static ushort ToProtocolAddress(int uiAddress)
             => (ushort)(uiAddress > 0 ? uiAddress - 1 : 0);
 
-        private void ValidateRead(byte unitId, int startAddress, int count)
+        private void ValidateRead(byte unitId, int startAddress, int count, PlcArea area, bool isWrite = false)
         {
             if (!_addressValidator.IsValidUnitId(unitId))
                 throw new ArgumentOutOfRangeException(nameof(unitId), $"Unit ID must be between {ModbusAddressValidator.MinUnitId} and {ModbusAddressValidator.MaxUnitId}.");
-            if (!_addressValidator.IsValidRange(startAddress, count))
-                throw new ArgumentOutOfRangeException(nameof(startAddress), $"The requested range {startAddress}..{startAddress + count - 1} is outside the Modbus address space.");
+            if (!_addressValidator.IsValidRange(startAddress, count, area, isWrite))
+                throw new ArgumentOutOfRangeException(nameof(startAddress), $"The requested range {startAddress}..{startAddress + count - 1} is outside the Modbus address space or exceeds the area limit.");
         }
 
         private void ValidateSingleAddress(byte unitId, int address)

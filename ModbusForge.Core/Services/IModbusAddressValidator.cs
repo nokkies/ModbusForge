@@ -1,3 +1,5 @@
+using ModbusForge.Models;
+
 namespace ModbusForge.Services
 {
     /// <summary>
@@ -9,5 +11,15 @@ namespace ModbusForge.Services
         bool IsValidStartAddress(int startAddress);
         bool IsValidCount(int count);
         bool IsValidRange(int startAddress, int count);
+
+        /// <summary>
+        /// Validates the count for a specific register area and operation direction.
+        /// </summary>
+        bool IsValidCount(int count, PlcArea area, bool isWrite = false);
+
+        /// <summary>
+        /// Validates the address range for a specific register area and operation direction.
+        /// </summary>
+        bool IsValidRange(int startAddress, int count, PlcArea area, bool isWrite = false);
     }
 }

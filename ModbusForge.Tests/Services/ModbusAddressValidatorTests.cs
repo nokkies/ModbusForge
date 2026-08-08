@@ -1,3 +1,4 @@
+using ModbusForge.Models;
 using ModbusForge.Services;
 using Xunit;
 
@@ -62,6 +63,22 @@ namespace ModbusForge.Tests.Services
         public void ValidateOrThrow_Throws_For_Invalid_Input(byte unitId, int startAddress, int count)
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => ModbusAddressValidator.ValidateOrThrow(unitId, startAddress, count));
+        }
+
+        [Theory]
+        [InlineData(PlcArea.HoldingRegister, false, 125, true)]
+        [InlineData(PlcArea.HoldingRegister, false, 126, false)]
+        [InlineData(PlcArea.HoldingRegister, true, 123, true)]
+        [InlineData(PlcArea.HoldingRegister, true, 124, false)]
+        [InlineData(PlcArea.Coil, false, 2000, true)]
+        [InlineData(PlcArea.Coil, false, 2001, false)]
+        [InlineData(PlcArea.Coil, true, 1968, true)]
+        [InlineData(PlcArea.Coil, true, 1969, false)]
+        [InlineData(PlcArea.DiscreteInput, false, 2000, true)]
+        [InlineData(PlcArea.DiscreteInput, false, 2001, false)]
+        public void IsValidCount_AreaAware_Returns_Expected(PlcArea area, bool isWrite, int count, bool expected)
+        {
+            Assert.Equal(expected, _validator.IsValidCount(count, area, isWrite));
         }
     }
 }
