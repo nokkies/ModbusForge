@@ -52,13 +52,15 @@ namespace ModbusForge.Models
         /// <summary>Number of hosts probed in parallel.</summary>
         public int MaxConcurrency { get; set; } = 16;
 
-        /// <summary>Register space and address used for the discovery probe.</summary>
+        /// <summary>Register space and address used for the discovery probe. Addresses are 1-based display addresses (0 maps to protocol address 0).</summary>
         public ScanRegisterType RegisterType { get; set; } = ScanRegisterType.HoldingRegisters;
-        public int ProbeAddress { get; set; }
+        public int ProbeAddress { get; set; } = 1;
 
         /// <summary>When true, discovered units are additionally scanned over <see cref="RegisterScanCount"/> addresses.</summary>
         public bool ScanRegisterRange { get; set; }
-        public int RegisterScanStartAddress { get; set; }
+
+        /// <summary>Start of the register scan range. 1-based display address (0 maps to protocol address 0).</summary>
+        public int RegisterScanStartAddress { get; set; } = 1;
         public int RegisterScanCount { get; set; } = 16;
 
         /// <summary>Addresses read per Modbus request while scanning a register range.</summary>

@@ -78,13 +78,13 @@ namespace ModbusForge.Avalonia.ViewModels
         private ScanRegisterType _registerType = ScanRegisterType.HoldingRegisters;
 
         [ObservableProperty]
-        private int _probeAddress;
+        private int _probeAddress = 1;
 
         [ObservableProperty]
         private bool _scanRegisterRange;
 
         [ObservableProperty]
-        private int _registerScanStartAddress;
+        private int _registerScanStartAddress = 1;
 
         [ObservableProperty]
         private int _registerScanCount = 16;

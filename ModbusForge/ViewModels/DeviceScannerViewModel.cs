@@ -41,9 +41,9 @@ namespace ModbusForge.ViewModels
         private int _responseTimeoutMs = 1000;
         private int _maxConcurrency = 16;
         private ScanRegisterType _registerType = ScanRegisterType.HoldingRegisters;
-        private int _probeAddress;
+        private int _probeAddress = 1;
         private bool _scanRegisterRange;
-        private int _registerScanStartAddress;
+        private int _registerScanStartAddress = 1;
         private int _registerScanCount = 16;
         private bool _readDeviceIdentification = true;
         private bool _detectFunctionCodes = true;

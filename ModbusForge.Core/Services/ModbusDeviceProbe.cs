@@ -300,7 +300,7 @@ namespace ModbusForge.Services
 
         private static ushort[] ReadValues(IModbusMaster master, byte unitId, int startAddress, int count, ScanRegisterType registerType)
         {
-            var address = (ushort)startAddress;
+            var address = ToProtocolAddress(startAddress);
             var quantity = (ushort)count;
 
             return registerType switch
@@ -312,6 +312,13 @@ namespace ModbusForge.Services
                 _ => throw new ArgumentOutOfRangeException(nameof(registerType), registerType, "Unsupported register type")
             };
         }
+
+        /// <summary>
+        /// Converts a 1-based display address to a 0-based Modbus protocol address,
+        /// matching the convention used by ModbusTcpService and ModbusSerialService.
+        /// </summary>
+        private static ushort ToProtocolAddress(int displayAddress)
+            => (ushort)(displayAddress > 0 ? displayAddress - 1 : 0);
 
         private static ushort[] ToRegisters(bool[] bits)
         {
