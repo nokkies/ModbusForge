@@ -522,6 +522,7 @@ namespace ModbusForge.Services
         public void Dispose()
         {
             Stop();
+            _animationTimer = null;
         }
     }
 }
