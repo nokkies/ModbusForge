@@ -78,6 +78,15 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.8.16 — Industrial Simulation Blocks & Engine Unification
+
+- **Simulation engine unified in Core**: `VisualSimulationServiceBase` and `IVisualSimulationService` now host the engine and block catalog in `ModbusForge.Core`, shared by WPF and Avalonia.
+- **Multi-output port support**: Nodes can expose named output ports (`Fault`, `SpeedFeedback`, `AtSpeed`, etc.) and bind each to its own Modbus address.
+- **Valve block** (`v2026.8.13`): Motorised valve with `OpenCmd`/`CloseCmd`, configurable travel time, normally-open rest position, and `Fault` output for simultaneous commands.
+- **DOL motor block** (`v2026.8.14`): Direct-on-line starter with `Start`/`Stop`, sealed contactor, configurable run pickup delay, and `Fault` output.
+- **VSD block** (`v2026.8.15`): Variable speed drive with `Run`, `SpeedReference`, ramped `SpeedFeedback`, `AtSpeed`, and `Running` outputs; configurable max speed, ramp up/down times, and speed tolerance.
+- **Version bumped to `2026.8.16`** in all projects.
+
 ### 2026.7.12 — Release Polish & Cross-Platform Packaging
 
 - **Avalonia is now the primary release artifact** for Windows and Linux.
