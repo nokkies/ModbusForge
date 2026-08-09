@@ -346,6 +346,12 @@ namespace ModbusForge.Services
                 AddAddressHash(ref hash, node.Input2Address);
                 AddAddressHash(ref hash, node.OutputAddress);
 
+                foreach (var (portName, address) in node.OutputPortBindings)
+                {
+                    hash.Add(portName);
+                    AddAddressHash(ref hash, address);
+                }
+
                 hash.Add(node.TimerPresetMs);
                 hash.Add(node.CounterPreset);
                 hash.Add(node.CompareValue);
@@ -403,6 +409,13 @@ namespace ModbusForge.Services
 
             if (IsOutputSink(visualNode.ElementType) && visualNode.OutputAddress?.Address >= 0)
                 node.OutputBindings["Output"] = visualNode.OutputAddress;
+
+            // Secondary output ports (e.g. Fault, SpeedFeedback) for multi-output blocks.
+            foreach (var (portName, address) in visualNode.OutputPortBindings)
+            {
+                if (address?.Address >= 0)
+                    node.OutputBindings[portName] = address;
+            }
 
             if (visualNode.TimerPresetMs != 0)
                 node.Parameters["TimerPresetMs"] = visualNode.TimerPresetMs;

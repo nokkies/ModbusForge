@@ -587,7 +587,7 @@ namespace ModbusForge.Views
         {
             if (NodeCanvas == null || _connectionPaths.ContainsKey(connection.Id)) return;
 
-            var startPoint = GetActualConnectorPosition(connection.SourceNodeId, "Output");
+            var startPoint = GetActualConnectorPosition(connection.SourceNodeId, string.IsNullOrEmpty(connection.SourceConnector) ? "Output" : connection.SourceConnector);
             var endPoint = GetActualConnectorPosition(connection.TargetNodeId, connection.TargetConnector);
 
             if (startPoint.X != 0 || startPoint.Y != 0)
@@ -664,7 +664,7 @@ namespace ModbusForge.Views
 
             foreach (var connection in connections)
             {
-                var startPoint = GetActualConnectorPosition(connection.SourceNodeId, "Output");
+                var startPoint = GetActualConnectorPosition(connection.SourceNodeId, string.IsNullOrEmpty(connection.SourceConnector) ? "Output" : connection.SourceConnector);
                 var endPoint   = GetActualConnectorPosition(connection.TargetNodeId, connection.TargetConnector);
 
                 // Update model so ViewModel stays consistent
@@ -1064,15 +1064,18 @@ namespace ModbusForge.Views
             Grid.SetColumn(contentStack, 1);
             contentGrid.Children.Add(contentStack);
 
-            // Output connector — right edge
+            // Output connector(s) — right edge
             var outputStack = new StackPanel
             {
                 Orientation = Orientation.Vertical,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, -8, 0) // pull dot to edge
             };
-            var output = CreateConnector(node.Id, "Output", false);
-            outputStack.Children.Add(output);
+            foreach (var portName in node.OutputPortNames)
+            {
+                var output = CreateConnector(node.Id, portName, false);
+                outputStack.Children.Add(output);
+            }
             Grid.SetColumn(outputStack, 2);
             contentGrid.Children.Add(outputStack);
 
@@ -2008,8 +2011,9 @@ namespace ModbusForge.Views
             var parts = tag.Split(',');
             var nodeId = parts[0];
             var connectorType = parts[1];
-            
-            if (connectorType == "Output")
+            var node = _viewModel?.Nodes.FirstOrDefault(n => n.Id == nodeId);
+
+            if (node?.OutputPortNames.Contains(connectorType) == true)
             {
                 // Start connection from output
                 _viewModel.PendingConnectionStart = tag;
@@ -2026,7 +2030,7 @@ namespace ModbusForge.Views
                     
                 if (IsValidConnection(startNodeId, startParts[1], nodeId, connectorType))
                 {
-                    _viewModel.CreateConnection(startNodeId, nodeId, connectorType);
+                    _viewModel.CreateConnection(startNodeId, nodeId, connectorType, startParts[1]);
                 }
                     
                     // Reset connection state
@@ -2080,8 +2084,12 @@ namespace ModbusForge.Views
         {
             if (_viewModel == null) return false;
 
-            // 1. Direction: source must be Output, target must be an Input
-            if (sourceConnector != "Output" || !targetConnector.StartsWith("Input"))
+            // 1. Direction: source must be a valid output port, target must be an Input
+            var sourceNode = _viewModel.Nodes.FirstOrDefault(n => n.Id == sourceNodeId);
+            if (sourceNode == null || !sourceNode.OutputPortNames.Contains(sourceConnector))
+                return false;
+
+            if (!targetConnector.StartsWith("Input"))
                 return false;
 
             // 2. Different nodes (no self-connection)
@@ -2091,6 +2099,7 @@ namespace ModbusForge.Views
             // 3. Duplicate check
             var duplicateExists = _viewModel.Connections.Any(c =>
                 c.SourceNodeId == sourceNodeId &&
+                c.SourceConnector == sourceConnector &&
                 c.TargetNodeId == targetNodeId &&
                 c.TargetConnector == targetConnector);
 
@@ -2128,17 +2137,24 @@ namespace ModbusForge.Views
         {
             var node = _viewModel?.Nodes.FirstOrDefault(n => n.Id == nodeId);
             if (node == null) return new Point(0, 0);
-            
+
             // Use constants for layout calculations
             double contentH = node.Height - NodeHeaderHeight;
             double yBase = node.Y + NodeHeaderHeight;
 
-            return connectorType switch
-            {
-                "Output" => new Point(node.X + node.Width - ConnectorOffset, yBase + contentH * SingleInputVerticalRatio),
-                "Input2" => new Point(node.X + ConnectorOffset, yBase + contentH * DualInputBottomRatio),
-                _        => new Point(node.X + ConnectorOffset, yBase + contentH * DualInputTopRatio)   // Input1 or default
-            };
+            // Input ports use fixed positions on the left.
+            if (connectorType == "Input2")
+                return new Point(node.X + ConnectorOffset, yBase + contentH * DualInputBottomRatio);
+            if (connectorType == "Input1" || connectorType.StartsWith("Input"))
+                return new Point(node.X + ConnectorOffset, yBase + contentH * DualInputTopRatio);
+
+            // Output ports are distributed evenly on the right edge.
+            var outputPortNames = node.OutputPortNames;
+            var portIndex = outputPortNames.IndexOf(connectorType);
+            if (portIndex < 0) portIndex = 0;
+            var outputCount = Math.Max(outputPortNames.Count, 1);
+            var yRatio = (portIndex + 1.0) / (outputCount + 1.0);
+            return new Point(node.X + node.Width - ConnectorOffset, yBase + contentH * yRatio);
         }
 
 

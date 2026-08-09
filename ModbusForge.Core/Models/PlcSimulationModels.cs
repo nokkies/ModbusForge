@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Text.Json.Serialization;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ModbusForge.Models
@@ -75,6 +76,7 @@ namespace ModbusForge.Models
         /// <summary>
         /// Display string showing either symbolic name or numeric address
         /// </summary>
+        [JsonIgnore]
         public string DisplayAddress
         {
             get
@@ -88,6 +90,7 @@ namespace ModbusForge.Models
         /// <summary>
         /// Returns true if this reference uses symbolic addressing
         /// </summary>
+        [JsonIgnore]
         public bool IsSymbolic => !string.IsNullOrEmpty(SymbolicName);
 
         /// <summary>

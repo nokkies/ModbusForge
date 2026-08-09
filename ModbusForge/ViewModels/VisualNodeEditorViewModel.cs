@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using ModbusForge.Core.Simulation.Core;
 using ModbusForge.Models;
 using ModbusForge.Services;
 using ModbusForge.Services.EditorCommands;
@@ -381,6 +382,8 @@ namespace ModbusForge.ViewModels
                         break;
                 }
                 
+                UpdateOutputPortNames(newNode);
+
                 _logger.LogDebug("About to add node to Nodes collection. Current count: {Count}", Nodes.Count);
 
                 var command = new AddNodeCommand(this, newNode, SelectedProgram);
@@ -596,6 +599,10 @@ namespace ModbusForge.ViewModels
                     Input1Address = node.Input1Address,
                     Input2Address = node.Input2Address,
                     OutputAddress = node.OutputAddress,
+                    OutputPortBindings = new Dictionary<string, PlcAddressReference>(
+                        node.OutputPortBindings.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Clone()),
+                        StringComparer.Ordinal),
+                    OutputPortNames = new ObservableCollection<string>(node.OutputPortNames),
                     TimerPresetMs = node.TimerPresetMs,
                     SetDominant = node.SetDominant,
                     CounterPreset = node.CounterPreset,
@@ -841,13 +848,14 @@ namespace ModbusForge.ViewModels
             }
         }
         
-        public void CreateConnection(string sourceNodeId, string targetNodeId, string targetConnector = "Input1")
+        public void CreateConnection(string sourceNodeId, string targetNodeId, string targetConnector = "Input1", string sourceConnector = "Output")
         {
-            _logger.LogDebug("CreateConnection called: {Source} -> {Target} ({TargetConnector})", sourceNodeId, targetNodeId, targetConnector);
+            _logger.LogDebug("CreateConnection called: {Source} ({SourceConnector}) -> {Target} ({TargetConnector})", sourceNodeId, sourceConnector, targetNodeId, targetConnector);
 
             // Check if connection already exists
             var existingConnection = Connections.FirstOrDefault(c =>
                 c.SourceNodeId == sourceNodeId &&
+                c.SourceConnector == sourceConnector &&
                 c.TargetNodeId == targetNodeId &&
                 c.TargetConnector == targetConnector);
 
@@ -864,7 +872,10 @@ namespace ModbusForge.ViewModels
 
             if (sourceNode != null && targetNode != null)
             {
-                var connection = new NodeConnection(sourceNodeId, targetNodeId, targetConnector);
+                var connection = new NodeConnection(sourceNodeId, targetNodeId, targetConnector)
+                {
+                    SourceConnector = sourceConnector
+                };
 
                 var command = new AddConnectionCommand(this, connection);
                 command.Execute();
@@ -916,15 +927,58 @@ namespace ModbusForge.ViewModels
         
         private void UpdateConnectionPoints(NodeConnection connection, VisualNode sourceNode, VisualNode targetNode)
         {
-            // Source point (output connector on right side of source node)
-            connection.StartX = sourceNode.X + sourceNode.Width - 6;
-            connection.StartY = sourceNode.Y + sourceNode.Height / 2;
-            
+            const double nodeHeaderHeight = 24;
+            const double connectorOffset = 6;
+
+            // Source point: right side of source node, positioned for the specific output port
+            var sourcePortNames = sourceNode.OutputPortNames;
+            var sourceConnector = string.IsNullOrEmpty(connection.SourceConnector) ? "Output" : connection.SourceConnector;
+            var sourceIndex = sourcePortNames.IndexOf(sourceConnector);
+            if (sourceIndex < 0) sourceIndex = 0;
+
+            var sourceContentH = sourceNode.Height - nodeHeaderHeight;
+            connection.StartX = sourceNode.X + sourceNode.Width - connectorOffset;
+            connection.StartY = sourceNode.Y + nodeHeaderHeight + sourceContentH * (sourceIndex + 1) / (sourcePortNames.Count + 1);
+
             // Target point (input connector on left side of target node)
-            connection.EndX = targetNode.X + 6;
-            connection.EndY = targetNode.Y + targetNode.Height / 2;
+            var targetContentH = targetNode.Height - nodeHeaderHeight;
+            var targetYRatio = connection.TargetConnector == "Input2" ? 0.667 : 0.333;
+            connection.EndX = targetNode.X + connectorOffset;
+            connection.EndY = targetNode.Y + nodeHeaderHeight + targetContentH * targetYRatio;
 
             _logger.LogDebug("Updated connection points: Start({StartX}, {StartY}) -> End({EndX}, {EndY})", connection.StartX, connection.StartY, connection.EndX, connection.EndY);
+        }
+
+        private void UpdateOutputPortNames(VisualNode node)
+        {
+            var descriptor = _visualSimulationService?.Catalog.GetDescriptor(node.ElementType.ToString());
+            if (descriptor == null)
+            {
+                node.OutputPortNames = new ObservableCollection<string>(new[] { "Output" });
+                return;
+            }
+
+            var names = descriptor.Ports
+                .Where(p => p.Direction == PortDirection.Output)
+                .Select(p => p.Name)
+                .ToList();
+
+            node.OutputPortNames = new ObservableCollection<string>(names);
+
+            // Remove stale bindings.
+            foreach (var stale in node.OutputPortBindings.Keys.Where(k => !names.Contains(k, StringComparer.Ordinal)).ToList())
+                node.OutputPortBindings.Remove(stale);
+
+            // Ensure the primary "Output" is not duplicated in the secondary bindings.
+            node.OutputPortBindings.Remove("Output");
+
+            // Ensure bindings exist for all advertised ports (except primary).
+            foreach (var name in names)
+            {
+                if (name == "Output") continue;
+                if (!node.OutputPortBindings.ContainsKey(name))
+                    node.OutputPortBindings[name] = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+            }
         }
         
         public void UpdateNodeValues(bool showLiveValues)

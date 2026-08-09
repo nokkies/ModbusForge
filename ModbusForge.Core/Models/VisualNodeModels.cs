@@ -107,6 +107,18 @@ namespace ModbusForge.Models
         
         [ObservableProperty]
         private PlcAddressReference _outputAddress = new PlcAddressReference();
+
+        /// <summary>
+        /// Secondary output port Modbus address bindings keyed by port name.
+        /// </summary>
+        [ObservableProperty]
+        private Dictionary<string, PlcAddressReference> _outputPortBindings = new();
+
+        /// <summary>
+        /// Names of the output ports exposed by this node. Rendered by the canvas.
+        /// </summary>
+        [ObservableProperty]
+        private ObservableCollection<string> _outputPortNames = new(new[] { "Output" });
         
         // Timer/Counter parameters
         [ObservableProperty]
@@ -180,6 +192,10 @@ namespace ModbusForge.Models
             OnPropertyChanged(nameof(HasSecondInput));
             OnPropertyChanged(nameof(HasParameters));
             OnPropertyChanged(nameof(ParameterDisplay));
+
+            // Reset to the default single output port. The view model will refresh
+            // this from the catalog descriptor once the node is attached/loaded.
+            OutputPortNames = new ObservableCollection<string>(new[] { "Output" });
         }
 
         partial void OnInput1AddressChanged(PlcAddressReference value)

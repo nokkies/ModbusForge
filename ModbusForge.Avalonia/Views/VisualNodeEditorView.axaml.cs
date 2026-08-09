@@ -308,7 +308,7 @@ namespace ModbusForge.Avalonia.Views
                 return;
             }
 
-            if (connector == "Output")
+            if (node.OutputPortNames.Contains(connector))
             {
                 if (ViewModel.IsConnectMode)
                 {
@@ -317,11 +317,11 @@ namespace ModbusForge.Avalonia.Views
 
                 _isConnecting = true;
                 _connectionSourceNode = node;
-                _connectionSourceConnector = "Output";
+                _connectionSourceConnector = connector;
                 _connectionPointer = e.Pointer;
                 _connectionPointer.Capture(_nodeCanvas);
 
-                var start = GetPortPosition(node, "Output");
+                var start = GetPortPosition(node, connector);
                 var canvasPosition = e.GetPosition(_nodeCanvas);
                 var zoom = Math.Max(ViewModel.ZoomLevel, 0.01);
                 var end = new Point(canvasPosition.X / zoom, canvasPosition.Y / zoom);
@@ -377,6 +377,11 @@ namespace ModbusForge.Avalonia.Views
 
         private static string? GetPortConnector(Ellipse port)
         {
+            if (port.Tag is string tag && !string.IsNullOrEmpty(tag))
+            {
+                return tag;
+            }
+
             if (port.Classes.Contains("OutputPort"))
             {
                 return "Output";
@@ -397,19 +402,26 @@ namespace ModbusForge.Avalonia.Views
 
         private static Point GetPortPosition(VisualNode node, string connector)
         {
-            var centerY = node.Y + node.Height / 2.0;
-
-            if (connector == "Output")
-            {
-                return new Point(node.X + node.Width, centerY);
-            }
+            const double HeaderHeight = 24;
+            var contentH = node.Height - HeaderHeight;
 
             if (connector == "Input2" && node.HasSecondInput)
             {
-                return new Point(node.X, node.Y + node.Height * 0.68);
+                return new Point(node.X, node.Y + HeaderHeight + contentH * 0.667);
             }
 
-            return new Point(node.X, node.Y + node.Height * 0.32);
+            if (connector == "Input1" || (connector?.StartsWith("Input") == true))
+            {
+                return new Point(node.X, node.Y + HeaderHeight + contentH * 0.333);
+            }
+
+            // Output ports are distributed on the right edge.
+            var outputPortNames = node.OutputPortNames;
+            var portIndex = outputPortNames.IndexOf(connector ?? "Output");
+            if (portIndex < 0) portIndex = 0;
+            var outputCount = Math.Max(outputPortNames.Count, 1);
+            var yRatio = (portIndex + 1.0) / (outputCount + 1.0);
+            return new Point(node.X + node.Width, node.Y + HeaderHeight + contentH * yRatio);
         }
 
         private void TryCompleteConnection(PointerEventArgs e)
@@ -423,7 +435,7 @@ namespace ModbusForge.Avalonia.Views
             if (target != null && !ReferenceEquals(_connectionSourceNode, target)
                 && connector is "Input1" or "Input2")
             {
-                ViewModel.TryConnectNodes(_connectionSourceNode, target, connector);
+                ViewModel.TryConnectNodes(_connectionSourceNode, target, connector, _connectionSourceConnector);
             }
         }
 

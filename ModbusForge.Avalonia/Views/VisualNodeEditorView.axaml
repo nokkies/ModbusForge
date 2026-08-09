@@ -308,7 +308,7 @@
                     </Grid>
 
                     <Canvas Canvas.Left="0" Canvas.Top="0" Width="{Binding Width}" Height="{Binding Height}" IsVisible="{Binding $parent[UserControl].((vm:VisualNodeEditorViewModel)DataContext).ShowConnectors, FallbackValue=True}">
-                      <Ellipse Classes="Input1Port" Width="10" Height="10" Fill="#2196F3" Stroke="#1565C0" StrokeThickness="1.5" Cursor="Hand" ToolTip.Tip="Input 1" PointerPressed="Port_PointerPressed">
+                      <Ellipse Classes="Input1Port" Tag="Input1" Width="10" Height="10" Fill="#2196F3" Stroke="#1565C0" StrokeThickness="1.5" Cursor="Hand" ToolTip.Tip="Input 1" PointerPressed="Port_PointerPressed">
                         <Canvas.Left>
                           <MultiBinding Converter="{x:Static converters:NodePortPositionConverter.Instance}" ConverterParameter="Input1X">
                             <Binding Path="Width"/>
@@ -323,7 +323,7 @@
                         </Canvas.Top>
                       </Ellipse>
 
-                      <Ellipse Classes="Input2Port" Width="10" Height="10" Fill="#2196F3" Stroke="#1565C0" StrokeThickness="1.5" Cursor="Hand" ToolTip.Tip="Input 2" IsVisible="{Binding HasSecondInput}" PointerPressed="Port_PointerPressed">
+                      <Ellipse Classes="Input2Port" Tag="Input2" Width="10" Height="10" Fill="#2196F3" Stroke="#1565C0" StrokeThickness="1.5" Cursor="Hand" ToolTip.Tip="Input 2" IsVisible="{Binding HasSecondInput}" PointerPressed="Port_PointerPressed">
                         <Canvas.Left>
                           <MultiBinding Converter="{x:Static converters:NodePortPositionConverter.Instance}" ConverterParameter="Input2X">
                             <Binding Path="Width"/>
@@ -338,7 +338,7 @@
                         </Canvas.Top>
                       </Ellipse>
 
-                      <Ellipse Classes="OutputPort" Width="10" Height="10" Fill="#FF9800" Stroke="#E65100" StrokeThickness="1.5" Cursor="Hand" ToolTip.Tip="Output" IsVisible="{Binding HasOutput}" PointerPressed="Port_PointerPressed">
+                      <Ellipse Classes="OutputPort" Tag="Output" Width="10" Height="10" Fill="#FF9800" Stroke="#E65100" StrokeThickness="1.5" Cursor="Hand" ToolTip.Tip="Output" IsVisible="{Binding HasOutput}" PointerPressed="Port_PointerPressed">
                         <Canvas.Left>
                           <MultiBinding Converter="{x:Static converters:NodePortPositionConverter.Instance}" ConverterParameter="OutputX">
                             <Binding Path="Width"/>

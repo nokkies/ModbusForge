@@ -15,6 +15,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using ModbusForge.Core.Simulation.Core;
 using ModbusForge.Models;
 using ModbusForge.Services;
 using ModbusForge.Services.EditorCommands;
@@ -896,10 +897,9 @@ namespace ModbusForge.Avalonia.ViewModels
                     continue;
                 }
 
-                var sourcePoint = new Point(source.X + source.Width, source.Y + source.Height / 2.0);
-                var targetY = connection.TargetConnector == "Input2"
-                    ? target.Y + target.Height * 0.68
-                    : target.Y + target.Height * 0.32;
+                var sourceY = GetPortY(source, connection.SourceConnector, false);
+                var sourcePoint = new Point(source.X + source.Width, sourceY);
+                var targetY = GetPortY(target, connection.TargetConnector, true);
                 var targetPoint = new Point(target.X, targetY);
 
                 var obstacles = Config.Nodes.Where(n => n != source && n != target);
@@ -924,6 +924,26 @@ namespace ModbusForge.Avalonia.ViewModels
             }
 
             ConnectionLines = lines;
+        }
+
+        private static double GetPortY(VisualNode node, string? connector, bool isInput)
+        {
+            const double headerHeight = 24;
+            var contentH = node.Height - headerHeight;
+
+            if (isInput)
+            {
+                var ratio = connector == "Input2" ? 0.667 : 0.333;
+                return node.Y + headerHeight + contentH * ratio;
+            }
+
+            var outputPortNames = node.OutputPortNames;
+            var portName = string.IsNullOrWhiteSpace(connector) ? "Output" : connector;
+            var portIndex = outputPortNames.IndexOf(portName);
+            if (portIndex < 0) portIndex = 0;
+            var outputCount = Math.Max(outputPortNames.Count, 1);
+            var yRatio = (portIndex + 1.0) / (outputCount + 1.0);
+            return node.Y + headerHeight + contentH * yRatio;
         }
 
         private void RefreshGridLines()
@@ -1227,6 +1247,37 @@ namespace ModbusForge.Avalonia.ViewModels
                     node.Input2Address = new PlcAddressReference { Area = IntIoArea, Address = -1 };
                     break;
             }
+
+            UpdateOutputPortNames(node);
+        }
+
+        private void UpdateOutputPortNames(VisualNode node)
+        {
+            var descriptor = _visualSimulation?.Catalog.GetDescriptor(node.ElementType.ToString());
+            if (descriptor == null)
+            {
+                node.OutputPortNames = new ObservableCollection<string>(new[] { "Output" });
+                return;
+            }
+
+            var names = descriptor.Ports
+                .Where(p => p.Direction == PortDirection.Output)
+                .Select(p => p.Name)
+                .ToList();
+
+            node.OutputPortNames = new ObservableCollection<string>(names);
+
+            foreach (var stale in node.OutputPortBindings.Keys.Where(k => !names.Contains(k, StringComparer.Ordinal)).ToList())
+                node.OutputPortBindings.Remove(stale);
+
+            node.OutputPortBindings.Remove("Output");
+
+            foreach (var name in names)
+            {
+                if (name == "Output") continue;
+                if (!node.OutputPortBindings.ContainsKey(name))
+                    node.OutputPortBindings[name] = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+            }
         }
 
         private int GetNextAvailableAddress(PlcArea area)
@@ -1357,7 +1408,7 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
-        public bool TryConnectNodes(VisualNode source, VisualNode target, string? targetConnector = null)
+        public bool TryConnectNodes(VisualNode source, VisualNode target, string? targetConnector = null, string? sourceConnector = null)
         {
             if (!Config.Nodes.Contains(source) || !Config.Nodes.Contains(target)) return false;
             if (ReferenceEquals(source, target))
@@ -1380,8 +1431,17 @@ namespace ModbusForge.Avalonia.ViewModels
                 return false;
             }
 
+            var sourcePort = string.IsNullOrWhiteSpace(sourceConnector) ? "Output" : sourceConnector;
+            if (!source.OutputPortNames.Contains(sourcePort))
+            {
+                StatusText = $"{source.Name} has no {sourcePort} output port.";
+                return false;
+            }
+
             if (Config.Connections.Any(connection =>
-                    connection.TargetNodeId == target.Id
+                    connection.SourceNodeId == source.Id
+                    && connection.SourceConnector == sourcePort
+                    && connection.TargetNodeId == target.Id
                     && connection.TargetConnector == connector))
             {
                 StatusText = $"{target.Name} {connector} is already connected.";
@@ -1390,7 +1450,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
             var connection = new NodeConnection(source.Id, target.Id, connector)
             {
-                SourceConnector = "Output",
+                SourceConnector = sourcePort,
                 IsConnected = true
             };
             var command = new EditorCommand(
@@ -1940,7 +2000,11 @@ namespace ModbusForge.Avalonia.ViewModels
                 CompareValue = source.CompareValue,
                 Input1Address = source.Input1Address?.Clone() ?? new PlcAddressReference(),
                 Input2Address = source.Input2Address?.Clone() ?? new PlcAddressReference(),
-                OutputAddress = source.OutputAddress?.Clone() ?? new PlcAddressReference()
+                OutputAddress = source.OutputAddress?.Clone() ?? new PlcAddressReference(),
+                OutputPortBindings = new Dictionary<string, PlcAddressReference>(
+                    source.OutputPortBindings.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Clone()),
+                    StringComparer.Ordinal),
+                OutputPortNames = new ObservableCollection<string>(source.OutputPortNames)
             };
         }
 
