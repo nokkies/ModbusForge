@@ -1246,6 +1246,14 @@ namespace ModbusForge.Avalonia.ViewModels
                 case PlcElementType.COMPARE_LE:
                     node.Input2Address = new PlcAddressReference { Area = IntIoArea, Address = -1 };
                     break;
+                case PlcElementType.Valve:
+                    node.Input1Address = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
+                    node.Input2Address = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
+                    node.OutputAddress = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
+                    node.OutputPortBindings["Fault"] = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
+                    node.ValveTravelTimeMs = 5000;
+                    node.ValveNormallyOpen = false;
+                    break;
             }
 
             UpdateOutputPortNames(node);

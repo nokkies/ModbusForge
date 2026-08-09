@@ -39,7 +39,9 @@ namespace ModbusForge.Models
         MATH_SUB,     // Subtraction
         MATH_MUL,     // Multiplication
         MATH_DIV,      // Division
-        SignalGenerator // Signal Generator
+        SignalGenerator, // Signal Generator
+        // Industrial devices
+        Valve       // Motorised valve with open/close commands and travel time
     }
 
     /// <summary>

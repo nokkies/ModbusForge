@@ -132,6 +132,13 @@ namespace ModbusForge.Models
         
         [ObservableProperty]
         private int _compareValue = 0;
+
+        // Industrial device parameters
+        [ObservableProperty]
+        private int _valveTravelTimeMs = 5000;
+
+        [ObservableProperty]
+        private bool _valveNormallyOpen = false;
         
         // Runtime state (not persisted)
         public int TimerAccumulatorMs { get; set; } = 0;
@@ -235,6 +242,18 @@ namespace ModbusForge.Models
         }
 
         partial void OnCounterPresetChanged(int value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnValveTravelTimeMsChanged(int value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnValveNormallyOpenChanged(bool value)
         {
             OnPropertyChanged(nameof(DisplayName));
             OnPropertyChanged(nameof(ParameterDisplay));

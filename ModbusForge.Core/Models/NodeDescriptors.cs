@@ -127,6 +127,12 @@ namespace ModbusForge.Models
                 hasSecondInput: true, hasParameters: true,
                 parameterDisplayFormatter: n => $"Const: {n.CompareValue}");
 
+            // Industrial devices
+            Add(PlcElementType.Valve, "Valve", "Valve", "Valve", "Valves & Motors", RgbColor.FromRgb(69, 90, 100), "VLV",
+                hasSecondInput: true, hasParameters: true,
+                displayNameFormatter: n => $"Valve ({n.ValveTravelTimeMs}ms)",
+                parameterDisplayFormatter: n => $"Travel: {n.ValveTravelTimeMs}ms, NO: {n.ValveNormallyOpen}");
+
             // Sources
             Add(PlcElementType.SignalGenerator, "SignalGenerator", "SignalGen", "Signal Generator", "Sources", RgbColor.FromRgb(141, 110, 189), "SIG",
                 hasSecondInput: true,

@@ -355,6 +355,14 @@ namespace ModbusForge.ViewModels
                         newNode.Width = 190;
                         newNode.Height = 100;
                         break;
+                    case PlcElementType.Valve:
+                        newNode.Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        newNode.Input2Address = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        newNode.OutputPortBindings["Fault"] = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        newNode.ValveTravelTimeMs = 5000;
+                        newNode.ValveNormallyOpen = false;
+                        break;
                     case PlcElementType.CTU:
                     case PlcElementType.CTD:
                     case PlcElementType.CTC:

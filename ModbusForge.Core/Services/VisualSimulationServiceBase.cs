@@ -107,6 +107,9 @@ namespace ModbusForge.Services
             // Sources
             catalog.Register(new SignalGeneratorBlock());
 
+            // Industrial devices
+            catalog.Register(new ValveBlock());
+
             return catalog;
         }
 
@@ -245,7 +248,7 @@ namespace ModbusForge.Services
             var node = _config.Nodes.FirstOrDefault(n => n.Id == nodeId);
             if (node == null) return;
 
-            var address = IsInputSource(node.ElementType)
+            var address = IsInput1Bound(node.ElementType)
                 ? node.Input1Address
                 : node.OutputAddress;
 
@@ -360,6 +363,9 @@ namespace ModbusForge.Services
                 hash.Add(node.PeriodMs);
                 hash.Add(node.Amplitude.GetHashCode());
                 hash.Add(node.Offset.GetHashCode());
+
+                hash.Add(node.ValveTravelTimeMs);
+                hash.Add(node.ValveNormallyOpen);
             }
 
             if (config.Connections != null)
@@ -394,10 +400,10 @@ namespace ModbusForge.Services
             var block = _catalog.Create(visualNode.ElementType.ToString());
             var node = new SimulationNode(visualNode.Id, visualNode.Name, block);
 
-            if (IsInputSource(visualNode.ElementType) && visualNode.Input1Address?.Address >= 0)
+            if (IsInput1Bound(visualNode.ElementType) && visualNode.Input1Address?.Address >= 0)
                 node.InputBindings["Input1"] = visualNode.Input1Address;
 
-            if (IsCompareOrMath(visualNode.ElementType))
+            if (IsInput2Bound(visualNode.ElementType))
             {
                 if (visualNode.Input1Address?.Address >= 0)
                     node.InputBindings["Input1"] = visualNode.Input1Address;
@@ -407,7 +413,7 @@ namespace ModbusForge.Services
                     node.InputBindings["Input2"] = visualNode.Input2Address;
             }
 
-            if (IsOutputSink(visualNode.ElementType) && visualNode.OutputAddress?.Address >= 0)
+            if (IsOutputBound(visualNode.ElementType) && visualNode.OutputAddress?.Address >= 0)
                 node.OutputBindings["Output"] = visualNode.OutputAddress;
 
             // Secondary output ports (e.g. Fault, SpeedFeedback) for multi-output blocks.
@@ -437,22 +443,24 @@ namespace ModbusForge.Services
 
             node.Parameters["Offset"] = visualNode.Offset;
 
+            if (visualNode.ValveTravelTimeMs != 0)
+                node.Parameters["ValveTravelTimeMs"] = visualNode.ValveTravelTimeMs;
+
+            node.Parameters["ValveNormallyOpen"] = visualNode.ValveNormallyOpen;
+
             return node;
         }
 
-        protected static bool IsInputSource(PlcElementType elementType)
+        protected static bool IsInput1Bound(PlcElementType elementType)
         {
-            return elementType is PlcElementType.Input or PlcElementType.InputBool or PlcElementType.InputInt;
+            return elementType is PlcElementType.Input or PlcElementType.InputBool or PlcElementType.InputInt
+                or PlcElementType.Valve;
         }
 
-        protected static bool IsOutputSink(PlcElementType elementType)
+        protected static bool IsInput2Bound(PlcElementType elementType)
         {
-            return elementType is PlcElementType.Output or PlcElementType.OutputBool or PlcElementType.OutputInt;
-        }
-
-        protected static bool IsCompareOrMath(PlcElementType elementType)
-        {
-            return elementType is PlcElementType.COMPARE_EQ
+            return elementType is PlcElementType.Valve
+                or PlcElementType.COMPARE_EQ
                 or PlcElementType.COMPARE_NE
                 or PlcElementType.COMPARE_GT
                 or PlcElementType.COMPARE_LT
@@ -462,6 +470,11 @@ namespace ModbusForge.Services
                 or PlcElementType.MATH_SUB
                 or PlcElementType.MATH_MUL
                 or PlcElementType.MATH_DIV;
+        }
+
+        protected static bool IsOutputBound(PlcElementType elementType)
+        {
+            return elementType is PlcElementType.Output or PlcElementType.OutputBool or PlcElementType.OutputInt or PlcElementType.Valve;
         }
 
         private static SimulationConnection MapToSimulationConnection(NodeConnection connection)

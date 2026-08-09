@@ -1300,6 +1300,39 @@ namespace ModbusForge.Views
                     footerPanel.Children.Add(setDomCheck);
                     break;
 
+                case PlcElementType.Valve:
+                    footerPanel.Children.Add(new TextBlock { Text = "Travel (ms):", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 2, 0) });
+                    var travelBox = new TextBox { Width = 45, Height = 18, FontSize = 10, Text = node.ValveTravelTimeMs.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                    int oldTravelTime = node.ValveTravelTimeMs;
+                    travelBox.GotFocus += (s, ev) => oldTravelTime = node.ValveTravelTimeMs;
+                    travelBox.LostFocus += (s, ev) => {
+                        if (int.TryParse(travelBox.Text, out int v) && v >= 0)
+                        {
+                            if (v != oldTravelTime)
+                            {
+                                var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.ValveTravelTimeMs), oldTravelTime, v);
+                                command.Execute();
+                                _viewModel?.UndoRedo.Push(command);
+                            }
+                        }
+                    };
+                    footerPanel.Children.Add(travelBox);
+
+                    footerPanel.Children.Add(new TextBlock { Text = " NO:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 2, 0) });
+                    var noCheck = new System.Windows.Controls.CheckBox { IsChecked = node.ValveNormallyOpen, VerticalAlignment = VerticalAlignment.Center };
+                    noCheck.Checked += (s, ev) => {
+                        var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.ValveNormallyOpen), false, true);
+                        command.Execute();
+                        _viewModel?.UndoRedo.Push(command);
+                    };
+                    noCheck.Unchecked += (s, ev) => {
+                        var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.ValveNormallyOpen), true, false);
+                        command.Execute();
+                        _viewModel?.UndoRedo.Push(command);
+                    };
+                    footerPanel.Children.Add(noCheck);
+                    break;
+
                 case PlcElementType.SignalGenerator:
                     footerPanel.Children.Add(new TextBlock { Text = "H:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
                     var sigHeightBox = new TextBox { Width = 35, Height = 18, FontSize = 10, Text = node.CompareValue.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };

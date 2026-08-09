@@ -84,19 +84,79 @@ namespace ModbusForge.Tests.Simulation
             Assert.True(context.GetOutput("Output")!.AsBool());
         }
 
+        [Fact]
+        public void ValveBlock_OpenCmd_ReachesOpen_AfterTravelTime()
+        {
+            var block = new ValveBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["ValveTravelTimeMs"] = 500;
+
+            // Start transition with OpenCmd.
+            context.SetInput("OpenCmd", SimulationValue.Bool(true));
+            context.SetInput("CloseCmd", SimulationValue.Bool(false));
+
+            // First scan starts the transition.
+            block.Execute(context);
+            Assert.False(context.GetOutput("Output")!.AsBool());
+
+            // Elapse half the travel time — still not open.
+            context.OverrideElapsed(TimeSpan.FromMilliseconds(250));
+            block.Execute(context);
+            Assert.False(context.GetOutput("Output")!.AsBool());
+
+            // Elapse full travel time — now open.
+            context.OverrideElapsed(TimeSpan.FromMilliseconds(500));
+            block.Execute(context);
+            Assert.True(context.GetOutput("Output")!.AsBool());
+        }
+
+        [Fact]
+        public void ValveBlock_BothCommandsActive_RaisesFault()
+        {
+            var block = new ValveBlock();
+            var context = new TestExecutionContext();
+            context.SetInput("OpenCmd", SimulationValue.Bool(true));
+            context.SetInput("CloseCmd", SimulationValue.Bool(true));
+
+            block.Execute(context);
+
+            Assert.False(context.GetOutput("Output")!.AsBool());
+            Assert.True(context.GetOutput("Fault")!.AsBool());
+        }
+
+        [Fact]
+        public void ValveBlock_NormallyOpen_RestPositionIsOpen()
+        {
+            var block = new ValveBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["ValveTravelTimeMs"] = 0;
+            context.Parameters["ValveNormallyOpen"] = true;
+
+            // No commands active.
+            context.SetInput("OpenCmd", SimulationValue.Bool(false));
+            context.SetInput("CloseCmd", SimulationValue.Bool(false));
+
+            block.Execute(context);
+
+            Assert.True(context.GetOutput("Output")!.AsBool());
+            Assert.False(context.GetOutput("Fault")!.AsBool());
+        }
+
         private sealed class TestExecutionContext : IExecutionContext
         {
             private readonly Dictionary<string, ISimulationValue> _inputs = new();
             private readonly Dictionary<string, ISimulationValue> _outputs = new();
 
             public DateTimeOffset CurrentTime => DateTimeOffset.UtcNow;
-            public TimeSpan Elapsed => TimeSpan.FromMilliseconds(100);
+            public TimeSpan Elapsed { get; private set; } = TimeSpan.FromMilliseconds(100);
             public int CycleCount => 0;
             public bool IsFirstScan => true;
             public Modbus.Data.DataStore? DataStore => null;
             public Microsoft.Extensions.Logging.ILogger Logger => Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
             public IStateBag State { get; } = new StateBag();
             public Dictionary<string, object?> Parameters { get; } = new();
+
+            public void OverrideElapsed(TimeSpan elapsed) => Elapsed = elapsed;
 
             public void SetInput(string name, ISimulationValue value) => _inputs[name] = value;
             public ISimulationValue? GetOutput(string name) => _outputs.TryGetValue(name, out var value) ? value : null;

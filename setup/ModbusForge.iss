@@ -2,7 +2,7 @@
 ; See https://jrsoftware.org/isinfo.php for documentation
 
 #ifndef AppVersion
-  #define AppVersion "2026.8.12"
+  #define AppVersion "2026.8.13"
 #endif
 
 [Setup]
