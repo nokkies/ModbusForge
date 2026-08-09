@@ -363,6 +363,13 @@ namespace ModbusForge.ViewModels
                         newNode.ValveTravelTimeMs = 5000;
                         newNode.ValveNormallyOpen = false;
                         break;
+                    case PlcElementType.MotorDol:
+                        newNode.Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        newNode.Input2Address = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        newNode.OutputPortBindings["Fault"] = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        newNode.MotorDolRunDelayMs = 100;
+                        break;
                     case PlcElementType.CTU:
                     case PlcElementType.CTD:
                     case PlcElementType.CTC:

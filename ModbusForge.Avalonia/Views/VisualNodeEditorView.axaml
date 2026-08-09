@@ -271,7 +271,7 @@
                       <TextBox Grid.Row="4" Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={x:Static converters:DoubleToStringConverter.Instance}}" IsVisible="{Binding ShowLiveValues}" HorizontalContentAlignment="Center" VerticalAlignment="Center" Height="22" FontSize="10" Padding="2,0" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" KeyDown="LiveValue_KeyDown" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
 
                       <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Spacing="3" Margin="0,0,0,4"
-                                  IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP,CTU,CTD,CTC,COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE,MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV,RS,Valve'}">
+                                  IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP,CTU,CTD,CTC,COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE,MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV,RS,Valve,MotorDol'}">
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP'}">
                           <TextBlock Text="ms:" FontSize="9" VerticalAlignment="Center"/>
                           <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
@@ -310,6 +310,11 @@
                           <TextBlock Text="ms" FontSize="9" VerticalAlignment="Center" Margin="1,0,4,0"/>
                           <TextBlock Text="NO" FontSize="9" VerticalAlignment="Center"/>
                           <TextBlock Text="{Binding ValveNormallyOpen}" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='MotorDol'}">
+                          <TextBlock Text="Run delay:" FontSize="9" VerticalAlignment="Center"/>
+                          <TextBlock Text="{Binding MotorDolRunDelayMs}" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                          <TextBlock Text="ms" FontSize="9" VerticalAlignment="Center" Margin="1,0,0,0"/>
                         </StackPanel>
                       </StackPanel>
                     </Grid>
@@ -513,6 +518,10 @@
                   <NumericUpDown Value="{Binding ValveTravelTimeMs}" Minimum="0" Maximum="100000" Width="100"/>
                   <TextBlock Text="NO:" VerticalAlignment="Center" Margin="8,0,0,0"/>
                   <CheckBox IsChecked="{Binding ValveNormallyOpen}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='MotorDol'}">
+                  <TextBlock Text="Run delay ms:" VerticalAlignment="Center" Width="80"/>
+                  <NumericUpDown Value="{Binding MotorDolRunDelayMs}" Minimum="0" Maximum="100000" Width="100"/>
                 </StackPanel>
               </StackPanel>
             </ScrollViewer>

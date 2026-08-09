@@ -125,6 +125,53 @@ namespace ModbusForge.Tests.Simulation
         }
 
         [Fact]
+        public void MotorDolBlock_StartPulse_PicksUpAfterRunDelay()
+        {
+            var block = new MotorDolBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["MotorDolRunDelayMs"] = 100;
+
+            context.SetInput("Start", SimulationValue.Bool(true));
+            context.SetInput("Stop", SimulationValue.Bool(false));
+
+            // First scan starts the pickup delay.
+            context.OverrideElapsed(TimeSpan.FromMilliseconds(10));
+            block.Execute(context);
+            Assert.False(context.GetOutput("Output")!.AsBool());
+
+            // Still before run delay.
+            context.OverrideElapsed(TimeSpan.FromMilliseconds(50));
+            block.Execute(context);
+            Assert.False(context.GetOutput("Output")!.AsBool());
+
+            // Run delay elapsed.
+            context.OverrideElapsed(TimeSpan.FromMilliseconds(50));
+            block.Execute(context);
+            Assert.True(context.GetOutput("Output")!.AsBool());
+        }
+
+        [Fact]
+        public void MotorDolBlock_StopActive_DropsRunningAndSetsFault()
+        {
+            var block = new MotorDolBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["MotorDolRunDelayMs"] = 0;
+
+            context.SetInput("Start", SimulationValue.Bool(true));
+            context.SetInput("Stop", SimulationValue.Bool(false));
+
+            block.Execute(context);
+            Assert.True(context.GetOutput("Output")!.AsBool());
+            Assert.False(context.GetOutput("Fault")!.AsBool());
+
+            context.SetInput("Stop", SimulationValue.Bool(true));
+
+            block.Execute(context);
+            Assert.False(context.GetOutput("Output")!.AsBool());
+            Assert.True(context.GetOutput("Fault")!.AsBool());
+        }
+
+        [Fact]
         public void ValveBlock_NormallyOpen_RestPositionIsOpen()
         {
             var block = new ValveBlock();

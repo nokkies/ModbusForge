@@ -109,6 +109,7 @@ namespace ModbusForge.Services
 
             // Industrial devices
             catalog.Register(new ValveBlock());
+            catalog.Register(new MotorDolBlock());
 
             return catalog;
         }
@@ -366,6 +367,7 @@ namespace ModbusForge.Services
 
                 hash.Add(node.ValveTravelTimeMs);
                 hash.Add(node.ValveNormallyOpen);
+                hash.Add(node.MotorDolRunDelayMs);
             }
 
             if (config.Connections != null)
@@ -448,18 +450,21 @@ namespace ModbusForge.Services
 
             node.Parameters["ValveNormallyOpen"] = visualNode.ValveNormallyOpen;
 
+            if (visualNode.MotorDolRunDelayMs != 0)
+                node.Parameters["MotorDolRunDelayMs"] = visualNode.MotorDolRunDelayMs;
+
             return node;
         }
 
         protected static bool IsInput1Bound(PlcElementType elementType)
         {
             return elementType is PlcElementType.Input or PlcElementType.InputBool or PlcElementType.InputInt
-                or PlcElementType.Valve;
+                or PlcElementType.Valve or PlcElementType.MotorDol;
         }
 
         protected static bool IsInput2Bound(PlcElementType elementType)
         {
-            return elementType is PlcElementType.Valve
+            return elementType is PlcElementType.Valve or PlcElementType.MotorDol
                 or PlcElementType.COMPARE_EQ
                 or PlcElementType.COMPARE_NE
                 or PlcElementType.COMPARE_GT
@@ -474,7 +479,8 @@ namespace ModbusForge.Services
 
         protected static bool IsOutputBound(PlcElementType elementType)
         {
-            return elementType is PlcElementType.Output or PlcElementType.OutputBool or PlcElementType.OutputInt or PlcElementType.Valve;
+            return elementType is PlcElementType.Output or PlcElementType.OutputBool or PlcElementType.OutputInt
+                or PlcElementType.Valve or PlcElementType.MotorDol;
         }
 
         private static SimulationConnection MapToSimulationConnection(NodeConnection connection)

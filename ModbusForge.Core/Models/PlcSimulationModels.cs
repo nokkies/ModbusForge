@@ -41,7 +41,8 @@ namespace ModbusForge.Models
         MATH_DIV,      // Division
         SignalGenerator, // Signal Generator
         // Industrial devices
-        Valve       // Motorised valve with open/close commands and travel time
+        Valve,       // Motorised valve with open/close commands and travel time
+        MotorDol     // Direct-on-line motor with start/stop and pickup delay
     }
 
     /// <summary>

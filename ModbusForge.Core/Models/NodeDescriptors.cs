@@ -133,6 +133,11 @@ namespace ModbusForge.Models
                 displayNameFormatter: n => $"Valve ({n.ValveTravelTimeMs}ms)",
                 parameterDisplayFormatter: n => $"Travel: {n.ValveTravelTimeMs}ms, NO: {n.ValveNormallyOpen}");
 
+            Add(PlcElementType.MotorDol, "MotorDol", "DOL Motor", "DOL Motor", "Valves & Motors", RgbColor.FromRgb(55, 71, 79), "MTR",
+                hasSecondInput: true, hasParameters: true,
+                displayNameFormatter: n => $"DOL Motor ({n.MotorDolRunDelayMs}ms)",
+                parameterDisplayFormatter: n => $"Run delay: {n.MotorDolRunDelayMs}ms");
+
             // Sources
             Add(PlcElementType.SignalGenerator, "SignalGenerator", "SignalGen", "Signal Generator", "Sources", RgbColor.FromRgb(141, 110, 189), "SIG",
                 hasSecondInput: true,

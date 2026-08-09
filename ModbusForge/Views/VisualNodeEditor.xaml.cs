@@ -1333,6 +1333,25 @@ namespace ModbusForge.Views
                     footerPanel.Children.Add(noCheck);
                     break;
 
+                case PlcElementType.MotorDol:
+                    footerPanel.Children.Add(new TextBlock { Text = "Run delay (ms):", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 2, 0) });
+                    var runDelayBox = new TextBox { Width = 45, Height = 18, FontSize = 10, Text = node.MotorDolRunDelayMs.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                    int oldRunDelay = node.MotorDolRunDelayMs;
+                    runDelayBox.GotFocus += (s, ev) => oldRunDelay = node.MotorDolRunDelayMs;
+                    runDelayBox.LostFocus += (s, ev) => {
+                        if (int.TryParse(runDelayBox.Text, out int v) && v >= 0)
+                        {
+                            if (v != oldRunDelay)
+                            {
+                                var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.MotorDolRunDelayMs), oldRunDelay, v);
+                                command.Execute();
+                                _viewModel?.UndoRedo.Push(command);
+                            }
+                        }
+                    };
+                    footerPanel.Children.Add(runDelayBox);
+                    break;
+
                 case PlcElementType.SignalGenerator:
                     footerPanel.Children.Add(new TextBlock { Text = "H:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
                     var sigHeightBox = new TextBox { Width = 35, Height = 18, FontSize = 10, Text = node.CompareValue.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };

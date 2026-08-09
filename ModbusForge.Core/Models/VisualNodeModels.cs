@@ -139,6 +139,9 @@ namespace ModbusForge.Models
 
         [ObservableProperty]
         private bool _valveNormallyOpen = false;
+
+        [ObservableProperty]
+        private int _motorDolRunDelayMs = 100;
         
         // Runtime state (not persisted)
         public int TimerAccumulatorMs { get; set; } = 0;
@@ -254,6 +257,12 @@ namespace ModbusForge.Models
         }
 
         partial void OnValveNormallyOpenChanged(bool value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnMotorDolRunDelayMsChanged(int value)
         {
             OnPropertyChanged(nameof(DisplayName));
             OnPropertyChanged(nameof(ParameterDisplay));
