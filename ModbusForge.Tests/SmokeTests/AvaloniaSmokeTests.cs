@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Conditions;
 using ModbusForge.Tests.Helpers;
 using Xunit;
 using Xunit.Abstractions;
@@ -65,12 +66,11 @@ public class AvaloniaSmokeTests : IDisposable
         var mainWindow = _app.GetMainWindowOrThrow();
         mainWindow.Focus();
 
-        var simButton = _app.FindElementByName(mainWindow, "Simulation");
-        Assert.NotNull(simButton);
-        _output.WriteLine("Found Simulation navigation button.");
-
-        simButton!.AsButton().Click();
-        Thread.Sleep(500);
+        var cf = new ConditionFactory(new FlaUI.UIA3.UIA3PropertyLibrary());
+        var navList = mainWindow.FindFirstDescendant(cf.ByControlType(FlaUI.Core.Definitions.ControlType.List))?.AsListBox();
+        Assert.NotNull(navList);
+        navList!.Select("Simulation");
+        _output.WriteLine("Selected Simulation from navigation ListBox.");
 
         var palette = _app.WaitForElementByName(mainWindow, "Palette");
         var programs = _app.WaitForElementByName(mainWindow, "Programs (POUs)");
@@ -89,10 +89,11 @@ public class AvaloniaSmokeTests : IDisposable
         var mainWindow = _app.GetMainWindowOrThrow();
         mainWindow.Focus();
 
-        var simButton = _app.FindElementByName(mainWindow, "Simulation");
-        Assert.NotNull(simButton);
-        simButton!.AsButton().Click();
-        Thread.Sleep(500);
+        var cf = new ConditionFactory(new FlaUI.UIA3.UIA3PropertyLibrary());
+        var navList = mainWindow.FindFirstDescendant(cf.ByControlType(FlaUI.Core.Definitions.ControlType.List))?.AsListBox();
+        Assert.NotNull(navList);
+        navList!.Select("Simulation");
+        _output.WriteLine("Selected Simulation from navigation ListBox.");
 
         var tagBrowserButton = _app.WaitForElementByName(mainWindow, "Tag Browser");
         Assert.NotNull(tagBrowserButton);
@@ -116,5 +117,70 @@ public class AvaloniaSmokeTests : IDisposable
 
         _output.WriteLine("Tag Browser window opened successfully from Visual Node Editor toolbar.");
         _app.CloseWindow(tagBrowserWindow);
+    }
+
+    [Fact]
+    public void ModeToggle_ChangesConnectionButtonText()
+    {
+        var mainWindow = _app.GetMainWindowOrThrow();
+        mainWindow.Focus();
+
+        var cf = new ConditionFactory(new FlaUI.UIA3.UIA3PropertyLibrary());
+
+        // The mode selector is the first editable ComboBox (Mode) in the connection bar.
+        var modeComboBox = mainWindow.FindFirstDescendant(cf.ByControlType(FlaUI.Core.Definitions.ControlType.ComboBox))?.AsComboBox();
+        Assert.NotNull(modeComboBox);
+
+        // The connection button sits in the same toolbar.
+        var connectButton = mainWindow.FindFirstDescendant(cf.ByName("Connect"))?.AsButton();
+        Assert.NotNull(connectButton);
+
+        // Switch to Server mode.
+        modeComboBox.Select("Server");
+        Thread.Sleep(500);
+
+        var startServerButton = mainWindow.FindFirstDescendant(cf.ByName("Start Server"))?.AsButton();
+        Assert.NotNull(startServerButton);
+        _output.WriteLine("Mode toggle changed Connect button to Start Server.");
+    }
+
+    [Fact]
+    public void ServerMode_StartServer_StopsCleanly()
+    {
+        var mainWindow = _app.GetMainWindowOrThrow();
+        mainWindow.Focus();
+
+        var cf = new ConditionFactory(new FlaUI.UIA3.UIA3PropertyLibrary());
+
+        // Switch to Server mode.
+        var modeComboBox = mainWindow.FindFirstDescendant(cf.ByControlType(FlaUI.Core.Definitions.ControlType.ComboBox))?.AsComboBox();
+        Assert.NotNull(modeComboBox);
+        modeComboBox.Select("Server");
+        Thread.Sleep(500);
+
+        var startButton = mainWindow.FindFirstDescendant(cf.ByName("Start Server"))?.AsButton();
+        Assert.NotNull(startButton);
+
+        startButton.Click();
+
+        // Wait for the server to start (the button will change to "Disconnect").
+        var connectedWait = DateTime.UtcNow.AddSeconds(10);
+        var disconnectButton = (AutomationElement?)null;
+        while (DateTime.UtcNow < connectedWait && disconnectButton == null)
+        {
+            disconnectButton = mainWindow.FindFirstDescendant(cf.ByName("Disconnect"));
+            Thread.Sleep(250);
+        }
+
+        Assert.NotNull(disconnectButton);
+        _output.WriteLine("Server started; disconnect button is visible.");
+
+        // Stop the server.
+        disconnectButton.AsButton().Click();
+        Thread.Sleep(1000);
+
+        var startButtonAfterStop = mainWindow.FindFirstDescendant(cf.ByName("Start Server"))?.AsButton();
+        Assert.NotNull(startButtonAfterStop);
+        _output.WriteLine("Server stopped cleanly and returned to Start Server state.");
     }
 }
