@@ -108,8 +108,8 @@ namespace ModbusForge.Avalonia.Tests.Services
 
         private static DataStore? GetDataStore(AvaloniaVisualSimulationService service)
         {
-            var field = typeof(AvaloniaVisualSimulationService)
-                .GetField("_dataStore", BindingFlags.NonPublic | BindingFlags.Instance);
+            var baseType = typeof(AvaloniaVisualSimulationService).BaseType;
+            var field = baseType?.GetField("_dataStore", BindingFlags.NonPublic | BindingFlags.Instance);
 
             return field?.GetValue(service) as DataStore;
         }

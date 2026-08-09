@@ -1015,7 +1015,14 @@ namespace ModbusForge.ViewModels
             {
                 if (value)
                 {
-                    _visualSimulationService.Start(Nodes, Connections, () => ShowLiveValues);
+                    Config = new VisualNodeEditorConfig
+                    {
+                        Nodes = Nodes,
+                        Connections = Connections,
+                        ConnectorConfigs = ConnectorConfigs,
+                        ShowLiveValues = true
+                    };
+                    _visualSimulationService.Start(Config);
                 }
                 else
                 {

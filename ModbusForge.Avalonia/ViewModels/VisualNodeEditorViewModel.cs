@@ -165,7 +165,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private const double LayoutHorizontalGap = 80.0;
         private const double LayoutVerticalGap = 40.0;
 
-        private readonly IAvaloniaVisualSimulationService _visualSimulation;
+        private readonly IVisualSimulationService _visualSimulation;
         private readonly IFileDialogService? _fileDialogService;
         private readonly IMessageBoxService? _messageBoxService;
         private readonly ITagWindowService? _tagWindowService;
@@ -386,7 +386,7 @@ namespace ModbusForge.Avalonia.ViewModels
         }
 
         public VisualNodeEditorViewModel(
-            IAvaloniaVisualSimulationService visualSimulation,
+            IVisualSimulationService visualSimulation,
             ITagWindowService tagWindowService,
             IFileDialogService? fileDialogService = null,
             IMessageBoxService? messageBoxService = null,

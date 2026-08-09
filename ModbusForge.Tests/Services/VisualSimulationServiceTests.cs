@@ -23,6 +23,7 @@ namespace ModbusForge.Tests.Services
     {
         private readonly Mock<ILogger<VisualSimulationService>> _simLoggerMock;
         private readonly Mock<ILogger<ModbusServerService>> _srvLoggerMock;
+        private readonly Mock<IConnectionManager> _connectionManagerMock;
         private readonly ModbusServerService _serverService;
         private readonly VisualSimulationService _simService;
         private readonly VisualNodeEditorViewModel _viewModel;
@@ -32,8 +33,10 @@ namespace ModbusForge.Tests.Services
         {
             _simLoggerMock = new Mock<ILogger<VisualSimulationService>>();
             _srvLoggerMock = new Mock<ILogger<ModbusServerService>>();
+            _connectionManagerMock = new Mock<IConnectionManager>();
             _serverService = new ModbusServerService(_srvLoggerMock.Object);
-            _simService = new VisualSimulationService(_simLoggerMock.Object, _serverService);
+            _connectionManagerMock.Setup(m => m.ActiveService).Returns(_serverService);
+            _simService = new VisualSimulationService(_simLoggerMock.Object, _connectionManagerMock.Object);
             _viewModel = new VisualNodeEditorViewModel();
             _testPort = GetFreePort();
         }
@@ -70,7 +73,14 @@ namespace ModbusForge.Tests.Services
         private void SetupAndRun()
         {
             _viewModel.ShowLiveValues = true;
-            _simService.Start(_viewModel.Nodes, _viewModel.Connections, () => _viewModel.ShowLiveValues);
+            var config = new VisualNodeEditorConfig
+            {
+                Nodes = _viewModel.Nodes,
+                Connections = _viewModel.Connections,
+                ConnectorConfigs = _viewModel.ConnectorConfigs,
+                ShowLiveValues = _viewModel.ShowLiveValues
+            };
+            _simService.Start(config);
             // Call UpdateNodeValues directly (bypasses DispatcherTimer)
             _simService.UpdateNodeValues();
         }

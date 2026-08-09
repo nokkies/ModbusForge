@@ -100,7 +100,7 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<SignalGeneratorViewModel>();
 
             // Visual simulation
-            services.AddSingleton<IAvaloniaVisualSimulationService, AvaloniaVisualSimulationService>();
+            services.AddSingleton<IVisualSimulationService, AvaloniaVisualSimulationService>();
             services.AddSingleton<VisualNodeEditorViewModel>();
 
             // ViewModels

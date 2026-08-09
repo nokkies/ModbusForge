@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using ModbusForge.Simulation.Blocks;
-using ModbusForge.Simulation.Core;
-using ModbusForge.Simulation.Engine;
+using ModbusForge.Core.Simulation.Blocks;
+using ModbusForge.Core.Simulation.Core;
+using ModbusForge.Core.Simulation.Engine;
 using ModbusForge.Models;
 using Xunit;
 

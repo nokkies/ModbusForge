@@ -1,5 +1,5 @@
-using ModbusForge.Simulation.Blocks;
-using ModbusForge.Simulation.Core;
+using ModbusForge.Core.Simulation.Blocks;
+using ModbusForge.Core.Simulation.Core;
 using Xunit;
 
 namespace ModbusForge.Tests.Simulation
