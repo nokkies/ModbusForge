@@ -370,6 +370,17 @@ namespace ModbusForge.ViewModels
                         newNode.OutputPortBindings["Fault"] = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
                         newNode.MotorDolRunDelayMs = 100;
                         break;
+                    case PlcElementType.Vsd:
+                        newNode.Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        newNode.Input2Address = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = -1 };
+                        newNode.OutputAddress = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        newNode.OutputPortBindings["SpeedFeedback"] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = -1 };
+                        newNode.OutputPortBindings["AtSpeed"] = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
+                        newNode.VsdMaxSpeed = 100.0;
+                        newNode.VsdRampUpMs = 2000;
+                        newNode.VsdRampDownMs = 2000;
+                        newNode.VsdAtSpeedTolerance = 2.0;
+                        break;
                     case PlcElementType.CTU:
                     case PlcElementType.CTD:
                     case PlcElementType.CTC:

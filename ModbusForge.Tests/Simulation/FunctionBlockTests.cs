@@ -151,6 +151,84 @@ namespace ModbusForge.Tests.Simulation
         }
 
         [Fact]
+        public void VsdBlock_RunTrue_RampsUpToReference()
+        {
+            var block = new VsdBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["VsdMaxSpeed"] = 100.0;
+            context.Parameters["VsdRampUpMs"] = 1000;
+            context.Parameters["VsdRampDownMs"] = 1000;
+            context.Parameters["VsdAtSpeedTolerance"] = 2.0;
+
+            context.SetInput("Run", SimulationValue.Bool(true));
+            context.SetInput("SpeedReference", SimulationValue.Real(50.0));
+
+            // Initial scan starts ramp.
+            context.OverrideElapsed(TimeSpan.FromMilliseconds(10));
+            block.Execute(context);
+            Assert.True(context.GetOutput("Output")!.AsBool());
+            var speed = context.GetOutput("SpeedFeedback")!.AsReal();
+            Assert.Equal(1.0, speed, precision: 1);
+            Assert.False(context.GetOutput("AtSpeed")!.AsBool());
+
+            // A quarter of the ramp time should reach ~25 (half the 50 reference).
+            context.OverrideElapsed(TimeSpan.FromMilliseconds(250));
+            block.Execute(context);
+            var feedback = context.GetOutput("SpeedFeedback")!.AsReal();
+            Assert.True(feedback > 20 && feedback < 30);
+
+            // Full ramp time should reach the 50 target.
+            context.OverrideElapsed(TimeSpan.FromMilliseconds(1000));
+            block.Execute(context);
+            Assert.Equal(50.0, context.GetOutput("SpeedFeedback")!.AsReal(), precision: 1);
+            Assert.True(context.GetOutput("AtSpeed")!.AsBool());
+        }
+
+        [Fact]
+        public void VsdBlock_RunFalse_RampsDownToZero()
+        {
+            var block = new VsdBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["VsdMaxSpeed"] = 100.0;
+            context.Parameters["VsdRampUpMs"] = 0;
+            context.Parameters["VsdRampDownMs"] = 1000;
+            context.Parameters["VsdAtSpeedTolerance"] = 2.0;
+
+            context.SetInput("Run", SimulationValue.Bool(true));
+            context.SetInput("SpeedReference", SimulationValue.Real(100.0));
+
+            context.OverrideElapsed(TimeSpan.FromMilliseconds(0));
+            block.Execute(context);
+            Assert.Equal(100.0, context.GetOutput("SpeedFeedback")!.AsReal(), precision: 0);
+
+            context.SetInput("Run", SimulationValue.Bool(false));
+            context.OverrideElapsed(TimeSpan.FromMilliseconds(1000));
+            block.Execute(context);
+
+            Assert.False(context.GetOutput("Output")!.AsBool());
+            Assert.Equal(0.0, context.GetOutput("SpeedFeedback")!.AsReal(), precision: 1);
+        }
+
+        [Fact]
+        public void VsdBlock_ReachesReference_AtSpeedTrue()
+        {
+            var block = new VsdBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["VsdMaxSpeed"] = 100.0;
+            context.Parameters["VsdRampUpMs"] = 0;
+            context.Parameters["VsdRampDownMs"] = 0;
+            context.Parameters["VsdAtSpeedTolerance"] = 2.0;
+
+            context.SetInput("Run", SimulationValue.Bool(true));
+            context.SetInput("SpeedReference", SimulationValue.Real(50.0));
+
+            block.Execute(context);
+
+            Assert.Equal(50.0, context.GetOutput("SpeedFeedback")!.AsReal(), precision: 0);
+            Assert.True(context.GetOutput("AtSpeed")!.AsBool());
+        }
+
+        [Fact]
         public void MotorDolBlock_StopActive_DropsRunningAndSetsFault()
         {
             var block = new MotorDolBlock();

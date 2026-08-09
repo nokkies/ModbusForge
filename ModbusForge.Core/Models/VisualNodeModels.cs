@@ -142,6 +142,19 @@ namespace ModbusForge.Models
 
         [ObservableProperty]
         private int _motorDolRunDelayMs = 100;
+
+        // VSD parameters
+        [ObservableProperty]
+        private double _vsdMaxSpeed = 100.0;
+
+        [ObservableProperty]
+        private int _vsdRampUpMs = 2000;
+
+        [ObservableProperty]
+        private int _vsdRampDownMs = 2000;
+
+        [ObservableProperty]
+        private double _vsdAtSpeedTolerance = 2.0;
         
         // Runtime state (not persisted)
         public int TimerAccumulatorMs { get; set; } = 0;
@@ -263,6 +276,30 @@ namespace ModbusForge.Models
         }
 
         partial void OnMotorDolRunDelayMsChanged(int value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnVsdMaxSpeedChanged(double value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnVsdRampUpMsChanged(int value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnVsdRampDownMsChanged(int value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnVsdAtSpeedToleranceChanged(double value)
         {
             OnPropertyChanged(nameof(DisplayName));
             OnPropertyChanged(nameof(ParameterDisplay));

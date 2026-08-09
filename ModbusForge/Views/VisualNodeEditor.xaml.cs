@@ -1352,6 +1352,76 @@ namespace ModbusForge.Views
                     footerPanel.Children.Add(runDelayBox);
                     break;
 
+                case PlcElementType.Vsd:
+                    footerPanel.Children.Add(new TextBlock { Text = "Max:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 2, 0) });
+                    var maxBox = new TextBox { Width = 45, Height = 18, FontSize = 10, Text = node.VsdMaxSpeed.ToString("0.##"), HorizontalContentAlignment = HorizontalAlignment.Center };
+                    double oldMaxSpeed = node.VsdMaxSpeed;
+                    maxBox.GotFocus += (s, ev) => oldMaxSpeed = node.VsdMaxSpeed;
+                    maxBox.LostFocus += (s, ev) => {
+                        if (double.TryParse(maxBox.Text, out double v) && v >= 0)
+                        {
+                            if (Math.Abs(v - oldMaxSpeed) > 0.001)
+                            {
+                                var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.VsdMaxSpeed), oldMaxSpeed, v);
+                                command.Execute();
+                                _viewModel?.UndoRedo.Push(command);
+                            }
+                        }
+                    };
+                    footerPanel.Children.Add(maxBox);
+
+                    footerPanel.Children.Add(new TextBlock { Text = " RUp:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 2, 0) });
+                    var rupBox = new TextBox { Width = 40, Height = 18, FontSize = 10, Text = node.VsdRampUpMs.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                    int oldRampUp = node.VsdRampUpMs;
+                    rupBox.GotFocus += (s, ev) => oldRampUp = node.VsdRampUpMs;
+                    rupBox.LostFocus += (s, ev) => {
+                        if (int.TryParse(rupBox.Text, out int v) && v >= 0)
+                        {
+                            if (v != oldRampUp)
+                            {
+                                var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.VsdRampUpMs), oldRampUp, v);
+                                command.Execute();
+                                _viewModel?.UndoRedo.Push(command);
+                            }
+                        }
+                    };
+                    footerPanel.Children.Add(rupBox);
+
+                    footerPanel.Children.Add(new TextBlock { Text = " RDown:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 2, 0) });
+                    var rdownBox = new TextBox { Width = 40, Height = 18, FontSize = 10, Text = node.VsdRampDownMs.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };
+                    int oldRampDown = node.VsdRampDownMs;
+                    rdownBox.GotFocus += (s, ev) => oldRampDown = node.VsdRampDownMs;
+                    rdownBox.LostFocus += (s, ev) => {
+                        if (int.TryParse(rdownBox.Text, out int v) && v >= 0)
+                        {
+                            if (v != oldRampDown)
+                            {
+                                var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.VsdRampDownMs), oldRampDown, v);
+                                command.Execute();
+                                _viewModel?.UndoRedo.Push(command);
+                            }
+                        }
+                    };
+                    footerPanel.Children.Add(rdownBox);
+
+                    footerPanel.Children.Add(new TextBlock { Text = " Tol:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 2, 0) });
+                    var tolBox = new TextBox { Width = 35, Height = 18, FontSize = 10, Text = node.VsdAtSpeedTolerance.ToString("0.##"), HorizontalContentAlignment = HorizontalAlignment.Center };
+                    double oldTol = node.VsdAtSpeedTolerance;
+                    tolBox.GotFocus += (s, ev) => oldTol = node.VsdAtSpeedTolerance;
+                    tolBox.LostFocus += (s, ev) => {
+                        if (double.TryParse(tolBox.Text, out double v) && v >= 0)
+                        {
+                            if (Math.Abs(v - oldTol) > 0.001)
+                            {
+                                var command = new ModbusForge.Services.EditorCommands.EditParameterCommand(node, nameof(node.VsdAtSpeedTolerance), oldTol, v);
+                                command.Execute();
+                                _viewModel?.UndoRedo.Push(command);
+                            }
+                        }
+                    };
+                    footerPanel.Children.Add(tolBox);
+                    break;
+
                 case PlcElementType.SignalGenerator:
                     footerPanel.Children.Add(new TextBlock { Text = "H:", FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,2,0) });
                     var sigHeightBox = new TextBox { Width = 35, Height = 18, FontSize = 10, Text = node.CompareValue.ToString(), HorizontalContentAlignment = HorizontalAlignment.Center };

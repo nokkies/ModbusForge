@@ -1261,6 +1261,17 @@ namespace ModbusForge.Avalonia.ViewModels
                     node.OutputPortBindings["Fault"] = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
                     node.MotorDolRunDelayMs = 100;
                     break;
+                case PlcElementType.Vsd:
+                    node.Input1Address = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
+                    node.Input2Address = new PlcAddressReference { Area = IntIoArea, Address = -1 };
+                    node.OutputAddress = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
+                    node.OutputPortBindings["SpeedFeedback"] = new PlcAddressReference { Area = IntIoArea, Address = -1 };
+                    node.OutputPortBindings["AtSpeed"] = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
+                    node.VsdMaxSpeed = 100.0;
+                    node.VsdRampUpMs = 2000;
+                    node.VsdRampDownMs = 2000;
+                    node.VsdAtSpeedTolerance = 2.0;
+                    break;
             }
 
             UpdateOutputPortNames(node);

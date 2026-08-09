@@ -271,7 +271,7 @@
                       <TextBox Grid.Row="4" Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={x:Static converters:DoubleToStringConverter.Instance}}" IsVisible="{Binding ShowLiveValues}" HorizontalContentAlignment="Center" VerticalAlignment="Center" Height="22" FontSize="10" Padding="2,0" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" KeyDown="LiveValue_KeyDown" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
 
                       <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Spacing="3" Margin="0,0,0,4"
-                                  IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP,CTU,CTD,CTC,COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE,MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV,RS,Valve,MotorDol'}">
+                                  IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP,CTU,CTD,CTC,COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE,MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV,RS,Valve,MotorDol,Vsd'}">
                         <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP'}">
                           <TextBlock Text="ms:" FontSize="9" VerticalAlignment="Center"/>
                           <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
@@ -315,6 +315,18 @@
                           <TextBlock Text="Run delay:" FontSize="9" VerticalAlignment="Center"/>
                           <TextBlock Text="{Binding MotorDolRunDelayMs}" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
                           <TextBlock Text="ms" FontSize="9" VerticalAlignment="Center" Margin="1,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Vsd'}">
+                          <TextBlock Text="Max:" FontSize="9" VerticalAlignment="Center"/>
+                          <TextBlock Text="{Binding VsdMaxSpeed}" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                          <TextBlock Text="RUp:" FontSize="9" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                          <TextBlock Text="{Binding VsdRampUpMs}" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                          <TextBlock Text="ms" FontSize="9" VerticalAlignment="Center" Margin="1,0,4,0"/>
+                          <TextBlock Text="RDown:" FontSize="9" VerticalAlignment="Center"/>
+                          <TextBlock Text="{Binding VsdRampDownMs}" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                          <TextBlock Text="ms" FontSize="9" VerticalAlignment="Center" Margin="1,0,4,0"/>
+                          <TextBlock Text="Tol:" FontSize="9" VerticalAlignment="Center"/>
+                          <TextBlock Text="{Binding VsdAtSpeedTolerance}" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
                         </StackPanel>
                       </StackPanel>
                     </Grid>
@@ -522,6 +534,16 @@
                 <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='MotorDol'}">
                   <TextBlock Text="Run delay ms:" VerticalAlignment="Center" Width="80"/>
                   <NumericUpDown Value="{Binding MotorDolRunDelayMs}" Minimum="0" Maximum="100000" Width="100"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Vsd'}">
+                  <TextBlock Text="Max:" VerticalAlignment="Center" Width="80"/>
+                  <NumericUpDown Value="{Binding VsdMaxSpeed}" Minimum="0" Maximum="100000" Width="80"/>
+                  <TextBlock Text="RUp:" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                  <NumericUpDown Value="{Binding VsdRampUpMs}" Minimum="0" Maximum="100000" Width="80"/>
+                  <TextBlock Text="RDown:" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                  <NumericUpDown Value="{Binding VsdRampDownMs}" Minimum="0" Maximum="100000" Width="80"/>
+                  <TextBlock Text="Tol:" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                  <NumericUpDown Value="{Binding VsdAtSpeedTolerance}" Minimum="0" Maximum="100000" Width="80"/>
                 </StackPanel>
               </StackPanel>
             </ScrollViewer>

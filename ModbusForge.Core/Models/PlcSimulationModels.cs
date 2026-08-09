@@ -42,7 +42,8 @@ namespace ModbusForge.Models
         SignalGenerator, // Signal Generator
         // Industrial devices
         Valve,       // Motorised valve with open/close commands and travel time
-        MotorDol     // Direct-on-line motor with start/stop and pickup delay
+        MotorDol,    // Direct-on-line motor with start/stop and pickup delay
+        Vsd          // Variable speed drive with ramped speed feedback
     }
 
     /// <summary>

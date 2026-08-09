@@ -138,6 +138,11 @@ namespace ModbusForge.Models
                 displayNameFormatter: n => $"DOL Motor ({n.MotorDolRunDelayMs}ms)",
                 parameterDisplayFormatter: n => $"Run delay: {n.MotorDolRunDelayMs}ms");
 
+            Add(PlcElementType.Vsd, "Vsd", "VSD", "VSD", "Valves & Motors", RgbColor.FromRgb(121, 85, 72), "VSD",
+                hasSecondInput: true, hasParameters: true,
+                displayNameFormatter: n => $"VSD ({n.VsdMaxSpeed}max)",
+                parameterDisplayFormatter: n => $"Max: {n.VsdMaxSpeed}, RUp: {n.VsdRampUpMs}ms, RDown: {n.VsdRampDownMs}ms, Tol: {n.VsdAtSpeedTolerance}");
+
             // Sources
             Add(PlcElementType.SignalGenerator, "SignalGenerator", "SignalGen", "Signal Generator", "Sources", RgbColor.FromRgb(141, 110, 189), "SIG",
                 hasSecondInput: true,

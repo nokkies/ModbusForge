@@ -110,6 +110,7 @@ namespace ModbusForge.Services
             // Industrial devices
             catalog.Register(new ValveBlock());
             catalog.Register(new MotorDolBlock());
+            catalog.Register(new VsdBlock());
 
             return catalog;
         }
@@ -368,6 +369,10 @@ namespace ModbusForge.Services
                 hash.Add(node.ValveTravelTimeMs);
                 hash.Add(node.ValveNormallyOpen);
                 hash.Add(node.MotorDolRunDelayMs);
+                hash.Add(node.VsdMaxSpeed.GetHashCode());
+                hash.Add(node.VsdRampUpMs);
+                hash.Add(node.VsdRampDownMs);
+                hash.Add(node.VsdAtSpeedTolerance.GetHashCode());
             }
 
             if (config.Connections != null)
@@ -453,18 +458,30 @@ namespace ModbusForge.Services
             if (visualNode.MotorDolRunDelayMs != 0)
                 node.Parameters["MotorDolRunDelayMs"] = visualNode.MotorDolRunDelayMs;
 
+            if (visualNode.VsdMaxSpeed != 0)
+                node.Parameters["VsdMaxSpeed"] = visualNode.VsdMaxSpeed;
+
+            if (visualNode.VsdRampUpMs != 0)
+                node.Parameters["VsdRampUpMs"] = visualNode.VsdRampUpMs;
+
+            if (visualNode.VsdRampDownMs != 0)
+                node.Parameters["VsdRampDownMs"] = visualNode.VsdRampDownMs;
+
+            if (visualNode.VsdAtSpeedTolerance != 0)
+                node.Parameters["VsdAtSpeedTolerance"] = visualNode.VsdAtSpeedTolerance;
+
             return node;
         }
 
         protected static bool IsInput1Bound(PlcElementType elementType)
         {
             return elementType is PlcElementType.Input or PlcElementType.InputBool or PlcElementType.InputInt
-                or PlcElementType.Valve or PlcElementType.MotorDol;
+                or PlcElementType.Valve or PlcElementType.MotorDol or PlcElementType.Vsd;
         }
 
         protected static bool IsInput2Bound(PlcElementType elementType)
         {
-            return elementType is PlcElementType.Valve or PlcElementType.MotorDol
+            return elementType is PlcElementType.Valve or PlcElementType.MotorDol or PlcElementType.Vsd
                 or PlcElementType.COMPARE_EQ
                 or PlcElementType.COMPARE_NE
                 or PlcElementType.COMPARE_GT
@@ -480,7 +497,7 @@ namespace ModbusForge.Services
         protected static bool IsOutputBound(PlcElementType elementType)
         {
             return elementType is PlcElementType.Output or PlcElementType.OutputBool or PlcElementType.OutputInt
-                or PlcElementType.Valve or PlcElementType.MotorDol;
+                or PlcElementType.Valve or PlcElementType.MotorDol or PlcElementType.Vsd;
         }
 
         private static SimulationConnection MapToSimulationConnection(NodeConnection connection)
