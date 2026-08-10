@@ -26,21 +26,14 @@ namespace ModbusForge.Avalonia.Views
 
         private void LinkButton_Click(object? sender, RoutedEventArgs e)
         {
-            if (sender is Button { Tag: string url })
+            if (sender is Button { Tag: string url } && !string.IsNullOrWhiteSpace(url))
             {
                 try
                 {
-                    if (url.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // Avalonia has no direct API; try opening with shell
-                    }
-                    else
-                    {
-                        using var process = new System.Diagnostics.Process();
-                        process.StartInfo.UseShellExecute = true;
-                        process.StartInfo.FileName = url;
-                        process.Start();
-                    }
+                    using var process = new System.Diagnostics.Process();
+                    process.StartInfo.UseShellExecute = true;
+                    process.StartInfo.FileName = url;
+                    process.Start();
                 }
                 catch (Exception)
                 {

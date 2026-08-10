@@ -5,8 +5,10 @@
         x:DataType="vm:AboutViewModel"
         Title="{Binding Title}"
         Width="500"
-        Height="460"
-        CanResize="False"
+        Height="560"
+        MinWidth="500"
+        MinHeight="400"
+        CanResize="True"
         WindowStartupLocation="CenterOwner">
 
   <Grid RowDefinitions="Auto,*,Auto">
@@ -17,7 +19,7 @@
       </StackPanel>
     </Border>
 
-    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="32,24">
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="32,24">
       <StackPanel Spacing="16">
         <TextBlock Text="{Binding Description}" TextAlignment="Center" TextWrapping="Wrap" FontSize="14" />
 
@@ -32,15 +34,21 @@
           <TextBlock Text="Connect &amp; Support" FontWeight="Bold" />
           <StackPanel>
             <TextBlock Text="LinkedIn" Opacity="0.7" />
-            <Button Content="{Binding LinkedInUrl}" Padding="0" HorizontalAlignment="Left" Background="Transparent" Foreground="DodgerBlue" Click="LinkButton_Click" Tag="{Binding LinkedInUrl}" />
+            <Button Padding="0" HorizontalAlignment="Left" Background="Transparent" Foreground="DodgerBlue" Click="LinkButton_Click" Tag="{Binding LinkedInUrl}">
+              <TextBlock Text="{Binding LinkedInDisplay}" TextWrapping="Wrap" Foreground="DodgerBlue" />
+            </Button>
           </StackPanel>
           <StackPanel>
             <TextBlock Text="GitHub" Opacity="0.7" />
-            <Button Content="{Binding GitHubUrl}" Padding="0" HorizontalAlignment="Left" Background="Transparent" Foreground="DodgerBlue" Click="LinkButton_Click" Tag="{Binding GitHubUrl}" />
+            <Button Padding="0" HorizontalAlignment="Left" Background="Transparent" Foreground="DodgerBlue" Click="LinkButton_Click" Tag="{Binding GitHubUrl}">
+              <TextBlock Text="{Binding GitHubDisplay}" TextWrapping="Wrap" Foreground="DodgerBlue" />
+            </Button>
           </StackPanel>
           <StackPanel>
             <TextBlock Text="Email" Opacity="0.7" />
-            <Button Content="{Binding Email}" Padding="0" HorizontalAlignment="Left" Background="Transparent" Foreground="DodgerBlue" Click="LinkButton_Click" Tag="{Binding Email}" />
+            <Button Padding="0" HorizontalAlignment="Left" Background="Transparent" Foreground="DodgerBlue" Click="LinkButton_Click" Tag="{Binding EmailUrl}">
+              <TextBlock Text="{Binding Email}" TextWrapping="Wrap" Foreground="DodgerBlue" />
+            </Button>
           </StackPanel>
         </StackPanel>
       </StackPanel>

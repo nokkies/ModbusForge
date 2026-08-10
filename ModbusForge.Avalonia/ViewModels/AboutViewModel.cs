@@ -12,9 +12,15 @@ namespace ModbusForge.Avalonia.ViewModels
         public string Title { get; } = "About ModbusForge";
         public string Description { get; } = "A professional Modbus TCP/RTU/ASCII client and server built with .NET 8 and Avalonia.";
         public string Author { get; } = "Reinach van Nieuwenhuizen";
+
         public string LinkedInUrl { get; } = "https://www.linkedin.com/in/nokkies/";
+        public string LinkedInDisplay { get; } = "linkedin.com/in/nokkies/";
+
         public string GitHubUrl { get; } = "https://github.com/nokkies/ModbusForge";
+        public string GitHubDisplay { get; } = "github.com/nokkies/ModbusForge";
+
         public string Email { get; } = "reinach@softwareForge.cc";
+        public string EmailUrl { get; } = "mailto:reinach@softwareForge.cc";
 
         public AboutViewModel()
         {
