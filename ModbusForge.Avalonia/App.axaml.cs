@@ -6,23 +6,26 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ModbusForge.Avalonia.Services;
+using ModbusForge.Avalonia.Services.Api;
 using ModbusForge.Configuration;
 using ModbusForge.Avalonia.ViewModels;
 using ModbusForge.Avalonia.Views;
 using ModbusForge.Services;
+using ModbusForge.Services.Api;
 
 namespace ModbusForge.Avalonia
 {
     public partial class App : global::Avalonia.Application
     {
         public IServiceProvider? Services { get; private set; }
+        private IApiServerService? _apiServerService;
 
         public override void Initialize()
         {
             global::Avalonia.Markup.Xaml.AvaloniaXamlLoader.Load(this);
         }
 
-        public override void OnFrameworkInitializationCompleted()
+        public override async void OnFrameworkInitializationCompleted()
         {
             Services = ConfigureServices();
 
@@ -31,6 +34,38 @@ namespace ModbusForge.Avalonia
                 desktop.MainWindow = new MainWindow
                 {
                     DataContext = Services.GetRequiredService<MainViewModel>()
+                };
+
+                var settingsService = Services.GetRequiredService<ISettingsService>();
+                _apiServerService = Services.GetRequiredService<IApiServerService>();
+
+                if (settingsService.EnableApi)
+                {
+                    try
+                    {
+                        await _apiServerService.StartAsync();
+                    }
+                    catch (Exception ex) when (ex is not OutOfMemoryException)
+                    {
+                        var logger = Services.GetService<ILogger<App>>();
+                        logger?.LogError(ex, "Failed to start API server");
+                    }
+                }
+
+                desktop.ShutdownRequested += async (_, _) =>
+                {
+                    if (_apiServerService?.IsRunning == true)
+                    {
+                        try
+                        {
+                            await _apiServerService.StopAsync();
+                        }
+                        catch (Exception ex) when (ex is not OutOfMemoryException)
+                        {
+                            var logger = Services?.GetService<ILogger<App>>();
+                            logger?.LogError(ex, "Failed to stop API server");
+                        }
+                    }
                 };
             }
 
@@ -46,6 +81,25 @@ namespace ModbusForge.Avalonia
                 options.SingleLine = true;
                 options.TimestampFormat = "HH:mm:ss.fff ";
             }));
+
+            // Options
+            services.AddOptions();
+            services.Configure<ServerSettings>(_ => { });
+
+            // Modbus client / server stack (mirrors WPF registration)
+            services.AddSingleton<ModbusTcpService>();
+            services.AddSingleton<ModbusServerService>();
+            services.AddSingleton<IModbusService>(provider =>
+            {
+                var settings = provider.GetRequiredService<IOptions<ServerSettings>>().Value;
+                return string.Equals(settings.Mode, "Server", StringComparison.OrdinalIgnoreCase)
+                    ? provider.GetRequiredService<ModbusServerService>()
+                    : provider.GetRequiredService<ModbusTcpService>();
+            });
+
+            // API-visible services
+            services.AddSingleton<IConsoleLoggerService, ConsoleLoggerService>();
+            services.AddSingleton<IScriptRuleService, ScriptRuleService>();
 
             // Avalonia platform services
             services.AddSingleton<ModbusForge.Services.IDispatcher, AvaloniaDispatcher>();
@@ -108,6 +162,20 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<DecodeViewModel>();
             services.AddSingleton<MqttViewModel>();
             services.AddSingleton<MainViewModel>();
+
+            // REST API facades and server
+            services.AddSingleton<IAppStateAccessor>(provider =>
+                new MainViewModelAppStateAccessor(provider.GetRequiredService<MainViewModel>()));
+            services.AddSingleton<IApiApplicationService>(provider =>
+                new ApiApplicationService(
+                    provider.GetRequiredService<IAppStateAccessor>(),
+                    provider.GetRequiredService<IModbusService>(),
+                    provider.GetRequiredService<IScriptRuleService>(),
+                    provider.GetRequiredService<IConsoleLoggerService>(),
+                    provider.GetRequiredService<ITrendLogger>(),
+                    provider.GetRequiredService<IDispatcher>(),
+                    provider.GetRequiredService<ILogger<ApiApplicationService>>()));
+            services.AddSingleton<IApiServerService, ApiServerService>();
 
             return services.BuildServiceProvider();
         }

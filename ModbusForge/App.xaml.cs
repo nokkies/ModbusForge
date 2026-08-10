@@ -179,14 +179,14 @@ namespace ModbusForge
             services.AddSingleton<IAppStateAccessor>(provider =>
                 new MainViewModelAppStateAccessor(provider.GetRequiredService<MainViewModel>()));
             services.AddSingleton<IApiApplicationService>(provider =>
-                new WpfApiApplicationService(
+                new ApiApplicationService(
                     provider.GetRequiredService<IAppStateAccessor>(),
                     provider.GetRequiredService<IModbusService>(),
                     provider.GetRequiredService<IScriptRuleService>(),
                     provider.GetRequiredService<IConsoleLoggerService>(),
                     provider.GetRequiredService<ITrendLogger>(),
                     provider.GetRequiredService<IDispatcher>(),
-                    provider.GetRequiredService<ILogger<WpfApiApplicationService>>()));
+                    provider.GetRequiredService<ILogger<ApiApplicationService>>()));
             services.AddSingleton<IApiServerService, ApiServerService>();
 
             services.AddSingleton<TagService>();

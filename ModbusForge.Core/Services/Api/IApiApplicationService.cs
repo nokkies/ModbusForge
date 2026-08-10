@@ -5,8 +5,8 @@ using ModbusForge.Services.Api.Dtos;
 namespace ModbusForge.Services.Api;
 
 /// <summary>
-/// Focused facade that the local REST API uses to interact with the WPF application.
-/// Implementations handle all dispatcher transitions; callers need not be aware of WPF threading.
+/// Focused facade that the local REST API uses to interact with the application.
+/// Implementations handle all dispatcher transitions; callers need not be aware of UI threading.
 /// </summary>
 public interface IApiApplicationService
 {
