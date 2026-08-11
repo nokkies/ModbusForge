@@ -63,7 +63,7 @@ jobs:
           -p:FileVersion=${{ steps.version.outputs.version }}.0
           -o .\publish\avalonia\linux-x64
 
-      - name: Package Avalonia artifacts
+      - name: Package release artifacts
         shell: pwsh
         run: |
           $version = '${{ steps.version.outputs.version }}'
@@ -71,15 +71,15 @@ jobs:
           $avaloniaLinux = ".\publish\avalonia\linux-x64"
           New-Item -ItemType Directory -Path .\packages -Force | Out-Null
 
-          Compress-Archive -Path "$avaloniaWin\*" -DestinationPath ".\packages\ModbusForge-$version-win-x64-avalonia.zip" -Force
+          Compress-Archive -Path "$avaloniaWin\*" -DestinationPath ".\packages\ModbusForge-$version-win-x64.zip" -Force
 
           $staging = ".\packages\ModbusForge"
           if (Test-Path $staging) { Remove-Item -Path $staging -Recurse -Force }
           Copy-Item -Path $avaloniaLinux -Destination $staging -Recurse
-          tar -czf ".\packages\ModbusForge-$version-linux-x64-avalonia.tar.gz" -C .\packages ModbusForge
+          tar -czf ".\packages\ModbusForge-$version-linux-x64.tar.gz" -C .\packages ModbusForge
           Remove-Item -Path $staging -Recurse -Force
 
-      - name: Generate Avalonia checksums
+      - name: Generate checksums
         shell: pwsh
         run: |
           $files = Get-ChildItem -Path .\packages -Filter 'ModbusForge-*'
@@ -96,13 +96,13 @@ jobs:
             Remove-Item -Path 'installers\*.exe' -Recurse -Force -ErrorAction SilentlyContinue
           }
 
-      - name: Build Avalonia Inno Setup Installer
+      - name: Build Inno Setup Installer
         shell: pwsh
         run: |
           $version = '${{ steps.version.outputs.version }}'
           $env:PATH += ";${env:ProgramFiles(x86)}\Inno Setup 6"
-          Write-Host "Building Avalonia installer with version $version..."
-          & iscc /DAppVersion=$version setup\ModbusForge.Avalonia.iss
+          Write-Host "Building installer with version $version..."
+          & iscc /DAppVersion=$version setup\ModbusForge.iss
           if (Test-Path .\installers) {
             Write-Host "Avalonia installer created:"
             Get-ChildItem .\installers\*.exe | Select-Object Name,Length
@@ -116,10 +116,10 @@ jobs:
         with:
           name: ModbusForge-${{ github.ref_name }}
           path: |
-            packages/ModbusForge-*-win-x64-avalonia.zip
-            packages/ModbusForge-*-win-x64-avalonia.zip.sha256
-            packages/ModbusForge-*-linux-x64-avalonia.tar.gz
-            packages/ModbusForge-*-linux-x64-avalonia.tar.gz.sha256
+            packages/ModbusForge-*-win-x64.zip
+            packages/ModbusForge-*-win-x64.zip.sha256
+            packages/ModbusForge-*-linux-x64.tar.gz
+            packages/ModbusForge-*-linux-x64.tar.gz.sha256
             installers/ModbusForge-${{ steps.version.outputs.version }}-setup.exe
           if-no-files-found: ignore
 
@@ -131,13 +131,13 @@ jobs:
           generate_release_notes: true
           body: |
             Automated release for ${{ github.ref_name }}.
-            The Avalonia build is now the recommended cross-platform entry point.
+            ModbusForge is now the recommended cross-platform entry point.
             See README.md Changelog for details.
           files: |
-            packages/ModbusForge-*-win-x64-avalonia.zip
-            packages/ModbusForge-*-win-x64-avalonia.zip.sha256
-            packages/ModbusForge-*-linux-x64-avalonia.tar.gz
-            packages/ModbusForge-*-linux-x64-avalonia.tar.gz.sha256
+            packages/ModbusForge-*-win-x64.zip
+            packages/ModbusForge-*-win-x64.zip.sha256
+            packages/ModbusForge-*-linux-x64.tar.gz
+            packages/ModbusForge-*-linux-x64.tar.gz.sha256
             installers/ModbusForge-${{ steps.version.outputs.version }}-setup.exe
           fail_on_unmatched_files: false
         env:

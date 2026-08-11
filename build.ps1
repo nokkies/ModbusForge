@@ -40,7 +40,7 @@ function Run-Publish {
 function Run-Installer {
     Write-Host "--- Building Inno Setup Installer ---" -ForegroundColor Cyan
 
-    $IssFile = Join-Path $ProjectRoot "setup\ModbusForge.Avalonia.iss"
+    $IssFile = Join-Path $ProjectRoot "setup\ModbusForge.iss"
     if (-not (Test-Path $IssFile)) {
         Write-Error "Inno Setup script not found at $IssFile"
         return

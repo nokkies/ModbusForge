@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publishes ModbusForge.Avalonia as self-contained single-file executables
+# Publishes ModbusForge as self-contained single-file executables
 # for Windows x64 and Linux x64.
 
 set -e
@@ -27,7 +27,7 @@ for PROFILE in "${PROFILES[@]}"; do
         exit 1
     fi
 
-    echo "Publishing ModbusForge.Avalonia for $PROFILE..."
+    echo "Publishing ModbusForge for $PROFILE..."
     dotnet publish "$PROJECT" -p:PublishProfile="$PROFILE" -c Release
 
     PUBLISH_DIR="$REPO_ROOT/publish/avalonia/$PROFILE"

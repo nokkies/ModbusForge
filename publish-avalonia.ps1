@@ -1,4 +1,4 @@
-# Publishes ModbusForge.Avalonia as self-contained single-file executables
+# Publishes ModbusForge as self-contained single-file executables
 # for Windows x64 and Linux x64.
 
 [CmdletBinding()]
@@ -23,7 +23,7 @@ if ($Runtime -in @('linux-x64', 'all')) { $runtimes += 'linux-x64' }
 foreach ($rt in $runtimes) {
     $publishDir = Join-Path (Join-Path (Join-Path $repoRoot 'publish') 'avalonia') $rt
 
-    Write-Output "Publishing ModbusForge.Avalonia for $rt..."
+    Write-Output "Publishing ModbusForge for $rt..."
     dotnet publish $project -c Release -r $rt `
         --self-contained true `
         -p:PublishSingleFile=true `
@@ -42,12 +42,12 @@ foreach ($rt in $runtimes) {
     Get-ChildItem -Path $publishDir -Filter '*.pdb' -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
 
     if ($rt -eq 'win-x64') {
-        $zipPath = Join-Path $packageDir "ModbusForge-$version-win-x64-avalonia.zip"
+        $zipPath = Join-Path $packageDir "ModbusForge-$version-win-x64.zip"
         Compress-Archive -Path "$publishDir\*" -DestinationPath $zipPath -Force
         Write-Output "Created $zipPath"
 
         $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-        $issPath = Join-Path $repoRoot 'setup\ModbusForge.Avalonia.iss'
+        $issPath = Join-Path $repoRoot 'setup\ModbusForge.iss'
 
         if (Test-Path $iscc) {
             Write-Output "Building Windows installer with Inno Setup..."
@@ -70,7 +70,7 @@ foreach ($rt in $runtimes) {
         }
     }
     elseif ($rt -eq 'linux-x64') {
-        $tarName = "ModbusForge-$version-linux-x64-avalonia.tar.gz"
+        $tarName = "ModbusForge-$version-linux-x64.tar.gz"
         $tarPath = Join-Path $packageDir $tarName
         $stagingName = 'ModbusForge'
         $staging = Join-Path $packageDir $stagingName

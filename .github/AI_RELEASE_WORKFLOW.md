@@ -11,7 +11,7 @@ triggers `.github/workflows/release.yml`, which:
 
 1. Builds the solution (Release)
 2. Publishes the Avalonia self-contained single-file executable for `win-x64` and `linux-x64`
-3. Compiles the Inno Setup installer (`setup/ModbusForge.Avalonia.iss`)
+3. Compiles the Inno Setup installer (`setup/ModbusForge.iss`)
 4. Packages ZIP / `.tar.gz` archives + SHA256 checksums
 5. Creates the GitHub Release and uploads all assets automatically
 
@@ -29,7 +29,7 @@ File: `ModbusForge/ModbusForge.csproj`
 <FileVersion>YYYY.M.I</FileVersion>
 ```
 
-**Do NOT** edit `setup/ModbusForge.Avalonia.iss` — the version is passed in by the
+**Do NOT** edit `setup/ModbusForge.iss` — the version is passed in by the
 workflow via `/DAppVersion=YYYY.M.I`.
 
 ### 2. Commit the version bump
@@ -56,10 +56,10 @@ The workflow runs on `windows-latest` and takes ~5–10 minutes.
 - Completed release: `https://github.com/nokkies/ModbusForge/releases`
 
 The release will contain:
-- `ModbusForge-YYYY.M.I-win-x64-avalonia.zip` — Windows self-contained build
-- `ModbusForge-YYYY.M.I-win-x64-avalonia.zip.sha256`
-- `ModbusForge-YYYY.M.I-linux-x64-avalonia.tar.gz` — Linux self-contained build
-- `ModbusForge-YYYY.M.I-linux-x64-avalonia.tar.gz.sha256`
+- `ModbusForge-YYYY.M.I-win-x64.zip` — Windows self-contained build
+- `ModbusForge-YYYY.M.I-win-x64.zip.sha256`
+- `ModbusForge-YYYY.M.I-linux-x64.tar.gz` — Linux self-contained build
+- `ModbusForge-YYYY.M.I-linux-x64.tar.gz.sha256`
 - `ModbusForge-YYYY.M.I-setup.exe` — Inno Setup installer
 
 ---
@@ -85,7 +85,7 @@ If you need to customise the GitHub Release body, edit
 | `.github/workflows/release.yml` | Main release workflow (triggered by `v*` tag) |
 | `.github/workflows/avalonia.yml` | CI build/test for Avalonia |
 | `.github/workflows/ci.yml` | CI build/test for the full solution |
-| `setup/ModbusForge.Avalonia.iss` | Inno Setup script — reads from `publish/avalonia/win-x64/` |
+| `setup/ModbusForge.iss` | Inno Setup script — reads from `publish/avalonia/win-x64/` |
 | `build.ps1` | Local build helper (optional, not used by CI) |
 | `publish/avalonia/win-x64/` | Windows self-contained publish output |
 | `publish/avalonia/linux-x64/` | Linux self-contained publish output |
@@ -95,8 +95,8 @@ If you need to customise the GitHub Release body, edit
 
 ## Inno Setup Details
 
-- Script: `setup/ModbusForge.Avalonia.iss`
-- Version injected at compile time: `iscc /DAppVersion=YYYY.M.I setup\ModbusForge.Avalonia.iss`
+- Script: `setup/ModbusForge.iss`
+- Version injected at compile time: `iscc /DAppVersion=YYYY.M.I setup\ModbusForge.iss`
 - Reads files from: `publish\avalonia\win-x64\*`
 - Outputs installer to: `installers\ModbusForge-YYYY.M.I-setup.exe`
 - Default install path: `%ProgramFiles%\ModbusForge`

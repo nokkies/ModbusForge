@@ -90,8 +90,8 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 ### 2026.7.12 — Release Polish & Cross-Platform Packaging
 
 - **Avalonia is now the primary release artifact** for Windows and Linux.
-- **Windows Avalonia installer**: New `setup/ModbusForge.Avalonia.iss` Inno Setup script builds `ModbusForge-Avalonia-{version}-setup.exe` from the self-contained `publish/avalonia/win-x64` output.
-- **Linux `.tar.gz` packaging**: `publish-avalonia.ps1` now creates `packages/ModbusForge-{version}-linux-x64-avalonia.tar.gz` and `packages/ModbusForge-{version}-win-x64-avalonia.zip` after publishing.
+- **Windows installer**: New `setup/ModbusForge.iss` Inno Setup script builds `ModbusForge-{version}-setup.exe` from the self-contained `publish/avalonia/win-x64` output.
+- **Linux `.tar.gz` packaging**: `publish-avalonia.ps1` now creates `packages/ModbusForge-{version}-linux-x64.tar.gz` and `packages/ModbusForge-{version}-win-x64.zip` after publishing.
 - **Release pipeline updates**: `.github/workflows/release.yml` now publishes Avalonia for Windows and Linux, packages the artifacts, builds the Avalonia installer, and uploads the `.zip`, `.tar.gz`, checksums, and installer to GitHub Releases.
 - **Version bumped to `2026.7.12`** in all projects.
 
@@ -637,13 +637,13 @@ dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-con
 
 ```powershell
 $version = "2026.8.16"
-Compress-Archive -Path .\publish\avalonia\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64-avalonia.zip -Force
+Compress-Archive -Path .\publish\avalonia\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
 ```
 
 ### Create an Installer
 
 ```powershell
-& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=2026.8.16 "setup\ModbusForge.Avalonia.iss"
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=2026.8.16 "setup\ModbusForge.iss"
 ```
 
 ---
