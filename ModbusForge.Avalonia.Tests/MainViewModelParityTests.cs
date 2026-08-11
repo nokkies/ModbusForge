@@ -446,6 +446,28 @@ namespace ModbusForge.Avalonia.Tests
             await vm.ToggleConnectionCommand.ExecuteAsync(null);
         }
 
+        [Fact]
+        public void IsBusy_changes_raise_CanExecuteChanged_for_read_commands()
+        {
+            var manager = new FakeConnectionManager();
+            var vm = new MainViewModel(
+                manager,
+                NullLogger<MainViewModel>.Instance,
+                new SyncDispatcher());
+
+            var events = 0;
+            vm.ReadHoldingRegistersCommand.CanExecuteChanged += (s, e) => events++;
+
+            vm.IsBusy = true;
+            Assert.True(events > 0, "CanExecuteChanged should be raised when IsBusy becomes true.");
+
+            var previous = events;
+            vm.IsBusy = false;
+            Assert.True(events > previous, "CanExecuteChanged should be raised when IsBusy becomes false.");
+
+            vm.Dispose();
+        }
+
         private static int GetFreePort()
         {
             using var listener = new TcpListener(IPAddress.Loopback, 0);

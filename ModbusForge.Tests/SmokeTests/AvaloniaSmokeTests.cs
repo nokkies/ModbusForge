@@ -160,27 +160,140 @@ public class AvaloniaSmokeTests : IDisposable
 
         var startButton = mainWindow.FindFirstDescendant(cf.ByName("Start Server"))?.AsButton();
         Assert.NotNull(startButton);
+        Assert.True(startButton.Patterns.Invoke.IsSupported, "Start Server button should support the Invoke pattern.");
 
-        startButton.Click();
+        startButton.Patterns.Invoke.Pattern.Invoke();
 
-        // Wait for the server to start (the button will change to "Disconnect").
+        // Wait for the server to be connected.
         var connectedWait = DateTime.UtcNow.AddSeconds(10);
-        var disconnectButton = (AutomationElement?)null;
-        while (DateTime.UtcNow < connectedWait && disconnectButton == null)
+        string debugText = string.Empty;
+        while (DateTime.UtcNow < connectedWait && !debugText.Contains("Connected: True"))
         {
-            disconnectButton = mainWindow.FindFirstDescendant(cf.ByName("Disconnect"));
-            Thread.Sleep(250);
+            var debugTab = mainWindow.FindFirstDescendant(cf.ByName("Debug"))?.AsTabItem();
+            if (debugTab != null)
+            {
+                debugTab.Select();
+                Thread.Sleep(250);
+                var debugSummary = mainWindow.FindFirstDescendant(cf.ByAutomationId("DebugSummary"))?.AsLabel();
+                debugText = debugSummary?.Text ?? string.Empty;
+            }
+            else
+            {
+                Thread.Sleep(250);
+            }
         }
-
-        Assert.NotNull(disconnectButton);
-        _output.WriteLine("Server started; disconnect button is visible.");
+        Assert.Contains("Connected: True", debugText);
+        _output.WriteLine("Server started; Connected: True.");
 
         // Stop the server.
-        disconnectButton.AsButton().Click();
-        Thread.Sleep(1000);
+        var disconnectButton = mainWindow.FindFirstDescendant(cf.ByName("Disconnect"))?.AsButton();
+        Assert.NotNull(disconnectButton);
+        Assert.True(disconnectButton.Patterns.Invoke.IsSupported, "Disconnect button should support the Invoke pattern.");
+        disconnectButton.Patterns.Invoke.Pattern.Invoke();
+
+        // Wait for the server to stop.
+        var stopWait = DateTime.UtcNow.AddSeconds(10);
+        debugText = string.Empty;
+        while (DateTime.UtcNow < stopWait && !debugText.Contains("Connected: False"))
+        {
+            var debugTab = mainWindow.FindFirstDescendant(cf.ByName("Debug"))?.AsTabItem();
+            if (debugTab != null)
+            {
+                debugTab.Select();
+                Thread.Sleep(250);
+                var debugSummary = mainWindow.FindFirstDescendant(cf.ByAutomationId("DebugSummary"))?.AsLabel();
+                debugText = debugSummary?.Text ?? string.Empty;
+            }
+            else
+            {
+                Thread.Sleep(250);
+            }
+        }
+        Assert.Contains("Connected: False", debugText);
 
         var startButtonAfterStop = mainWindow.FindFirstDescendant(cf.ByName("Start Server"))?.AsButton();
         Assert.NotNull(startButtonAfterStop);
         _output.WriteLine("Server stopped cleanly and returned to Start Server state.");
+    }
+
+    [Fact]
+    public void ServerMode_RegistersTab_DataGrid_Populates_AfterRead()
+    {
+        var mainWindow = _app.GetMainWindowOrThrow();
+        mainWindow.Focus();
+
+        var cf = new ConditionFactory(new FlaUI.UIA3.UIA3PropertyLibrary());
+
+        // Switch to Server mode and start the server.
+        var modeComboBox = mainWindow.FindFirstDescendant(cf.ByControlType(FlaUI.Core.Definitions.ControlType.ComboBox))?.AsComboBox();
+        Assert.NotNull(modeComboBox);
+        modeComboBox.Select("Server");
+        Thread.Sleep(500);
+
+        var startButton = mainWindow.FindFirstDescendant(cf.ByName("Start Server"))?.AsButton();
+        Assert.NotNull(startButton);
+        Assert.True(startButton.Patterns.Invoke.IsSupported, "Start Server button should support the Invoke pattern.");
+        startButton.Patterns.Invoke.Pattern.Invoke();
+
+        // Wait for the server to be connected.
+        var connectedWait = DateTime.UtcNow.AddSeconds(10);
+        string debugText = string.Empty;
+        while (DateTime.UtcNow < connectedWait && !debugText.Contains("Connected: True"))
+        {
+            var debugTab = mainWindow.FindFirstDescendant(cf.ByName("Debug"))?.AsTabItem();
+            if (debugTab != null)
+            {
+                debugTab.Select();
+                Thread.Sleep(250);
+                var debugSummary = mainWindow.FindFirstDescendant(cf.ByAutomationId("DebugSummary"))?.AsLabel();
+                debugText = debugSummary?.Text ?? string.Empty;
+                _output.WriteLine($"DebugSummary: {debugText}");
+            }
+            else
+            {
+                Thread.Sleep(250);
+            }
+        }
+        Assert.Contains("Connected: True", debugText);
+
+        // Open the Registers tab.
+        var navList = mainWindow.FindFirstDescendant(cf.ByControlType(FlaUI.Core.Definitions.ControlType.List))?.AsListBox();
+        Assert.NotNull(navList);
+        navList!.Select("Registers");
+        Thread.Sleep(500);
+
+        // Find the holding-registers DataGrid and its Read button.
+        var dataGrid = mainWindow.FindFirstDescendant(cf.ByName("Holding Registers Grid"));
+        Assert.NotNull(dataGrid);
+        _output.WriteLine($"Holding Registers Grid found: {dataGrid.BoundingRectangle}");
+
+        var parent = dataGrid.Parent;
+        Assert.NotNull(parent);
+        var readButton = parent.FindFirstDescendant(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Button).And(cf.ByName("Read")))?.AsButton();
+        Assert.NotNull(readButton);
+        _output.WriteLine($"Read button IsEnabled: {readButton.IsEnabled}");
+
+        // Click Read using the Invoke pattern.
+        Assert.True(readButton.Patterns.Invoke.IsSupported, "Read button should support the Invoke pattern.");
+        readButton.Patterns.Invoke.Pattern.Invoke();
+
+        // Wait for the read to complete.
+        var readWait = DateTime.UtcNow.AddSeconds(10);
+        string statusText = string.Empty;
+        while (DateTime.UtcNow < readWait && !statusText.Contains("Read 20 holding registers"))
+        {
+            var statusMessage = mainWindow.FindFirstDescendant(cf.ByAutomationId("StatusMessage"))?.AsLabel();
+            statusText = statusMessage?.Text ?? string.Empty;
+            _output.WriteLine($"StatusMessage: {statusText}");
+            Thread.Sleep(250);
+        }
+        Assert.Contains("Read 20 holding registers", statusText);
+
+        // Verify the DataGrid has rows.
+        dataGrid = mainWindow.FindFirstDescendant(cf.ByName("Holding Registers Grid"));
+        Assert.NotNull(dataGrid);
+        var rows = dataGrid.FindAllDescendants(cf.ByControlType(FlaUI.Core.Definitions.ControlType.DataItem));
+        _output.WriteLine($"DataGrid row count: {rows.Length}");
+        Assert.True(rows.Length >= 1, "DataGrid should display at least one row after reading.");
     }
 }

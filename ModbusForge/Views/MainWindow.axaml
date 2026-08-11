@@ -89,7 +89,7 @@
 
     <!-- Status Bar -->
     <Border Grid.Row="3" Background="#1E1E1E" Padding="8,4">
-      <TextBlock Text="{Binding StatusMessage}" Foreground="White" VerticalAlignment="Center" />
+      <TextBlock Text="{Binding StatusMessage}" AutomationProperties.AutomationId="StatusMessage" Foreground="White" VerticalAlignment="Center" />
     </Border>
   </Grid>
 </Window>

@@ -313,6 +313,8 @@ namespace ModbusForge.Avalonia.ViewModels
                     OnPropertyChanged(nameof(ModeIndex));
                     OnPropertyChanged(nameof(IsServerMode));
                     OnPropertyChanged(nameof(ConnectButtonText));
+                    OnPropertyChanged(nameof(ToggleConnectionButtonText));
+                    OnPropertyChanged(nameof(DebugSummary));
                     OnPropertyChanged(nameof(ConnectionHeader));
                     OnPropertyChanged(nameof(AddressLabel));
                     OnPropertyChanged(nameof(ShowClientFields));
@@ -694,6 +696,7 @@ namespace ModbusForge.Avalonia.ViewModels
             : HasConnectionError ? "Connection error" : "Not connected";
 
         public string DebugSummary => $"Profile: {ActiveProfile?.DisplayName ?? "None"} | " +
+                                      $"Mode: {ActiveProfile?.Mode ?? "(null)"} | IsServer: {ActiveProfile?.IsServerMode} | " +
                                       $"Connected: {IsConnected} | Busy: {IsBusy} | " +
                                       $"Holding: {HoldingRegisters.Count} | Input: {InputRegisters.Count} | " +
                                       $"Coils: {Coils.Count} | Discrete: {DiscreteInputs.Count}";
@@ -1400,6 +1403,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 OnPropertyChanged(nameof(ConnectionHeader));
                 OnPropertyChanged(nameof(AddressLabel));
                 OnPropertyChanged(nameof(EffectiveUnitId));
+                OnPropertyChanged(nameof(DebugSummary));
                 RefreshAvailableUnitIds();
                 OnPropertyChanged(nameof(AvailableUnitIds));
                 OnPropertyChanged(nameof(SelectedUnitId));
