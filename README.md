@@ -550,6 +550,96 @@ Act as a Modbus TCP server for testing client applications. Configure the listen
 
 ---
 
+## Headless Runtime
+
+`ModbusForge.Headless` is a cross-platform console poller for Linux, Windows, and other environments where a GUI is not available. It supports Modbus TCP, RTU, and ASCII, polls holding/input registers or coils/discrete inputs, and can forward every value to an MQTT broker.
+
+### Configuration
+
+Configuration is read from `appsettings.json` and an optional environment-specific `appsettings.<Environment>.json` (for example `appsettings.Production.json`). Settings can also be supplied as command-line switches or as environment variables prefixed with `MODBUSFORGE_`.
+
+Example `appsettings.json`:
+
+```json
+{
+  "Logging": {
+    "Console": { "UseJson": false },
+    "File": {
+      "Path": "logs/modbusforge-headless.log",
+      "RollingInterval": "Day",
+      "FileSizeLimitBytes": 10485760,
+      "RollOnFileSizeLimit": true,
+      "RetainedFileCountLimit": 7
+    },
+    "LogLevel": { "Default": "Information", "Microsoft": "Warning" }
+  },
+  "Connection": {
+    "Transport": "Tcp",
+    "Host": "127.0.0.1",
+    "Port": 502,
+    "UnitId": 1,
+    "ComPort": "COM1",
+    "BaudRate": 9600,
+    "Parity": "None",
+    "DataBits": 8,
+    "StopBits": "One",
+    "RtsEnable": false
+  },
+  "Polling": {
+    "Area": "HoldingRegister",
+    "StartAddress": 0,
+    "Count": 10,
+    "IntervalMs": 1000
+  },
+  "Mqtt": {
+    "Enabled": false,
+    "BrokerHost": "localhost",
+    "BrokerPort": 1883,
+    "ClientId": "ModbusForge-Headless",
+    "TopicTemplate": "modbusforge/{UnitId}/{Tag}",
+    "QualityOfService": 0,
+    "RetainMessages": false,
+    "PublishPeriodMs": 1000
+  }
+}
+```
+
+Set `Logging:Console:UseJson` to `true` for JSON output to the console and to the log file.
+
+Run `ModbusForge.Headless --help` for a complete list of command-line switches.
+
+### Linux systemd service
+
+Save the following to `/etc/systemd/system/modbusforge-headless.service` and adjust paths and `MODBUSFORGE_CONNECTION__HOST` as needed:
+
+```ini
+[Unit]
+Description=ModbusForge Headless Modbus Poller
+After=network.target
+
+[Service]
+Type=notify
+WorkingDirectory=/opt/modbusforge
+ExecStart=/opt/modbusforge/ModbusForge.Headless --environment Production
+Restart=always
+RestartSec=10
+Environment="MODBUSFORGE_CONNECTION__HOST=192.168.1.100"
+Environment="MODBUSFORGE_CONNECTION__PORT=502"
+Environment="MODBUSFORGE_CONNECTION__UNITID=1"
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then enable and start it:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now modbusforge-headless
+```
+
+---
+
 ## FAQ
 
 ### Q: What operating systems are supported?

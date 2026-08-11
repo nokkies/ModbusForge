@@ -22,26 +22,30 @@ namespace ModbusForge.Headless
     public sealed class HeadlessCustomService : BackgroundService
     {
         private readonly IModbusService _modbusService;
+        private readonly MqttGatewayService? _mqttService;
+        private readonly IHostApplicationLifetime _lifetime;
         private readonly ILogger<HeadlessCustomService> _logger;
-        private readonly string _host;
-        private readonly int _port;
-        private readonly byte _unitId;
+        private readonly ConnectionProfile _profile;
         private readonly int _tickMs;
         private readonly string _customFile;
+        private readonly MqttSettings _mqttSettings;
 
         public HeadlessCustomService(
             IModbusService modbusService,
+            MqttGatewayService? mqttService,
+            IHostApplicationLifetime lifetime,
             IConfiguration configuration,
             ILogger<HeadlessCustomService> logger)
         {
             _modbusService = modbusService ?? throw new ArgumentNullException(nameof(modbusService));
+            _mqttService = mqttService;
+            _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-            _host = configuration["Connection:Host"] ?? "127.0.0.1";
-            _port = int.TryParse(configuration["Connection:Port"], out var p) ? p : 502;
-            _unitId = byte.TryParse(configuration["Connection:UnitId"], out var u) ? u : (byte)1;
-            _tickMs = int.TryParse(configuration["Custom:TickMs"], out var t) ? t : 100;
+            _profile = HeadlessProfileFactory.CreateConnectionProfile(configuration);
+            _tickMs = configuration.GetValue<int?>("Custom:TickMs") ?? 100;
             _customFile = configuration["Custom:Path"] ?? string.Empty;
+            _mqttSettings = HeadlessProfileFactory.CreateMqttSettings(configuration);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -53,14 +57,27 @@ namespace ModbusForge.Headless
                 return;
             }
 
-            _logger.LogInformation("Connecting to {Host}:{Port} (unit {UnitId})...", _host, _port, _unitId);
+            if (_profile.Transport == TransportType.Tcp)
+            {
+                _logger.LogInformation("Connecting to {Host}:{Port} (unit {UnitId}) via {Transport}...",
+                    _profile.IpAddress, _profile.Port, _profile.UnitId, _profile.Transport);
+            }
+            else
+            {
+                _logger.LogInformation("Connecting to {ComPort} @ {BaudRate} (unit {UnitId}) via {Transport}...",
+                    _profile.ComPort, _profile.BaudRate, _profile.UnitId, _profile.Transport);
+            }
 
-            var connected = await _modbusService.ConnectAsync(_host, _port, _unitId.ToString(), stoppingToken);
+            var connected = await _modbusService.ConnectAsync(_profile, stoppingToken);
             if (!connected)
             {
-                _logger.LogError("Failed to connect to {Host}:{Port}", _host, _port);
+                _logger.LogError("Failed to connect to the Modbus device.");
+                _lifetime.StopApplication();
                 return;
             }
+
+            _mqttService?.ApplySettings(_mqttSettings);
+            await (_mqttService?.ConnectAsync(stoppingToken) ?? Task.CompletedTask);
 
             _logger.LogInformation("Connected. Running custom watch on {Count} entries.", entries.Count);
 
@@ -80,6 +97,7 @@ namespace ModbusForge.Headless
                             entry.Value = value;
                             entry.LastReadUtc = now;
                             _logger.LogInformation("[{Name}] {Area}:{Address} = {Value}", entry.Name, entry.Area, entry.Address, value);
+                            await PublishAsync(entry, value, stoppingToken);
                         }
 
                         if (entry.Continuous && (now - entry.LastWriteUtc).TotalMilliseconds >= entry.PeriodMs)
@@ -88,6 +106,7 @@ namespace ModbusForge.Headless
                             entry.LastWriteUtc = now;
                             _logger.LogInformation("[{Name}] wrote {Value} to {Area}:{Address} ({Ok})",
                                 entry.Name, entry.WriteValue, entry.Area, entry.Address, ok);
+                            await PublishAsync(entry, entry.WriteValue, stoppingToken);
                         }
                     }
                     catch (Exception ex)
@@ -106,7 +125,9 @@ namespace ModbusForge.Headless
                 }
             }
 
+            await (_mqttService?.DisconnectAsync() ?? Task.CompletedTask);
             await _modbusService.DisconnectAsync();
+            _lifetime.StopApplication();
         }
 
         private static async Task<List<CustomEntry>?> LoadCustomEntriesAsync(string path, CancellationToken token)
@@ -143,8 +164,8 @@ namespace ModbusForge.Headless
                 case "inputregister":
                     int count = type == "real" ? 2 : 1;
                     var values = area == "holdingregister"
-                        ? await _modbusService.ReadHoldingRegistersAsync(_unitId, entry.Address, count)
-                        : await _modbusService.ReadInputRegistersAsync(_unitId, entry.Address, count);
+                        ? await _modbusService.ReadHoldingRegistersAsync(_profile.UnitId, entry.Address, count)
+                        : await _modbusService.ReadInputRegistersAsync(_profile.UnitId, entry.Address, count);
 
                     if (values == null || values.Length == 0) return "No response";
 
@@ -159,8 +180,8 @@ namespace ModbusForge.Headless
                 case "coil":
                 case "discreteinput":
                     var coilValues = area == "coil"
-                        ? await _modbusService.ReadCoilsAsync(_unitId, entry.Address, 1)
-                        : await _modbusService.ReadDiscreteInputsAsync(_unitId, entry.Address, 1);
+                        ? await _modbusService.ReadCoilsAsync(_profile.UnitId, entry.Address, 1)
+                        : await _modbusService.ReadDiscreteInputsAsync(_profile.UnitId, entry.Address, 1);
                     if (coilValues == null || coilValues.Length == 0) return "No response";
                     return coilValues[0] ? "1" : "0";
 
@@ -184,20 +205,20 @@ namespace ModbusForge.Headless
                                 float.TryParse(entry.WriteValue, NumberStyles.Float, CultureInfo.CurrentCulture, out f))
                             {
                                 var words = DataTypeConverter.ToUInt16(f, false, false);
-                                await _modbusService.WriteRegistersAsync(_unitId, entry.Address, words);
+                                await _modbusService.WriteRegistersAsync(_profile.UnitId, entry.Address, words);
                                 return true;
                             }
                             return false;
 
                         case "string":
                             var stringWords = DataTypeConverter.ToUInt16(entry.WriteValue ?? string.Empty);
-                            await _modbusService.WriteRegistersAsync(_unitId, entry.Address, stringWords);
+                            await _modbusService.WriteRegistersAsync(_profile.UnitId, entry.Address, stringWords);
                             return true;
 
                         case "int":
                             if (int.TryParse(entry.WriteValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out int iv))
                             {
-                                await _modbusService.WriteSingleRegisterAsync(_unitId, entry.Address, unchecked((ushort)iv));
+                                await _modbusService.WriteSingleRegisterAsync(_profile.UnitId, entry.Address, unchecked((ushort)iv));
                                 return true;
                             }
                             return false;
@@ -206,7 +227,7 @@ namespace ModbusForge.Headless
                             if (uint.TryParse(entry.WriteValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out uint uv))
                             {
                                 if (uv > 0xFFFF) uv = 0xFFFF;
-                                await _modbusService.WriteSingleRegisterAsync(_unitId, entry.Address, (ushort)uv);
+                                await _modbusService.WriteSingleRegisterAsync(_profile.UnitId, entry.Address, (ushort)uv);
                                 return true;
                             }
                             return false;
@@ -215,13 +236,39 @@ namespace ModbusForge.Headless
                 case "coil":
                     if (TryParseBool(entry.WriteValue, out bool b))
                     {
-                        await _modbusService.WriteSingleCoilAsync(_unitId, entry.Address, b);
+                        await _modbusService.WriteSingleCoilAsync(_profile.UnitId, entry.Address, b);
                         return true;
                     }
                     return false;
 
                 default:
                     return false;
+            }
+        }
+
+        private async Task PublishAsync(CustomEntry entry, object? value, CancellationToken token)
+        {
+            if (_mqttService is null) return;
+
+            var plcArea = Enum.TryParse<PlcArea>(entry.Area, true, out var a) ? a : PlcArea.HoldingRegister;
+
+            var update = new MqttTagUpdate
+            {
+                UnitId = _profile.UnitId,
+                TagName = entry.Name,
+                Area = plcArea,
+                Address = entry.Address,
+                Value = value,
+                Timestamp = DateTime.UtcNow,
+            };
+
+            try
+            {
+                await _mqttService.PublishAsync(new[] { update }, token);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to publish MQTT update for {Name}", entry.Name);
             }
         }
 
