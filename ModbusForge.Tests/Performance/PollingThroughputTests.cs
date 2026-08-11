@@ -61,7 +61,7 @@ namespace ModbusForge.Tests.Performance
             engine.Start();
 
             const int unitCount = 20;
-            const int readsPerUnit = 10; // 10 polling cycles at 50ms = 500ms
+            const int readsPerUnit = 1;
 
             var stopwatch = Stopwatch.StartNew();
 

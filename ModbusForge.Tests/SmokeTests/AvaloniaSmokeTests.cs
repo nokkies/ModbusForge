@@ -22,12 +22,12 @@ public class AvaloniaSmokeTests : IDisposable
         _output = output;
 
         var solutionDir = FlaUiAppHelper.GetSolutionDirectory();
-        var appPath = Path.Combine(solutionDir, "ModbusForge.Avalonia", "bin", "Debug", "net8.0", "ModbusForge.exe");
+        var appPath = Path.Combine(solutionDir, "ModbusForge", "bin", "Debug", "net8.0", "ModbusForge.exe");
 
         if (!File.Exists(appPath))
         {
             var fallbackPath = new[] { "Release", "Debug" }
-                .Select(c => Path.Combine(solutionDir, "ModbusForge.Avalonia", "bin", c, "net8.0", "ModbusForge.exe"))
+                .Select(c => Path.Combine(solutionDir, "ModbusForge", "bin", c, "net8.0", "ModbusForge.exe"))
                 .FirstOrDefault(File.Exists);
 
             appPath = fallbackPath ?? appPath;

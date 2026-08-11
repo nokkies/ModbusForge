@@ -30,12 +30,12 @@ public class FlaUiAppHelper : IDisposable
     {
         var solutionDir = GetSolutionDirectory();
         var config = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory).Parent?.Name ?? "Debug";
-        var appPath = Path.Combine(solutionDir, "ModbusForge", "bin", config, "net8.0-windows", "ModbusForge.exe");
+        var appPath = Path.Combine(solutionDir, "ModbusForge", "bin", config, "net8.0", "ModbusForge.exe");
 
         if (!File.Exists(appPath))
         {
             var fallbackPath = new[] { "Release", "Debug" }
-                .Select(c => Path.Combine(solutionDir, "ModbusForge", "bin", c, "net8.0-windows", "ModbusForge.exe"))
+                .Select(c => Path.Combine(solutionDir, "ModbusForge", "bin", c, "net8.0", "ModbusForge.exe"))
                 .FirstOrDefault(File.Exists);
 
             appPath = fallbackPath ?? appPath;
