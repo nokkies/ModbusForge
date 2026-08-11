@@ -78,7 +78,7 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
-### 2026.8.18 — Headless Runtime & CI Hardening
+### 2026.8.18 - Headless Runtime & CI Hardening
 
 - **Headless runtime improvements**: `ModbusForge.Headless` now supports `ConnectionProfile` for TCP and RTU/ASCII serial, environment-specific `appsettings.<Environment>.json`, `MODBUSFORGE_` environment variables, structured Serilog console and file output, MQTT publishing via `MqttGatewayService`, `--help`, CLI validation, and graceful shutdown.
 - **Hardened CI/release workflow**: Resolved `secrets` context usage in conditional steps, added environment-specific build/test jobs, and prevented recursive release runs from the `github-actions[bot]` tag push.
