@@ -1,10 +1,9 @@
 name: Release
 
 on:
-  # Disabled until the new system rebuild is complete.
-  # push:
-  #   tags:
-  #     - 'v*'
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
