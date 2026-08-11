@@ -60,6 +60,18 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=$tag" >> $env:GITHUB_OUTPUT
 
+      - name: Check code-signing secrets
+        id: codesign
+        shell: pwsh
+        run: |
+          $cert = '${{ secrets.CODESIGN_CERTIFICATE_BASE64 }}'
+          $password = '${{ secrets.CODESIGN_CERTIFICATE_PASSWORD }}'
+          if ($cert -and $password) {
+            'has-cert=true' >> $env:GITHUB_OUTPUT
+          } else {
+            'has-cert=false' >> $env:GITHUB_OUTPUT
+          }
+
       - name: Restore
         run: dotnet restore
 
@@ -133,7 +145,7 @@ jobs:
           Get-ChildItem -Path .\publish -Filter '*.pdb' -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 
       - name: Code sign Windows executable (optional)
-        if: ${{ secrets.CODESIGN_CERTIFICATE_BASE64 != '' }}
+        if: ${{ steps.codesign.outputs.has-cert == 'true' }}
         shell: pwsh
         run: |
           $cert = [System.Convert]::FromBase64String('${{ secrets.CODESIGN_CERTIFICATE_BASE64 }}')
@@ -172,7 +184,7 @@ jobs:
           }
 
       - name: Code sign installer (optional)
-        if: ${{ secrets.CODESIGN_CERTIFICATE_BASE64 != '' }}
+        if: ${{ steps.codesign.outputs.has-cert == 'true' }}
         shell: pwsh
         run: |
           $version = '${{ steps.version.outputs.version }}'
