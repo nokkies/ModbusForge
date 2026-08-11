@@ -4,7 +4,7 @@ using System.IO.Ports;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Modbus.Device;
+using NModbus;
 using ModbusForge.Models;
 using ModbusForge.Services.Messages;
 
@@ -14,6 +14,7 @@ namespace ModbusForge.Services
     {
         private SerialPort? _serialPort;
         private IModbusMaster? _client;
+        private readonly IModbusFactory _factory = new ModbusFactory();
         private ConnectionProfile? _connectionProfile;
         private bool _disposed;
         private readonly ILogger<ModbusSerialService> _logger;
@@ -117,9 +118,11 @@ namespace ModbusForge.Services
                     _serialPort.Open();
 
                     var adapter = ModbusStreamAdapterFactory.CreateSerialAdapter(_serialPort);
-                    _client = Transport == TransportType.Rtu
-                        ? ModbusSerialMaster.CreateRtu(new LoggingStreamResource(adapter, _frameLogger))
-                        : ModbusSerialMaster.CreateAscii(new LoggingStreamResource(adapter, _frameLogger));
+                    var transport = Transport == TransportType.Rtu
+                        ? (IModbusSerialTransport)_factory.CreateRtuTransport(new LoggingStreamResource(adapter, _frameLogger))
+                        : (IModbusSerialTransport)_factory.CreateAsciiTransport(new LoggingStreamResource(adapter, _frameLogger));
+
+                    _client = _factory.CreateMaster(transport);
 
                     _client.Transport.ReadTimeout = 5000;
                     _client.Transport.WriteTimeout = 5000;
@@ -255,10 +258,10 @@ namespace ModbusForge.Services
             return await ExecuteMasterAsync<ushort?>(
                 $"Mask writing register at {registerAddress} (AND 0x{andMask:X4}, OR 0x{orMask:X4})",
                 "Error mask writing register",
-                (master, cast) =>
+                master =>
                 {
                     ushort protocolAddress = ToProtocolAddress(registerAddress);
-                    cast.ExecuteCustomMessage<MaskWriteRegisterRequestResponse>(
+                    master.ExecuteCustomMessage<MaskWriteRegisterRequestResponse>(
                         new MaskWriteRegisterRequestResponse(unitId, protocolAddress, andMask, orMask));
 
                     // FC22 echoes the masks rather than the result, so read the register back.
@@ -276,7 +279,7 @@ namespace ModbusForge.Services
             return await ExecuteMasterAsync<ushort[]?>(
                 $"Reading {readCount} registers at {readStartAddress} and writing {writeValues.Length} registers at {writeStartAddress}",
                 "Error in read/write multiple registers",
-                (master, _) => master.ReadWriteMultipleRegisters(
+                master => master.ReadWriteMultipleRegisters(
                     unitId,
                     ToProtocolAddress(readStartAddress),
                     (ushort)readCount,
@@ -289,14 +292,14 @@ namespace ModbusForge.Services
             return await ExecuteMasterAsync<DeviceIdentification?>(
                 $"Reading device identification ({category}) from object 0x{objectId:X2}",
                 "Error reading device identification",
-                (_, cast) =>
+                master =>
                 {
                     var identification = new DeviceIdentification();
                     byte nextObjectId = objectId;
 
                     for (int transaction = 0; transaction < MaxDeviceIdTransactions; transaction++)
                     {
-                        var response = cast.ExecuteCustomMessage<ReadDeviceIdentificationResponse>(
+                        var response = master.ExecuteCustomMessage<ReadDeviceIdentificationResponse>(
                             new ReadDeviceIdentificationRequest(unitId, (byte)category, nextObjectId));
 
                         identification.ConformityLevel = response.ConformityLevel;
@@ -414,7 +417,7 @@ namespace ModbusForge.Services
         private async Task<T?> ExecuteMasterAsync<T>(
             string debugLogMessage,
             string errorLogContext,
-            Func<IModbusMaster, ModbusMaster, T?> operation)
+            Func<IModbusMaster, T?> operation)
         {
             if (!IsConnected)
                 return default;
@@ -427,14 +430,14 @@ namespace ModbusForge.Services
                     try
                     {
                         _logger.LogDebug(debugLogMessage);
-                        if (_client is not ModbusMaster master)
+                        if (_client == null)
                             return default;
 
                         T? result = default;
-                        ApplySerialTiming(() => result = operation(_client, master));
+                        ApplySerialTiming(() => result = operation(_client));
                         return result;
                     }
-                    catch (Modbus.SlaveException ex)
+                    catch (NModbus.SlaveException ex)
                     {
                         _logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
                         return default;
@@ -496,7 +499,7 @@ namespace ModbusForge.Services
 
         private void DisconnectCore()
         {
-            try { _client?.Dispose(); } catch { }
+            try { (_client as IDisposable)?.Dispose(); } catch { }
             _client = null;
 
             try
@@ -589,14 +592,22 @@ namespace ModbusForge.Services
             try
             {
                 var adapter = ModbusStreamAdapterFactory.CreateSerialAdapter(port);
-                using var master = Transport == TransportType.Rtu
-                    ? ModbusSerialMaster.CreateRtu(new LoggingStreamResource(adapter, _frameLogger))
-                    : ModbusSerialMaster.CreateAscii(new LoggingStreamResource(adapter, _frameLogger));
-                master.Transport.ReadTimeout = 1000;
-                master.Transport.WriteTimeout = 1000;
+                var transport = Transport == TransportType.Rtu
+                    ? (IModbusSerialTransport)_factory.CreateRtuTransport(new LoggingStreamResource(adapter, _frameLogger))
+                    : (IModbusSerialTransport)_factory.CreateAsciiTransport(new LoggingStreamResource(adapter, _frameLogger));
+                var master = _factory.CreateMaster(transport);
+                try
+                {
+                    master.Transport.ReadTimeout = 1000;
+                    master.Transport.WriteTimeout = 1000;
 
-                sw.Restart();
-                EvaluateModbusRead(master.ReadHoldingRegisters(unitId, 0, 1), sw, result);
+                    sw.Restart();
+                    EvaluateModbusRead(master.ReadHoldingRegisters(unitId, 0, 1), sw, result);
+                }
+                finally
+                {
+                    (master as IDisposable)?.Dispose();
+                }
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
@@ -614,7 +625,7 @@ namespace ModbusForge.Services
         {
             switch (ex)
             {
-                case Modbus.SlaveException slaveEx:
+                case NModbus.SlaveException slaveEx:
                     result.ModbusResponding = true;
                     result.ModbusError = $"Device responded with exception code {slaveEx.SlaveExceptionCode}";
                     _logger.LogInformation("Diagnostics: Modbus serial device responded with exception - {Error}", result.ModbusError);

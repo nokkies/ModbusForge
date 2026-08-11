@@ -1,5 +1,5 @@
 using System;
-using Modbus.IO;
+using NModbus.IO;
 using ModbusForge.Models;
 
 namespace ModbusForge.Services

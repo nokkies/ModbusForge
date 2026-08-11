@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Modbus.Data;
+using ModbusForge.Data;
 using ModbusForge.Models;
 using ModbusForge.Services;
 using ModbusForge.Core.Simulation.Core;

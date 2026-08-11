@@ -4,7 +4,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Modbus.Data;
+using ModbusForge.Data;
 using System.Net.Sockets;
 using ModbusForge.Helpers;
 using ModbusForge.Models;
@@ -251,7 +251,7 @@ namespace ModbusForge.Services
         private async Task<T[]?> ReadFromDataStoreAsync<T>(
             byte unitId, int startAddress, int count,
             Func<DataStore, ModbusDataCollection<T>> collectionSelector,
-            string resourceName)
+            string resourceName) where T : struct
         {
             if (!_isRunning) throw new InvalidOperationException("Modbus server is not running");
             return await Task.Run(() =>

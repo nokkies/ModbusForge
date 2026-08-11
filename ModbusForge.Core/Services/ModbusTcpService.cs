@@ -1,4 +1,5 @@
-using Modbus.Device;
+using NModbus;
+using NModbus.Device;
 using ModbusForge.Models;
 using ModbusForge.Services.Messages;
 using System;
@@ -14,6 +15,7 @@ namespace ModbusForge.Services
     public class ModbusTcpService : IModbusService, IDisposable
     {
         private IModbusMaster? _client;
+        private readonly IModbusFactory _factory = new ModbusFactory();
         private TcpClient? _tcpClient;
         private bool _disposed = false;
         private readonly ILogger<ModbusTcpService> _logger;
@@ -108,7 +110,9 @@ namespace ModbusForge.Services
                 {
                     await tcpClient.ConnectAsync(ipAddress, port, cancellationToken).ConfigureAwait(false);
                     _tcpClient = tcpClient;
-                    _client = ModbusIpMaster.CreateIp(new LoggingStreamResource(ModbusStreamAdapterFactory.CreateTcpAdapter(tcpClient), _frameLogger));
+                    var streamResource = new LoggingStreamResource(ModbusStreamAdapterFactory.CreateTcpAdapter(tcpClient), _frameLogger);
+                    var transport = _factory.CreateIpTransport(streamResource);
+                    _client = new ModbusIpMaster(transport);
                     var message = $"Connected to Modbus server at {ipAddress}:{port}";
                     _logger.LogInformation(message);
                     _consoleLoggerService?.Log(message);
@@ -119,7 +123,7 @@ namespace ModbusForge.Services
                     var message = $"Failed to connect to Modbus server at {ipAddress}:{port}: {ex.Message}";
                     _logger.LogError(ex, message);
                     _consoleLoggerService?.Log(message);
-                    _client?.Dispose();
+                    (_client as IDisposable)?.Dispose();
                     _client = null;
                     tcpClient.Dispose();
                     _tcpClient = null;
@@ -142,7 +146,7 @@ namespace ModbusForge.Services
                     var message = $"Disconnecting from Modbus server at {_lastIpAddress}:{_lastPort}";
                     _logger.LogInformation(message);
                     _consoleLoggerService?.Log(message);
-                    _client?.Dispose();
+                    (_client as IDisposable)?.Dispose();
                     _client = null;
                     _tcpClient?.Close();
                     _tcpClient = null;
@@ -224,10 +228,10 @@ namespace ModbusForge.Services
             return await ExecuteMasterAsync<ushort?>(
                 $"Mask writing register at {registerAddress} (AND 0x{andMask:X4}, OR 0x{orMask:X4})",
                 "Error mask writing register",
-                (master, cast) =>
+                master =>
                 {
                     ushort protocolAddress = ToProtocolAddress(registerAddress);
-                    cast.ExecuteCustomMessage<MaskWriteRegisterRequestResponse>(
+                    master.ExecuteCustomMessage<MaskWriteRegisterRequestResponse>(
                         new MaskWriteRegisterRequestResponse(unitId, protocolAddress, andMask, orMask));
 
                     // FC22 echoes the masks rather than the result, so read the register back.
@@ -245,7 +249,7 @@ namespace ModbusForge.Services
             return await ExecuteMasterAsync<ushort[]?>(
                 $"Reading {readCount} registers at {readStartAddress} and writing {writeValues.Length} registers at {writeStartAddress}",
                 "Error in read/write multiple registers",
-                (master, _) => master.ReadWriteMultipleRegisters(
+                master => master.ReadWriteMultipleRegisters(
                     unitId,
                     ToProtocolAddress(readStartAddress),
                     (ushort)readCount,
@@ -258,7 +262,7 @@ namespace ModbusForge.Services
             return await ExecuteMasterAsync<DeviceIdentification?>(
                 $"Reading device identification ({category}) from object 0x{objectId:X2}",
                 "Error reading device identification",
-                (_, cast) =>
+                master =>
                 {
                     var identification = new DeviceIdentification();
                     byte nextObjectId = objectId;
@@ -266,7 +270,7 @@ namespace ModbusForge.Services
                     // 0xFF and reports where the next transaction has to resume.
                     for (int transaction = 0; transaction < MaxDeviceIdTransactions; transaction++)
                     {
-                        var response = cast.ExecuteCustomMessage<ReadDeviceIdentificationResponse>(
+                        var response = master.ExecuteCustomMessage<ReadDeviceIdentificationResponse>(
                             new ReadDeviceIdentificationRequest(unitId, (byte)category, nextObjectId));
 
                         identification.ConformityLevel = response.ConformityLevel;
@@ -303,7 +307,7 @@ namespace ModbusForge.Services
         private async Task<T?> ExecuteMasterAsync<T>(
             string debugLogMessage,
             string errorLogContext,
-            Func<IModbusMaster, ModbusMaster, T?> operation)
+            Func<IModbusMaster, T?> operation)
         {
             if (!IsConnected)
                 return default;
@@ -316,12 +320,12 @@ namespace ModbusForge.Services
                     try
                     {
                         _logger.LogDebug(debugLogMessage);
-                        if (_client is not ModbusMaster master)
+                        if (_client == null)
                             return default;
 
-                        return operation(_client, master);
+                        return operation(_client);
                     }
-                    catch (Modbus.SlaveException ex)
+                    catch (NModbus.SlaveException ex)
                     {
                         _logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
                         return default;
@@ -423,7 +427,7 @@ namespace ModbusForge.Services
             _logger.LogInformation("Client is disconnected. Cleaning up connection.");
             try
             {
-                _client?.Dispose();
+                (_client as IDisposable)?.Dispose();
                 _client = null;
                 _tcpClient?.Close();
                 _tcpClient = null;
@@ -455,7 +459,7 @@ namespace ModbusForge.Services
                 await _ioLock.WaitAsync().ConfigureAwait(false);
                 try
                 {
-                    _client?.Dispose();
+                    (_client as IDisposable)?.Dispose();
                     _tcpClient?.Close();
                 }
                 finally
@@ -476,7 +480,7 @@ namespace ModbusForge.Services
             {
                 // Dispose the underlying connection first so any in-flight I/O is
                 // aborted, allowing the operation holding the lock to release it.
-                _client?.Dispose();
+                (_client as IDisposable)?.Dispose();
                 _client = null;
                 _tcpClient?.Close();
                 _tcpClient = null;
@@ -553,11 +557,13 @@ namespace ModbusForge.Services
                 sw.Restart();
                 _logger.LogInformation($"Diagnostics: Testing Modbus protocol with Unit ID {unitId}");
 
-                using var master = ModbusIpMaster.CreateIp(testClient);
-                master.Transport.ReadTimeout = 5000;
-                master.Transport.WriteTimeout = 5000;
+                var master = _factory.CreateMaster(testClient);
+                try
+                {
+                    master.Transport.ReadTimeout = 5000;
+                    master.Transport.WriteTimeout = 5000;
 
-                // Try to read a single holding register - this is the most basic Modbus operation
+                    // Try to read a single holding register - this is the most basic Modbus operation
                 try
                 {
                     var registers = master.ReadHoldingRegisters(unitId, 0, 1);
@@ -565,7 +571,7 @@ namespace ModbusForge.Services
                     result.ModbusResponding = true;
                     _logger.LogInformation($"Diagnostics: Modbus responded in {result.ModbusLatencyMs}ms, read value: {registers[0]}");
                 }
-                catch (Modbus.SlaveException slaveEx)
+                catch (NModbus.SlaveException slaveEx)
                 {
                     // Slave responded with an exception - this means Modbus IS working, just the request was invalid
                     result.ModbusLatencyMs = (int)sw.ElapsedMilliseconds;
@@ -591,6 +597,11 @@ namespace ModbusForge.Services
                     result.ModbusResponding = false;
                     result.ModbusError = "Modbus timeout - device accepted TCP but did not respond to Modbus request. Check Unit ID or device may not support Modbus TCP.";
                     _logger.LogWarning($"Diagnostics: Modbus timeout");
+                }
+                }
+                finally
+                {
+                    (master as IDisposable)?.Dispose();
                 }
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))

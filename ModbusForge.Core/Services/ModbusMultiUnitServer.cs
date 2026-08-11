@@ -7,7 +7,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
-using Modbus.Data;
+using ModbusForge.Data;
 using Microsoft.Extensions.Logging;
 using ModbusForge.Models;
 

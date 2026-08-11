@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Reflection;
-using Modbus.Data;
+using ModbusForge.Data;
 using ModbusForge.Models;
 using ModbusForge.Services;
 

@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Modbus.Data;
+using ModbusForge.Data;
 using ModbusForge.Core.Simulation.Core;
 
 namespace ModbusForge.Core.Simulation.Engine

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
-using Modbus.Data;
+using ModbusForge.Data;
 using ModbusForge.Core.Simulation.Core;
 
 namespace ModbusForge.Core.Simulation.Engine

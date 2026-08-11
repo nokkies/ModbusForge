@@ -276,7 +276,7 @@ namespace ModbusForge.Tests.Simulation
             public TimeSpan Elapsed { get; private set; } = TimeSpan.FromMilliseconds(100);
             public int CycleCount => 0;
             public bool IsFirstScan => true;
-            public Modbus.Data.DataStore? DataStore => null;
+            public ModbusForge.Data.DataStore? DataStore => null;
             public Microsoft.Extensions.Logging.ILogger Logger => Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
             public IStateBag State { get; } = new StateBag();
             public Dictionary<string, object?> Parameters { get; } = new();

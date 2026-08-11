@@ -1,5 +1,5 @@
 using System;
-using Modbus.Message;
+using NModbus;
 
 namespace ModbusForge.Services.Messages
 {

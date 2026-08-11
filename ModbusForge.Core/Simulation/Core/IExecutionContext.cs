@@ -1,6 +1,6 @@
 using System;
 using Microsoft.Extensions.Logging;
-using Modbus.Data;
+using ModbusForge.Data;
 
 namespace ModbusForge.Core.Simulation.Core
 {

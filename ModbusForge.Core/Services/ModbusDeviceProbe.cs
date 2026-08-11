@@ -6,8 +6,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Modbus;
-using Modbus.Device;
+using NModbus;
 using ModbusForge.Models;
 
 namespace ModbusForge.Services
@@ -264,7 +263,7 @@ namespace ModbusForge.Services
                         .ConfigureAwait(false);
                     return new ReadOutcome(DeviceProbeStatus.Responded, string.Empty, values);
                 }
-                catch (SlaveException slaveException)
+                catch (NModbus.SlaveException slaveException)
                 {
                     // An exception response still proves a unit is listening at this address.
                     return new ReadOutcome(
@@ -341,7 +340,7 @@ namespace ModbusForge.Services
 
                 await tcpClient.ConnectAsync(ipAddress, port, timeoutSource.Token).ConfigureAwait(false);
 
-                var master = ModbusIpMaster.CreateIp(tcpClient);
+                var master = new ModbusFactory().CreateMaster(tcpClient);
                 master.Transport.ReadTimeout = Math.Max(1, options.ResponseTimeoutMs);
                 master.Transport.WriteTimeout = Math.Max(1, options.ResponseTimeoutMs);
                 master.Transport.Retries = 0;
@@ -389,7 +388,7 @@ namespace ModbusForge.Services
 
             public void Dispose()
             {
-                Master?.Dispose();
+                (Master as IDisposable)?.Dispose();
                 TcpClient?.Dispose();
                 Master = null;
                 TcpClient = null;

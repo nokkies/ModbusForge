@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Modbus.Data;
+using ModbusForge.Data;
 using ModbusForge.Models;
 
 namespace ModbusForge.Services

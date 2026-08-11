@@ -214,9 +214,9 @@ namespace ModbusForge.Tests.Simulation
             return new SimulationNode(id, id, block);
         }
 
-        private static Modbus.Data.DataStore CreateDataStore()
+        private static ModbusForge.Data.DataStore CreateDataStore()
         {
-            return Modbus.Data.DataStoreFactory.CreateDefaultDataStore();
+            return ModbusForge.Data.DataStoreFactory.CreateDefaultDataStore();
         }
     }
 }

@@ -4,7 +4,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Modbus.Device;
+using NModbus;
 using ModbusForge.Services;
 using Moq;
 using Xunit;

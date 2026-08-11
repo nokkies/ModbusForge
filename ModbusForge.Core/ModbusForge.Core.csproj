@@ -13,8 +13,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NModbus4" Version="2.0.5516.31020" />
     <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
+    <PackageReference Include="NModbus" Version="3.0.83" />
     <PackageReference Include="PacketDotNet" Version="1.4.8" />
     <PackageReference Include="YamlDotNet" Version="17.1.0" />
     <PackageReference Include="System.IO.Ports" Version="9.0.0" />
