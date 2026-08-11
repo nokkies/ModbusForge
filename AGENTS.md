@@ -73,7 +73,7 @@ As of the v6.1.0 / headless split work, ModbusForge uses **CalVer-style** versio
 - `M` = month (no leading zero)
 - `INCREMENT` = release number within that month, starting at 1
 
-Update the version in all three `.csproj` files before tagging (`ModbusForge.Avalonia`, `ModbusForge.Core`, `ModbusForge.Headless`):
+Update the version in all three `.csproj` files before tagging (`ModbusForge`, `ModbusForge.Core`, `ModbusForge.Headless`):
 
 ```xml
 <Version>2026.7.1</Version>
@@ -93,7 +93,7 @@ Tags should still be prefixed with `v`, e.g. `v2026.7.1`.
 
 ## Project Structure
 
-- `ModbusForge.Avalonia/` - Main Avalonia desktop application (`net8.0`)
+- `ModbusForge/` - Main Avalonia desktop application (`net8.0`)
 - `ModbusForge.Core/` - Cross-platform view-agnostic class library (`net8.0`)
 - `ModbusForge.Avalonia.Tests/` - Avalonia integration/unit tests (`net8.0`)
 - `ModbusForge.Headless/` - Linux/headless console runtime (`net8.0`)

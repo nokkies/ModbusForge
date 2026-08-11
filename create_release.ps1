@@ -16,7 +16,7 @@ param(
 )
 
 $repoRoot = $PSScriptRoot
-$csproj = Join-Path $repoRoot "ModbusForge.Avalonia\ModbusForge.Avalonia.csproj"
+$csproj = Join-Path $repoRoot "ModbusForge\ModbusForge.csproj"
 if (-not $Version) {
     $Version = ((Get-Content $csproj | Select-String '<Version>(.*)</Version>').Matches[0].Groups[1].Value)
 }

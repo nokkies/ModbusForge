@@ -21,7 +21,7 @@ triggers `.github/workflows/release.yml`, which:
 
 ### 1. Bump the version in the Avalonia csproj
 
-File: `ModbusForge.Avalonia/ModbusForge.Avalonia.csproj`
+File: `ModbusForge/ModbusForge.csproj`
 
 ```xml
 <Version>YYYY.M.I</Version>
@@ -35,7 +35,7 @@ workflow via `/DAppVersion=YYYY.M.I`.
 ### 2. Commit the version bump
 
 ```powershell
-git add ModbusForge.Avalonia/ModbusForge.Avalonia.csproj
+git add ModbusForge/ModbusForge.csproj
 git commit -m "vYYYY.M.I: <short description of changes>"
 git push origin master
 ```
@@ -81,7 +81,7 @@ If you need to customise the GitHub Release body, edit
 
 | File | Purpose |
 |------|---------|
-| `ModbusForge.Avalonia/ModbusForge.Avalonia.csproj` | Version source — bump `<Version>` here |
+| `ModbusForge/ModbusForge.csproj` | Version source — bump `<Version>` here |
 | `.github/workflows/release.yml` | Main release workflow (triggered by `v*` tag) |
 | `.github/workflows/avalonia.yml` | CI build/test for Avalonia |
 | `.github/workflows/ci.yml` | CI build/test for the full solution |
@@ -118,7 +118,7 @@ If you need to customise the GitHub Release body, edit
 
 ### Wrong version in installer
 - The version is passed via `/DAppVersion` — confirm `<Version>` in
-  `ModbusForge.Avalonia/ModbusForge.Avalonia.csproj` matches the tag you pushed
+  `ModbusForge/ModbusForge.csproj` matches the tag you pushed
 
 ### Tag already exists locally but not on remote
 ```powershell
@@ -139,9 +139,9 @@ git push origin vYYYY.M.I
 ## Complete Example (v2026.8.16)
 
 ```powershell
-# 1. Bump version in ModbusForge.Avalonia/ModbusForge.Avalonia.csproj to 2026.8.16
+# 1. Bump version in ModbusForge/ModbusForge.csproj to 2026.8.16
 # 2. Commit
-git add ModbusForge.Avalonia/ModbusForge.Avalonia.csproj
+git add ModbusForge/ModbusForge.csproj
 git commit -m "v2026.8.16: Description of changes"
 git push origin master
 

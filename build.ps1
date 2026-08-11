@@ -14,7 +14,7 @@ param (
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Get-Location
 $SolutionFile = Join-Path $ProjectRoot "ModbusForge.sln"
-$ProjectFile = Join-Path $ProjectRoot "ModbusForge.Avalonia\ModbusForge.Avalonia.csproj"
+$ProjectFile = Join-Path $ProjectRoot "ModbusForge\ModbusForge.csproj"
 $PublishDir = Join-Path $ProjectRoot "publish"
 $Version = ((Get-Content $ProjectFile | Select-String '<Version>(.*)</Version>').Matches[0].Groups[1].Value)
 

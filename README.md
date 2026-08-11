@@ -152,7 +152,7 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ### 2026.7.3 — Avalonia Foundations
 
-- **Default startup project**: `ModbusForge.Avalonia` is now first in `ModbusForge.sln`.
+- **Default startup project**: `ModbusForge` is now first in `ModbusForge.sln`.
 - **Cross-platform CI**: Added GitHub Actions workflow to build and test Avalonia on Windows and Linux.
 - **Self-contained publishing**: Validated `win-x64` and `linux-x64` single-file publishes.
 
@@ -630,7 +630,7 @@ dotnet build ModbusForge.sln -c Release
 
 ```powershell
 $version = "2026.8.16"
-dotnet publish .\ModbusForge.Avalonia\ModbusForge.Avalonia.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o .\publish\avalonia\win-x64
+dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o .\publish\avalonia\win-x64
 ```
 
 ### Create a ZIP Artifact

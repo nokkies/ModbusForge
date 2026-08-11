@@ -5,7 +5,7 @@
 set -e
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
-PROJECT="$REPO_ROOT/ModbusForge.Avalonia/ModbusForge.Avalonia.csproj"
+PROJECT="$REPO_ROOT/ModbusForge/ModbusForge.csproj"
 
 RUNTIME="${1:-all}"
 PROFILES=()
@@ -19,7 +19,7 @@ if [ "$RUNTIME" = "linux-x64" ] || [ "$RUNTIME" = "all" ]; then
 fi
 
 for PROFILE in "${PROFILES[@]}"; do
-    PROFILE_PATH="ModbusForge.Avalonia/Properties/PublishProfiles/$PROFILE.pubxml"
+    PROFILE_PATH="ModbusForge/Properties/PublishProfiles/$PROFILE.pubxml"
     FULL_PROFILE="$REPO_ROOT/$PROFILE_PATH"
 
     if [ ! -f "$FULL_PROFILE" ]; then

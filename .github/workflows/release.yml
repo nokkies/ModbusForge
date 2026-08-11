@@ -41,7 +41,7 @@ jobs:
 
       - name: Publish Avalonia (Windows)
         run: >
-          dotnet publish .\ModbusForge.Avalonia\ModbusForge.Avalonia.csproj -c Release -r win-x64
+          dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64
           --self-contained true
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
@@ -53,7 +53,7 @@ jobs:
 
       - name: Publish Avalonia (Linux)
         run: >
-          dotnet publish .\ModbusForge.Avalonia\ModbusForge.Avalonia.csproj -c Release -r linux-x64
+          dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r linux-x64
           --self-contained true
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true

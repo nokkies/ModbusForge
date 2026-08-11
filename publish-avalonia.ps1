@@ -9,7 +9,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = $PSScriptRoot
-$project = Join-Path (Join-Path $repoRoot 'ModbusForge.Avalonia') 'ModbusForge.Avalonia.csproj'
+$project = Join-Path (Join-Path $repoRoot 'ModbusForge') 'ModbusForge.csproj'
 Write-Output "Starting publish from $repoRoot"
 
 $version = ((Get-Content $project | Select-String '<Version>(.*)</Version>').Matches[0].Groups[1].Value)

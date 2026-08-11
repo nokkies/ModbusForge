@@ -26,12 +26,12 @@ jobs:
 
     - name: Restore dependencies
       run: |
-        dotnet restore ./ModbusForge.Avalonia/ModbusForge.Avalonia.csproj
+        dotnet restore ./ModbusForge/ModbusForge.csproj
         dotnet restore ./ModbusForge.Avalonia.Tests/ModbusForge.Avalonia.Tests.csproj
 
     - name: Build Avalonia
       run: |
-        dotnet build ./ModbusForge.Avalonia/ModbusForge.Avalonia.csproj --configuration Release --no-restore
+        dotnet build ./ModbusForge/ModbusForge.csproj --configuration Release --no-restore
         dotnet build ./ModbusForge.Avalonia.Tests/ModbusForge.Avalonia.Tests.csproj --configuration Release --no-restore
 
     - name: Run Avalonia tests

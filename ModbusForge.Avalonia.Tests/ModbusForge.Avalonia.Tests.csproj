@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ModbusForge.Avalonia\ModbusForge.Avalonia.csproj" />
+    <ProjectReference Include="..\ModbusForge\ModbusForge.csproj" />
     <ProjectReference Include="..\ModbusForge.Core\ModbusForge.Core.csproj" />
   </ItemGroup>
 
