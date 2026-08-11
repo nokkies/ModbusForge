@@ -26,6 +26,7 @@ permissions:
 
 jobs:
   release:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && github.actor != 'github-actions[bot]')
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -41,7 +42,7 @@ jobs:
         shell: pwsh
         run: |
           if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
-            $version = '${{ inputs.version }}'.TrimStart('v')
+            $version = '${{ github.event.inputs.version }}'.TrimStart('v')
             $tag = "v$version"
           } else {
             $tag = '${{ github.ref_name }}'
@@ -70,6 +71,18 @@ jobs:
             'has-cert=true' >> $env:GITHUB_OUTPUT
           } else {
             'has-cert=false' >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Determine release flags
+        id: flags
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            'draft=${{ github.event.inputs.draft }}' >> $env:GITHUB_OUTPUT
+            'prerelease=${{ github.event.inputs.prerelease }}' >> $env:GITHUB_OUTPUT
+          } else {
+            'draft=false' >> $env:GITHUB_OUTPUT
+            'prerelease=false' >> $env:GITHUB_OUTPUT
           }
 
       - name: Restore
@@ -311,9 +324,9 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ModbusForge ${{ steps.version.outputs.tag }}
-          draft: ${{ github.event_name == 'workflow_dispatch' && inputs.draft }}
-          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease }}
-          make_latest: ${{ (github.event_name == 'workflow_dispatch' && inputs.draft) && 'false' || 'true' }}
+          draft: ${{ steps.flags.outputs.draft }}
+          prerelease: ${{ steps.flags.outputs.prerelease }}
+          make_latest: ${{ (github.event_name == 'workflow_dispatch' && steps.flags.outputs.draft == 'true') && 'false' || 'true' }}
           generate_release_notes: false
           body_path: ./release-notes.md
           files: packages/ModbusForge-*
