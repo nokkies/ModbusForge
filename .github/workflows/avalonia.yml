@@ -36,3 +36,31 @@ jobs:
 
     - name: Run Avalonia tests
       run: dotnet test ./ModbusForge.Avalonia.Tests/ModbusForge.Avalonia.Tests.csproj --configuration Release --no-build --verbosity normal
+
+    - name: Restore and publish Headless (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        dotnet restore ./ModbusForge.Headless/ModbusForge.Headless.csproj
+        dotnet publish ./ModbusForge.Headless/ModbusForge.Headless.csproj \
+          --configuration Release --runtime linux-x64 \
+          --self-contained true \
+          -p:PublishSingleFile=true \
+          -p:IncludeNativeLibrariesForSelfExtract=true \
+          -p:PublishTrimmed=false \
+          -p:Version=0.0.0-ci \
+          -o ./publish/headless/linux-x64
+
+    - name: Headless smoke test (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      shell: bash
+      run: |
+        ./publish/headless/linux-x64/ModbusForge.Headless \
+          --host 127.0.0.1 --port 1502 --interval 1000 > headless-smoke.log 2>&1 &
+        HEADLESS_PID=$!
+        sleep 5
+        kill $HEADLESS_PID || true
+        cat headless-smoke.log
+        if ! grep -q "Connecting" headless-smoke.log; then
+          echo "Headless did not log a connection attempt"
+          exit 1
+        fi

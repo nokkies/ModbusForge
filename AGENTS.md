@@ -31,9 +31,9 @@ This file provides instructions for AI coding assistants working on this project
 
 ### Creating a Release
 
-**Important:** Do **not** create GitHub Releases or push `v*` tags while the program is being rebuilt on the new system. The `.github/workflows/release.yml` trigger is currently disabled (`workflow_dispatch` only) to prevent accidental releases. Re-enable tag-based releases only after the rebuild is complete.
+The release workflow is automated via `.github/workflows/release.yml`. It triggers on `v*` tag pushes and can also be started manually from the Actions tab (`workflow_dispatch`).
 
-1. **Update version in `.csproj`**:
+1. **Update version in all three `.csproj` files** (`ModbusForge`, `ModbusForge.Core`, `ModbusForge.Headless`):
    ```xml
    <Version>2026.7.12</Version>
    <AssemblyVersion>2026.7.12</AssemblyVersion>
@@ -52,18 +52,12 @@ This file provides instructions for AI coding assistants working on this project
    git push origin v2026.7.12
    ```
 
-4. **Build installer** (optional - for full release):
+   Pushing the tag will automatically build, test, package, and create a GitHub Release with the installer, Windows/Linux Avalonia zips, and Windows/Linux Headless zips.
+
+4. **Local installer build** (optional):
    ```powershell
    .\build.ps1 -Task Installer
    ```
-
-5. **Create GitHub release** manually at:
-   https://github.com/nokkies/ModbusForge/releases/new
-
-   - Select the tag (e.g., v2026.7.12)
-   - Title: `ModbusForge v2026.7.12`
-   - Upload: `installers\ModbusForge-2026.7.12-setup.exe`
-   - Description: Brief changelog
 
 ## Versioning
 

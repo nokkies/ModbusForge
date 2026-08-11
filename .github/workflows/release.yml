@@ -5,12 +5,28 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 2026.8.18)'
+        required: true
+        type: string
+      draft:
+        description: 'Create as draft release'
+        required: false
+        default: false
+        type: boolean
+      prerelease:
+        description: 'Create as pre-release'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
 
 jobs:
   release:
     runs-on: windows-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,14 +36,29 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Compute version from tag
+      - name: Compute version and tag
         id: version
         shell: pwsh
         run: |
-          $versionTag = '${{ github.ref_name }}'
-          if (-not $versionTag) { $versionTag = 'v0.0.0' }
-          $version = $versionTag.TrimStart('v')
-          echo "version=$version" >> $env:GITHUB_OUTPUT
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            $version = '${{ inputs.version }}'.TrimStart('v')
+            $tag = "v$version"
+          } else {
+            $tag = '${{ github.ref_name }}'
+            $version = $tag.TrimStart('v')
+          }
+
+          if (-not $version) {
+            Write-Error 'Could not determine release version.'
+            exit 1
+          }
+
+          if ($version -notmatch '^\d{4}\.\d{1,2}\.\d+$') {
+            Write-Warning "Version '$version' does not match the expected CalVer pattern (YYYY.M.INCREMENT)."
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
 
       - name: Restore
         run: dotnet restore
@@ -36,7 +67,17 @@ jobs:
         shell: pwsh
         run: |
           $version = '${{ steps.version.outputs.version }}'
-          dotnet build ModbusForge.sln -c Release --no-restore -p:Version=$version -p:AssemblyVersion=$version.0 -p:FileVersion=$version.0
+          dotnet build ModbusForge.sln -c Release --no-restore `
+            -p:Version=$version `
+            -p:AssemblyVersion=$version.0 `
+            -p:FileVersion=$version.0
+
+      - name: Test (Windows, no UI/Smoke)
+        shell: pwsh
+        run: |
+          dotnet test ModbusForge.Tests/ModbusForge.Tests.csproj -c Release --no-build `
+            --filter 'FullyQualifiedName!~UITests & FullyQualifiedName!~SmokeTests'
+          dotnet test ModbusForge.Avalonia.Tests/ModbusForge.Avalonia.Tests.csproj -c Release --no-build
 
       - name: Publish Avalonia (Windows)
         run: >
@@ -62,38 +103,61 @@ jobs:
           -p:FileVersion=${{ steps.version.outputs.version }}.0
           -o .\publish\avalonia\linux-x64
 
-      - name: Package release artifacts
+      - name: Publish Headless (Windows)
+        run: >
+          dotnet publish .\ModbusForge.Headless\ModbusForge.Headless.csproj -c Release -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:PublishTrimmed=false
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:AssemblyVersion=${{ steps.version.outputs.version }}.0
+          -p:FileVersion=${{ steps.version.outputs.version }}.0
+          -o .\publish\headless\win-x64
+
+      - name: Publish Headless (Linux)
+        run: >
+          dotnet publish .\ModbusForge.Headless\ModbusForge.Headless.csproj -c Release -r linux-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:PublishTrimmed=false
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:AssemblyVersion=${{ steps.version.outputs.version }}.0
+          -p:FileVersion=${{ steps.version.outputs.version }}.0
+          -o .\publish\headless\linux-x64
+
+      - name: Strip debug symbols from publish outputs
         shell: pwsh
         run: |
-          $version = '${{ steps.version.outputs.version }}'
-          $avaloniaWin = ".\publish\avalonia\win-x64"
-          $avaloniaLinux = ".\publish\avalonia\linux-x64"
-          New-Item -ItemType Directory -Path .\packages -Force | Out-Null
+          Get-ChildItem -Path .\publish -Filter '*.pdb' -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 
-          Compress-Archive -Path "$avaloniaWin\*" -DestinationPath ".\packages\ModbusForge-$version-win-x64.zip" -Force
-
-          $staging = ".\packages\ModbusForge"
-          if (Test-Path $staging) { Remove-Item -Path $staging -Recurse -Force }
-          Copy-Item -Path $avaloniaLinux -Destination $staging -Recurse
-          tar -czf ".\packages\ModbusForge-$version-linux-x64.tar.gz" -C .\packages ModbusForge
-          Remove-Item -Path $staging -Recurse -Force
-
-      - name: Generate checksums
+      - name: Code sign Windows executable (optional)
+        if: ${{ secrets.CODESIGN_CERTIFICATE_BASE64 != '' }}
         shell: pwsh
         run: |
-          $files = Get-ChildItem -Path .\packages -Filter 'ModbusForge-*'
-          foreach ($f in $files) {
-            $hash = (Get-FileHash -Algorithm SHA256 -Path $f.FullName).Hash.ToLower()
-            $out = "$hash  $($f.Name)"
-            $out | Out-File -FilePath "$($f.FullName).sha256" -Encoding ascii -NoNewline
+          $cert = [System.Convert]::FromBase64String('${{ secrets.CODESIGN_CERTIFICATE_BASE64 }}')
+          [System.IO.File]::WriteAllBytes('codesign.pfx', $cert)
+
+          $signtool = Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10\bin' `
+            -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue | `
+            Select-Object -First 1 -ExpandProperty FullName
+
+          if (-not $signtool) {
+            Write-Error 'signtool.exe not found. Install the Windows SDK on the runner.'
+            exit 1
           }
 
-      - name: Clean stale installer artifacts
+          & $signtool sign `
+            /f codesign.pfx `
+            /p '${{ secrets.CODESIGN_CERTIFICATE_PASSWORD }}' `
+            /tr http://timestamp.digicert.com `
+            /td sha256 /fd sha256 /a `
+            '.\publish\avalonia\win-x64\ModbusForge.exe'
+
+      - name: Install Inno Setup
         shell: pwsh
-        run: |
-          if (Test-Path 'installers') {
-            Remove-Item -Path 'installers\*.exe' -Recurse -Force -ErrorAction SilentlyContinue
-          }
+        run: choco install innosetup -y
 
       - name: Build Inno Setup Installer
         shell: pwsh
@@ -102,42 +166,145 @@ jobs:
           $env:PATH += ";${env:ProgramFiles(x86)}\Inno Setup 6"
           Write-Host "Building installer with version $version..."
           & iscc /DAppVersion=$version setup\ModbusForge.iss
-          if (Test-Path .\installers) {
-            Write-Host "Avalonia installer created:"
-            Get-ChildItem .\installers\*.exe | Select-Object Name,Length
-          } else {
-            Write-Host "ERROR: installers directory not found!"
+          if (-not (Test-Path .\installers)) {
+            Write-Error 'Installers directory not found after Inno Setup build.'
             exit 1
           }
+
+      - name: Code sign installer (optional)
+        if: ${{ secrets.CODESIGN_CERTIFICATE_BASE64 != '' }}
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $cert = [System.Convert]::FromBase64String('${{ secrets.CODESIGN_CERTIFICATE_BASE64 }}')
+          [System.IO.File]::WriteAllBytes('codesign.pfx', $cert)
+
+          $signtool = Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10\bin' `
+            -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue | `
+            Select-Object -First 1 -ExpandProperty FullName
+
+          if (-not $signtool) {
+            Write-Error 'signtool.exe not found. Install the Windows SDK on the runner.'
+            exit 1
+          }
+
+          & $signtool sign `
+            /f codesign.pfx `
+            /p '${{ secrets.CODESIGN_CERTIFICATE_PASSWORD }}' `
+            /tr http://timestamp.digicert.com `
+            /td sha256 /fd sha256 /a `
+            ".\installers\ModbusForge-$version-setup.exe"
+
+      - name: Package release artifacts
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          if (Test-Path .\packages) { Remove-Item -Path .\packages -Recurse -Force }
+          New-Item -ItemType Directory -Path .\packages -Force | Out-Null
+
+          # Avalonia Windows
+          Compress-Archive -Path '.\publish\avalonia\win-x64\*' `
+            -DestinationPath ".\packages\ModbusForge-$version-win-x64.zip" -Force
+
+          # Avalonia Linux
+          $staging = ".\packages\ModbusForge"
+          if (Test-Path $staging) { Remove-Item -Path $staging -Recurse -Force }
+          Copy-Item -Path '.\publish\avalonia\linux-x64' -Destination $staging -Recurse
+          tar -czf ".\packages\ModbusForge-$version-linux-x64.tar.gz" -C .\packages ModbusForge
+          Remove-Item -Path $staging -Recurse -Force
+
+          # Headless Windows
+          Compress-Archive -Path '.\publish\headless\win-x64\*' `
+            -DestinationPath ".\packages\ModbusForge-$version-headless-win-x64.zip" -Force
+
+          # Headless Linux
+          $staging = ".\packages\ModbusForge.Headless"
+          if (Test-Path $staging) { Remove-Item -Path $staging -Recurse -Force }
+          Copy-Item -Path '.\publish\headless\linux-x64' -Destination $staging -Recurse
+          tar -czf ".\packages\ModbusForge-$version-headless-linux-x64.tar.gz" -C .\packages ModbusForge.Headless
+          Remove-Item -Path $staging -Recurse -Force
+
+          # Copy installer into packages for a single release asset location
+          Copy-Item -Path ".\installers\ModbusForge-$version-setup.exe" `
+            -Destination ".\packages\ModbusForge-$version-setup.exe" -Force
+
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path .\packages -File -Filter 'ModbusForge-*'
+          foreach ($f in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -Path $f.FullName).Hash.ToLower()
+            $out = "$hash  $($f.Name)"
+            $out | Out-File -FilePath "$($f.FullName).sha256" -Encoding ascii -NoNewline
+          }
+
+      - name: Validate installer asset name
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $installer = ".\packages\ModbusForge-$version-setup.exe"
+          if (-not (Test-Path $installer)) {
+            Write-Error "Installer asset not found: $installer"
+            exit 1
+          }
+          $size = (Get-Item $installer).Length
+          if ($size -eq 0) {
+            Write-Error 'Installer asset is empty.'
+            exit 1
+          }
+          Write-Host "Installer asset validated: $installer ($size bytes)"
+
+      - name: Generate release notes
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $lines = Get-Content README.md
+          $foundWhatsNew = $false
+          $collect = $false
+          $notes = @()
+
+          foreach ($line in $lines) {
+            if ($line -match '^## What''s New') {
+              $foundWhatsNew = $true
+              continue
+            }
+
+            if ($foundWhatsNew -and $line -match '^### ') {
+              if ($collect) { break }
+              $collect = $true
+            }
+
+            if ($collect) {
+              $notes += $line
+            }
+          }
+
+          if ($notes.Count -eq 0) {
+            $notes = @('See [README.md](README.md) for the full changelog.')
+          }
+
+          $header = "# ModbusForge v$version"
+          $body = "$header`n`n" + ($notes -join "`n")
+          $body | Out-File -FilePath release-notes.md -Encoding utf8
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ModbusForge-${{ github.ref_name }}
-          path: |
-            packages/ModbusForge-*-win-x64.zip
-            packages/ModbusForge-*-win-x64.zip.sha256
-            packages/ModbusForge-*-linux-x64.tar.gz
-            packages/ModbusForge-*-linux-x64.tar.gz.sha256
-            installers/ModbusForge-${{ steps.version.outputs.version }}-setup.exe
-          if-no-files-found: ignore
+          name: ModbusForge-${{ steps.version.outputs.tag }}
+          path: packages/ModbusForge-*
+          if-no-files-found: error
 
       - name: Create GitHub Release and upload assets
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ModbusForge ${{ github.ref_name }}
-          generate_release_notes: true
-          body: |
-            Automated release for ${{ github.ref_name }}.
-            ModbusForge is now the recommended cross-platform entry point.
-            See README.md Changelog for details.
-          files: |
-            packages/ModbusForge-*-win-x64.zip
-            packages/ModbusForge-*-win-x64.zip.sha256
-            packages/ModbusForge-*-linux-x64.tar.gz
-            packages/ModbusForge-*-linux-x64.tar.gz.sha256
-            installers/ModbusForge-${{ steps.version.outputs.version }}-setup.exe
-          fail_on_unmatched_files: false
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ModbusForge ${{ steps.version.outputs.tag }}
+          draft: ${{ github.event_name == 'workflow_dispatch' && inputs.draft }}
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease }}
+          make_latest: ${{ (github.event_name == 'workflow_dispatch' && inputs.draft) && 'false' || 'true' }}
+          generate_release_notes: false
+          body_path: ./release-notes.md
+          files: packages/ModbusForge-*
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
