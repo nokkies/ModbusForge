@@ -626,33 +626,24 @@ dotnet restore
 dotnet build ModbusForge.sln -c Release
 ```
 
-### Publish (framework-dependent, single-file)
+### Publish (Avalonia, self-contained, single-file)
 
 ```powershell
-$version = "5.8.7"
-dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishTrimmed=false -o .\publish\win-x64
-```
-
-### Publish (self-contained, single-file)
-
-```powershell
-$version = "5.8.7"
-dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o .\publish\win-x64-sc
+$version = "2026.8.16"
+dotnet publish .\ModbusForge.Avalonia\ModbusForge.Avalonia.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o .\publish\avalonia\win-x64
 ```
 
 ### Create a ZIP Artifact
 
 ```powershell
-$version = "5.8.7"
-Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
-# or for self-contained
-Compress-Archive -Path .\publish\win-x64-sc\* -DestinationPath .\ModbusForge-$version-win-x64-sc.zip -Force
+$version = "2026.8.16"
+Compress-Archive -Path .\publish\avalonia\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64-avalonia.zip -Force
 ```
 
 ### Create an Installer
 
 ```powershell
-& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "setup\ModbusForge.iss"
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=2026.8.16 "setup\ModbusForge.Avalonia.iss"
 ```
 
 ---

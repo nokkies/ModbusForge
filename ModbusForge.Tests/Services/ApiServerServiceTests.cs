@@ -433,7 +433,7 @@ namespace ModbusForge.Tests.Services
         }
 
         // ──────────────────────────────────────────────────────────────────────
-        // WpfApiApplicationService: concurrency / cancellation
+        // ApiApplicationService: concurrency / cancellation
         // ──────────────────────────────────────────────────────────────────────
 
         [Fact]
@@ -458,14 +458,14 @@ namespace ModbusForge.Tests.Services
         {
             var fakeAccessor = new FakeAppStateAccessor { IsConnected = false };
             var dispatcher = new ImmediateDispatcher();
-            var svc = new WpfApiApplicationService(
+            var svc = new ApiApplicationService(
                 fakeAccessor,
                 new Mock<IModbusService>().Object,
                 new Mock<IScriptRuleService>().Object,
                 new Mock<IConsoleLoggerService>().Object,
                 new Mock<ITrendLogger>().Object,
                 dispatcher,
-                NullLogger<WpfApiApplicationService>.Instance);
+                NullLogger<ApiApplicationService>.Instance);
 
             // Never set IsConnected = true → the wait will be cancelled
             var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
@@ -483,14 +483,14 @@ namespace ModbusForge.Tests.Services
         {
             var fakeAccessor = new FakeAppStateAccessor { IsConnected = true };
             var dispatcher = new ImmediateDispatcher();
-            var svc = new WpfApiApplicationService(
+            var svc = new ApiApplicationService(
                 fakeAccessor,
                 new Mock<IModbusService>().Object,
                 new Mock<IScriptRuleService>().Object,
                 new Mock<IConsoleLoggerService>().Object,
                 new Mock<ITrendLogger>().Object,
                 dispatcher,
-                NullLogger<WpfApiApplicationService>.Instance);
+                NullLogger<ApiApplicationService>.Instance);
 
             // Disconnect command fires but never changes IsConnected → timeout
             fakeAccessor.ShouldExecuteDisconnect = true;
@@ -544,7 +544,7 @@ namespace ModbusForge.Tests.Services
         {
             const int expectedMin = 10_000;
             const int expectedMax = 60_000;
-            var field = typeof(WpfApiApplicationService).GetField(
+            var field = typeof(ApiApplicationService).GetField(
                 "ConnectionStateTimeoutMs",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
             Assert.NotNull(field);

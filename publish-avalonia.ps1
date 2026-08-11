@@ -12,37 +12,36 @@ $repoRoot = $PSScriptRoot
 $project = Join-Path (Join-Path $repoRoot 'ModbusForge.Avalonia') 'ModbusForge.Avalonia.csproj'
 Write-Output "Starting publish from $repoRoot"
 
-$profiles = @()
-if ($Runtime -in @('win-x64', 'all')) { $profiles += 'win-x64' }
-if ($Runtime -in @('linux-x64', 'all')) { $profiles += 'linux-x64' }
+$version = ((Get-Content $project | Select-String '<Version>(.*)</Version>').Matches[0].Groups[1].Value)
+$packageDir = Join-Path $repoRoot 'packages'
+New-Item -ItemType Directory -Path $packageDir -Force | Out-Null
 
-foreach ($profile in $profiles) {
-    $profilePath = Join-Path (Join-Path (Join-Path 'ModbusForge.Avalonia' 'Properties') 'PublishProfiles') "$profile.pubxml"
-    $fullProfile = Join-Path $repoRoot $profilePath
+$runtimes = @()
+if ($Runtime -in @('win-x64', 'all')) { $runtimes += 'win-x64' }
+if ($Runtime -in @('linux-x64', 'all')) { $runtimes += 'linux-x64' }
 
-    if (-not (Test-Path $fullProfile)) {
-        throw "Publish profile not found: $fullProfile"
-    }
+foreach ($rt in $runtimes) {
+    $publishDir = Join-Path (Join-Path (Join-Path $repoRoot 'publish') 'avalonia') $rt
 
-    Write-Output "Publishing ModbusForge.Avalonia for $profile..."
-    dotnet publish $project -p:PublishProfile=$profile -c Release
+    Write-Output "Publishing ModbusForge.Avalonia for $rt..."
+    dotnet publish $project -c Release -r $rt `
+        --self-contained true `
+        -p:PublishSingleFile=true `
+        -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:PublishTrimmed=false `
+        -p:Version=$version `
+        -o $publishDir
 
     if ($LASTEXITCODE -ne 0) {
-        throw "Publish failed for $profile"
+        throw "Publish failed for $rt"
     }
 
-    $publishDir = Join-Path (Join-Path (Join-Path $repoRoot 'publish') 'avalonia') $profile
     Write-Output "Published to $publishDir"
 
     # Strip debug symbols from the published package; single-file bundles don't need them.
     Get-ChildItem -Path $publishDir -Filter '*.pdb' -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
 
-    # Package the output
-    $version = (Get-Content (Join-Path $repoRoot 'ModbusForge.Avalonia\ModbusForge.Avalonia.csproj') | Select-String '<Version>(.*)</Version>').Matches[0].Groups[1].Value
-    $packageDir = Join-Path $repoRoot 'packages'
-    New-Item -ItemType Directory -Path $packageDir -Force | Out-Null
-
-    if ($profile -eq 'win-x64') {
+    if ($rt -eq 'win-x64') {
         $zipPath = Join-Path $packageDir "ModbusForge-$version-win-x64-avalonia.zip"
         Compress-Archive -Path "$publishDir\*" -DestinationPath $zipPath -Force
         Write-Output "Created $zipPath"
@@ -70,7 +69,7 @@ foreach ($profile in $profiles) {
             Write-Warning "Inno Setup compiler not found at $iscc; skipping installer build"
         }
     }
-    elseif ($profile -eq 'linux-x64') {
+    elseif ($rt -eq 'linux-x64') {
         $tarName = "ModbusForge-$version-linux-x64-avalonia.tar.gz"
         $tarPath = Join-Path $packageDir $tarName
         $stagingName = 'ModbusForge'

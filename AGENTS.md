@@ -54,8 +54,7 @@ This file provides instructions for AI coding assistants working on this project
 
 4. **Build installer** (optional - for full release):
    ```powershell
-   dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o .\publish\win-x64
-   & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "setup\ModbusForge.iss"
+   .\build.ps1 -Task Installer
    ```
 
 5. **Create GitHub release** manually at:
@@ -74,7 +73,7 @@ As of the v6.1.0 / headless split work, ModbusForge uses **CalVer-style** versio
 - `M` = month (no leading zero)
 - `INCREMENT` = release number within that month, starting at 1
 
-Update the version in all four `.csproj` files before tagging (`ModbusForge`, `ModbusForge.Core`, `ModbusForge.Headless`, `ModbusForge.Avalonia`):
+Update the version in all three `.csproj` files before tagging (`ModbusForge.Avalonia`, `ModbusForge.Core`, `ModbusForge.Headless`):
 
 ```xml
 <Version>2026.7.1</Version>
@@ -94,13 +93,12 @@ Tags should still be prefixed with `v`, e.g. `v2026.7.1`.
 
 ## Project Structure
 
-- `ModbusForge/` - Main WPF application
+- `ModbusForge.Avalonia/` - Main Avalonia desktop application (`net8.0`)
 - `ModbusForge.Core/` - Cross-platform view-agnostic class library (`net8.0`)
-- `ModbusForge.Avalonia/` - Cross-platform Avalonia UI spike (`net8.0`)
 - `ModbusForge.Avalonia.Tests/` - Avalonia integration/unit tests (`net8.0`)
 - `ModbusForge.Headless/` - Linux/headless console runtime (`net8.0`)
-- `ModbusForge.Tests/` - Unit tests
-- `setup/ModbusForge.iss` - Inno Setup installer script
+- `ModbusForge.Tests/` - Core/headless unit tests (`net8.0-windows`)
+- `setup/ModbusForge.Avalonia.iss` - Inno Setup installer script
 - `installers/` - Built installers (gitignored)
 - `.windsurf/workflows/` - Workflow definitions
 

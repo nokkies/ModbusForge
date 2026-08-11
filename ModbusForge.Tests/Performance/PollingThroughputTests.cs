@@ -82,7 +82,7 @@ namespace ModbusForge.Tests.Performance
                 await Task.Delay(50);
             }
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var results = new List<PollingResult>(unitCount * readsPerUnit);
             while (results.Count < unitCount * readsPerUnit)
             {

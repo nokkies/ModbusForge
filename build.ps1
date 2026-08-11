@@ -1,5 +1,5 @@
 # ModbusForge Build Automation Script
-# Usage: .\build.ps1 -Task <Restore|Build|Publish|All> [-Configuration <Debug|Release>]
+# Usage: .\build.ps1 -Task <Restore|Build|Publish|Installer|All> [-Configuration <Debug|Release>]
 
 param (
     [Parameter(Mandatory = $false)]
@@ -14,9 +14,9 @@ param (
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Get-Location
 $SolutionFile = Join-Path $ProjectRoot "ModbusForge.sln"
-$ProjectFile = Join-Path $ProjectRoot "ModbusForge\ModbusForge.csproj"
+$ProjectFile = Join-Path $ProjectRoot "ModbusForge.Avalonia\ModbusForge.Avalonia.csproj"
 $PublishDir = Join-Path $ProjectRoot "publish"
-$Version = "3.0.3" # Current version from Inno Setup script
+$Version = ((Get-Content $ProjectFile | Select-String '<Version>(.*)</Version>').Matches[0].Groups[1].Value)
 
 function Run-Restore {
     Write-Host "--- Restoring NuGet Packages ---" -ForegroundColor Cyan
@@ -29,23 +29,18 @@ function Run-Build {
 }
 
 function Run-Publish {
-    Write-Host "--- Publishing Application ---" -ForegroundColor Cyan
-    
-    # 1. Framework-dependent, single-file
-    $OutDir1 = Join-Path $PublishDir "win-x64"
-    Write-Host "Publishing framework-dependent to $OutDir1..." -ForegroundColor Gray
-    dotnet publish $ProjectFile -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishTrimmed=false -o $OutDir1
+    Write-Host "--- Publishing Avalonia Application ---" -ForegroundColor Cyan
 
-    # 2. Self-contained, single-file
-    $OutDir2 = Join-Path $PublishDir "win-x64-sc"
-    Write-Host "Publishing self-contained to $OutDir2..." -ForegroundColor Gray
-    dotnet publish $ProjectFile -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o $OutDir2
+    # Self-contained, single-file for the Windows installer
+    $OutDir = Join-Path $PublishDir "avalonia\win-x64"
+    Write-Host "Publishing self-contained single-file to $OutDir..." -ForegroundColor Gray
+    dotnet publish $ProjectFile -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o $OutDir
 }
 
 function Run-Installer {
     Write-Host "--- Building Inno Setup Installer ---" -ForegroundColor Cyan
-    
-    $IssFile = Join-Path $ProjectRoot "setup\ModbusForge.iss"
+
+    $IssFile = Join-Path $ProjectRoot "setup\ModbusForge.Avalonia.iss"
     if (-not (Test-Path $IssFile)) {
         Write-Error "Inno Setup script not found at $IssFile"
         return
