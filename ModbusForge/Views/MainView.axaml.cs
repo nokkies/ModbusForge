@@ -24,12 +24,9 @@ namespace ModbusForge.Avalonia.Views
         private DataGrid? _inputRegistersGrid;
         private DataGrid? _discreteInputsGrid;
 
-        private MainViewModel? _subscribedViewModel;
-
         public MainView()
         {
             InitializeComponent();
-            DataContextChanged += OnDataContextChanged;
         }
 
         private void InitializeComponent()
@@ -40,15 +37,11 @@ namespace ModbusForge.Avalonia.Views
             _coilsGrid = this.FindControl<DataGrid>("CoilsGrid");
             _inputRegistersGrid = this.FindControl<DataGrid>("InputRegistersGrid");
             _discreteInputsGrid = this.FindControl<DataGrid>("DiscreteInputsGrid");
-
-            AttachGridItemSourceHandlers();
         }
 
         protected override void OnAttachedToVisualTree(global::Avalonia.VisualTreeAttachmentEventArgs e)
         {
             base.OnAttachedToVisualTree(e);
-
-            HookViewModel();
 
             if (global::Avalonia.Application.Current is App app)
             {
@@ -57,84 +50,7 @@ namespace ModbusForge.Avalonia.Views
             }
         }
 
-        protected override void OnDetachedFromVisualTree(global::Avalonia.VisualTreeAttachmentEventArgs e)
-        {
-            UnhookViewModel();
-            base.OnDetachedFromVisualTree(e);
-        }
-
-        private void OnDataContextChanged(object? sender, EventArgs e)
-        {
-            UnhookViewModel();
-            HookViewModel();
-        }
-
-        private void HookViewModel()
-        {
-            if (DataContext is not MainViewModel vm) return;
-
-            _subscribedViewModel = vm;
-            _subscribedViewModel.PropertyChanged += OnViewModelPropertyChanged;
-            UpdateAllGridItemsSources();
-        }
-
-        private void UnhookViewModel()
-        {
-            if (_subscribedViewModel is null) return;
-
-            _subscribedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
-            _subscribedViewModel = null;
-        }
-
-        private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            var vm = _subscribedViewModel;
-            if (vm is null) return;
-
-            switch (e.PropertyName)
-            {
-                case nameof(MainViewModel.HoldingRegisters):
-                    _holdingRegistersGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.HoldingRegisters);
-                    break;
-                case nameof(MainViewModel.InputRegisters):
-                    _inputRegistersGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.InputRegisters);
-                    break;
-                case nameof(MainViewModel.Coils):
-                    _coilsGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.Coils);
-                    break;
-                case nameof(MainViewModel.DiscreteInputs):
-                    _discreteInputsGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.DiscreteInputs);
-                    break;
-            }
-        }
-
-        private void UpdateAllGridItemsSources()
-        {
-            var vm = _subscribedViewModel;
-            if (vm is null) return;
-
-            _holdingRegistersGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.HoldingRegisters);
-            _inputRegistersGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.InputRegisters);
-            _coilsGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.Coils);
-            _discreteInputsGrid?.SetValue(DataGrid.ItemsSourceProperty, vm.DiscreteInputs);
-        }
-
         private MainViewModel? ViewModel => DataContext as MainViewModel;
-
-        private void AttachGridItemSourceHandlers()
-        {
-            if (_holdingRegistersGrid is not null)
-                _holdingRegistersGrid.AttachedToVisualTree += (s, e) => _holdingRegistersGrid.ItemsSource = ViewModel?.HoldingRegisters;
-
-            if (_coilsGrid is not null)
-                _coilsGrid.AttachedToVisualTree += (s, e) => _coilsGrid.ItemsSource = ViewModel?.Coils;
-
-            if (_inputRegistersGrid is not null)
-                _inputRegistersGrid.AttachedToVisualTree += (s, e) => _inputRegistersGrid.ItemsSource = ViewModel?.InputRegisters;
-
-            if (_discreteInputsGrid is not null)
-                _discreteInputsGrid.AttachedToVisualTree += (s, e) => _discreteInputsGrid.ItemsSource = ViewModel?.DiscreteInputs;
-        }
 
         private void ActiveUnitIdComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {

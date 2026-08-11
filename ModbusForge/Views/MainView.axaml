@@ -184,6 +184,8 @@
           </StackPanel>
 
           <DataGrid x:Name="HoldingRegistersGrid" Grid.Row="1"
+                    ItemsSource="{Binding HoldingRegisters}"
+                    AutomationProperties.Name="Holding Registers Grid"
                     AutoGenerateColumns="False"
                     IsReadOnly="False"
                     GridLinesVisibility="All"
@@ -232,6 +234,8 @@
           </StackPanel>
 
           <DataGrid x:Name="CoilsGrid" Grid.Row="1"
+                    ItemsSource="{Binding Coils}"
+                    AutomationProperties.Name="Coils Grid"
                     AutoGenerateColumns="False"
                     IsReadOnly="False"
                     GridLinesVisibility="All"
@@ -274,6 +278,8 @@
           </StackPanel>
 
           <DataGrid x:Name="InputRegistersGrid" Grid.Row="1"
+                    ItemsSource="{Binding InputRegisters}"
+                    AutomationProperties.Name="Input Registers Grid"
                     AutoGenerateColumns="False"
                     IsReadOnly="True"
                     GridLinesVisibility="All"
@@ -319,6 +325,8 @@
           </StackPanel>
 
           <DataGrid x:Name="DiscreteInputsGrid" Grid.Row="1"
+                    ItemsSource="{Binding DiscreteInputs}"
+                    AutomationProperties.Name="Discrete Inputs Grid"
                     AutoGenerateColumns="False"
                     IsReadOnly="True"
                     GridLinesVisibility="All"
