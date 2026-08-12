@@ -10,6 +10,7 @@
 
   <UserControl.Resources>
     <converters:NavigationIndexConverter x:Key="NavigationIndexConverter" />
+    <converters:DecimalToIntConverter x:Key="DecimalToIntConverter" />
   </UserControl.Resources>
 
   <UserControl.Styles>

@@ -78,6 +78,11 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.8.23 - NumericUpDown Converter Localisation
+
+- **Register count fix**: the `DecimalToIntConverter` is now declared directly in the views that use it, ensuring the `NumericUpDown` count/start/period values correctly write back to the view model.
+- **Version bumped to `2026.8.23`** in all projects.
+
 ### 2026.8.22 - Custom Watch Bulk Add, Auto-Monitoring & Count Binding Fixes
 
 - **Bulk-add custom watch entries**: new `Add Bulk` dialog creates a contiguous range with start register, count, type, area, read period and write period.

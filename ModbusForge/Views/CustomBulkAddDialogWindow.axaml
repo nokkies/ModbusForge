@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+        xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters"
         x:Class="ModbusForge.Avalonia.Views.CustomBulkAddDialogWindow"
         x:DataType="vm:CustomBulkAddDialogViewModel"
         Title="Add Bulk Custom Entries"
@@ -8,6 +9,9 @@
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         CanResize="False">
+  <Window.Resources>
+    <converters:DecimalToIntConverter x:Key="DecimalToIntConverter" />
+  </Window.Resources>
   <Grid Margin="20,16" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
     <TextBlock Grid.Row="0" Grid.Column="0" Text="Start Register:" VerticalAlignment="Center" Margin="0,0,8,8" />
     <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding StartRegister, Mode=TwoWay, Converter={StaticResource DecimalToIntConverter}}" Minimum="0" Maximum="65535" Width="120" Margin="0,0,0,8" HorizontalAlignment="Left" />
