@@ -192,6 +192,7 @@
                     VerticalAlignment="Stretch"
                     HorizontalAlignment="Stretch"
                     Loaded="HoldingRegistersGrid_Loaded"
+                    BeginningEdit="HoldingRegistersGrid_BeginningEdit"
                     CellEditEnded="HoldingRegistersGrid_CellEditEnded">
             <DataGrid.ContextMenu>
               <ContextMenu>
@@ -244,6 +245,7 @@
                     GridLinesVisibility="All"
                     VerticalAlignment="Stretch"
                     HorizontalAlignment="Stretch"
+                    BeginningEdit="CoilsGrid_BeginningEdit"
                     CellEditEnded="CoilsGrid_CellEditEnded">
             <DataGrid.ContextMenu>
               <ContextMenu>

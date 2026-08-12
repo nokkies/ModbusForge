@@ -78,8 +78,14 @@ namespace ModbusForge.Avalonia.Views
             ViewModel?.DebugMessages.Add($"Holding grid loaded; items={count}");
         }
 
+        private void HoldingRegistersGrid_BeginningEdit(object? sender, DataGridBeginningEditEventArgs e)
+        {
+            if (ViewModel is not null) ViewModel.IsRegisterGridEditing = true;
+        }
+
         private void HoldingRegistersGrid_CellEditEnded(object? sender, DataGridCellEditEndedEventArgs e)
         {
+            if (ViewModel is not null) ViewModel.IsRegisterGridEditing = false;
             if (e.EditAction != DataGridEditAction.Commit) return;
             if (e.Row?.DataContext is not RegisterEntry entry) return;
             if (e.Column?.Header?.ToString() != "Value") return;
@@ -87,8 +93,14 @@ namespace ModbusForge.Avalonia.Views
             ViewModel?.WriteHoldingRegisterFromEditAsync(entry);
         }
 
+        private void CoilsGrid_BeginningEdit(object? sender, DataGridBeginningEditEventArgs e)
+        {
+            if (ViewModel is not null) ViewModel.IsRegisterGridEditing = true;
+        }
+
         private void CoilsGrid_CellEditEnded(object? sender, DataGridCellEditEndedEventArgs e)
         {
+            if (ViewModel is not null) ViewModel.IsRegisterGridEditing = false;
             if (e.EditAction != DataGridEditAction.Commit) return;
             if (e.Row?.DataContext is not CoilEntry entry) return;
             if (e.Column?.Header?.ToString() != "State") return;

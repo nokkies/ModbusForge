@@ -643,6 +643,9 @@ namespace ModbusForge.Avalonia.ViewModels
         private bool _isTrendTabVisible = true;
 
         [ObservableProperty]
+        private bool _isRegisterGridEditing;
+
+        [ObservableProperty]
         private bool _isConsoleTabVisible = true;
 
         [ObservableProperty]
@@ -848,6 +851,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         partial void OnSelectedAreaChanged(PlcArea value)
         {
+            IsRegisterGridEditing = false;
             SelectedAreaIndex = (int)value;
             OnPropertyChanged(nameof(IsRegisterArea));
             OnPropertyChanged(nameof(CanWrite));
@@ -859,6 +863,11 @@ namespace ModbusForge.Avalonia.ViewModels
             GlobalType = GetAreaGlobalType(value);
             SwapBytes = GetAreaSwapBytes(value);
             SwapWords = GetAreaSwapWords(value);
+        }
+
+        partial void OnSelectedTabIndexChanged(int value)
+        {
+            IsRegisterGridEditing = false;
         }
 
         partial void OnSelectedAreaIndexChanged(int value)
@@ -2007,6 +2016,7 @@ namespace ModbusForge.Avalonia.ViewModels
                             ?? throw new InvalidOperationException("Read returned no response.");
                         await _dispatcher.InvokeAsync(() =>
                         {
+                            if (IsRegisterGridEditing) return;
                             HoldingRegisters = ApplyRegisterValues(
                                 start,
                                 holding,
@@ -2023,6 +2033,7 @@ namespace ModbusForge.Avalonia.ViewModels
                             ?? throw new InvalidOperationException("Read returned no response.");
                         await _dispatcher.InvokeAsync(() =>
                         {
+                            if (IsRegisterGridEditing) return;
                             InputRegisters = ApplyRegisterValues(
                                 start,
                                 input,
@@ -2039,6 +2050,7 @@ namespace ModbusForge.Avalonia.ViewModels
                             ?? throw new InvalidOperationException("Read returned no response.");
                         await _dispatcher.InvokeAsync(() =>
                         {
+                            if (IsRegisterGridEditing) return;
                             Coils = ApplyCoilValues(start, coils);
                             StatusMessage = $"Read {coils.Length} coils";
                         });
@@ -2049,6 +2061,7 @@ namespace ModbusForge.Avalonia.ViewModels
                             ?? throw new InvalidOperationException("Read returned no response.");
                         await _dispatcher.InvokeAsync(() =>
                         {
+                            if (IsRegisterGridEditing) return;
                             DiscreteInputs = ApplyCoilValues(start, discrete);
                             StatusMessage = $"Read {discrete.Length} discrete inputs";
                         });
