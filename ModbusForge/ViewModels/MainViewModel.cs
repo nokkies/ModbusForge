@@ -29,6 +29,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly IFileDialogService? _fileDialogService;
         private readonly IFileSystem _fileSystem;
         private readonly IInputDialogService? _inputDialogService;
+        private readonly ICustomBulkAddDialogService? _customBulkAddDialogService;
         private readonly IMessageBoxService? _messageBoxService;
         private readonly ISettingsService? _settingsService;
         private readonly IThemeService? _themeService;
@@ -391,6 +392,7 @@ namespace ModbusForge.Avalonia.ViewModels
             ICustomEntryService? customEntryService = null,
             IFileDialogService? fileDialogService = null,
             IInputDialogService? inputDialogService = null,
+            ICustomBulkAddDialogService? customBulkAddDialogService = null,
             IMessageBoxService? messageBoxService = null,
             ISettingsService? settingsService = null,
             IThemeService? themeService = null,
@@ -418,6 +420,7 @@ namespace ModbusForge.Avalonia.ViewModels
             _customEntryService = customEntryService;
             _fileDialogService = fileDialogService;
             _inputDialogService = inputDialogService;
+            _customBulkAddDialogService = customBulkAddDialogService;
             _messageBoxService = messageBoxService;
             _settingsService = settingsService;
             _themeService = themeService;
@@ -461,6 +464,7 @@ namespace ModbusForge.Avalonia.ViewModels
             WriteCoilCommand = new AsyncRelayCommand(WriteCoilAsync, () => CanWrite(PlcArea.Coil));
 
             AddCustomEntryCommand = new AsyncRelayCommand(AddCustomEntryAsync, () => !IsBusy);
+            AddBulkCustomEntryCommand = new AsyncRelayCommand(AddCustomBulkEntryAsync, () => !IsBusy);
             RemoveCustomEntryCommand = new AsyncRelayCommand(RemoveCustomEntryAsync, () => CanRemoveCustomEntry());
             ReadCustomEntryCommand = new AsyncRelayCommand(ReadSelectedCustomEntryAsync, () => CanReadCustomEntry());
             WriteCustomEntryCommand = new AsyncRelayCommand(WriteSelectedCustomEntryAsync, () => CanWriteCustomEntry());
@@ -565,6 +569,7 @@ namespace ModbusForge.Avalonia.ViewModels
         public IAsyncRelayCommand WriteCoilCommand { get; }
 
         public IAsyncRelayCommand AddCustomEntryCommand { get; }
+        public IAsyncRelayCommand AddBulkCustomEntryCommand { get; }
         public IAsyncRelayCommand RemoveCustomEntryCommand { get; }
         public IAsyncRelayCommand ReadCustomEntryCommand { get; }
         public IAsyncRelayCommand WriteCustomEntryCommand { get; }
@@ -2402,6 +2407,48 @@ namespace ModbusForge.Avalonia.ViewModels
                 SelectedCustomEntry = entry;
                 ReadAllCustomNowCommand.NotifyCanExecuteChanged();
                 StatusMessage = $"Added custom entry {name}.";
+            });
+        }
+
+        private Task AddCustomBulkEntryAsync()
+        {
+            if (_customBulkAddDialogService == null) return Task.CompletedTask;
+
+            return _dispatcher.InvokeAsync(() =>
+            {
+                if (!_customBulkAddDialogService.TryGetBulkAdd(out var result) || result == null)
+                {
+                    StatusMessage = "Bulk add cancelled.";
+                    return;
+                }
+
+                int increment = IsMultiRegisterType(result.Type)
+                    ? MultiRegisterTypeIncrement
+                    : SingleRegisterTypeIncrement;
+
+                for (int i = 0; i < result.Count; i++)
+                {
+                    int address = result.StartRegister + i * increment;
+                    var entry = new CustomEntry
+                    {
+                        Name = $"{result.NamePrefix}{i}",
+                        Address = address,
+                        Area = result.Area,
+                        Type = result.Type,
+                        Value = "0",
+                        WriteValue = "0",
+                        Continuous = false,
+                        PeriodMs = result.WritePeriodMs,
+                        Monitor = false,
+                        ReadPeriodMs = result.ReadPeriodMs
+                    };
+
+                    CustomEntries.Add(entry);
+                }
+
+                SelectedCustomEntry = CustomEntries[^1];
+                ReadAllCustomNowCommand.NotifyCanExecuteChanged();
+                StatusMessage = $"Added {result.Count} custom entries starting at {result.StartRegister}.";
             });
         }
 

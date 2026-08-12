@@ -107,6 +107,7 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<IThemeService, AvaloniaThemeService>();
             services.AddSingleton<IFileDialogService, AvaloniaFileDialogService>();
             services.AddSingleton<IInputDialogService, AvaloniaInputDialogService>();
+            services.AddSingleton<ICustomBulkAddDialogService, AvaloniaCustomBulkAddDialogService>();
             services.AddSingleton<IMessageBoxService, AvaloniaMessageBoxService>();
 
             // Connection management

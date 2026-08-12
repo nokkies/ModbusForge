@@ -361,6 +361,7 @@
         <Grid RowDefinitions="Auto,*" Margin="0,0,0,0">
           <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
             <Button Content="Add" Command="{Binding AddCustomEntryCommand}" />
+            <Button Content="Add Bulk" Command="{Binding AddBulkCustomEntryCommand}" />
             <Button Content="Remove" Command="{Binding RemoveCustomEntryCommand}" />
             <Button Content="Read Selected" Command="{Binding ReadCustomEntryCommand}" />
             <Button Content="Read All" Command="{Binding ReadAllCustomNowCommand}" />

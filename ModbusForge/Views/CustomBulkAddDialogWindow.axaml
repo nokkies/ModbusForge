@@ -1,0 +1,38 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+        x:Class="ModbusForge.Avalonia.Views.CustomBulkAddDialogWindow"
+        x:DataType="vm:CustomBulkAddDialogViewModel"
+        Title="Add Bulk Custom Entries"
+        Width="420"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+  <Grid Margin="20,16" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+    <TextBlock Grid.Row="0" Grid.Column="0" Text="Start Register:" VerticalAlignment="Center" Margin="0,0,8,8" />
+    <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding StartRegister, Mode=TwoWay}" Minimum="0" Maximum="65535" Width="120" Margin="0,0,0,8" HorizontalAlignment="Left" />
+
+    <TextBlock Grid.Row="1" Grid.Column="0" Text="Count:" VerticalAlignment="Center" Margin="0,0,8,8" />
+    <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding Count, Mode=TwoWay}" Minimum="1" Maximum="1000" Width="120" Margin="0,0,0,8" HorizontalAlignment="Left" />
+
+    <TextBlock Grid.Row="2" Grid.Column="0" Text="Area:" VerticalAlignment="Center" Margin="0,0,8,8" />
+    <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Areas}" SelectedItem="{Binding SelectedArea, Mode=TwoWay}" Width="180" Margin="0,0,0,8" HorizontalAlignment="Left" />
+
+    <TextBlock Grid.Row="3" Grid.Column="0" Text="Type:" VerticalAlignment="Center" Margin="0,0,8,8" />
+    <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Types}" SelectedItem="{Binding SelectedType, Mode=TwoWay}" Width="120" Margin="0,0,0,8" HorizontalAlignment="Left" />
+
+    <TextBlock Grid.Row="4" Grid.Column="0" Text="Read Period (ms):" VerticalAlignment="Center" Margin="0,0,8,8" />
+    <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding ReadPeriodMs, Mode=TwoWay}" Minimum="1" Maximum="60000" Width="120" Margin="0,0,0,8" HorizontalAlignment="Left" />
+
+    <TextBlock Grid.Row="5" Grid.Column="0" Text="Write Period (ms):" VerticalAlignment="Center" Margin="0,0,8,8" />
+    <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding WritePeriodMs, Mode=TwoWay}" Minimum="1" Maximum="60000" Width="120" Margin="0,0,0,8" HorizontalAlignment="Left" />
+
+    <TextBlock Grid.Row="6" Grid.Column="0" Text="Name Prefix:" VerticalAlignment="Center" Margin="0,0,8,8" />
+    <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding NamePrefix, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="180" Margin="0,0,0,8" HorizontalAlignment="Left" />
+
+    <StackPanel Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+      <Button Content="OK" Command="{Binding OkCommand}" IsDefault="True" />
+      <Button Content="Cancel" Command="{Binding CancelCommand}" IsCancel="True" />
+    </StackPanel>
+  </Grid>
+</Window>
