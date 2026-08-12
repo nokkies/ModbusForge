@@ -83,6 +83,7 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 - **Headless runtime improvements**: `ModbusForge.Headless` now supports `ConnectionProfile` for TCP and RTU/ASCII serial, environment-specific `appsettings.<Environment>.json`, `MODBUSFORGE_` environment variables, structured Serilog console and file output, MQTT publishing via `MqttGatewayService`, `--help`, CLI validation, and graceful shutdown.
 - **Hardened CI/release workflow**: Resolved `secrets` context usage in conditional steps, added environment-specific build/test jobs, and prevented recursive release runs from the `github-actions[bot]` tag push.
 - **Avalonia-only desktop**: WPF project and assets fully removed; Avalonia is the only desktop UI.
+- **Connection Manager serial improvements**: COM port dropdown now auto-detects ports and shows device names in brackets (e.g. `COM3 (MOXA ...)`); a **Custom port...** option allows manual COM port entry; baud rate is now a preset dropdown of standard Modbus rates; and an **Auto-detect settings** button scans common baud/parity/data/stop-bit combinations and reports the first valid Modbus response.
 - **Version bumped to `2026.8.18`** in all projects.
 
 ### 2026.8.16 — Industrial Simulation Blocks & Engine Unification
