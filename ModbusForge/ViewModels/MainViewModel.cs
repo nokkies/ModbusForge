@@ -3712,7 +3712,6 @@ namespace ModbusForge.Avalonia.ViewModels
                 else
                 {
                     StatusMessage = $"Up to date ({result.CurrentVersion}).";
-                    _messageBoxService?.ShowAsync($"You are running the latest version ({result.CurrentVersion}).", "No Update", DialogButton.Ok, DialogIcon.Information).ConfigureAwait(false);
                 }
             }
             catch (Exception ex)

@@ -34,7 +34,7 @@ namespace ModbusForge.Avalonia.ViewModels
         public static IReadOnlyList<StopBits> StopBitsOptions { get; } =
             new[] { StopBits.None, StopBits.One, StopBits.OnePointFive, StopBits.Two };
 
-        public static IReadOnlyList<int> BaudRates => SerialSettingsDetector.CommonBaudRates;
+        public static IReadOnlyList<int> BaudRates => SerialSettingsDetector.CommonBaudRates.OrderBy(b => b).ToList();
 
         public bool IsSerial => SelectedProfile?.Transport is TransportType.Rtu or TransportType.Ascii;
 
