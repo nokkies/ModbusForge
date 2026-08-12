@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
@@ -470,6 +471,7 @@ namespace ModbusForge.Avalonia.ViewModels
             WriteCustomEntryCommand = new AsyncRelayCommand(WriteSelectedCustomEntryAsync, () => CanWriteCustomEntry());
             ReadCustomNowCommand = new AsyncRelayCommand<CustomEntry?>(ReadCustomEntryNowAsync, CanReadCustomEntry);
             WriteCustomNowCommand = new AsyncRelayCommand<CustomEntry?>(WriteCustomEntryNowAsync, CanWriteCustomEntry);
+            DeleteCustomEntryCommand = new AsyncRelayCommand<CustomEntry?>(DeleteCustomEntryAsync, entry => entry != null);
             ReadAllCustomNowCommand = new AsyncRelayCommand(ReadAllCustomEntriesAsync, CanReadAllCustomEntries);
             SaveCustomCommand = new AsyncRelayCommand(SaveCustomAsync, () => CanSaveCustom());
             LoadCustomCommand = new AsyncRelayCommand(LoadCustomAsync, () => CanLoadCustom());
@@ -554,6 +556,8 @@ namespace ModbusForge.Avalonia.ViewModels
             OnPropertyChanged(nameof(SelectedUnitId));
 
             ShowAllTabs();
+            HookCustomEntries();
+            UpdateCustomWatchMonitoringState();
         }
 
         public IAsyncRelayCommand ConnectCommand { get; }
@@ -575,6 +579,7 @@ namespace ModbusForge.Avalonia.ViewModels
         public IAsyncRelayCommand WriteCustomEntryCommand { get; }
         public IAsyncRelayCommand<CustomEntry?> ReadCustomNowCommand { get; }
         public IAsyncRelayCommand<CustomEntry?> WriteCustomNowCommand { get; }
+        public IAsyncRelayCommand<CustomEntry?> DeleteCustomEntryCommand { get; }
         public IAsyncRelayCommand ReadAllCustomNowCommand { get; }
         public IAsyncRelayCommand SaveCustomCommand { get; }
         public IAsyncRelayCommand LoadCustomCommand { get; }
@@ -967,6 +972,82 @@ namespace ModbusForge.Avalonia.ViewModels
             else
             {
                 StopCustomWatchMonitoring();
+            }
+        }
+
+        protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+        {
+            base.OnPropertyChanged(e);
+
+            if (e.PropertyName == nameof(CustomEntries))
+            {
+                HookCustomEntries();
+                UpdateCustomWatchMonitoringState();
+            }
+        }
+
+        private ObservableCollection<CustomEntry>? _hookedCustomEntries;
+
+        private void HookCustomEntries()
+        {
+            if (_hookedCustomEntries == CustomEntries) return;
+
+            if (_hookedCustomEntries != null)
+            {
+                _hookedCustomEntries.CollectionChanged -= OnCustomEntriesCollectionChanged;
+                foreach (var entry in _hookedCustomEntries)
+                {
+                    entry.PropertyChanged -= OnCustomEntryPropertyChanged;
+                }
+            }
+
+            _hookedCustomEntries = CustomEntries;
+
+            if (_hookedCustomEntries != null)
+            {
+                _hookedCustomEntries.CollectionChanged += OnCustomEntriesCollectionChanged;
+                foreach (var entry in _hookedCustomEntries)
+                {
+                    entry.PropertyChanged += OnCustomEntryPropertyChanged;
+                }
+            }
+        }
+
+        private void OnCustomEntriesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.NewItems != null)
+            {
+                foreach (CustomEntry item in e.NewItems)
+                {
+                    item.PropertyChanged += OnCustomEntryPropertyChanged;
+                }
+            }
+
+            if (e.OldItems != null)
+            {
+                foreach (CustomEntry item in e.OldItems)
+                {
+                    item.PropertyChanged -= OnCustomEntryPropertyChanged;
+                }
+            }
+
+            UpdateCustomWatchMonitoringState();
+        }
+
+        private void OnCustomEntryPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is nameof(CustomEntry.Monitor) or nameof(CustomEntry.Continuous))
+            {
+                UpdateCustomWatchMonitoringState();
+            }
+        }
+
+        private void UpdateCustomWatchMonitoringState()
+        {
+            var shouldMonitor = CustomEntries.Any(entry => entry.Monitor || entry.Continuous);
+            if (IsCustomWatchMonitoring != shouldMonitor)
+            {
+                IsCustomWatchMonitoring = shouldMonitor;
             }
         }
 
@@ -2468,6 +2549,23 @@ namespace ModbusForge.Avalonia.ViewModels
                 SelectedCustomEntry = null;
                 ReadAllCustomNowCommand.NotifyCanExecuteChanged();
                 StatusMessage = "Removed custom entry.";
+            });
+        }
+
+        private Task DeleteCustomEntryAsync(CustomEntry? entry)
+        {
+            if (entry == null) return Task.CompletedTask;
+
+            return _dispatcher.InvokeAsync(() =>
+            {
+                CustomEntries.Remove(entry);
+                if (SelectedCustomEntry == entry)
+                {
+                    SelectedCustomEntry = null;
+                }
+
+                ReadAllCustomNowCommand.NotifyCanExecuteChanged();
+                StatusMessage = $"Removed custom entry {entry.Name}.";
             });
         }
 
