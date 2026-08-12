@@ -7,9 +7,9 @@
     <Nullable>enable</Nullable>
     <AssemblyName>ModbusForge.Headless</AssemblyName>
     <RootNamespace>ModbusForge.Headless</RootNamespace>
-    <Version>2026.8.20</Version>
-    <AssemblyVersion>2026.8.20</AssemblyVersion>
-    <FileVersion>2026.8.20</FileVersion>
+    <Version>2026.8.21</Version>
+    <AssemblyVersion>2026.8.21</AssemblyVersion>
+    <FileVersion>2026.8.21</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

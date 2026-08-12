@@ -78,6 +78,13 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.8.21 - Connection Manager Polish & Update Popup Fix
+
+- **Connection Manager COM port enumeration is now async**: the window opens instantly while friendly port names are loaded in the background.
+- **Connection Manager baud-rate dropdown is now sorted ascending** (1200 → 115200).
+- **No-update startup popup removed**: the app now only shows the status message when already on the latest release.
+- **Version bumped to `2026.8.21`** in all projects.
+
 ### 2026.8.20 - Startup Update Check Fix
 
 - **Check for updates on startup is now wired in the Avalonia desktop app**: the existing `Check for updates on startup` preference is honored when the main window opens.
