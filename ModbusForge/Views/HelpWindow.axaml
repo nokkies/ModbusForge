@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+        xmlns:helpers="clr-namespace:ModbusForge.Avalonia.Helpers"
         x:Class="ModbusForge.Avalonia.Views.HelpWindow"
         x:DataType="vm:HelpViewModel"
         Title="Help"
@@ -37,7 +38,8 @@
 
       <Border Grid.Column="1" Background="White" Padding="16">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-          <TextBlock Text="{Binding HelpContent}" TextWrapping="Wrap" FontSize="13" LineHeight="22"/>
+          <StackPanel Spacing="6"
+                      helpers:MarkdownHelper.MarkdownText="{Binding HelpContent}"/>
         </ScrollViewer>
       </Border>
     </Grid>

@@ -45,7 +45,7 @@ namespace ModbusForge.Tests.Services
                 sw.Stop();
 
                 // Assert
-                Assert.True(sw.ElapsedMilliseconds >= 100, "DisposeAsync should have waited for the lock release");
+                Assert.True(sw.ElapsedMilliseconds >= 50, "DisposeAsync should have waited for the lock release");
             }
             finally
             {

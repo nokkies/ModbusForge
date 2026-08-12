@@ -49,6 +49,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 new HelpTopic { TopicId = "trends", Title = "Trend & Logging" },
                 new HelpTopic { TopicId = "visual-editor", Title = "Visual Node Editor" },
                 new HelpTopic { TopicId = "preferences", Title = "Preferences" },
+                new HelpTopic { TopicId = "mcp-server", Title = "API & MCP Server" },
                 new HelpTopic { TopicId = "keyboard-shortcuts", Title = "Keyboard Shortcuts" },
                 new HelpTopic { TopicId = "troubleshooting", Title = "Troubleshooting" }
             };

@@ -54,6 +54,7 @@ namespace ModbusForge.Services
                 ["trends"] = GetTrendsContent(),
                 ["visual-editor"] = GetVisualEditorContent(),
                 ["preferences"] = GetPreferencesContent(),
+                ["mcp-server"] = GetMcpServerContent(),
                 ["keyboard-shortcuts"] = GetKeyboardShortcutsContent(),
                 ["troubleshooting"] = GetTroubleshootingContent()
             };
@@ -596,6 +597,55 @@ To export diagnostic information:
 1. Go to Help → Diagnostics
 2. Click ""Export Diagnostics""
 3. Save the file and share with support";
+        }
+
+        private string GetMcpServerContent()
+        {
+            return @"# API & Model Context Protocol (MCP) Server
+
+ModbusForge includes an embedded REST API server that can be integrated with Model Context Protocol (MCP) clients to allow AI assistants (like Claude, ChatGPT, or Cursor) to view and control Modbus operations.
+
+## How to Enable the Server
+
+1. Open the application.
+2. Navigate to **Options → Preferences**.
+3. Toggle the **Enable REST API / MCP** setting to **ON**.
+4. Set the **API Port** (default is `5000`).
+5. Choose whether to enable API documentation (Swagger) or require authentication.
+
+## API Documentation (Swagger)
+
+If **Enable API documentation (Swagger)** is turned on:
+- You can navigate to `http://localhost:5000/swagger` in your web browser.
+- This hosts an interactive developer console listing all API endpoints, Function Codes, and request/response models.
+- You can test read and write commands directly from your browser.
+
+## Connecting an AI Agent via MCP
+
+To connect an LLM or AI coding assistant using the Model Context Protocol (MCP):
+1. Configure an MCP bridge (e.g., node-based bridge) pointing to the ModbusForge REST API.
+2. In your MCP client configuration (such as `claude_desktop_config.json`), add a server entry:
+```json
+{
+  ""mcpServers"": {
+    ""modbusforge"": {
+      ""command"": ""node"",
+      ""args"": [""path/to/modbusforge-mcp-bridge.js""],
+      ""env"": {
+        ""MODBUSFORGE_API_URL"": ""http://localhost:5000"",
+        ""MODBUSFORGE_API_KEY"": ""YOUR_API_KEY""
+      }
+    }
+  }
+}
+```
+
+## Verifying the Server is Running
+
+- Check the application log in the **Console** tab; it will print `API Server started on http://localhost:5000`.
+- Send a query to the status endpoint:
+  `curl http://localhost:5000/api/status`
+  It should return `{""status"":""Running""}`.";
         }
 
         private string GetNotFoundContent(string topicId)
