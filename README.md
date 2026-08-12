@@ -78,6 +78,13 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.8.19 - Continuous Read Grid Editing & Type/Area Binding Fixes
+
+- **Continuous read no longer steals focus while editing register/coil values**: register and coil grids are updated in place during polling, and a per-area editing guard avoids overwriting an active cell edit.
+- **Custom Watch and register type/area combo boxes keep their selections** after tab switching and update immediately when changed.
+- **Default numeric type changed to `int`** for new register and custom entries.
+- **Version bumped to `2026.8.19`** in all projects.
+
 ### 2026.8.18 - Headless Runtime & CI Hardening
 
 - **Headless runtime improvements**: `ModbusForge.Headless` now supports `ConnectionProfile` for TCP and RTU/ASCII serial, environment-specific `appsettings.<Environment>.json`, `MODBUSFORGE_` environment variables, structured Serilog console and file output, MQTT publishing via `MqttGatewayService`, `--help`, CLI validation, and graceful shutdown.

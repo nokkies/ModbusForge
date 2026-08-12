@@ -8,9 +8,9 @@
     <RootNamespace>ModbusForge.Avalonia</RootNamespace>
     <AssemblyName>ModbusForge</AssemblyName>
     <ApplicationIcon>Assets\ModbusForge.ico</ApplicationIcon>
-    <Version>2026.8.18</Version>
-    <AssemblyVersion>2026.8.18</AssemblyVersion>
-    <FileVersion>2026.8.18</FileVersion>
+    <Version>2026.8.19</Version>
+    <AssemblyVersion>2026.8.19</AssemblyVersion>
+    <FileVersion>2026.8.19</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
