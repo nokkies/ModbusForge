@@ -1280,19 +1280,19 @@ namespace ModbusForge.Avalonia.ViewModels
             _isApplyingUnitConfiguration = true;
             try
             {
-                HoldingRegisterStart = Math.Max(1, settings.RegisterStart);
+                HoldingRegisterStart = Math.Max(0, settings.RegisterStart);
                 HoldingRegisterCount = Math.Max(1, settings.RegisterCount);
                 RegistersGlobalType = settings.RegistersGlobalType ?? "int";
                 RegistersSwapBytes = settings.RegistersSwapBytes;
                 RegistersSwapWords = settings.RegistersSwapWords;
-                InputRegisterStart = Math.Max(1, settings.InputRegisterStart);
+                InputRegisterStart = Math.Max(0, settings.InputRegisterStart);
                 InputRegisterCount = Math.Max(1, settings.InputRegisterCount);
                 InputRegistersGlobalType = settings.InputRegistersGlobalType ?? "int";
                 InputRegistersSwapBytes = settings.InputRegistersSwapBytes;
                 InputRegistersSwapWords = settings.InputRegistersSwapWords;
-                CoilStart = Math.Max(1, settings.CoilStart);
+                CoilStart = Math.Max(0, settings.CoilStart);
                 CoilCount = Math.Max(1, settings.CoilCount);
-                DiscreteInputStart = Math.Max(1, settings.DiscreteInputStart);
+                DiscreteInputStart = Math.Max(0, settings.DiscreteInputStart);
                 DiscreteInputCount = Math.Max(1, settings.DiscreteInputCount);
                 HoldingMonitorEnabled = monitoring.HoldingMonitorEnabled;
                 HoldingMonitorPeriodMs = monitoring.HoldingMonitorPeriodMs;
@@ -2018,6 +2018,7 @@ namespace ModbusForge.Avalonia.ViewModels
                         {
                             if (IsRegisterGridEditing) return;
                             HoldingRegisters = ApplyRegisterValues(
+                                HoldingRegisters,
                                 start,
                                 holding,
                                 RegistersGlobalType,
@@ -2035,6 +2036,7 @@ namespace ModbusForge.Avalonia.ViewModels
                         {
                             if (IsRegisterGridEditing) return;
                             InputRegisters = ApplyRegisterValues(
+                                InputRegisters,
                                 start,
                                 input,
                                 InputRegistersGlobalType,
@@ -2051,7 +2053,7 @@ namespace ModbusForge.Avalonia.ViewModels
                         await _dispatcher.InvokeAsync(() =>
                         {
                             if (IsRegisterGridEditing) return;
-                            Coils = ApplyCoilValues(start, coils);
+                            Coils = ApplyCoilValues(Coils, start, coils);
                             StatusMessage = $"Read {coils.Length} coils";
                         });
                         break;
@@ -2062,7 +2064,7 @@ namespace ModbusForge.Avalonia.ViewModels
                         await _dispatcher.InvokeAsync(() =>
                         {
                             if (IsRegisterGridEditing) return;
-                            DiscreteInputs = ApplyCoilValues(start, discrete);
+                            DiscreteInputs = ApplyCoilValues(DiscreteInputs, start, discrete);
                             StatusMessage = $"Read {discrete.Length} discrete inputs";
                         });
                         break;
@@ -2179,6 +2181,7 @@ namespace ModbusForge.Avalonia.ViewModels
         }
 
         private ObservableCollection<RegisterEntry> ApplyRegisterValues(
+            ObservableCollection<RegisterEntry>? target,
             int start,
             ushort[] values,
             string globalType,
@@ -2186,9 +2189,12 @@ namespace ModbusForge.Avalonia.ViewModels
             bool swapWords,
             IEnumerable<RegisterMetadata>? metadata = null)
         {
-            var target = new ObservableCollection<RegisterEntry>();
+            target ??= new ObservableCollection<RegisterEntry>();
             var metadataByAddress = metadata?.ToDictionary(item => item.Address)
                                     ?? new Dictionary<int, RegisterMetadata>();
+
+            var entriesByAddress = target.ToDictionary(e => e.Address);
+            var usedAddresses = new HashSet<int>();
 
             int idx = 0;
             while (idx < values.Length)
@@ -2196,20 +2202,25 @@ namespace ModbusForge.Avalonia.ViewModels
                 var address = start + idx;
                 var savedMetadata = metadataByAddress.GetValueOrDefault(address);
                 var type = (savedMetadata?.Type ?? globalType).ToLowerInvariant();
-                var entry = new RegisterEntry
+                usedAddresses.Add(address);
+
+                if (!entriesByAddress.TryGetValue(address, out var entry))
                 {
-                    Address = address,
-                    Value = values[idx],
-                    Type = type,
-                    SwapBytes = savedMetadata?.SwapBytes ?? swapBytes,
-                    SwapWords = savedMetadata?.SwapWords ?? swapWords
-                };
+                    entry = new RegisterEntry();
+                    target.Add(entry);
+                    entriesByAddress[address] = entry;
+                }
+
+                entry.Address = address;
+                entry.Value = values[idx];
+                entry.Type = type;
+                entry.SwapBytes = savedMetadata?.SwapBytes ?? swapBytes;
+                entry.SwapWords = savedMetadata?.SwapWords ?? swapWords;
 
                 switch (type)
                 {
                     case "int":
                         entry.ValueText = unchecked((short)values[idx]).ToString(CultureInfo.InvariantCulture);
-                        target.Add(entry);
                         idx += 1;
                         break;
 
@@ -2217,59 +2228,134 @@ namespace ModbusForge.Avalonia.ViewModels
                         if (idx + 1 < values.Length)
                         {
                             entry.ValueText = DataTypeConverter.ToSingle(values[idx], values[idx + 1], entry.SwapBytes, entry.SwapWords).ToString(CultureInfo.InvariantCulture);
-                            target.Add(entry);
 
-                            var next = new RegisterEntry
+                            var nextAddress = address + 1;
+                            usedAddresses.Add(nextAddress);
+                            if (!entriesByAddress.TryGetValue(nextAddress, out var next))
                             {
-                                Address = address + 1,
-                                Value = values[idx + 1],
-                                Type = type,
-                                SwapBytes = swapBytes,
-                                SwapWords = swapWords,
-                                ValueText = string.Empty
-                            };
-                            target.Add(next);
+                                next = new RegisterEntry();
+                                target.Add(next);
+                                entriesByAddress[nextAddress] = next;
+                            }
+
+                            next.Address = nextAddress;
+                            next.Value = values[idx + 1];
+                            next.Type = type;
+                            next.SwapBytes = swapBytes;
+                            next.SwapWords = swapWords;
+                            next.ValueText = string.Empty;
 
                             idx += 2;
                         }
                         else
                         {
                             entry.ValueText = values[idx].ToString(CultureInfo.InvariantCulture);
-                            target.Add(entry);
                             idx += 1;
                         }
                         break;
 
                     case "string":
                         entry.ValueText = DataTypeConverter.ToString(values[idx]);
-                        target.Add(entry);
                         idx += 1;
                         break;
 
                     default:
                         entry.ValueText = values[idx].ToString(CultureInfo.InvariantCulture);
-                        target.Add(entry);
                         idx += 1;
                         break;
                 }
             }
 
+            for (int i = target.Count - 1; i >= 0; i--)
+            {
+                if (!usedAddresses.Contains(target[i].Address))
+                {
+                    target.RemoveAt(i);
+                }
+            }
+
+            EnsureSortedByAddress(target);
             return target;
         }
 
-        private ObservableCollection<CoilEntry> ApplyCoilValues(int start, bool[] values)
+        private static void EnsureSortedByAddress(ObservableCollection<RegisterEntry> collection)
         {
-            var target = new ObservableCollection<CoilEntry>();
-            for (int i = 0; i < values.Length; i++)
+            if (collection.Count < 2) return;
+
+            bool sorted = true;
+            for (int i = 1; i < collection.Count; i++)
             {
-                target.Add(new CoilEntry
+                if (collection[i].Address < collection[i - 1].Address)
                 {
-                    Address = start + i,
-                    State = values[i]
-                });
+                    sorted = false;
+                    break;
+                }
             }
 
+            if (sorted) return;
+
+            var entries = collection.OrderBy(e => e.Address).ToList();
+            collection.Clear();
+            foreach (var entry in entries)
+            {
+                collection.Add(entry);
+            }
+        }
+
+        private ObservableCollection<CoilEntry> ApplyCoilValues(ObservableCollection<CoilEntry>? target, int start, bool[] values)
+        {
+            target ??= new ObservableCollection<CoilEntry>();
+            var entriesByAddress = target.ToDictionary(e => e.Address);
+            var usedAddresses = new HashSet<int>();
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                var address = start + i;
+                usedAddresses.Add(address);
+                if (!entriesByAddress.TryGetValue(address, out var entry))
+                {
+                    entry = new CoilEntry { Address = address };
+                    target.Add(entry);
+                    entriesByAddress[address] = entry;
+                }
+
+                entry.State = values[i];
+            }
+
+            for (int i = target.Count - 1; i >= 0; i--)
+            {
+                if (!usedAddresses.Contains(target[i].Address))
+                {
+                    target.RemoveAt(i);
+                }
+            }
+
+            EnsureSortedByAddress(target);
             return target;
+        }
+
+        private static void EnsureSortedByAddress(ObservableCollection<CoilEntry> collection)
+        {
+            if (collection.Count < 2) return;
+
+            bool sorted = true;
+            for (int i = 1; i < collection.Count; i++)
+            {
+                if (collection[i].Address < collection[i - 1].Address)
+                {
+                    sorted = false;
+                    break;
+                }
+            }
+
+            if (sorted) return;
+
+            var entries = collection.OrderBy(e => e.Address).ToList();
+            collection.Clear();
+            foreach (var entry in entries)
+            {
+                collection.Add(entry);
+            }
         }
 
         #region Custom Watch
