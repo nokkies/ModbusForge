@@ -78,6 +78,11 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.8.20 - Startup Update Check Fix
+
+- **Check for updates on startup is now wired in the Avalonia desktop app**: the existing `Check for updates on startup` preference is honored when the main window opens.
+- **Version bumped to `2026.8.20`** in all projects.
+
 ### 2026.8.19 - Continuous Read Grid Editing & Type/Area Binding Fixes
 
 - **Continuous read no longer steals focus while editing register/coil values**: register and coil grids are updated in place during polling, and a per-area editing guard avoids overwriting an active cell edit.
