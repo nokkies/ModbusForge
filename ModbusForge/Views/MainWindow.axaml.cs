@@ -3,6 +3,7 @@ using global::Avalonia;
 using global::Avalonia.Controls;
 using global::Avalonia.Interactivity;
 using global::Avalonia.Markup.Xaml;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ModbusForge.Avalonia.Services;
@@ -24,6 +25,26 @@ namespace ModbusForge.Avalonia.Views
         }
 
         private MainViewModel? ViewModel => DataContext as MainViewModel;
+
+        protected override async void OnOpened(EventArgs e)
+        {
+            base.OnOpened(e);
+
+            if (ViewModel?.CheckForUpdatesCommand is not IAsyncRelayCommand asyncCmd) return;
+
+            var app = global::Avalonia.Application.Current as App;
+            var settingsService = app?.Services?.GetService<ISettingsService>();
+            if (settingsService?.CheckForUpdatesOnStartup != true) return;
+
+            try
+            {
+                await asyncCmd.ExecuteAsync(null);
+            }
+            catch (Exception)
+            {
+                // Best-effort startup update check
+            }
+        }
 
         private void ScriptEditor_Click(object? sender, RoutedEventArgs e)
         {
