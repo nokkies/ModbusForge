@@ -99,7 +99,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private int _selectedAreaIndex;
 
         [ObservableProperty]
-        private string _globalType = "uint";
+        private string _globalType = "int";
 
         [ObservableProperty]
         private bool _swapBytes;
@@ -116,7 +116,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private int _holdingRegisterCount = 20;
 
         [ObservableProperty]
-        private string _registersGlobalType = "uint";
+        private string _registersGlobalType = "int";
 
         [ObservableProperty]
         private bool _registersSwapBytes;
@@ -139,7 +139,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private int _inputRegisterCount = 20;
 
         [ObservableProperty]
-        private string _inputRegistersGlobalType = "uint";
+        private string _inputRegistersGlobalType = "int";
 
         [ObservableProperty]
         private bool _inputRegistersSwapBytes;
@@ -246,9 +246,9 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public bool IsRegisterArea => SelectedArea is PlcArea.HoldingRegister or PlcArea.InputRegister;
 
-        public IReadOnlyList<string> RegisterTypes { get; } = new[] { "uint", "int", "real", "string" };
+        public IReadOnlyList<string> RegisterTypes => RegisterEntry.AvailableTypes;
 
-        public IReadOnlyList<string> CustomAreas { get; } = new[] { "HoldingRegister", "InputRegister", "Coil", "DiscreteInput" };
+        public IReadOnlyList<string> CustomAreas => CustomEntry.AvailableAreas;
 
         public List<string> Modes { get; } = new() { "Client", "Server" };
 
@@ -1066,7 +1066,7 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 PlcArea.HoldingRegister => RegistersGlobalType,
                 PlcArea.InputRegister => InputRegistersGlobalType,
-                _ => "uint"
+                _ => "int"
             };
         }
 
@@ -1273,12 +1273,12 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 HoldingRegisterStart = Math.Max(1, settings.RegisterStart);
                 HoldingRegisterCount = Math.Max(1, settings.RegisterCount);
-                RegistersGlobalType = settings.RegistersGlobalType ?? "uint";
+                RegistersGlobalType = settings.RegistersGlobalType ?? "int";
                 RegistersSwapBytes = settings.RegistersSwapBytes;
                 RegistersSwapWords = settings.RegistersSwapWords;
                 InputRegisterStart = Math.Max(1, settings.InputRegisterStart);
                 InputRegisterCount = Math.Max(1, settings.InputRegisterCount);
-                InputRegistersGlobalType = settings.InputRegistersGlobalType ?? "uint";
+                InputRegistersGlobalType = settings.InputRegistersGlobalType ?? "int";
                 InputRegistersSwapBytes = settings.InputRegistersSwapBytes;
                 InputRegistersSwapWords = settings.InputRegistersSwapWords;
                 CoilStart = Math.Max(1, settings.CoilStart);
@@ -1326,7 +1326,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     continue;
                 }
 
-                entry.Type = saved.Type ?? "uint";
+                entry.Type = saved.Type ?? "int";
                 entry.SwapBytes = saved.SwapBytes;
                 entry.SwapWords = saved.SwapWords;
             }
@@ -1747,7 +1747,7 @@ namespace ModbusForge.Avalonia.ViewModels
             try
             {
                 var unitId = EffectiveUnitId;
-                var type = (entry.Type ?? "uint").ToLowerInvariant();
+                var type = (entry.Type ?? "int").ToLowerInvariant();
                 var text = (entry.ValueText ?? string.Empty).Trim().Replace(',', '.');
 
                 await _modbusIoGate.WaitAsync(CancellationToken.None);
@@ -2266,14 +2266,14 @@ namespace ModbusForge.Avalonia.ViewModels
             await _dispatcher.InvokeAsync(() =>
             {
                 int nextAddress = 1;
-                string type = "uint";
+                string type = "int";
                 string area = "HoldingRegister";
                 string name = "Tag0";
 
                 if (CustomEntries.Count > 0)
                 {
                     var last = CustomEntries[^1];
-                    type = last.Type ?? "uint";
+                    type = last.Type ?? "int";
                     area = last.Area ?? "HoldingRegister";
                     name = GenerateNextName(last.Name);
 
@@ -2480,7 +2480,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
             var unitId = EffectiveUnitId;
             var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
-            var type = (entry.Type ?? "uint").ToLowerInvariant();
+            var type = (entry.Type ?? "int").ToLowerInvariant();
 
             switch (area)
             {
@@ -2526,7 +2526,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
             var unitId = EffectiveUnitId;
             var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
-            var type = (entry.Type ?? "uint").ToLowerInvariant();
+            var type = (entry.Type ?? "int").ToLowerInvariant();
 
             switch (area)
             {
@@ -3400,7 +3400,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
                 configuration.RegisterSettings.RegisterStart = legacy.StartAddress;
                 configuration.RegisterSettings.RegisterCount = legacy.RegisterCount;
-                configuration.RegisterSettings.RegistersGlobalType = legacy.GlobalType ?? "uint";
+                configuration.RegisterSettings.RegistersGlobalType = legacy.GlobalType ?? "int";
                 configuration.RegisterSettings.RegistersSwapBytes = legacy.SwapBytes;
                 configuration.RegisterSettings.RegistersSwapWords = legacy.SwapWords;
                 snapshot = new ProjectWorkspaceSnapshot

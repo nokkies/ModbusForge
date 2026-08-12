@@ -208,8 +208,11 @@
               <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="120" />
               <DataGridTemplateColumn Header="Type" Width="80" IsReadOnly="True">
                 <DataGridTemplateColumn.CellTemplate>
-                  <DataTemplate>
-                    <ComboBox ItemsSource="{Binding DataContext.RegisterTypes, RelativeSource={RelativeSource FindAncestor, AncestorType=DataGrid}}" SelectedItem="{Binding Type}" />
+                  <DataTemplate x:DataType="models:RegisterEntry">
+                    <ComboBox ItemsSource="{Binding Source={x:Static models:RegisterEntry.AvailableTypes}}"
+                              SelectedItem="{Binding Type, Mode=OneWay}"
+                              IsEnabled="False"
+                              HorizontalAlignment="Stretch" />
                   </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
@@ -299,8 +302,11 @@
               <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="120" IsReadOnly="True" />
               <DataGridTemplateColumn Header="Type" Width="80" IsReadOnly="True">
                 <DataGridTemplateColumn.CellTemplate>
-                  <DataTemplate>
-                    <ComboBox ItemsSource="{Binding DataContext.RegisterTypes, RelativeSource={RelativeSource FindAncestor, AncestorType=DataGrid}}" SelectedItem="{Binding Type}" />
+                  <DataTemplate x:DataType="models:RegisterEntry">
+                    <ComboBox ItemsSource="{Binding Source={x:Static models:RegisterEntry.AvailableTypes}}"
+                              SelectedItem="{Binding Type, Mode=OneWay}"
+                              IsEnabled="False"
+                              HorizontalAlignment="Stretch" />
                   </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
@@ -372,25 +378,33 @@
               <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
               <DataGridTemplateColumn Header="Area" Width="120">
                 <DataGridTemplateColumn.CellTemplate>
-                  <DataTemplate>
-                    <ComboBox ItemsSource="{Binding DataContext.CustomAreas, RelativeSource={RelativeSource FindAncestor, AncestorType=DataGrid}}" SelectedItem="{Binding Area, Mode=TwoWay}" />
+                  <DataTemplate x:DataType="models:CustomEntry">
+                    <ComboBox ItemsSource="{Binding Source={x:Static models:CustomEntry.AvailableAreas}}"
+                              SelectedItem="{Binding Area, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              HorizontalAlignment="Stretch" />
                   </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
                 <DataGridTemplateColumn.CellEditingTemplate>
-                  <DataTemplate>
-                    <ComboBox ItemsSource="{Binding DataContext.CustomAreas, RelativeSource={RelativeSource FindAncestor, AncestorType=DataGrid}}" SelectedItem="{Binding Area, Mode=TwoWay}" />
+                  <DataTemplate x:DataType="models:CustomEntry">
+                    <ComboBox ItemsSource="{Binding Source={x:Static models:CustomEntry.AvailableAreas}}"
+                              SelectedItem="{Binding Area, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              HorizontalAlignment="Stretch" />
                   </DataTemplate>
                 </DataGridTemplateColumn.CellEditingTemplate>
               </DataGridTemplateColumn>
               <DataGridTemplateColumn Header="Type" Width="80">
                 <DataGridTemplateColumn.CellTemplate>
-                  <DataTemplate>
-                    <ComboBox ItemsSource="{Binding DataContext.RegisterTypes, RelativeSource={RelativeSource FindAncestor, AncestorType=DataGrid}}" SelectedItem="{Binding Type, Mode=TwoWay}" />
+                  <DataTemplate x:DataType="models:CustomEntry">
+                    <ComboBox ItemsSource="{Binding Source={x:Static models:CustomEntry.AvailableTypes}}"
+                              SelectedItem="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              HorizontalAlignment="Stretch" />
                   </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
                 <DataGridTemplateColumn.CellEditingTemplate>
-                  <DataTemplate>
-                    <ComboBox ItemsSource="{Binding DataContext.RegisterTypes, RelativeSource={RelativeSource FindAncestor, AncestorType=DataGrid}}" SelectedItem="{Binding Type, Mode=TwoWay}" />
+                  <DataTemplate x:DataType="models:CustomEntry">
+                    <ComboBox ItemsSource="{Binding Source={x:Static models:CustomEntry.AvailableTypes}}"
+                              SelectedItem="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              HorizontalAlignment="Stretch" />
                   </DataTemplate>
                 </DataGridTemplateColumn.CellEditingTemplate>
               </DataGridTemplateColumn>

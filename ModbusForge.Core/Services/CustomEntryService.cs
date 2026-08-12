@@ -46,7 +46,7 @@ namespace ModbusForge.Services
                 {
                     Name = item.TryGetProperty("Name", out var nm) ? nm.GetString() ?? string.Empty : string.Empty,
                     Address = item.GetProperty("Address").GetInt32(),
-                    Type = item.TryGetProperty("Type", out var t) ? t.GetString() ?? "uint" : "uint",
+                    Type = item.TryGetProperty("Type", out var t) ? t.GetString() ?? "int" : "int",
                     Value = item.TryGetProperty("Value", out var v) ? v.GetString() ?? "0" : "0",
                     WriteValue = item.TryGetProperty("WriteValue", out var wv) ? wv.GetString() ?? "0" : "0",
                     Continuous = item.TryGetProperty("Continuous", out var c) && c.GetBoolean(),

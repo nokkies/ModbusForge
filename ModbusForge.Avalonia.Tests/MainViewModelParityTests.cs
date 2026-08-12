@@ -25,9 +25,9 @@ namespace ModbusForge.Avalonia.Tests
 
             await vm.AddCustomEntryCommand.ExecuteAsync(null);
             Assert.Equal(1, vm.CustomEntries[0].Address);
-            Assert.Equal("uint", vm.CustomEntries[0].Type);
+            Assert.Equal("int", vm.CustomEntries[0].Type);
 
-            // uint is a single-register type, so it advances by 1.
+            // int is a single-register type, so it advances by 1.
             await vm.AddCustomEntryCommand.ExecuteAsync(null);
             Assert.Equal(2, vm.CustomEntries[1].Address);
 

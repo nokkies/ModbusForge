@@ -12,9 +12,9 @@ public sealed class CreateCustomEntryRequest
     [Range(0, 65535)]
     public int Address { get; set; }
 
-    /// <summary>uint | int | real</summary>
-    [RegularExpression("^(uint|int|real)$")]
-    public string Type { get; set; } = "uint";
+    /// <summary>int | uint | real | string</summary>
+    [RegularExpression("^(int|uint|real|string)$")]
+    public string Type { get; set; } = "int";
 
     [MaxLength(64)]
     public string Value { get; set; } = "0";

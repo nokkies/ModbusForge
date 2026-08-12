@@ -156,7 +156,7 @@ namespace ModbusForge.Headless
         private async Task<string> ReadCustomValueAsync(CustomEntry entry, CancellationToken token)
         {
             var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
-            var type = (entry.Type ?? "uint").ToLowerInvariant();
+            var type = (entry.Type ?? "int").ToLowerInvariant();
 
             switch (area)
             {
@@ -193,7 +193,7 @@ namespace ModbusForge.Headless
         private async Task<bool> WriteCustomValueAsync(CustomEntry entry, CancellationToken token)
         {
             var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
-            var type = (entry.Type ?? "uint").ToLowerInvariant();
+            var type = (entry.Type ?? "int").ToLowerInvariant();
 
             switch (area)
             {

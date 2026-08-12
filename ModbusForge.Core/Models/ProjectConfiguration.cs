@@ -95,14 +95,14 @@ namespace ModbusForge.Models
         public int RegisterCount { get; set; } = 10;
         public int WriteRegisterAddress { get; set; } = 1;
         public ushort WriteRegisterValue { get; set; } = 0;
-        public string RegistersGlobalType { get; set; } = "uint";
+        public string RegistersGlobalType { get; set; } = "int";
         public int CoilStart { get; set; } = 1;
         public int CoilCount { get; set; } = 16;
         public int WriteCoilAddress { get; set; } = 1;
         public bool WriteCoilState { get; set; } = false;
         public int InputRegisterStart { get; set; } = 1;
         public int InputRegisterCount { get; set; } = 10;
-        public string InputRegistersGlobalType { get; set; } = "uint";
+        public string InputRegistersGlobalType { get; set; } = "int";
         public int DiscreteInputStart { get; set; } = 1;
         public int DiscreteInputCount { get; set; } = 16;
     }

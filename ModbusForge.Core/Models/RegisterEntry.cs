@@ -7,8 +7,13 @@ namespace ModbusForge.Models
     {
         private int _address;
         private ushort _value;
-        private string _type = "uint";
+        private string _type = "int";
         private bool _swapBytes;
+
+        /// <summary>
+        /// Available type options for register entries.
+        /// </summary>
+        public static IReadOnlyList<string> AvailableTypes { get; } = new[] { "int", "uint", "real", "string" };
         private bool _swapWords;
         private string _valueText = "0"; // used for editing/display to avoid WPF ConvertBack to ushort
 
@@ -96,7 +101,7 @@ namespace ModbusForge.Models
                     if (string.IsNullOrWhiteSpace(_valueText))
                         return "Value is required.";
 
-                    var type = (_type ?? "uint").ToLowerInvariant();
+                    var type = (_type ?? "int").ToLowerInvariant();
                     switch (type)
                     {
                         case "uint":

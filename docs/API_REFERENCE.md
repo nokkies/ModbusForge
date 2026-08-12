@@ -109,7 +109,7 @@ public class CustomEntry
 {
     public string Area { get; set; } = "HoldingRegister";
     public int Address { get; set; } = 1;
-    public string Type { get; set; } = "uint";
+    public string Type { get; set; } = "int";
     public string Description { get; set; } = string.Empty;
     public bool Trend { get; set; }
     public bool Continuous { get; set; }

@@ -191,7 +191,7 @@ namespace ModbusForge.Models
     public class RegisterMetadata
     {
         public int Address { get; set; }
-        public string Type { get; set; } = "uint";
+        public string Type { get; set; } = "int";
         public bool SwapBytes { get; set; } = false;
         public bool SwapWords { get; set; } = false;
     }
@@ -206,7 +206,7 @@ namespace ModbusForge.Models
         public int RegisterCount { get; set; } = 10;
         public int WriteRegisterAddress { get; set; } = 1;
         public ushort WriteRegisterValue { get; set; } = 0;
-        public string RegistersGlobalType { get; set; } = "uint";
+        public string RegistersGlobalType { get; set; } = "int";
         public bool RegistersSwapBytes { get; set; } = false;
         public bool RegistersSwapWords { get; set; } = false;
         public List<RegisterMetadata> HoldingRegisterMetadata { get; set; } = new();
@@ -220,7 +220,7 @@ namespace ModbusForge.Models
         // Input registers
         public int InputRegisterStart { get; set; } = 1;
         public int InputRegisterCount { get; set; } = 10;
-        public string InputRegistersGlobalType { get; set; } = "uint";
+        public string InputRegistersGlobalType { get; set; } = "int";
         public bool InputRegistersSwapBytes { get; set; } = false;
         public bool InputRegistersSwapWords { get; set; } = false;
         public List<RegisterMetadata> InputRegisterMetadata { get; set; } = new();

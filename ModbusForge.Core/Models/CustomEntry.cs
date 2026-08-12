@@ -8,7 +8,7 @@ namespace ModbusForge.Models
     {
         private string _name = string.Empty;
         private int _address;
-        private string _type = "uint"; // uint,int,real
+        private string _type = "int"; // int,uint,real,string
         private string _value = "0";
         private string _writeValue = "0";
         private bool _continuous = false;
@@ -19,6 +19,16 @@ namespace ModbusForge.Models
         private int _readPeriodMs = 1000;
         public DateTime LastReadUtc { get; set; } = DateTime.MinValue;
         private string _area = "HoldingRegister"; // HoldingRegister, Coil, InputRegister, DiscreteInput
+
+        /// <summary>
+        /// Available Modbus areas for custom watch entries.
+        /// </summary>
+        public static IReadOnlyList<string> AvailableAreas { get; } = new[] { "HoldingRegister", "InputRegister", "Coil", "DiscreteInput" };
+
+        /// <summary>
+        /// Available data type options for custom watch entries.
+        /// </summary>
+        public static IReadOnlyList<string> AvailableTypes { get; } = new[] { "int", "uint", "real", "string" };
         // Trend selection support
         private bool _trend = false;
 
@@ -43,7 +53,7 @@ namespace ModbusForge.Models
             if (string.IsNullOrWhiteSpace(value))
                 return $"{displayName} is required.";
 
-            var type = (_type ?? "uint").ToLowerInvariant();
+            var type = (_type ?? "int").ToLowerInvariant();
             switch (type)
             {
                 case "uint":
