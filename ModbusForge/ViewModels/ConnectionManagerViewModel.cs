@@ -6,11 +6,13 @@ using System.IO.Ports;
 using System.Linq;
 using System.Management;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 using ModbusForge.Avalonia.Models;
 using ModbusForge.Avalonia.Services;
 using ModbusForge.Models;
@@ -39,8 +41,10 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly IConnectionManager _connectionManager;
         private readonly IDispatcher _dispatcher;
         private readonly IMessageBoxService _messageBoxService;
+        private readonly ILogger<ConnectionManagerViewModel>? _logger;
         private readonly SerialSettingsDetector _detector = new();
         private CancellationTokenSource? _autoDetectCts;
+        private CancellationTokenSource? _refreshSerialPortsCts;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(RemoveCommand))]
@@ -82,11 +86,12 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public bool CanClone => HasSelection;
 
-        public ConnectionManagerViewModel(IConnectionManager connectionManager, IDispatcher dispatcher, IMessageBoxService messageBoxService)
+        public ConnectionManagerViewModel(IConnectionManager connectionManager, IDispatcher dispatcher, IMessageBoxService messageBoxService, ILogger<ConnectionManagerViewModel>? logger = null)
         {
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
             _messageBoxService = messageBoxService ?? throw new ArgumentNullException(nameof(messageBoxService));
+            _logger = logger;
 
             AddCommand = new RelayCommand(AddProfile);
             RemoveCommand = new RelayCommand(RemoveProfile, () => CanRemove);
@@ -102,11 +107,13 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 SelectedProfile = _connectionManager.ActiveProfile ?? _connectionManager.Profiles[0];
             }
+            else
+            {
+                _ = RefreshSerialPortsAsync();
+            }
 
             _connectionManager.Profiles.CollectionChanged += Profiles_CollectionChanged;
             _connectionManager.ActiveProfileChanged += ConnectionManager_ActiveProfileChanged;
-
-            RefreshSerialPorts();
         }
 
         public IRelayCommand AddCommand { get; }
@@ -136,7 +143,7 @@ namespace ModbusForge.Avalonia.ViewModels
             OnPropertyChanged(nameof(CanDisconnect));
             AutoDetectSettingsCommand.NotifyCanExecuteChanged();
 
-            RefreshSerialPorts();
+            _ = RefreshSerialPortsAsync();
         }
 
         partial void OnSelectedProfileChanging(ConnectionProfile? value)
@@ -199,68 +206,146 @@ namespace ModbusForge.Avalonia.ViewModels
             _dispatcher.Invoke(() => SelectedProfile = e);
         }
 
-        private void RefreshSerialPorts()
+        private async Task RefreshSerialPortsAsync()
         {
-            AvailableSerialPorts.Clear();
+            _refreshSerialPortsCts?.Cancel();
+            _refreshSerialPortsCts?.Dispose();
+            _refreshSerialPortsCts = new CancellationTokenSource();
+            var token = _refreshSerialPortsCts.Token;
 
+            try
+            {
+                var ports = await Task.Run(() => SerialPort.GetPortNames()
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                    .ToList(), token);
+
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    AvailableSerialPorts.Clear();
+                    foreach (var port in ports)
+                    {
+                        AvailableSerialPorts.Add(new SerialPortInfo(port));
+                    }
+
+                    AvailableSerialPorts.Add(new SerialPortInfo("Custom port...", isCustom: true));
+                    SyncSelectedSerialPort();
+                });
+
+                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    return;
+                }
+
+                var descriptions = await Task.Run(() =>
+#pragma warning disable CA1416
+                    GetSerialPortDescriptions(),
+#pragma warning restore CA1416
+                    token);
+
+                if (descriptions == null || token.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    var previousPortName = SelectedSerialPort?.PortName;
+
+                    AvailableSerialPorts.Clear();
+                    foreach (var port in descriptions.Keys.OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+                    {
+                        AvailableSerialPorts.Add(new SerialPortInfo(port, descriptions[port]));
+                    }
+
+                    AvailableSerialPorts.Add(new SerialPortInfo("Custom port...", isCustom: true));
+
+                    if (!string.IsNullOrWhiteSpace(previousPortName))
+                    {
+                        var matching = AvailableSerialPorts.FirstOrDefault(p =>
+                            !p.IsCustom && string.Equals(p.PortName, previousPortName, StringComparison.OrdinalIgnoreCase));
+                        if (matching != null)
+                        {
+                            SelectedSerialPort = matching;
+                            return;
+                        }
+                    }
+
+                    SyncSelectedSerialPort();
+                });
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to refresh serial ports");
+            }
+        }
+
+        [SupportedOSPlatform("windows")]
+        private static Dictionary<string, string> GetSerialPortDescriptions()
+        {
             var descriptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                try
-                {
-                    using var pnpSearcher = new ManagementObjectSearcher("SELECT * FROM Win32_PnPEntity WHERE Name LIKE '%(COM%'");
-                    foreach (var o in pnpSearcher.Get())
-                    {
-                        using var mo = (ManagementObject)o;
-                        var name = mo["Name"]?.ToString();
-                        if (string.IsNullOrWhiteSpace(name)) continue;
-
-                        var match = Regex.Match(name, @"\(COM\d+\)");
-                        if (match.Success)
-                        {
-                            var port = match.Value.Trim('(', ')');
-                            var description = Regex.Replace(name, @"\s*\(COM\d+\)", string.Empty).Trim();
-                            descriptions[port] = description;
-                        }
-                    }
-                }
-                catch
-                {
-                    // Fall through to plain COM port names.
-                }
-
-                try
-                {
-                    using var serialSearcher = new ManagementObjectSearcher("SELECT * FROM Win32_SerialPort");
-                    foreach (var o in serialSearcher.Get())
-                    {
-                        using var mo = (ManagementObject)o;
-                        var deviceId = mo["DeviceID"]?.ToString();
-                        var description = mo["Description"]?.ToString();
-
-                        if (!string.IsNullOrWhiteSpace(deviceId) &&
-                            !descriptions.ContainsKey(deviceId) &&
-                            !string.IsNullOrWhiteSpace(description))
-                        {
-                            descriptions[deviceId] = description;
-                        }
-                    }
-                }
-                catch
-                {
-                    // Fall through to plain COM port names.
-                }
+                return descriptions;
             }
 
-            foreach (var port in SerialPort.GetPortNames().Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+            try
             {
-                descriptions.TryGetValue(port, out var description);
-                AvailableSerialPorts.Add(new SerialPortInfo(port, description));
+                using var pnpSearcher = new ManagementObjectSearcher("SELECT * FROM Win32_PnPEntity WHERE Name LIKE '%(COM%'");
+                pnpSearcher.Options.Timeout = TimeSpan.FromSeconds(5);
+                foreach (var o in pnpSearcher.Get())
+                {
+                    using var mo = (ManagementObject)o;
+                    var name = mo["Name"]?.ToString();
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+
+                    var match = Regex.Match(name, @"\(COM\d+\)");
+                    if (match.Success)
+                    {
+                        var port = match.Value.Trim('(', ')');
+                        var description = Regex.Replace(name, @"\s*\(COM\d+\)", string.Empty).Trim();
+                        descriptions[port] = description;
+                    }
+                }
+            }
+            catch
+            {
+                // Fall through to plain COM port names.
             }
 
-            AvailableSerialPorts.Add(new SerialPortInfo("Custom port...", isCustom: true));
-            SyncSelectedSerialPort();
+            try
+            {
+                using var serialSearcher = new ManagementObjectSearcher("SELECT * FROM Win32_SerialPort");
+                serialSearcher.Options.Timeout = TimeSpan.FromSeconds(5);
+                foreach (var o in serialSearcher.Get())
+                {
+                    using var mo = (ManagementObject)o;
+                    var deviceId = mo["DeviceID"]?.ToString();
+                    var description = mo["Description"]?.ToString();
+
+                    if (!string.IsNullOrWhiteSpace(deviceId) &&
+                        !descriptions.ContainsKey(deviceId) &&
+                        !string.IsNullOrWhiteSpace(description))
+                    {
+                        descriptions[deviceId] = description;
+                    }
+                }
+            }
+            catch
+            {
+                // Fall through to plain COM port names.
+            }
+
+            foreach (var port in SerialPort.GetPortNames().Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                descriptions.TryAdd(port, string.Empty);
+            }
+
+            return descriptions;
         }
 
         private void SyncSelectedSerialPort()
@@ -415,6 +500,8 @@ namespace ModbusForge.Avalonia.ViewModels
             _connectionManager.Profiles.CollectionChanged -= Profiles_CollectionChanged;
             _connectionManager.ActiveProfileChanged -= ConnectionManager_ActiveProfileChanged;
             _autoDetectCts?.Dispose();
+            _refreshSerialPortsCts?.Cancel();
+            _refreshSerialPortsCts?.Dispose();
 
             if (SelectedProfile != null)
             {

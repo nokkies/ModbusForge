@@ -47,6 +47,7 @@ namespace ModbusForge.Avalonia.Services
         private readonly IFileDialogService _fileDialogService;
         private readonly IFileSystem _fileSystem;
         private readonly IMessageBoxService _messageBoxService;
+        private readonly ILogger<ConnectionManagerViewModel>? _connectionManagerLogger;
         private readonly ILogger<AvaloniaDockingHost>? _logger;
 
         private MainView? _mainView;
@@ -74,6 +75,7 @@ namespace ModbusForge.Avalonia.Services
             IFileDialogService fileDialogService,
             IFileSystem fileSystem,
             IMessageBoxService messageBoxService,
+            ILogger<ConnectionManagerViewModel>? connectionManagerLogger = null,
             ILogger<AvaloniaDockingHost>? logger = null)
         {
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
@@ -84,6 +86,7 @@ namespace ModbusForge.Avalonia.Services
             _fileDialogService = fileDialogService ?? throw new ArgumentNullException(nameof(fileDialogService));
             _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
             _messageBoxService = messageBoxService ?? throw new ArgumentNullException(nameof(messageBoxService));
+            _connectionManagerLogger = connectionManagerLogger;
             _logger = logger;
         }
 
@@ -343,7 +346,7 @@ namespace ModbusForge.Avalonia.Services
 
         private DockedTool CreateConnectionManager()
         {
-            var viewModel = new ConnectionManagerViewModel(_connectionManager, _dispatcher, _messageBoxService);
+            var viewModel = new ConnectionManagerViewModel(_connectionManager, _dispatcher, _messageBoxService, _connectionManagerLogger);
             var window = new ConnectionManagerWindow { DataContext = viewModel };
 
             var content = window.Content as Control
