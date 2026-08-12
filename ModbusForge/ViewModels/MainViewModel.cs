@@ -1500,6 +1500,8 @@ namespace ModbusForge.Avalonia.ViewModels
                     SelectedUnitId = unitIds[0];
                 }
 
+                StatusMessage = $"Server started on {server.BoundEndpoint}";
+
                 OnPropertyChanged(nameof(ShowServerFields));
                 ExportUnitIdCommand.NotifyCanExecuteChanged();
                 ImportUnitIdAsCommand.NotifyCanExecuteChanged();

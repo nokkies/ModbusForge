@@ -34,4 +34,4 @@ Name: "{group}\ModbusForge"; Filename: "{app}\ModbusForge.exe"
 Name: "{autodesktop}\ModbusForge"; Filename: "{app}\ModbusForge.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\ModbusForge.exe"; Description: "{cm:LaunchProgram,ModbusForge}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\ModbusForge.exe"; Description: "{cm:LaunchProgram,ModbusForge}"; Flags: nowait postinstall

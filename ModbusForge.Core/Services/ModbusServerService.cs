@@ -153,20 +153,13 @@ namespace ModbusForge.Services
 
         private string GetLocalNetworkIp()
         {
-            try
+            var ip = IpRangeHelper.GetPrimaryLocalIPv4();
+            if (!string.IsNullOrWhiteSpace(ip))
             {
-                var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
-                var ips = host.AddressList
-                    .Where(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-                    .Select(ip => ip.ToString())
-                    .ToList();
-                if (ips.Count > 0)
-                    return string.Join(", ", ips);
+                return ip;
             }
-            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-            {
-                _logger.LogWarning(ex, "Failed to retrieve local network IP address");
-            }
+
+            _logger.LogWarning("Failed to retrieve a local network IP address");
             return "0.0.0.0";
         }
 

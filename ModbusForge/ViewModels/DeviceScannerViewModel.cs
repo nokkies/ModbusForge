@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using ModbusForge.Helpers;
 using ModbusForge.Models;
 using ModbusForge.Services;
 
@@ -121,6 +122,10 @@ namespace ModbusForge.Avalonia.ViewModels
             _messageBoxService = messageBoxService ?? throw new ArgumentNullException(nameof(messageBoxService));
             _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+            var (startIp, endIp) = IpRangeHelper.GetLocalNetworkRange();
+            StartIpAddress = startIp;
+            EndIpAddress = endIp;
 
             StartScanCommand = new AsyncRelayCommand(StartScanAsync, () => !IsScanning);
             CancelScanCommand = new RelayCommand(CancelScan, () => IsScanning);

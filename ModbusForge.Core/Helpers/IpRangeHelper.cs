@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
 namespace ModbusForge.Helpers
@@ -81,6 +83,108 @@ namespace ModbusForge.Helpers
             }
 
             return addresses;
+        }
+
+        /// <summary>
+        /// Returns the primary non-loopback IPv4 address, or <c>null</c> if one cannot be found.
+        /// </summary>
+        public static string? GetPrimaryLocalIPv4()
+        {
+            try
+            {
+                var active = NetworkInterface.GetAllNetworkInterfaces()
+                    .Where(ni => ni.OperationalStatus == OperationalStatus.Up)
+                    .Where(ni => ni.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                    .OrderBy(ni => ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet ? 0
+                        : ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 ? 1
+                        : 2)
+                    .FirstOrDefault();
+
+                if (active != null)
+                {
+                    var address = active.GetIPProperties().UnicastAddresses
+                        .Select(u => u.Address)
+                        .FirstOrDefault(a =>
+                            a.AddressFamily == AddressFamily.InterNetwork &&
+                            !IPAddress.IsLoopback(a) &&
+                            !a.ToString().StartsWith("169.254.", StringComparison.OrdinalIgnoreCase));
+
+                    if (address != null)
+                    {
+                        return address.ToString();
+                    }
+                }
+
+                var host = Dns.GetHostEntry(Dns.GetHostName());
+                return host.AddressList
+                    .Where(ip => ip.AddressFamily == AddressFamily.InterNetwork)
+                    .Where(ip => !IPAddress.IsLoopback(ip))
+                    .Where(ip => !ip.ToString().StartsWith("169.254.", StringComparison.OrdinalIgnoreCase))
+                    .Select(ip => ip.ToString())
+                    .FirstOrDefault();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Returns a sensible default IPv4 scan range for the local network based on the
+        /// primary adapter's subnet, falling back to the primary IP's /24 if the subnet
+        /// is too large to scan.
+        /// </summary>
+        public static (string StartAddress, string EndAddress) GetLocalNetworkRange()
+        {
+            try
+            {
+                var adapter = NetworkInterface.GetAllNetworkInterfaces()
+                    .Where(ni => ni.OperationalStatus == OperationalStatus.Up)
+                    .Where(ni => ni.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                    .OrderBy(ni => ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet ? 0
+                        : ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 ? 1
+                        : 2)
+                    .FirstOrDefault();
+
+                var unicast = adapter?.GetIPProperties().UnicastAddresses
+                    .FirstOrDefault(u =>
+                        u.Address?.AddressFamily == AddressFamily.InterNetwork &&
+                        u.IPv4Mask != null);
+
+                if (unicast?.Address is not null && unicast.IPv4Mask is not null)
+                {
+                    var ipBytes = unicast.Address.GetAddressBytes();
+                    var maskBytes = unicast.IPv4Mask.GetAddressBytes();
+                    var network = new byte[4];
+                    var broadcast = new byte[4];
+                    for (int i = 0; i < 4; i++)
+                    {
+                        network[i] = (byte)(ipBytes[i] & maskBytes[i]);
+                        broadcast[i] = (byte)(network[i] | ~maskBytes[i]);
+                    }
+
+                    var end = ((uint)((broadcast[0] << 24) | (broadcast[1] << 16) | (broadcast[2] << 8) | broadcast[3]) - 1);
+                    var start = ((uint)((network[0] << 24) | (network[1] << 16) | (network[2] << 8) | network[3]) + 1);
+
+                    if (end >= start && end - start + 1 <= MaxAddresses)
+                    {
+                        return (ToIPv4String(start), ToIPv4String(end));
+                    }
+                }
+
+                var primary = GetPrimaryLocalIPv4();
+                if (!string.IsNullOrWhiteSpace(primary) && TryParseIPv4(primary, out var ipValue))
+                {
+                    var bytes = ToIPv4String(ipValue).Split('.');
+                    return ($"{bytes[0]}.{bytes[1]}.{bytes[2]}.1", $"{bytes[0]}.{bytes[1]}.{bytes[2]}.254");
+                }
+            }
+            catch
+            {
+                // Fall through to loopback fallback.
+            }
+
+            return ("127.0.0.1", "127.0.0.1");
         }
     }
 }
