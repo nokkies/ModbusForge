@@ -78,6 +78,15 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.8.22 - Custom Watch Bulk Add, Auto-Monitoring & Count Binding Fixes
+
+- **Bulk-add custom watch entries**: new `Add Bulk` dialog creates a contiguous range with start register, count, type, area, read period and write period.
+- **Per-row delete button** in the Custom Watch `Actions` column.
+- **Custom Watch auto-starts**: the background loop starts automatically when any row's `Read` or `Continuous Write` is checked and stops when all are unchecked.
+- **Register/coil count caps raised** to the Modbus protocol limits (125 for holding/input registers, 2000 for coils/discrete inputs).
+- **NumericUpDown two-way binding fixed**: added a `DecimalToIntConverter` so count, start and period `NumericUpDown`s actually update the view model.
+- **Version bumped to `2026.8.22`** in all projects.
+
 ### 2026.8.21 - Connection Manager Polish & Update Popup Fix
 
 - **Connection Manager COM port enumeration is now async**: the window opens instantly while friendly port names are loaded in the background.
