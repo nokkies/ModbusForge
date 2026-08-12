@@ -4,9 +4,15 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO.Ports;
 using System.Linq;
+using System.Management;
+using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using ModbusForge.Avalonia.Models;
+using ModbusForge.Avalonia.Services;
 using ModbusForge.Models;
 using ModbusForge.Services;
 
@@ -26,29 +32,49 @@ namespace ModbusForge.Avalonia.ViewModels
         public static IReadOnlyList<StopBits> StopBitsOptions { get; } =
             new[] { StopBits.None, StopBits.One, StopBits.OnePointFive, StopBits.Two };
 
+        public static IReadOnlyList<int> BaudRates => SerialSettingsDetector.CommonBaudRates;
+
         public bool IsSerial => SelectedProfile?.Transport is TransportType.Rtu or TransportType.Ascii;
 
         private readonly IConnectionManager _connectionManager;
         private readonly IDispatcher _dispatcher;
+        private readonly IMessageBoxService _messageBoxService;
+        private readonly SerialSettingsDetector _detector = new();
+        private CancellationTokenSource? _autoDetectCts;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(RemoveCommand))]
         [NotifyCanExecuteChangedFor(nameof(CloneCommand))]
         [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
         [NotifyCanExecuteChangedFor(nameof(DisconnectCommand))]
+        [NotifyCanExecuteChangedFor(nameof(AutoDetectSettingsCommand))]
         private ConnectionProfile? _selectedProfile;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
         [NotifyCanExecuteChangedFor(nameof(DisconnectCommand))]
+        [NotifyCanExecuteChangedFor(nameof(AutoDetectSettingsCommand))]
         private bool _isConnecting;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(AutoDetectSettingsCommand))]
+        [NotifyCanExecuteChangedFor(nameof(CancelAutoDetectCommand))]
+        [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
+        [NotifyCanExecuteChangedFor(nameof(DisconnectCommand))]
+        private bool _isAutoDetecting;
+
+        [ObservableProperty]
+        private bool _isCustomPortSelected;
 
         [ObservableProperty]
         private string _statusMessage = string.Empty;
 
+        [ObservableProperty]
+        private SerialPortInfo? _selectedSerialPort;
+
         public ObservableCollection<ConnectionProfile> Profiles => _connectionManager.Profiles;
 
-        public ObservableCollection<string> AvailableSerialPorts { get; } = new();
+        public ObservableCollection<SerialPortInfo> AvailableSerialPorts { get; } = new();
 
         public bool HasSelection => SelectedProfile != null;
 
@@ -56,10 +82,11 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public bool CanClone => HasSelection;
 
-        public ConnectionManagerViewModel(IConnectionManager connectionManager, IDispatcher dispatcher)
+        public ConnectionManagerViewModel(IConnectionManager connectionManager, IDispatcher dispatcher, IMessageBoxService messageBoxService)
         {
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
+            _messageBoxService = messageBoxService ?? throw new ArgumentNullException(nameof(messageBoxService));
 
             AddCommand = new RelayCommand(AddProfile);
             RemoveCommand = new RelayCommand(RemoveProfile, () => CanRemove);
@@ -68,6 +95,8 @@ namespace ModbusForge.Avalonia.ViewModels
             DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => CanDisconnect());
             SaveCommand = new RelayCommand(SaveAndClose);
             CancelCommand = new RelayCommand(Cancel);
+            AutoDetectSettingsCommand = new AsyncRelayCommand(AutoDetectSettingsAsync, () => CanAutoDetect());
+            CancelAutoDetectCommand = new RelayCommand(CancelAutoDetect, () => IsAutoDetecting);
 
             if (_connectionManager.Profiles.Count > 0)
             {
@@ -87,6 +116,8 @@ namespace ModbusForge.Avalonia.ViewModels
         public IAsyncRelayCommand DisconnectCommand { get; }
         public IRelayCommand SaveCommand { get; }
         public IRelayCommand CancelCommand { get; }
+        public IAsyncRelayCommand AutoDetectSettingsCommand { get; }
+        public IRelayCommand CancelAutoDetectCommand { get; }
 
         public event EventHandler<bool>? RequestClose;
 
@@ -103,6 +134,8 @@ namespace ModbusForge.Avalonia.ViewModels
             OnPropertyChanged(nameof(CanClone));
             OnPropertyChanged(nameof(CanConnect));
             OnPropertyChanged(nameof(CanDisconnect));
+            AutoDetectSettingsCommand.NotifyCanExecuteChanged();
+
             RefreshSerialPorts();
         }
 
@@ -114,9 +147,28 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
-        private bool CanConnect() => HasSelection && !IsConnecting && SelectedProfile is { IsConnected: false };
+        partial void OnSelectedSerialPortChanged(SerialPortInfo? value)
+        {
+            if (value != null && SelectedProfile != null)
+            {
+                if (!value.IsCustom && !string.Equals(SelectedProfile.ComPort, value.PortName, StringComparison.OrdinalIgnoreCase))
+                {
+                    SelectedProfile.ComPort = value.PortName;
+                }
 
-        private bool CanDisconnect() => HasSelection && !IsConnecting && SelectedProfile is { IsConnected: true };
+                IsCustomPortSelected = value.IsCustom;
+            }
+            else
+            {
+                IsCustomPortSelected = false;
+            }
+        }
+
+        private bool CanConnect() => HasSelection && !IsConnecting && !IsAutoDetecting && SelectedProfile is { IsConnected: false };
+
+        private bool CanDisconnect() => HasSelection && !IsConnecting && !IsAutoDetecting && SelectedProfile is { IsConnected: true };
+
+        private bool CanAutoDetect() => HasSelection && !IsAutoDetecting && IsSerial && !string.IsNullOrWhiteSpace(SelectedProfile?.ComPort);
 
         private void SelectedProfile_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
@@ -128,6 +180,12 @@ namespace ModbusForge.Avalonia.ViewModels
             else if (e.PropertyName == nameof(ConnectionProfile.Transport))
             {
                 OnPropertyChanged(nameof(IsSerial));
+                AutoDetectSettingsCommand.NotifyCanExecuteChanged();
+            }
+            else if (e.PropertyName == nameof(ConnectionProfile.ComPort))
+            {
+                AutoDetectSettingsCommand.NotifyCanExecuteChanged();
+                SyncSelectedSerialPort();
             }
         }
 
@@ -144,10 +202,80 @@ namespace ModbusForge.Avalonia.ViewModels
         private void RefreshSerialPorts()
         {
             AvailableSerialPorts.Clear();
-            foreach (var port in SerialPort.GetPortNames())
+
+            var descriptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                AvailableSerialPorts.Add(port);
+                try
+                {
+                    using var pnpSearcher = new ManagementObjectSearcher("SELECT * FROM Win32_PnPEntity WHERE Name LIKE '%(COM%'");
+                    foreach (var o in pnpSearcher.Get())
+                    {
+                        using var mo = (ManagementObject)o;
+                        var name = mo["Name"]?.ToString();
+                        if (string.IsNullOrWhiteSpace(name)) continue;
+
+                        var match = Regex.Match(name, @"\(COM\d+\)");
+                        if (match.Success)
+                        {
+                            var port = match.Value.Trim('(', ')');
+                            var description = Regex.Replace(name, @"\s*\(COM\d+\)", string.Empty).Trim();
+                            descriptions[port] = description;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Fall through to plain COM port names.
+                }
+
+                try
+                {
+                    using var serialSearcher = new ManagementObjectSearcher("SELECT * FROM Win32_SerialPort");
+                    foreach (var o in serialSearcher.Get())
+                    {
+                        using var mo = (ManagementObject)o;
+                        var deviceId = mo["DeviceID"]?.ToString();
+                        var description = mo["Description"]?.ToString();
+
+                        if (!string.IsNullOrWhiteSpace(deviceId) &&
+                            !descriptions.ContainsKey(deviceId) &&
+                            !string.IsNullOrWhiteSpace(description))
+                        {
+                            descriptions[deviceId] = description;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Fall through to plain COM port names.
+                }
             }
+
+            foreach (var port in SerialPort.GetPortNames().Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+            {
+                descriptions.TryGetValue(port, out var description);
+                AvailableSerialPorts.Add(new SerialPortInfo(port, description));
+            }
+
+            AvailableSerialPorts.Add(new SerialPortInfo("Custom port...", isCustom: true));
+            SyncSelectedSerialPort();
+        }
+
+        private void SyncSelectedSerialPort()
+        {
+            if (SelectedProfile == null)
+            {
+                SelectedSerialPort = null;
+                return;
+            }
+
+            var matching = AvailableSerialPorts.FirstOrDefault(p =>
+                !p.IsCustom && string.Equals(p.PortName, SelectedProfile.ComPort, StringComparison.OrdinalIgnoreCase));
+
+            SelectedSerialPort = matching ?? AvailableSerialPorts.FirstOrDefault(p => p.IsCustom);
+            IsCustomPortSelected = SelectedSerialPort?.IsCustom ?? false;
         }
 
         private void AddProfile()
@@ -226,6 +354,51 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
+        private async Task AutoDetectSettingsAsync()
+        {
+            if (SelectedProfile == null || IsAutoDetecting) return;
+
+            _autoDetectCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+            IsAutoDetecting = true;
+            StatusMessage = "Auto-detecting serial settings...";
+
+            try
+            {
+                var progress = new Progress<string>(m => StatusMessage = m);
+                var result = await _detector.DetectAsync(SelectedProfile, progress, _autoDetectCts.Token);
+
+                if (result.Found && SelectedProfile != null)
+                {
+                    SelectedProfile.BaudRate = result.BaudRate;
+                    SelectedProfile.Parity = result.Parity;
+                    SelectedProfile.DataBits = result.DataBits;
+                    SelectedProfile.StopBits = result.StopBits;
+                }
+
+                StatusMessage = result.Summary;
+                await _messageBoxService.ShowAsync(result.Log, "Auto-Detect Result", DialogButton.Ok, DialogIcon.Information);
+            }
+            catch (OperationCanceledException)
+            {
+                StatusMessage = "Auto-detect cancelled.";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Auto-detect error: {ex.Message}";
+            }
+            finally
+            {
+                IsAutoDetecting = false;
+                _autoDetectCts?.Dispose();
+                _autoDetectCts = null;
+            }
+        }
+
+        private void CancelAutoDetect()
+        {
+            _autoDetectCts?.Cancel();
+        }
+
         private void SaveAndClose()
         {
             _connectionManager.SaveProfiles();
@@ -241,6 +414,7 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             _connectionManager.Profiles.CollectionChanged -= Profiles_CollectionChanged;
             _connectionManager.ActiveProfileChanged -= ConnectionManager_ActiveProfileChanged;
+            _autoDetectCts?.Dispose();
 
             if (SelectedProfile != null)
             {

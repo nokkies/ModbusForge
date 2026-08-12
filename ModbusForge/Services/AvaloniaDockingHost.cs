@@ -343,7 +343,7 @@ namespace ModbusForge.Avalonia.Services
 
         private DockedTool CreateConnectionManager()
         {
-            var viewModel = new ConnectionManagerViewModel(_connectionManager, _dispatcher);
+            var viewModel = new ConnectionManagerViewModel(_connectionManager, _dispatcher, _messageBoxService);
             var window = new ConnectionManagerWindow { DataContext = viewModel };
 
             var content = window.Content as Control
