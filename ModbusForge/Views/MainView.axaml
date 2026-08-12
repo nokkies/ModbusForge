@@ -172,7 +172,7 @@
             <TextBlock VerticalAlignment="Center" Text="Start:" />
             <NumericUpDown Value="{Binding HoldingRegisterStart}" Minimum="0" Width="100" />
             <TextBlock VerticalAlignment="Center" Text="Count:" />
-            <NumericUpDown Value="{Binding HoldingRegisterCount}" Minimum="1" Maximum="100" Width="80" />
+            <NumericUpDown Value="{Binding HoldingRegisterCount}" Minimum="1" Maximum="125" Width="80" />
             <Button Content="Read" Command="{Binding ReadHoldingRegistersCommand}" />
             <TextBlock VerticalAlignment="Center" Text="Type:" Margin="16,0,0,0" />
             <ComboBox ItemsSource="{Binding RegisterTypes}" SelectedItem="{Binding RegistersGlobalType}" Width="80" />
@@ -230,7 +230,7 @@
             <TextBlock VerticalAlignment="Center" Text="Start:" />
             <NumericUpDown Value="{Binding CoilStart}" Minimum="0" Width="100" />
             <TextBlock VerticalAlignment="Center" Text="Count:" />
-            <NumericUpDown Value="{Binding CoilCount}" Minimum="1" Maximum="100" Width="80" />
+            <NumericUpDown Value="{Binding CoilCount}" Minimum="1" Maximum="2000" Width="90" />
             <Button Content="Read" Command="{Binding ReadCoilsCommand}" />
             <CheckBox Content="Continuous Read" IsChecked="{Binding CoilsMonitorEnabled}" VerticalAlignment="Center" />
             <TextBlock VerticalAlignment="Center" Text="Period (ms):" />
@@ -271,7 +271,7 @@
             <TextBlock VerticalAlignment="Center" Text="Start:" />
             <NumericUpDown Value="{Binding InputRegisterStart}" Minimum="0" Width="100" />
             <TextBlock VerticalAlignment="Center" Text="Count:" />
-            <NumericUpDown Value="{Binding InputRegisterCount}" Minimum="1" Maximum="100" Width="80" />
+            <NumericUpDown Value="{Binding InputRegisterCount}" Minimum="1" Maximum="125" Width="80" />
             <Button Content="Read" Command="{Binding ReadInputRegistersCommand}" />
             <TextBlock VerticalAlignment="Center" Text="Type:" Margin="16,0,0,0" />
             <ComboBox ItemsSource="{Binding RegisterTypes}" SelectedItem="{Binding InputRegistersGlobalType}" Width="80" />
@@ -325,7 +325,7 @@
             <TextBlock VerticalAlignment="Center" Text="Start:" />
             <NumericUpDown Value="{Binding DiscreteInputStart}" Minimum="0" Width="100" />
             <TextBlock VerticalAlignment="Center" Text="Count:" />
-            <NumericUpDown Value="{Binding DiscreteInputCount}" Minimum="1" Maximum="100" Width="80" />
+            <NumericUpDown Value="{Binding DiscreteInputCount}" Minimum="1" Maximum="2000" Width="90" />
             <Button Content="Read" Command="{Binding ReadDiscreteInputsCommand}" />
             <CheckBox Content="Continuous Read" IsChecked="{Binding DiscreteInputsMonitorEnabled}" VerticalAlignment="Center" />
             <TextBlock VerticalAlignment="Center" Text="Period (ms):" />
