@@ -1121,7 +1121,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
             var (start, count) = GetAreaStartCount(area);
             var validator = new ModbusAddressValidator();
-            return validator.IsValidRange(start, count);
+            return validator.IsValidRange(start, count, area);
         }
 
         private bool CanWrite() => CanWrite(SelectedArea);
