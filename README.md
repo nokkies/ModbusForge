@@ -78,6 +78,14 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.8.25 - Chunked Modbus Reads, Large Writes & Partial-Read UI
+
+- **Chunked register reads/writes**: holding/input register reads, multi-register writes, and bulk coil writes are now automatically split into protocol-sized packets and reassembled, supporting the full 0..65535 address range.
+- **Red partial-read marker**: if a chunked read fails partway through, the last successfully read value appears in red with a tooltip explaining the partial result.
+- **Raised register count limits**: holding/input register count fields now allow up to 65536; coil/discrete counts remain capped at the Modbus maximum of 2000.
+- **Partial reads help topic**: a new searchable help topic explains the red value and how to clear it.
+- **Version bumped to `2026.8.25`** in all projects.
+
 ### 2026.8.24 - NumericUpDown Two-Way Binding
 
 - **Register/coil count fix**: removed the explicit `DecimalToIntConverter` so the `NumericUpDown` count/start/period values use Avalonia’s built-in `int ↔ decimal?` conversion, restoring reliable two-way binding.
