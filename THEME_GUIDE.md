@@ -112,7 +112,7 @@ MainWindow.xaml
 
 ## Browser Compatibility
 
-✅ **WPF .NET 8.0** - Full support for all visual effects
+✅ **Avalonia .NET 8.0** - Full support for all visual effects
 ✅ **Windows 10/11** - Native DropShadow effects
 ✅ **Hardware Acceleration** - GPU-accelerated animations
 

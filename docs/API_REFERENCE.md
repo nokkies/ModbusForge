@@ -237,4 +237,4 @@ Default Unit ID (slave ID) for client connections.
 
 - All service interfaces are registered in the DI container via `App.xaml.cs`
 - Implementations are selected at runtime based on the configured mode
-- The API is primarily used internally by the WPF UI; direct API usage is for advanced scenarios and plugin development
+- The API is primarily used internally by the Avalonia desktop UI; direct API usage is for advanced scenarios and plugin development

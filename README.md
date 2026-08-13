@@ -1,4 +1,4 @@
-# ModbusForge v6.0.4
+# ModbusForge v2026.8.24
 
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows)](https://www.microsoft.com/windows)
@@ -6,7 +6,7 @@
 [![GitHub release](https://img.shields.io/github/v/release/nokkies/ModbusForge)](https://github.com/nokkies/ModbusForge/releases)
 [![GitHub issues](https://img.shields.io/github/issues/nokkies/ModbusForge)](https://github.com/nokkies/ModbusForge/issues)
 
-A professional Modbus TCP/RTU/ASCII client/server application built with .NET 8.0 and WPF. ModbusForge provides comprehensive tools for testing, monitoring, and automating Modbus communications.
+A professional Modbus TCP/RTU/ASCII client/server application built with .NET 8.0 and Avalonia. ModbusForge provides comprehensive tools for testing, monitoring, and automating Modbus communications on Windows and Linux.
 
 ![ModbusForge](ModbusForge/Resources/ModbusForgeLOGO.png)
 
@@ -689,7 +689,7 @@ sudo systemctl enable --now modbusforge-headless
 ## FAQ
 
 ### Q: What operating systems are supported?
-**A:** ModbusForge is built for Windows 10 and Windows 11 using WPF and .NET 8.0.
+**A:** ModbusForge runs on Windows 10/11 and Linux using Avalonia and .NET 8.0. The headless runtime works on any platform .NET 8 supports.
 
 ### Q: Do I need administrator privileges?
 **A:** Only if you use the default Modbus port 502. Windows requires admin privileges to bind to ports below 1024. You can use a higher port number (e.g., 1502) to avoid this.

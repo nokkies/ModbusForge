@@ -1,24 +1,24 @@
 ---
 name: testing-modbusforge
-description: Build, run, and end-to-end test the ModbusForge WPF app locally. Use when verifying UI/ViewModel changes (registers grid, connect/disconnect, Unit ID switching, custom watch, trends).
+description: Build, run, and end-to-end test the ModbusForge Avalonia app locally. Use when verifying UI/ViewModel changes (registers grid, connect/disconnect, Unit ID switching, custom watch, trends).
 ---
 
-# Testing ModbusForge (WPF, net8.0-windows)
+# Testing ModbusForge (Avalonia, net8.0)
 
 ## Build & unit tests
 ```powershell
 dotnet build ModbusForge.sln
 dotnet test ModbusForge.Tests/ModbusForge.Tests.csproj --filter "FullyQualifiedName!~UITests & FullyQualifiedName!~SmokeTests" --no-build
 ```
-The `UITests`/`SmokeTests` filters exclude FlaUI automation that needs a running app; the remaining ~355 unit tests run headless. One test (`DisposeAsync_DoesNotBlockCallingThread_WhenLockIsHeld`) can be timing-flaky — rerun once before treating a failure as real.
+The `UITests`/`SmokeTests` filters exclude FlaUI automation that needs a running app; the remaining ~400 unit tests run headless. One test (`DisposeAsync_DoesNotBlockCallingThread_WhenLockIsHeld`) can be timing-flaky — rerun once before treating a failure as real.
 
 ## Running the app for GUI testing
-Built exe: `ModbusForge\bin\Debug\net8.0-windows\ModbusForge.exe`.
+Built exe: `ModbusForge\bin\Debug\net8.0\ModbusForge.exe`.
 
-If the .NET SDK is installed to a non-default location (e.g. `C:\dotnet` via dotnet-install.ps1), the apphost won't find the WindowsDesktop runtime and shows a "To run this application, you must install .NET Desktop Runtime" dialog. Fix by pointing the apphost at the SDK's bundled runtime:
+If the .NET SDK is installed to a non-default location (e.g. `C:\dotnet` via dotnet-install.ps1), point the apphost at the SDK's bundled runtime:
 ```powershell
 $env:DOTNET_ROOT="C:\dotnet"; $env:PATH="C:\dotnet;"+$env:PATH
-Start-Process ".\ModbusForge\bin\Debug\net8.0-windows\ModbusForge.exe" -WorkingDirectory "$HOME\repos\ModbusForge"
+Start-Process ".\ModbusForge\bin\Debug\net8.0\ModbusForge.exe" -WorkingDirectory "$HOME\repos\ModbusForge"
 ```
 (If the standard `C:\Program Files\dotnet` runtime is present, no DOTNET_ROOT is needed.) Maximize the window before recording via the Win32 `ShowWindow(handle, 3)` call on the process `MainWindowHandle`.
 
