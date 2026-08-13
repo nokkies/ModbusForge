@@ -10,7 +10,6 @@
 
   <UserControl.Resources>
     <converters:NavigationIndexConverter x:Key="NavigationIndexConverter" />
-    <converters:DecimalToIntConverter x:Key="DecimalToIntConverter" />
   </UserControl.Resources>
 
   <UserControl.Styles>
@@ -171,9 +170,9 @@
         <Grid RowDefinitions="Auto,*">
           <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
             <TextBlock VerticalAlignment="Center" Text="Start:" />
-            <NumericUpDown Value="{Binding HoldingRegisterStart, Mode=TwoWay, Converter={StaticResource DecimalToIntConverter}}" Minimum="0" Width="100" />
+            <NumericUpDown Value="{Binding HoldingRegisterStart}" Minimum="0" Width="100" />
             <TextBlock VerticalAlignment="Center" Text="Count:" />
-            <NumericUpDown Value="{Binding HoldingRegisterCount, Mode=TwoWay, Converter={StaticResource DecimalToIntConverter}}" Minimum="1" Maximum="125" Width="80" />
+            <NumericUpDown Value="{Binding HoldingRegisterCount}" Minimum="1" Maximum="125" Width="80" />
             <Button Content="Read" Command="{Binding ReadHoldingRegistersCommand}" />
             <TextBlock VerticalAlignment="Center" Text="Type:" Margin="16,0,0,0" />
             <ComboBox ItemsSource="{Binding RegisterTypes}" SelectedItem="{Binding RegistersGlobalType}" Width="80" />
@@ -181,7 +180,7 @@
             <CheckBox Content="Swap Words" IsChecked="{Binding RegistersSwapWords}" VerticalAlignment="Center" />
             <CheckBox Content="Continuous Read" IsChecked="{Binding HoldingMonitorEnabled}" VerticalAlignment="Center" />
             <TextBlock VerticalAlignment="Center" Text="Period (ms):" />
-            <NumericUpDown Value="{Binding HoldingMonitorPeriodMs, Mode=TwoWay, Converter={StaticResource DecimalToIntConverter}}" Minimum="50" Maximum="60000" Width="100" />
+            <NumericUpDown Value="{Binding HoldingMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
           <DataGrid x:Name="HoldingRegistersGrid" Grid.Row="1"
@@ -229,13 +228,13 @@
         <Grid RowDefinitions="Auto,*">
           <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
             <TextBlock VerticalAlignment="Center" Text="Start:" />
-            <NumericUpDown Value="{Binding CoilStart, Mode=TwoWay, Converter={StaticResource DecimalToIntConverter}}" Minimum="0" Width="100" />
+            <NumericUpDown Value="{Binding CoilStart}" Minimum="0" Width="100" />
             <TextBlock VerticalAlignment="Center" Text="Count:" />
-            <NumericUpDown Value="{Binding CoilCount, Mode=TwoWay, Converter={StaticResource DecimalToIntConverter}}" Minimum="1" Maximum="2000" Width="90" />
+            <NumericUpDown Value="{Binding CoilCount}" Minimum="1" Maximum="2000" Width="90" />
             <Button Content="Read" Command="{Binding ReadCoilsCommand}" />
             <CheckBox Content="Continuous Read" IsChecked="{Binding CoilsMonitorEnabled}" VerticalAlignment="Center" />
             <TextBlock VerticalAlignment="Center" Text="Period (ms):" />
-            <NumericUpDown Value="{Binding CoilsMonitorPeriodMs, Mode=TwoWay, Converter={StaticResource DecimalToIntConverter}}" Minimum="50" Maximum="60000" Width="100" />
+            <NumericUpDown Value="{Binding CoilsMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
           <DataGrid x:Name="CoilsGrid" Grid.Row="1"
@@ -270,9 +269,9 @@
         <Grid RowDefinitions="Auto,*">
           <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
             <TextBlock VerticalAlignment="Center" Text="Start:" />
-            <NumericUpDown Value="{Binding InputRegisterStart, Mode=TwoWay, Converter={StaticResource DecimalToIntConverter}}" Minimum="0" Width="100" />
+            <NumericUpDown Value="{Binding InputRegisterStart}" Minimum="0" Width="100" />
             <TextBlock VerticalAlignment="Center" Text="Count:" />
-            <NumericUpDown Value="{Binding InputRegisterCount, Mode=TwoWay, Converter={StaticResource DecimalToIntConverter}}" Minimum="1" Maximum="125" Width="80" />
+            <NumericUpDown Value="{Binding InputRegisterCount}" Minimum="1" Maximum="125" Width="80" />
             <Button Content="Read" Command="{Binding ReadInputRegistersCommand}" />
             <TextBlock VerticalAlignment="Center" Text="Type:" Margin="16,0,0,0" />
             <ComboBox ItemsSource="{Binding RegisterTypes}" SelectedItem="{Binding InputRegistersGlobalType}" Width="80" />
@@ -280,7 +279,7 @@
             <CheckBox Content="Swap Words" IsChecked="{Binding InputRegistersSwapWords}" VerticalAlignment="Center" />
             <CheckBox Content="Continuous Read" IsChecked="{Binding InputRegistersMonitorEnabled}" VerticalAlignment="Center" />
             <TextBlock VerticalAlignment="Center" Text="Period (ms):" />
-            <NumericUpDown Value="{Binding InputRegistersMonitorPeriodMs, Mode=TwoWay, Converter={StaticResource DecimalToIntConverter}}" Minimum="50" Maximum="60000" Width="100" />
+            <NumericUpDown Value="{Binding InputRegistersMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
           <DataGrid x:Name="InputRegistersGrid" Grid.Row="1"
@@ -324,13 +323,13 @@
         <Grid RowDefinitions="Auto,*">
           <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
             <TextBlock VerticalAlignment="Center" Text="Start:" />
-            <NumericUpDown Value="{Binding DiscreteInputStart, Mode=TwoWay, Converter={StaticResource DecimalToIntConverter}}" Minimum="0" Width="100" />
+            <NumericUpDown Value="{Binding DiscreteInputStart}" Minimum="0" Width="100" />
             <TextBlock VerticalAlignment="Center" Text="Count:" />
-            <NumericUpDown Value="{Binding DiscreteInputCount, Mode=TwoWay, Converter={StaticResource DecimalToIntConverter}}" Minimum="1" Maximum="2000" Width="90" />
+            <NumericUpDown Value="{Binding DiscreteInputCount}" Minimum="1" Maximum="2000" Width="90" />
             <Button Content="Read" Command="{Binding ReadDiscreteInputsCommand}" />
             <CheckBox Content="Continuous Read" IsChecked="{Binding DiscreteInputsMonitorEnabled}" VerticalAlignment="Center" />
             <TextBlock VerticalAlignment="Center" Text="Period (ms):" />
-            <NumericUpDown Value="{Binding DiscreteInputsMonitorPeriodMs, Mode=TwoWay, Converter={StaticResource DecimalToIntConverter}}" Minimum="50" Maximum="60000" Width="100" />
+            <NumericUpDown Value="{Binding DiscreteInputsMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
           <DataGrid x:Name="DiscreteInputsGrid" Grid.Row="1"

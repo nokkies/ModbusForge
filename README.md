@@ -78,6 +78,11 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.8.24 - NumericUpDown Two-Way Binding
+
+- **Register/coil count fix**: removed the explicit `DecimalToIntConverter` so the `NumericUpDown` count/start/period values use Avalonia’s built-in `int ↔ decimal?` conversion, restoring reliable two-way binding.
+- **Version bumped to `2026.8.24`** in all projects.
+
 ### 2026.8.23 - NumericUpDown Converter Localisation
 
 - **Register count fix**: the `DecimalToIntConverter` is now declared directly in the views that use it, ensuring the `NumericUpDown` count/start/period values correctly write back to the view model.
