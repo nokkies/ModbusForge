@@ -22,9 +22,7 @@
     <KeyBinding Gesture="Ctrl+L" Command="{Binding ToggleConnectionCommand}" />
     <KeyBinding Gesture="Ctrl+W" Command="{Binding OpenWatchWindowCommand}" />
     <KeyBinding Gesture="Ctrl+N" Command="{Binding AddCustomEntryCommand}" />
-    <KeyBinding Gesture="Ctrl+B" Command="{Binding AddCustomBulkEntryCommand}" />
-    <KeyBinding Gesture="Ctrl+D" Command="{Binding OpenDeviceScannerWindowCommand}" />
-    <KeyBinding Gesture="Ctrl+M" Command="{Binding ToggleMonitoringCommand}" />
+    <KeyBinding Gesture="Ctrl+B" Command="{Binding AddBulkCustomEntryCommand}" />
   </Window.KeyBindings>
 
   <Grid RowDefinitions="Auto,Auto,*,Auto">
