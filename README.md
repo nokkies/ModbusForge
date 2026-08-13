@@ -78,6 +78,11 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.8.27 - Server IP in Active Profile Display
+
+- **Active profile now shows the real server IP**: when running in Server mode the top toolbar and dashboard display the actual bound IP and port (e.g. `192.168.1.100:502`) instead of the loopback address, while the Interface text box still holds `127.0.0.1` or `0.0.0.0` for binding.
+- **Version bumped to `2026.8.27`** in all projects.
+
 ### 2026.8.26 - Server IP Display
 
 - **Server mode now shows your local IP**: the main toolbar displays the IP address(es) and port clients can use to connect when ModbusForge is running as a Modbus server, so you no longer need to look it up in Windows settings.
