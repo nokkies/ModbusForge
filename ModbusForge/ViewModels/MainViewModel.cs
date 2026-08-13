@@ -1121,7 +1121,9 @@ namespace ModbusForge.Avalonia.ViewModels
 
             var (start, count) = GetAreaStartCount(area);
             var validator = new ModbusAddressValidator();
-            return validator.IsValidRange(start, count, area);
+            return area is PlcArea.HoldingRegister or PlcArea.InputRegister
+                ? validator.IsValidAddressRange(start, count)
+                : validator.IsValidRange(start, count, area);
         }
 
         private bool CanWrite() => CanWrite(SelectedArea);
@@ -2102,6 +2104,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     case PlcArea.HoldingRegister:
                         var holding = await service.ReadHoldingRegistersAsync(unitId, start, count)
                             ?? throw new InvalidOperationException("Read returned no response.");
+                        var holdingPartial = holding.Length < count;
                         await _dispatcher.InvokeAsync(() =>
                         {
                             if (IsRegisterGridEditing) return;
@@ -2112,14 +2115,18 @@ namespace ModbusForge.Avalonia.ViewModels
                                 RegistersGlobalType,
                                 RegistersSwapBytes,
                                 RegistersSwapWords,
-                                CurrentConfig.RegisterSettings.HoldingRegisterMetadata);
-                            StatusMessage = $"Read {holding.Length} holding registers";
+                                CurrentConfig.RegisterSettings.HoldingRegisterMetadata,
+                                holdingPartial);
+                            StatusMessage = holdingPartial
+                                ? $"Partial read: {holding.Length} of {count} holding registers"
+                                : $"Read {holding.Length} holding registers";
                         });
                         break;
 
                     case PlcArea.InputRegister:
                         var input = await service.ReadInputRegistersAsync(unitId, start, count)
                             ?? throw new InvalidOperationException("Read returned no response.");
+                        var inputPartial = input.Length < count;
                         await _dispatcher.InvokeAsync(() =>
                         {
                             if (IsRegisterGridEditing) return;
@@ -2130,30 +2137,39 @@ namespace ModbusForge.Avalonia.ViewModels
                                 InputRegistersGlobalType,
                                 InputRegistersSwapBytes,
                                 InputRegistersSwapWords,
-                                CurrentConfig.RegisterSettings.InputRegisterMetadata);
-                            StatusMessage = $"Read {input.Length} input registers";
+                                CurrentConfig.RegisterSettings.InputRegisterMetadata,
+                                inputPartial);
+                            StatusMessage = inputPartial
+                                ? $"Partial read: {input.Length} of {count} input registers"
+                                : $"Read {input.Length} input registers";
                         });
                         break;
 
                     case PlcArea.Coil:
                         var coils = await service.ReadCoilsAsync(unitId, start, count)
                             ?? throw new InvalidOperationException("Read returned no response.");
+                        var coilsPartial = coils.Length < count;
                         await _dispatcher.InvokeAsync(() =>
                         {
                             if (IsRegisterGridEditing) return;
-                            Coils = ApplyCoilValues(Coils, start, coils);
-                            StatusMessage = $"Read {coils.Length} coils";
+                            Coils = ApplyCoilValues(Coils, start, coils, coilsPartial);
+                            StatusMessage = coilsPartial
+                                ? $"Partial read: {coils.Length} of {count} coils"
+                                : $"Read {coils.Length} coils";
                         });
                         break;
 
                     case PlcArea.DiscreteInput:
                         var discrete = await service.ReadDiscreteInputsAsync(unitId, start, count)
                             ?? throw new InvalidOperationException("Read returned no response.");
+                        var discretePartial = discrete.Length < count;
                         await _dispatcher.InvokeAsync(() =>
                         {
                             if (IsRegisterGridEditing) return;
-                            DiscreteInputs = ApplyCoilValues(DiscreteInputs, start, discrete);
-                            StatusMessage = $"Read {discrete.Length} discrete inputs";
+                            DiscreteInputs = ApplyCoilValues(DiscreteInputs, start, discrete, discretePartial);
+                            StatusMessage = discretePartial
+                                ? $"Partial read: {discrete.Length} of {count} discrete inputs"
+                                : $"Read {discrete.Length} discrete inputs";
                         });
                         break;
                 }
@@ -2275,7 +2291,8 @@ namespace ModbusForge.Avalonia.ViewModels
             string globalType,
             bool swapBytes,
             bool swapWords,
-            IEnumerable<RegisterMetadata>? metadata = null)
+            IEnumerable<RegisterMetadata>? metadata = null,
+            bool isPartialRead = false)
         {
             target ??= new ObservableCollection<RegisterEntry>();
             var metadataByAddress = metadata?.ToDictionary(item => item.Address)
@@ -2304,6 +2321,8 @@ namespace ModbusForge.Avalonia.ViewModels
                 entry.Type = type;
                 entry.SwapBytes = savedMetadata?.SwapBytes ?? swapBytes;
                 entry.SwapWords = savedMetadata?.SwapWords ?? swapWords;
+                entry.IsReadError = false;
+                entry.ReadErrorMessage = null;
 
                 switch (type)
                 {
@@ -2332,6 +2351,8 @@ namespace ModbusForge.Avalonia.ViewModels
                             next.SwapBytes = swapBytes;
                             next.SwapWords = swapWords;
                             next.ValueText = string.Empty;
+                            next.IsReadError = false;
+                            next.ReadErrorMessage = null;
 
                             idx += 2;
                         }
@@ -2359,6 +2380,19 @@ namespace ModbusForge.Avalonia.ViewModels
                 if (!usedAddresses.Contains(target[i].Address))
                 {
                     target.RemoveAt(i);
+                }
+            }
+
+            if (isPartialRead)
+            {
+                var lastVisible = target
+                    .Where(e => !string.IsNullOrEmpty(e.ValueText))
+                    .OrderByDescending(e => e.Address)
+                    .FirstOrDefault();
+                if (lastVisible != null)
+                {
+                    lastVisible.IsReadError = true;
+                    lastVisible.ReadErrorMessage = "Read stopped here. The remaining registers could not be read.";
                 }
             }
 
@@ -2390,7 +2424,7 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
-        private ObservableCollection<CoilEntry> ApplyCoilValues(ObservableCollection<CoilEntry>? target, int start, bool[] values)
+        private ObservableCollection<CoilEntry> ApplyCoilValues(ObservableCollection<CoilEntry>? target, int start, bool[] values, bool isPartialRead = false)
         {
             target ??= new ObservableCollection<CoilEntry>();
             var entriesByAddress = target.ToDictionary(e => e.Address);
@@ -2408,6 +2442,8 @@ namespace ModbusForge.Avalonia.ViewModels
                 }
 
                 entry.State = values[i];
+                entry.IsReadError = false;
+                entry.ReadErrorMessage = null;
             }
 
             for (int i = target.Count - 1; i >= 0; i--)
@@ -2416,6 +2452,13 @@ namespace ModbusForge.Avalonia.ViewModels
                 {
                     target.RemoveAt(i);
                 }
+            }
+
+            if (isPartialRead && target.Count > 0)
+            {
+                var lastCoil = target.OrderByDescending(e => e.Address).First();
+                lastCoil.IsReadError = true;
+                lastCoil.ReadErrorMessage = "Read stopped here. The remaining coils could not be read.";
             }
 
             EnsureSortedByAddress(target);

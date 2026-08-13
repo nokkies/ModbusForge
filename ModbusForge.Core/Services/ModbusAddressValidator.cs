@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using ModbusForge.Models;
 
 namespace ModbusForge.Services
@@ -14,6 +15,7 @@ namespace ModbusForge.Services
         public const int MaxStartAddress = ushort.MaxValue;
         public const int MinCount = 1;
         public const int MaxCount = 125; // Modbus protocol maximum for read holding registers
+        public const int MaxTotalCount = MaxStartAddress + 1; // Largest possible contiguous read across the whole address space
 
         // Modbus protocol per-function limits.
         private const int MaxReadCoils = 2000;
@@ -54,6 +56,35 @@ namespace ModbusForge.Services
 
             long end = (long)startAddress + count - 1;
             return end >= MinStartAddress && end <= MaxStartAddress;
+        }
+
+        public bool IsValidAddressRange(int startAddress, int count)
+        {
+            if (count < MinCount)
+                return false;
+
+            if (!IsValidStartAddress(startAddress))
+                return false;
+
+            long end = (long)startAddress + count - 1;
+            return end >= MinStartAddress && end <= MaxStartAddress;
+        }
+
+        public int GetMaxCountPerRequest(PlcArea area, bool isWrite = false) => GetMaxCount(area, isWrite);
+
+        public IEnumerable<ModbusReadRange> GetReadRanges(int startAddress, int count, PlcArea area, bool isWrite = false)
+        {
+            if (!IsValidAddressRange(startAddress, count))
+                throw new ArgumentOutOfRangeException(nameof(count), $"The requested range {startAddress}..{startAddress + count - 1} exceeds the Modbus address space.");
+
+            int max = GetMaxCount(area, isWrite);
+            int offset = 0;
+            while (offset < count)
+            {
+                int chunk = Math.Min(max, count - offset);
+                yield return new ModbusReadRange(startAddress + offset, chunk);
+                offset += chunk;
+            }
         }
 
         private static int GetMaxCount(PlcArea area, bool isWrite) => area switch

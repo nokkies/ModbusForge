@@ -176,46 +176,102 @@ namespace ModbusForge.Services
 
         public virtual async Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, int startAddress, int count)
         {
-            ValidateRead(unitId, startAddress, count, PlcArea.HoldingRegister);
-            return await ExecuteReadAsync(
+            ValidateAddressRange(unitId, startAddress, count);
+            return await ModbusChunkedExecutor.ReadAsync(
+                () => IsConnected,
+                _ioLock,
+                _client,
+                _addressValidator,
+                _logger,
+                HandleConnectionLoss,
+                ToProtocolAddress,
                 unitId,
                 startAddress,
+                count,
+                PlcArea.HoldingRegister,
                 $"Reading {count} holding registers starting at {startAddress}",
                 "Error reading holding registers",
-                (client, protocolAddress) => client.ReadHoldingRegisters(unitId, protocolAddress, (ushort)count));
+                (client, protocolAddress, chunkCount) =>
+                {
+                    ushort[]? result = null;
+                    ApplySerialTiming(() => { result = client.ReadHoldingRegisters(unitId, protocolAddress, chunkCount); });
+                    return result ?? Array.Empty<ushort>();
+                });
         }
 
         public virtual async Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
         {
-            ValidateRead(unitId, startAddress, count, PlcArea.InputRegister);
-            return await ExecuteReadAsync(
+            ValidateAddressRange(unitId, startAddress, count);
+            return await ModbusChunkedExecutor.ReadAsync(
+                () => IsConnected,
+                _ioLock,
+                _client,
+                _addressValidator,
+                _logger,
+                HandleConnectionLoss,
+                ToProtocolAddress,
                 unitId,
                 startAddress,
+                count,
+                PlcArea.InputRegister,
                 $"Reading {count} input registers starting at {startAddress}",
                 "Error reading input registers",
-                (client, protocolAddress) => client.ReadInputRegisters(unitId, protocolAddress, (ushort)count));
+                (client, protocolAddress, chunkCount) =>
+                {
+                    ushort[]? result = null;
+                    ApplySerialTiming(() => { result = client.ReadInputRegisters(unitId, protocolAddress, chunkCount); });
+                    return result ?? Array.Empty<ushort>();
+                });
         }
 
         public virtual async Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
         {
-            ValidateRead(unitId, startAddress, count, PlcArea.DiscreteInput);
-            return await ExecuteReadAsync(
+            ValidateSingleRequest(unitId, startAddress, count, PlcArea.DiscreteInput);
+            return await ModbusChunkedExecutor.ReadAsync(
+                () => IsConnected,
+                _ioLock,
+                _client,
+                _addressValidator,
+                _logger,
+                HandleConnectionLoss,
+                ToProtocolAddress,
                 unitId,
                 startAddress,
+                count,
+                PlcArea.DiscreteInput,
                 $"Reading {count} discrete inputs starting at {startAddress}",
                 "Error reading discrete inputs",
-                (client, protocolAddress) => client.ReadInputs(unitId, protocolAddress, (ushort)count));
+                (client, protocolAddress, chunkCount) =>
+                {
+                    bool[]? result = null;
+                    ApplySerialTiming(() => { result = client.ReadInputs(unitId, protocolAddress, chunkCount); });
+                    return result ?? Array.Empty<bool>();
+                });
         }
 
         public virtual async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
         {
-            ValidateRead(unitId, startAddress, count, PlcArea.Coil);
-            return await ExecuteReadAsync(
+            ValidateSingleRequest(unitId, startAddress, count, PlcArea.Coil);
+            return await ModbusChunkedExecutor.ReadAsync(
+                () => IsConnected,
+                _ioLock,
+                _client,
+                _addressValidator,
+                _logger,
+                HandleConnectionLoss,
+                ToProtocolAddress,
                 unitId,
                 startAddress,
+                count,
+                PlcArea.Coil,
                 $"Reading {count} coils starting at {startAddress}",
                 "Error reading coils",
-                (client, protocolAddress) => client.ReadCoils(unitId, protocolAddress, (ushort)count));
+                (client, protocolAddress, chunkCount) =>
+                {
+                    bool[]? result = null;
+                    ApplySerialTiming(() => { result = client.ReadCoils(unitId, protocolAddress, chunkCount); });
+                    return result ?? Array.Empty<bool>();
+                });
         }
 
         public virtual async Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
@@ -232,13 +288,23 @@ namespace ModbusForge.Services
         public virtual async Task WriteRegistersAsync(byte unitId, int startAddress, ushort[] values)
         {
             ArgumentNullException.ThrowIfNull(values);
-            ValidateRead(unitId, startAddress, values.Length, PlcArea.HoldingRegister, isWrite: true);
-            await ExecuteWriteAsync(
+            ValidateAddressRange(unitId, startAddress, values.Length);
+            await ModbusChunkedExecutor.WriteAsync(
+                () => IsConnected,
+                _ioLock,
+                _client,
+                _addressValidator,
+                _logger,
+                HandleConnectionLoss,
+                ToProtocolAddress,
                 unitId,
                 startAddress,
+                values,
+                PlcArea.HoldingRegister,
                 $"Writing {values.Length} registers starting at {startAddress}",
                 "Error writing multiple registers",
-                (client, protocolAddress) => client.WriteMultipleRegisters(unitId, protocolAddress, values));
+                (client, protocolAddress, chunkValues) =>
+                    ApplySerialTiming(() => { client.WriteMultipleRegisters(unitId, protocolAddress, chunkValues); }));
         }
 
         public virtual async Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)
@@ -250,6 +316,28 @@ namespace ModbusForge.Services
                 $"Writing coil at {coilAddress}",
                 "Error writing single coil",
                 (client, protocolAddress) => client.WriteSingleCoil(unitId, protocolAddress, value));
+        }
+
+        public virtual async Task WriteCoilsAsync(byte unitId, int startAddress, bool[] values)
+        {
+            ArgumentNullException.ThrowIfNull(values);
+            ValidateAddressRange(unitId, startAddress, values.Length);
+            await ModbusChunkedExecutor.WriteAsync(
+                () => IsConnected,
+                _ioLock,
+                _client,
+                _addressValidator,
+                _logger,
+                HandleConnectionLoss,
+                ToProtocolAddress,
+                unitId,
+                startAddress,
+                values,
+                PlcArea.Coil,
+                $"Writing {values.Length} coils starting at {startAddress}",
+                "Error writing multiple coils",
+                (client, protocolAddress, chunkValues) =>
+                    ApplySerialTiming(() => { client.WriteMultipleCoils(unitId, protocolAddress, chunkValues); }));
         }
 
         public virtual async Task<ushort?> MaskWriteRegisterAsync(byte unitId, int registerAddress, ushort andMask, ushort orMask)
@@ -273,8 +361,8 @@ namespace ModbusForge.Services
         public virtual async Task<ushort[]?> ReadWriteMultipleRegistersAsync(byte unitId, int readStartAddress, int readCount, int writeStartAddress, ushort[] writeValues)
         {
             ArgumentNullException.ThrowIfNull(writeValues);
-            ValidateRead(unitId, readStartAddress, readCount, PlcArea.HoldingRegister);
-            ValidateRead(unitId, writeStartAddress, writeValues.Length, PlcArea.HoldingRegister, isWrite: true);
+            ValidateSingleRequest(unitId, readStartAddress, readCount, PlcArea.HoldingRegister);
+            ValidateSingleRequest(unitId, writeStartAddress, writeValues.Length, PlcArea.HoldingRegister, isWrite: true);
 
             return await ExecuteMasterAsync<ushort[]?>(
                 $"Reading {readCount} registers at {readStartAddress} and writing {writeValues.Length} registers at {writeStartAddress}",
@@ -314,48 +402,6 @@ namespace ModbusForge.Services
 
                     return identification;
                 });
-        }
-
-        private async Task<T[]?> ExecuteReadAsync<T>(
-            byte unitId,
-            int startAddress,
-            string debugLogMessage,
-            string errorLogContext,
-            Func<IModbusMaster, ushort, T[]> readFunc)
-        {
-            if (!IsConnected)
-                return null;
-
-            await _ioLock.WaitAsync().ConfigureAwait(false);
-            try
-            {
-                return await Task.Run(() =>
-                {
-                    try
-                    {
-                        _logger.LogDebug($"{debugLogMessage} (Unit ID: {unitId})");
-                        // NModbus uses 0-based protocol addresses, convert from 1-based UI address
-                        ushort protocolAddress = (ushort)(startAddress > 0 ? startAddress - 1 : 0);
-
-                        if (_client == null)
-                            return Array.Empty<T>();
-
-                        T[]? result = null;
-                        ApplySerialTiming(() => result = readFunc(_client!, protocolAddress));
-                        return result ?? Array.Empty<T>();
-                    }
-                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-                    {
-                        _logger.LogError(ex, errorLogContext);
-                        HandleConnectionLoss();
-                        return null;
-                    }
-                }).ConfigureAwait(false);
-            }
-            finally
-            {
-                _ioLock.Release();
-            }
         }
 
         private async Task ExecuteWriteAsync(
@@ -398,7 +444,15 @@ namespace ModbusForge.Services
         private static ushort ToProtocolAddress(int uiAddress)
             => (ushort)(uiAddress > 0 ? uiAddress - 1 : 0);
 
-        private void ValidateRead(byte unitId, int startAddress, int count, PlcArea area, bool isWrite = false)
+        private void ValidateAddressRange(byte unitId, int startAddress, int count)
+        {
+            if (!_addressValidator.IsValidUnitId(unitId))
+                throw new ArgumentOutOfRangeException(nameof(unitId), $"Unit ID must be between {ModbusAddressValidator.MinUnitId} and {ModbusAddressValidator.MaxUnitId}.");
+            if (!_addressValidator.IsValidAddressRange(startAddress, count))
+                throw new ArgumentOutOfRangeException(nameof(startAddress), $"The requested range {startAddress}..{startAddress + count - 1} is outside the Modbus address space.");
+        }
+
+        private void ValidateSingleRequest(byte unitId, int startAddress, int count, PlcArea area, bool isWrite = false)
         {
             if (!_addressValidator.IsValidUnitId(unitId))
                 throw new ArgumentOutOfRangeException(nameof(unitId), $"Unit ID must be between {ModbusAddressValidator.MinUnitId} and {ModbusAddressValidator.MaxUnitId}.");

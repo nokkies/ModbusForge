@@ -88,6 +88,7 @@ namespace ModbusForge.Services
         Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count);
         Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count);
         Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value);
+        Task WriteCoilsAsync(byte unitId, int startAddress, bool[] values);
 
         // Advanced function codes
         /// <summary>

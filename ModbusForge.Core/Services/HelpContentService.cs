@@ -56,6 +56,7 @@ namespace ModbusForge.Services
                 ["preferences"] = GetPreferencesContent(),
                 ["mcp-server"] = GetMcpServerContent(),
                 ["keyboard-shortcuts"] = GetKeyboardShortcutsContent(),
+                ["partial-reads"] = GetPartialReadsContent(),
                 ["troubleshooting"] = GetTroubleshootingContent()
             };
         }
@@ -646,6 +647,47 @@ To connect an LLM or AI coding assistant using the Model Context Protocol (MCP):
 - Send a query to the status endpoint:
   `curl http://localhost:5000/api/status`
   It should return `{""status"":""Running""}`.";
+        }
+
+        private string GetPartialReadsContent()
+        {
+            return @"# Partial or Chunked Reads
+
+The Modbus protocol limits how many registers can be read in a single network packet. ModbusForge automatically splits large requests into multiple packets and reassembles the result, so you can read or write more registers than a single Modbus request normally allows.
+
+## When does this happen?
+
+- **Holding and input register reads** larger than **125** registers are sent as several consecutive requests.
+- **Holding register writes** larger than **123** registers are split into several writes.
+- **Coil writes** larger than **1968** coils are split into several writes.
+
+You can enter any count that fits in the Modbus address space (**1 to 65536**) for holding and input registers. Coil and discrete input counts are still limited to the protocol maximum of **2000**.
+
+## What does a red value mean?
+
+If one of the chunks fails, ModbusForge keeps all the values that were successfully read and shows the last successful value in **red**.
+
+- Hover over the red value to see a tooltip explaining that the read was partial.
+- The red value is the last register that was read successfully before the failure.
+- Any registers after the red value were not read.
+
+## How to clear a red value
+
+- Run the read again. If it succeeds, the red marker disappears and all values are updated.
+- Write to a red register (if it is a holding register) and re-read to verify the device is responding.
+
+## Common causes of a partial read
+
+- Network timeout or disconnection after some chunks completed.
+- The slave device stopped responding.
+- An address in the requested range is not mapped on the device, causing a Modbus exception.
+- Reading or writing beyond the device's actual register map.
+
+## Tips
+
+- For very large ranges over slow or serial links, the operation can take a noticeable amount of time.
+- If partial reads happen frequently, reduce the count or increase the timeout/period.
+- Use the connection log to see how many packets were sent and where the failure occurred.";
         }
 
         private string GetNotFoundContent(string topicId)

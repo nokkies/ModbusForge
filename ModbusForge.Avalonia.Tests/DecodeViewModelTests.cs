@@ -242,6 +242,8 @@ namespace ModbusForge.Avalonia.Tests
 
             public Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value) => Task.CompletedTask;
 
+            public Task WriteCoilsAsync(byte unitId, int startAddress, bool[] values) => Task.CompletedTask;
+
             public Task<ushort?> MaskWriteRegisterAsync(byte unitId, int registerAddress, ushort andMask, ushort orMask)
                 => Task.FromResult<ushort?>(null);
 

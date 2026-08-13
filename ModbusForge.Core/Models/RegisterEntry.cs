@@ -16,6 +16,8 @@ namespace ModbusForge.Models
         public static IReadOnlyList<string> AvailableTypes { get; } = new[] { "int", "uint", "real", "string" };
         private bool _swapWords;
         private string _valueText = "0"; // used for editing/display to avoid WPF ConvertBack to ushort
+        private bool _isReadError;
+        private string? _readErrorMessage;
 
         public int Address
         {
@@ -67,6 +69,18 @@ namespace ModbusForge.Models
         {
             get => _swapWords;
             set { if (_swapWords != value) { _swapWords = value; OnPropertyChanged(nameof(SwapWords)); } }
+        }
+
+        public bool IsReadError
+        {
+            get => _isReadError;
+            set { if (_isReadError != value) { _isReadError = value; OnPropertyChanged(nameof(IsReadError)); } }
+        }
+
+        public string? ReadErrorMessage
+        {
+            get => _readErrorMessage;
+            set { if (_readErrorMessage != value) { _readErrorMessage = value; OnPropertyChanged(nameof(ReadErrorMessage)); } }
         }
 
         // String representation shown/edited in the grid to avoid ConvertBack to ushort for 'real'/'string'

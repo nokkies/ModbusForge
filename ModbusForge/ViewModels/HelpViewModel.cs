@@ -51,6 +51,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 new HelpTopic { TopicId = "preferences", Title = "Preferences" },
                 new HelpTopic { TopicId = "mcp-server", Title = "API & MCP Server" },
                 new HelpTopic { TopicId = "keyboard-shortcuts", Title = "Keyboard Shortcuts" },
+                new HelpTopic { TopicId = "partial-reads", Title = "Partial or Chunked Reads" },
                 new HelpTopic { TopicId = "troubleshooting", Title = "Troubleshooting" }
             };
         }
@@ -116,6 +117,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     new HelpTopic { TopicId = "visual-editor", Title = "Visual Node Editor" },
                     new HelpTopic { TopicId = "preferences", Title = "Preferences" },
                     new HelpTopic { TopicId = "keyboard-shortcuts", Title = "Keyboard Shortcuts" },
+                    new HelpTopic { TopicId = "partial-reads", Title = "Partial or Chunked Reads" },
                     new HelpTopic { TopicId = "troubleshooting", Title = "Troubleshooting" }
                 };
 

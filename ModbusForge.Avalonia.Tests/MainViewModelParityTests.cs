@@ -506,6 +506,7 @@ namespace ModbusForge.Avalonia.Tests
             public Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count) => Task.FromResult<bool[]?>(Array.Empty<bool>());
             public Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count) => Task.FromResult<bool[]?>(Array.Empty<bool>());
             public Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value) => Task.CompletedTask;
+            public Task WriteCoilsAsync(byte unitId, int startAddress, bool[] values) => Task.CompletedTask;
             public Task<ushort?> MaskWriteRegisterAsync(byte unitId, int registerAddress, ushort andMask, ushort orMask) => Task.FromResult<ushort?>(null);
             public Task<ushort[]?> ReadWriteMultipleRegistersAsync(byte unitId, int readStartAddress, int readCount, int writeStartAddress, ushort[] writeValues) => Task.FromResult<ushort[]?>(null);
             public Task<DeviceIdentification?> ReadDeviceIdentificationAsync(byte unitId, byte objectId = DeviceIdObject.VendorName, DeviceIdCategory category = DeviceIdCategory.Basic) => Task.FromResult<DeviceIdentification?>(null);

@@ -10,6 +10,7 @@
 
   <UserControl.Resources>
     <converters:NavigationIndexConverter x:Key="NavigationIndexConverter" />
+    <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" />
     <x:Int32 x:Key="CountFallback">1</x:Int32>
   </UserControl.Resources>
 
@@ -176,7 +177,7 @@
             <TextBlock VerticalAlignment="Center" Text="Start:" />
             <NumericUpDown Value="{Binding HoldingRegisterStart}" Minimum="0" Width="100" />
             <TextBlock VerticalAlignment="Center" Text="Count:" />
-            <NumericUpDown Value="{Binding HoldingRegisterCount, TargetNullValue={StaticResource CountFallback}, FallbackValue={StaticResource CountFallback}}" Minimum="1" Maximum="125" Width="80" />
+            <NumericUpDown Value="{Binding HoldingRegisterCount, TargetNullValue={StaticResource CountFallback}, FallbackValue={StaticResource CountFallback}}" Minimum="1" Maximum="65536" Width="90" />
             <Button Content="Read" Command="{Binding ReadHoldingRegistersCommand}" />
             <TextBlock VerticalAlignment="Center" Text="Type:" Margin="16,0,0,0" />
             <ComboBox ItemsSource="{Binding RegisterTypes}" SelectedItem="{Binding RegistersGlobalType}" Width="80" />
@@ -210,7 +211,22 @@
             </DataGrid.ContextMenu>
             <DataGrid.Columns>
               <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" IsReadOnly="True" />
-              <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="120" />
+              <DataGridTemplateColumn Header="Value" Width="120">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="models:RegisterEntry">
+                    <TextBlock Text="{Binding ValueText}"
+                               Foreground="{Binding IsReadError, Converter={StaticResource BoolToBrushConverter}}"
+                               ToolTip.Tip="{Binding ReadErrorMessage}"
+                               VerticalAlignment="Center"
+                               Margin="4,0" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+                <DataGridTemplateColumn.CellEditingTemplate>
+                  <DataTemplate x:DataType="models:RegisterEntry">
+                    <TextBox Text="{Binding ValueText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellEditingTemplate>
+              </DataGridTemplateColumn>
               <DataGridTemplateColumn Header="Type" Width="80" IsReadOnly="True">
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate x:DataType="models:RegisterEntry">
@@ -275,7 +291,7 @@
             <TextBlock VerticalAlignment="Center" Text="Start:" />
             <NumericUpDown Value="{Binding InputRegisterStart}" Minimum="0" Width="100" />
             <TextBlock VerticalAlignment="Center" Text="Count:" />
-            <NumericUpDown Value="{Binding InputRegisterCount, TargetNullValue={StaticResource CountFallback}, FallbackValue={StaticResource CountFallback}}" Minimum="1" Maximum="125" Width="80" />
+            <NumericUpDown Value="{Binding InputRegisterCount, TargetNullValue={StaticResource CountFallback}, FallbackValue={StaticResource CountFallback}}" Minimum="1" Maximum="65536" Width="90" />
             <Button Content="Read" Command="{Binding ReadInputRegistersCommand}" />
             <TextBlock VerticalAlignment="Center" Text="Type:" Margin="16,0,0,0" />
             <ComboBox ItemsSource="{Binding RegisterTypes}" SelectedItem="{Binding InputRegistersGlobalType}" Width="80" />
@@ -305,7 +321,17 @@
             </DataGrid.ContextMenu>
             <DataGrid.Columns>
               <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" IsReadOnly="True" />
-              <DataGridTextColumn Header="Value" Binding="{Binding ValueText}" Width="120" IsReadOnly="True" />
+              <DataGridTemplateColumn Header="Value" Width="120" IsReadOnly="True">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="models:RegisterEntry">
+                    <TextBlock Text="{Binding ValueText}"
+                               Foreground="{Binding IsReadError, Converter={StaticResource BoolToBrushConverter}}"
+                               ToolTip.Tip="{Binding ReadErrorMessage}"
+                               VerticalAlignment="Center"
+                               Margin="4,0" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
               <DataGridTemplateColumn Header="Type" Width="80" IsReadOnly="True">
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate x:DataType="models:RegisterEntry">

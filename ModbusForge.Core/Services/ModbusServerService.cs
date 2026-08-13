@@ -238,6 +238,26 @@ namespace ModbusForge.Services
             }).ConfigureAwait(false);
         }
 
+        public virtual async Task WriteCoilsAsync(byte unitId, int startAddress, bool[] values)
+        {
+            if (!_isRunning) throw new InvalidOperationException("Modbus server is not running");
+            await Task.Run(() =>
+            {
+                var ds = GetDataStore(unitId);
+                if (ds == null || startAddress < 0 || startAddress + values.Length > ds.CoilDiscretes.Count)
+                    throw new ArgumentOutOfRangeException(nameof(startAddress));
+
+                lock (ds)
+                {
+                    for (int i = 0; i < values.Length; i++)
+                    {
+                        ds.CoilDiscretes[(ushort)(startAddress + i)] = values[i];
+                    }
+                }
+                _consoleLoggerService?.Log($"Server wrote coils {startAddress}..{startAddress + values.Length - 1} (Unit ID: {unitId})");
+            }).ConfigureAwait(false);
+        }
+
         public virtual Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count) =>
             ReadFromDataStoreAsync(unitId, startAddress, count, ds => ds.CoilDiscretes, "coils");
 
