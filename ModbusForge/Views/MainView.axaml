@@ -10,9 +10,13 @@
 
   <UserControl.Resources>
     <converters:NavigationIndexConverter x:Key="NavigationIndexConverter" />
+    <x:Int32 x:Key="CountFallback">1</x:Int32>
   </UserControl.Resources>
 
   <UserControl.Styles>
+    <Style Selector="NumericUpDown">
+      <Setter Property="ClipValueToMinMax" Value="True" />
+    </Style>
     <Style Selector="NumericUpDown.compact /template/ ButtonSpinner">
       <Setter Property="MinHeight" Value="0" />
       <Setter Property="Padding" Value="0" />
@@ -172,7 +176,7 @@
             <TextBlock VerticalAlignment="Center" Text="Start:" />
             <NumericUpDown Value="{Binding HoldingRegisterStart}" Minimum="0" Width="100" />
             <TextBlock VerticalAlignment="Center" Text="Count:" />
-            <NumericUpDown Value="{Binding HoldingRegisterCount}" Minimum="1" Maximum="125" Width="80" />
+            <NumericUpDown Value="{Binding HoldingRegisterCount, TargetNullValue={StaticResource CountFallback}, FallbackValue={StaticResource CountFallback}}" Minimum="1" Maximum="125" Width="80" />
             <Button Content="Read" Command="{Binding ReadHoldingRegistersCommand}" />
             <TextBlock VerticalAlignment="Center" Text="Type:" Margin="16,0,0,0" />
             <ComboBox ItemsSource="{Binding RegisterTypes}" SelectedItem="{Binding RegistersGlobalType}" Width="80" />
@@ -230,7 +234,7 @@
             <TextBlock VerticalAlignment="Center" Text="Start:" />
             <NumericUpDown Value="{Binding CoilStart}" Minimum="0" Width="100" />
             <TextBlock VerticalAlignment="Center" Text="Count:" />
-            <NumericUpDown Value="{Binding CoilCount}" Minimum="1" Maximum="2000" Width="90" />
+            <NumericUpDown Value="{Binding CoilCount, TargetNullValue={StaticResource CountFallback}, FallbackValue={StaticResource CountFallback}}" Minimum="1" Maximum="2000" Width="90" />
             <Button Content="Read" Command="{Binding ReadCoilsCommand}" />
             <CheckBox Content="Continuous Read" IsChecked="{Binding CoilsMonitorEnabled}" VerticalAlignment="Center" />
             <TextBlock VerticalAlignment="Center" Text="Period (ms):" />
@@ -271,7 +275,7 @@
             <TextBlock VerticalAlignment="Center" Text="Start:" />
             <NumericUpDown Value="{Binding InputRegisterStart}" Minimum="0" Width="100" />
             <TextBlock VerticalAlignment="Center" Text="Count:" />
-            <NumericUpDown Value="{Binding InputRegisterCount}" Minimum="1" Maximum="125" Width="80" />
+            <NumericUpDown Value="{Binding InputRegisterCount, TargetNullValue={StaticResource CountFallback}, FallbackValue={StaticResource CountFallback}}" Minimum="1" Maximum="125" Width="80" />
             <Button Content="Read" Command="{Binding ReadInputRegistersCommand}" />
             <TextBlock VerticalAlignment="Center" Text="Type:" Margin="16,0,0,0" />
             <ComboBox ItemsSource="{Binding RegisterTypes}" SelectedItem="{Binding InputRegistersGlobalType}" Width="80" />
@@ -325,7 +329,7 @@
             <TextBlock VerticalAlignment="Center" Text="Start:" />
             <NumericUpDown Value="{Binding DiscreteInputStart}" Minimum="0" Width="100" />
             <TextBlock VerticalAlignment="Center" Text="Count:" />
-            <NumericUpDown Value="{Binding DiscreteInputCount}" Minimum="1" Maximum="2000" Width="90" />
+            <NumericUpDown Value="{Binding DiscreteInputCount, TargetNullValue={StaticResource CountFallback}, FallbackValue={StaticResource CountFallback}}" Minimum="1" Maximum="2000" Width="90" />
             <Button Content="Read" Command="{Binding ReadDiscreteInputsCommand}" />
             <CheckBox Content="Continuous Read" IsChecked="{Binding DiscreteInputsMonitorEnabled}" VerticalAlignment="Center" />
             <TextBlock VerticalAlignment="Center" Text="Period (ms):" />
