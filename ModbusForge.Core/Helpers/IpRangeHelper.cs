@@ -130,6 +130,40 @@ namespace ModbusForge.Helpers
         }
 
         /// <summary>
+        /// Returns all non-loopback, non-link-local IPv4 addresses assigned to local network adapters.
+        /// </summary>
+        public static IReadOnlyList<string> GetAllLocalIPv4()
+        {
+            try
+            {
+                var fromNics = NetworkInterface.GetAllNetworkInterfaces()
+                    .Where(ni => ni.OperationalStatus == OperationalStatus.Up)
+                    .Where(ni => ni.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                    .SelectMany(ni => ni.GetIPProperties().UnicastAddresses)
+                    .Select(u => u.Address)
+                    .Where(a =>
+                        a.AddressFamily == AddressFamily.InterNetwork &&
+                        !IPAddress.IsLoopback(a) &&
+                        !a.ToString().StartsWith("169.254.", StringComparison.OrdinalIgnoreCase))
+                    .Select(a => a.ToString())
+                    .Distinct(StringComparer.OrdinalIgnoreCase);
+
+                var fromDns = Dns.GetHostEntry(Dns.GetHostName()).AddressList
+                    .Where(ip => ip.AddressFamily == AddressFamily.InterNetwork)
+                    .Where(ip => !IPAddress.IsLoopback(ip))
+                    .Where(ip => !ip.ToString().StartsWith("169.254.", StringComparison.OrdinalIgnoreCase))
+                    .Select(ip => ip.ToString())
+                    .Distinct(StringComparer.OrdinalIgnoreCase);
+
+                return fromNics.Concat(fromDns).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            }
+            catch
+            {
+                return Array.Empty<string>();
+            }
+        }
+
+        /// <summary>
         /// Returns a sensible default IPv4 scan range for the local network based on the
         /// primary adapter's subnet, falling back to the primary IP's /24 if the subnet
         /// is too large to scan.
