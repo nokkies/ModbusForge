@@ -78,6 +78,11 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.8.26 - Server IP Display
+
+- **Server mode now shows your local IP**: the main toolbar displays the IP address(es) and port clients can use to connect when ModbusForge is running as a Modbus server, so you no longer need to look it up in Windows settings.
+- **Version bumped to `2026.8.26`** in all projects.
+
 ### 2026.8.25 - Chunked Modbus Reads, Large Writes & Partial-Read UI
 
 - **Chunked register reads/writes**: holding/input register reads, multi-register writes, and bulk coil writes are now automatically split into protocol-sized packets and reassembled, supporting the full 0..65535 address range.
