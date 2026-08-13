@@ -698,6 +698,20 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
+        public string ActiveProfileDisplayName
+        {
+            get
+            {
+                if (ActiveProfile == null)
+                    return "None";
+
+                if (IsServerMode)
+                    return $"{ActiveProfile.Name} ({ServerIpAddress})";
+
+                return ActiveProfile.DisplayName;
+            }
+        }
+
         public DateTime LastErrorTime { get; private set; } = DateTime.MinValue;
 
         public int HoldingMonitorFailureCount => GetMonitorFailureCount(PlcArea.HoldingRegister);
@@ -1109,6 +1123,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
             OnPropertyChanged(nameof(ActiveService));
             OnPropertyChanged(nameof(ServerIpAddress));
+            OnPropertyChanged(nameof(ActiveProfileDisplayName));
             OnPropertyChanged(nameof(UnitId));
             OnPropertyChanged(nameof(Mode));
             OnPropertyChanged(nameof(ModeIndex));
@@ -1466,6 +1481,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 OnPropertyChanged(nameof(IsConnectionErrorVisible));
                 OnPropertyChanged(nameof(ConnectionStatusText));
                 OnPropertyChanged(nameof(ServerIpAddress));
+            OnPropertyChanged(nameof(ActiveProfileDisplayName));
                 OnPropertyChanged(nameof(DebugSummary));
                 OnPropertyChanged(nameof(CanConnect));
                 OnPropertyChanged(nameof(CanDisconnect));
@@ -1501,6 +1517,7 @@ namespace ModbusForge.Avalonia.ViewModels
             if (e.PropertyName == nameof(ConnectionProfile.Port))
             {
                 OnPropertyChanged(nameof(ServerIpAddress));
+            OnPropertyChanged(nameof(ActiveProfileDisplayName));
             }
 
             if (e.PropertyName == nameof(ConnectionProfile.UnitId))
@@ -1597,6 +1614,7 @@ namespace ModbusForge.Avalonia.ViewModels
             OnPropertyChanged(nameof(IsConnectionErrorVisible));
             OnPropertyChanged(nameof(ConnectionStatusText));
             OnPropertyChanged(nameof(ServerIpAddress));
+            OnPropertyChanged(nameof(ActiveProfileDisplayName));
             OnPropertyChanged(nameof(DebugSummary));
 
             if (e.IsServerMode && _connectionManager.ActiveService is ModbusServerService server)
@@ -1634,6 +1652,7 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             _logger.LogInformation("Profile disconnected: {Name}", e.Name);
             OnPropertyChanged(nameof(ServerIpAddress));
+            OnPropertyChanged(nameof(ActiveProfileDisplayName));
             _trendLogger?.Stop();
             StopPolling();
             StopCustomWatchMonitoring();
