@@ -43,7 +43,23 @@ namespace ModbusForge.Models
         public bool Monitor { get => _monitor; set { if (_monitor != value) { _monitor = value; OnPropertyChanged(nameof(Monitor)); } } }
         public int ReadPeriodMs { get => _readPeriodMs; set { if (_readPeriodMs != value) { _readPeriodMs = value; OnPropertyChanged(nameof(ReadPeriodMs)); } } }
         public string Area { get => _area; set { if (_area != value) { _area = value; OnPropertyChanged(nameof(Area)); } } }
-        public bool Trend { get => _trend; set { if (_trend != value) { _trend = value; OnPropertyChanged(nameof(Trend)); } } }
+        public bool Trend 
+        { 
+            get => _trend; 
+            set 
+            { 
+                if (_trend != value) 
+                { 
+                    _trend = value; 
+                    OnPropertyChanged(nameof(Trend)); 
+                    // Auto-enable monitoring when trend is enabled
+                    if (value && !_monitor)
+                    {
+                        Monitor = true;
+                    }
+                } 
+            } 
+        }
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

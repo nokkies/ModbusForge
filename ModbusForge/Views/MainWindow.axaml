@@ -19,6 +19,12 @@
     <KeyBinding Gesture="F1" Command="{Binding OpenHelpCommand}" />
     <KeyBinding Gesture="Ctrl+P" Command="{Binding OpenPreferencesCommand}" />
     <KeyBinding Gesture="Ctrl+Q" Command="{Binding ExitCommand}" />
+    <KeyBinding Gesture="Ctrl+L" Command="{Binding ToggleConnectionCommand}" />
+    <KeyBinding Gesture="Ctrl+W" Command="{Binding OpenWatchWindowCommand}" />
+    <KeyBinding Gesture="Ctrl+N" Command="{Binding AddCustomEntryCommand}" />
+    <KeyBinding Gesture="Ctrl+B" Command="{Binding AddCustomBulkEntryCommand}" />
+    <KeyBinding Gesture="Ctrl+D" Command="{Binding OpenDeviceScannerWindowCommand}" />
+    <KeyBinding Gesture="Ctrl+M" Command="{Binding ToggleMonitoringCommand}" />
   </Window.KeyBindings>
 
   <Grid RowDefinitions="Auto,Auto,*,Auto">

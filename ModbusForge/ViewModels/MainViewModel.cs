@@ -2574,7 +2574,8 @@ namespace ModbusForge.Avalonia.ViewModels
                     Continuous = false,
                     PeriodMs = DefaultCustomPeriodMs,
                     Monitor = false,
-                    ReadPeriodMs = DefaultCustomPeriodMs
+                    ReadPeriodMs = DefaultCustomPeriodMs,
+                    Trend = false
                 };
 
                 CustomEntries.Add(entry);
@@ -2614,7 +2615,8 @@ namespace ModbusForge.Avalonia.ViewModels
                         Continuous = false,
                         PeriodMs = result.WritePeriodMs,
                         Monitor = false,
-                        ReadPeriodMs = result.ReadPeriodMs
+                        ReadPeriodMs = result.ReadPeriodMs,
+                        Trend = false
                     };
 
                     CustomEntries.Add(entry);
