@@ -40,6 +40,8 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly IApplicationLifetime? _applicationLifetime;
         private readonly IDockingHost? _dockingHost;
         private readonly ITrendLogger? _trendLogger;
+        private readonly MqttGatewayService? _mqttGateway;
+        private readonly IConsoleLoggerService? _consoleLoggerService;
         private CancellationTokenSource? _pollCts;
         private readonly object _pollLifecycleLock = new();
         private readonly object _pendingPollLock = new();
@@ -52,6 +54,9 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly Dictionary<PlcArea, DateTime> _lastMonitorFailureUtc = new();
         private bool _disposed;
         private bool _isApplyingUnitConfiguration;
+        private CancellationTokenSource? _autoReconnectCts;
+        private readonly object _autoReconnectLock = new();
+        private volatile bool _userInitiatedDisconnect;
         private DateTime _lastHoldingReadUtc;
         private DateTime _lastInputRegReadUtc;
         private DateTime _lastCoilsReadUtc;
@@ -62,6 +67,30 @@ namespace ModbusForge.Avalonia.ViewModels
         private const int DefaultCustomPeriodMs = 1000;
         private const int MultiRegisterTypeIncrement = 2;
         private const int SingleRegisterTypeIncrement = 1;
+
+        /// <summary>
+        /// Pause before restarting the poll loop after it died from an error, so a
+        /// persistently failing service cannot spin an error → immediate-restart loop.
+        /// </summary>
+        private const int PollRestartBackoffMs = 1000;
+
+        // TabItem indices in MainTabControl (MainView.axaml). Referenced by the navigation
+        // model and the open-tab commands instead of magic numbers.
+        private const int DashboardTabIndex = 0;
+        private const int TrendsTabIndex = 1;
+        private const int FrameInspectorTabIndex = 2;
+        private const int MqttTabIndex = 3;
+        private const int ScriptEditorTabIndex = 4;
+        private const int SignalGeneratorTabIndex = 5;
+        private const int SimulationTabIndex = 6;
+        private const int HoldingRegistersTabIndex = 7;
+        private const int CoilsTabIndex = 8;
+        private const int InputRegistersTabIndex = 9;
+        private const int DiscreteInputsTabIndex = 10;
+        private const int CustomWatchTabIndex = 11;
+        private const int DecodeTabIndex = 12;
+        private const int ConsoleTabIndex = 13;
+        private const int DebugTabIndex = 14;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ReadCommand))]
@@ -411,7 +440,8 @@ namespace ModbusForge.Avalonia.ViewModels
             DecodeViewModel? decodeViewModel = null,
             IUnitConfigurationStore? unitConfigurationStore = null,
             IFileSystem? fileSystem = null,
-            IDockingHost? dockingHost = null)
+            IDockingHost? dockingHost = null,
+            IConsoleLoggerService? consoleLoggerService = null)
         {
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -430,6 +460,8 @@ namespace ModbusForge.Avalonia.ViewModels
             _applicationLifetime = applicationLifetime;
             _dockingHost = dockingHost;
             _trendLogger = trendLogger;
+            _consoleLoggerService = consoleLoggerService;
+            ConsoleMessages = consoleLoggerService?.LogMessages ?? _consoleMessageFallback;
             TrendViewModel = trendViewModel;
             FrameInspectorViewModel = frameInspectorViewModel;
             MqttViewModel = mqttViewModel;
@@ -447,6 +479,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 DecodeViewModel.UnitIdProvider = () => EffectiveUnitId;
             }
 
+            _mqttGateway = mqttGateway;
             if (mqttGateway is not null)
             {
                 mqttGateway.SnapshotProvider = BuildMqttSnapshot;
@@ -487,11 +520,12 @@ namespace ModbusForge.Avalonia.ViewModels
             CheckForUpdatesCommand = new AsyncRelayCommand(CheckForUpdatesAsync);
             ExitCommand = new RelayCommand(() => _applicationLifetime?.Shutdown());
             ReadShortcutCommand = new RelayCommand(() => ReadCommand.Execute(null));
-            OpenTrendsCommand = new RelayCommand(() => SelectedTabIndex = 1);
-            OpenFrameInspectorCommand = new RelayCommand(() => SelectedTabIndex = 2);
+            OpenTrendsCommand = new RelayCommand(() => SelectedTabIndex = TrendsTabIndex);
+            OpenFrameInspectorCommand = new RelayCommand(() => SelectedTabIndex = FrameInspectorTabIndex);
+            OpenScriptEditorCommand = new RelayCommand(() => SelectedTabIndex = ScriptEditorTabIndex);
             OpenPcapCommand = new RelayCommand(() =>
             {
-                SelectedTabIndex = 2;
+                SelectedTabIndex = FrameInspectorTabIndex;
                 FrameInspectorViewModel?.ImportPcapCommand.Execute(null);
             });
             OpenTagBrowserCommand = new RelayCommand(() => _dockingHost?.ShowTagBrowser());
@@ -506,6 +540,28 @@ namespace ModbusForge.Avalonia.ViewModels
             ResetTabsCommand = new RelayCommand(ResetTabs);
             ClearConsoleCommand = new RelayCommand(() => ConsoleMessages.Clear());
             ClearDebugCommand = new RelayCommand(() => DebugMessages.Clear());
+
+            // Navigation list entries in user-facing order; TabIndex points into the
+            // MainTabControl item order, and IsVisible mirrors the tab-visibility flag.
+            NavigationItems = new List<NavigationItem>
+            {
+                new("Dashboard", DashboardTabIndex, () => true),
+                new("Trends", TrendsTabIndex, () => IsTrendTabVisible),
+                new("Frame Inspector", FrameInspectorTabIndex, () => true),
+                new("MQTT", MqttTabIndex, () => true),
+                new("Script Editor", ScriptEditorTabIndex, () => true),
+                new("Signal Generator", SignalGeneratorTabIndex, () => true),
+                new("Simulation", SimulationTabIndex, () => IsSimulationTabVisible),
+                new("Registers", HoldingRegistersTabIndex, () => IsRegistersTabVisible),
+                new("Input Registers", InputRegistersTabIndex, () => IsInputRegistersTabVisible),
+                new("Coils", CoilsTabIndex, () => IsCoilsTabVisible),
+                new("Discrete Inputs", DiscreteInputsTabIndex, () => IsDiscreteInputsTabVisible),
+                new("Custom Watch", CustomWatchTabIndex, () => IsCustomWatchTabVisible),
+                new("Decode", DecodeTabIndex, () => IsDecodeTabVisible),
+                new("Console", ConsoleTabIndex, () => IsConsoleTabVisible),
+                new("Debug", DebugTabIndex, () => IsDebugTabVisible),
+            };
+            SelectedNavigationItem = NavigationItems[0];
 
             if (_themeService != null)
             {
@@ -597,6 +653,7 @@ namespace ModbusForge.Avalonia.ViewModels
         public ICommand ReadShortcutCommand { get; }
         public ICommand OpenTrendsCommand { get; }
         public ICommand OpenFrameInspectorCommand { get; }
+        public ICommand OpenScriptEditorCommand { get; }
         public ICommand OpenPcapCommand { get; }
         public ICommand OpenTagBrowserCommand { get; }
         public ICommand OpenWatchWindowCommand { get; }
@@ -627,6 +684,20 @@ namespace ModbusForge.Avalonia.ViewModels
 
         [ObservableProperty]
         private int _selectedTabIndex;
+
+        /// <summary>Left navigation list entries (see MainView.axaml).</summary>
+        public IReadOnlyList<NavigationItem> NavigationItems { get; }
+
+        [ObservableProperty]
+        private NavigationItem? _selectedNavigationItem;
+
+        partial void OnSelectedNavigationItemChanged(NavigationItem? value)
+        {
+            if (value is not null && SelectedTabIndex != value.TabIndex)
+            {
+                SelectedTabIndex = value.TabIndex;
+            }
+        }
 
         [ObservableProperty]
         private bool _isRegistersTabVisible = true;
@@ -664,7 +735,15 @@ namespace ModbusForge.Avalonia.ViewModels
         [ObservableProperty]
         private bool _hasConnectionError;
 
-        public ObservableCollection<string> ConsoleMessages { get; } = new();
+        /// <summary>
+        /// Console tab backing store. When the shared <see cref="IConsoleLoggerService"/> is
+        /// available (the normal DI case) this is the same collection the Modbus services,
+        /// script engine, and API server already log into - so the tab shows backend
+        /// messages too, and the configured MaxConsoleMessages cap applies.
+        /// </summary>
+        public ObservableCollection<string> ConsoleMessages { get; }
+
+        private readonly ObservableCollection<string> _consoleMessageFallback = new();
 
         public ObservableCollection<string> DebugMessages { get; } = new();
 
@@ -765,23 +844,40 @@ namespace ModbusForge.Avalonia.ViewModels
             OnPropertyChanged(nameof(DebugSummary));
         }
 
-        partial void OnIsRegistersTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
-        partial void OnIsInputRegistersTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
-        partial void OnIsCoilsTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
-        partial void OnIsDiscreteInputsTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
-        partial void OnIsCustomWatchTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
-        partial void OnIsSimulationTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
-        partial void OnIsDecodeTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
-        partial void OnIsTrendTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
-        partial void OnIsConsoleTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
-        partial void OnIsDebugTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
+        partial void OnIsRegistersTabVisibleChanged(bool value) => OnTabVisibilityChanged(HoldingRegistersTabIndex);
+        partial void OnIsInputRegistersTabVisibleChanged(bool value) => OnTabVisibilityChanged(InputRegistersTabIndex);
+        partial void OnIsCoilsTabVisibleChanged(bool value) => OnTabVisibilityChanged(CoilsTabIndex);
+        partial void OnIsDiscreteInputsTabVisibleChanged(bool value) => OnTabVisibilityChanged(DiscreteInputsTabIndex);
+        partial void OnIsCustomWatchTabVisibleChanged(bool value) => OnTabVisibilityChanged(CustomWatchTabIndex);
+        partial void OnIsSimulationTabVisibleChanged(bool value) => OnTabVisibilityChanged(SimulationTabIndex);
+        partial void OnIsDecodeTabVisibleChanged(bool value) => OnTabVisibilityChanged(DecodeTabIndex);
+        partial void OnIsTrendTabVisibleChanged(bool value) => OnTabVisibilityChanged(TrendsTabIndex);
+        partial void OnIsConsoleTabVisibleChanged(bool value) => OnTabVisibilityChanged(ConsoleTabIndex);
+        partial void OnIsDebugTabVisibleChanged(bool value) => OnTabVisibilityChanged(DebugTabIndex);
+
+        private string? _lastConsoleMessage;
 
         private void AppendConsoleMessage(string message)
         {
             if (string.IsNullOrWhiteSpace(message)) return;
 
+            // The poll loop re-sets the same status message every cycle; appending every
+            // repetition is what used to spam the console panel.
+            if (message == _lastConsoleMessage) return;
+            _lastConsoleMessage = message;
+
+            if (_consoleLoggerService != null)
+            {
+                // Shared sink: dispatches to the UI thread and enforces the configured
+                // MaxConsoleMessages cap.
+                _consoleLoggerService.Log(message);
+                return;
+            }
+
+            // Fallback (no DI-provided console service, e.g. some test setups).
+            var cap = Math.Max(1, _settingsService?.MaxConsoleMessages ?? 1000);
             ConsoleMessages.Add(message);
-            while (ConsoleMessages.Count > 1000)
+            while (ConsoleMessages.Count > cap)
             {
                 ConsoleMessages.RemoveAt(0);
             }
@@ -868,24 +964,23 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             if (IsTabIndexVisible(SelectedTabIndex)) return;
 
-            SelectedTabIndex = Enumerable.Range(0, 15).FirstOrDefault(IsTabIndexVisible);
+            SelectedTabIndex = Enumerable.Range(0, NavigationItems.Count).FirstOrDefault(IsTabIndexVisible);
         }
 
         private bool IsTabIndexVisible(int index)
         {
             return index switch
             {
-                0 => true,
-                1 => IsTrendTabVisible,
-                6 => IsSimulationTabVisible,
-                7 => IsRegistersTabVisible,
-                8 => IsCoilsTabVisible,
-                9 => IsInputRegistersTabVisible,
-                10 => IsDiscreteInputsTabVisible,
-                11 => IsCustomWatchTabVisible,
-                12 => IsDecodeTabVisible,
-                13 => IsConsoleTabVisible,
-                14 => IsDebugTabVisible,
+                TrendsTabIndex => IsTrendTabVisible,
+                SimulationTabIndex => IsSimulationTabVisible,
+                HoldingRegistersTabIndex => IsRegistersTabVisible,
+                CoilsTabIndex => IsCoilsTabVisible,
+                InputRegistersTabIndex => IsInputRegistersTabVisible,
+                DiscreteInputsTabIndex => IsDiscreteInputsTabVisible,
+                CustomWatchTabIndex => IsCustomWatchTabVisible,
+                DecodeTabIndex => IsDecodeTabVisible,
+                ConsoleTabIndex => IsConsoleTabVisible,
+                DebugTabIndex => IsDebugTabVisible,
                 _ => true
             };
         }
@@ -914,6 +1009,30 @@ namespace ModbusForge.Avalonia.ViewModels
         partial void OnSelectedTabIndexChanged(int value)
         {
             IsRegisterGridEditing = false;
+
+            // Keep the navigation list in sync when the tab is changed programmatically.
+            var item = NavigationItems.FirstOrDefault(i => i.TabIndex == value && i.IsVisible);
+            if (!ReferenceEquals(item, SelectedNavigationItem))
+            {
+                SelectedNavigationItem = item;
+            }
+        }
+
+        /// <summary>
+        /// Shared handler for the tab-visibility flags: re-anchors the selection if the
+        /// current tab was hidden and raises the navigation list's visibility change.
+        /// </summary>
+        private void OnTabVisibilityChanged(int tabIndex)
+        {
+            EnsureSelectedTabIsVisible();
+
+            var item = NavigationItems.First(i => i.TabIndex == tabIndex);
+            item.RaiseVisibilityChanged();
+
+            if (SelectedNavigationItem is { } selected && selected.TabIndex == tabIndex && !selected.IsVisible)
+            {
+                SelectedNavigationItem = null;
+            }
         }
 
         partial void OnSelectedAreaIndexChanged(int value)
@@ -1028,14 +1147,7 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             if (_hookedCustomEntries == CustomEntries) return;
 
-            if (_hookedCustomEntries != null)
-            {
-                _hookedCustomEntries.CollectionChanged -= OnCustomEntriesCollectionChanged;
-                foreach (var entry in _hookedCustomEntries)
-                {
-                    entry.PropertyChanged -= OnCustomEntryPropertyChanged;
-                }
-            }
+            UnhookCustomEntries();
 
             _hookedCustomEntries = CustomEntries;
 
@@ -1047,6 +1159,19 @@ namespace ModbusForge.Avalonia.ViewModels
                     entry.PropertyChanged += OnCustomEntryPropertyChanged;
                 }
             }
+        }
+
+        private void UnhookCustomEntries()
+        {
+            if (_hookedCustomEntries == null)
+                return;
+
+            _hookedCustomEntries.CollectionChanged -= OnCustomEntriesCollectionChanged;
+            foreach (var entry in _hookedCustomEntries)
+            {
+                entry.PropertyChanged -= OnCustomEntryPropertyChanged;
+            }
+            _hookedCustomEntries = null;
         }
 
         private void OnCustomEntriesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -1469,6 +1594,14 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void ActiveProfile_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
+            // The profile is mutated from thread-pool threads too (ConnectProfileAsync /
+            // DisconnectProfileAsync set IsConnected/Status), so marshal to the UI thread
+            // before touching view-model state.
+            _ = _dispatcher.InvokeAsync(() => HandleActiveProfilePropertyChanged(e));
+        }
+
+        private void HandleActiveProfilePropertyChanged(PropertyChangedEventArgs e)
+        {
             if (e.PropertyName == nameof(ConnectionProfile.IsConnected))
             {
                 if (ActiveProfile?.IsConnected == true)
@@ -1563,6 +1696,16 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void ConnectionManager_ActiveProfileChanged(object? sender, ConnectionProfile? e)
         {
+            // Raised on the caller's thread (UI in most cases, but ConnectionManager can be
+            // driven from other threads) - marshal to keep VM state on the UI thread.
+            _ = _dispatcher.InvokeAsync(() => HandleActiveProfileChanged(e));
+        }
+
+        private void HandleActiveProfileChanged(ConnectionProfile? e)
+        {
+            // The auto-reconnect loop targets a specific profile; a profile switch voids it.
+            StopAutoReconnect();
+
             SyncCurrentUnitConfiguration();
 
             if (ActiveProfile != null)
@@ -1606,6 +1749,15 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void ConnectionManager_ProfileConnected(object? sender, ConnectionProfile e)
         {
+            // Raised from ConnectProfileAsync on a thread-pool thread.
+            _ = _dispatcher.InvokeAsync(() => HandleProfileConnected(e));
+        }
+
+        private void HandleProfileConnected(ConnectionProfile e)
+        {
+            // A successful connection (manual or auto) ends any pending auto-reconnect.
+            StopAutoReconnect();
+
             _logger.LogInformation("Profile connected: {Name}", e.Name);
             ResetMonitorFailures();
             HasConnectionError = false;
@@ -1650,12 +1802,33 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void ConnectionManager_ProfileDisconnected(object? sender, ConnectionProfile e)
         {
+            // Raised from DisconnectProfileAsync on a thread-pool thread.
+            _ = _dispatcher.InvokeAsync(() => HandleProfileDisconnected(e));
+        }
+
+        private void HandleProfileDisconnected(ConnectionProfile e)
+        {
             _logger.LogInformation("Profile disconnected: {Name}", e.Name);
             OnPropertyChanged(nameof(ServerIpAddress));
             OnPropertyChanged(nameof(ActiveProfileDisplayName));
             _trendLogger?.Stop();
             StopPolling();
             StopCustomWatchMonitoring();
+
+            var userInitiated = _userInitiatedDisconnect;
+            _userInitiatedDisconnect = false;
+
+            // Profiles removed from the manager (profile deleted, project reloaded) must
+            // never be reconnected either.
+            if (userInitiated || !_connectionManager.Profiles.Contains(e))
+            {
+                StopAutoReconnect();
+            }
+            else
+            {
+                // Unexpected loss: restart the link if the user opted in.
+                StartAutoReconnectIfEnabled("unexpected connection loss");
+            }
         }
 
         private void RefreshAvailableUnitIds()
@@ -1737,6 +1910,9 @@ namespace ModbusForge.Avalonia.ViewModels
             if (ActiveProfile == null) return;
 
             IsBusy = true;
+            // Distinguishes a deliberate user disconnect (no auto-reconnect) from an
+            // unexpected service-side loss (auto-reconnect if enabled).
+            _userInitiatedDisconnect = true;
             try
             {
                 await _connectionManager.DisconnectProfileAsync(ActiveProfile);
@@ -1749,6 +1925,107 @@ namespace ModbusForge.Avalonia.ViewModels
             finally
             {
                 IsBusy = false;
+            }
+        }
+
+        /// <summary>
+        /// Starts the auto-reconnect loop if the AutoReconnect preference is enabled.
+        /// Retries ConnectProfileAsync on the configured interval until it succeeds, the
+        /// profile changes, the user disconnects, or the view model is disposed.
+        /// </summary>
+        private void StartAutoReconnectIfEnabled(string reason)
+        {
+            if (_disposed)
+                return;
+
+            if (_settingsService is not { AutoReconnect: true })
+                return;
+
+            lock (_autoReconnectLock)
+            {
+                if (_autoReconnectCts != null)
+                    return; // a loop is already running
+
+                _autoReconnectCts = new CancellationTokenSource();
+            }
+
+            _logger.LogInformation("Auto-reconnect started ({Reason})", reason);
+            _ = AutoReconnectLoopAsync(_autoReconnectCts.Token);
+        }
+
+        private void StopAutoReconnect()
+        {
+            lock (_autoReconnectLock)
+            {
+                _autoReconnectCts?.Cancel();
+                // Disposal happens in the loop's finally.
+            }
+        }
+
+        private async Task AutoReconnectLoopAsync(CancellationToken token)
+        {
+            try
+            {
+                while (!token.IsCancellationRequested && !_disposed)
+                {
+                    // Read the interval each iteration so preference changes apply without a restart.
+                    var intervalMs = Math.Max(100, _settingsService?.AutoReconnectIntervalMs ?? 5000);
+                    try
+                    {
+                        await Task.Delay(intervalMs, token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
+
+                    var profile = ActiveProfile;
+                    if (profile is null || profile.IsConnected)
+                        return;
+
+                    await _dispatcher.InvokeAsync(() => StatusMessage = $"Connection lost. Retrying in {intervalMs / 1000.0:0.#} s...");
+
+                    bool success;
+                    try
+                    {
+                        success = await _connectionManager.ConnectProfileAsync(profile);
+                    }
+                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                    {
+                        _logger.LogWarning(ex, "Auto-reconnect attempt for profile {Name} threw", profile.Name);
+                        success = false;
+                    }
+
+                    if (token.IsCancellationRequested || _disposed)
+                        return;
+
+                    if (success)
+                    {
+                        // ProfileConnected (marshaled) stops the loop; also break here in case it raced.
+                        _logger.LogInformation("Auto-reconnect succeeded for profile {Name}", profile.Name);
+                        return;
+                    }
+
+                    _logger.LogWarning("Auto-reconnect attempt failed for profile {Name}; retrying in {Interval} ms", profile.Name, intervalMs);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                _logger.LogError(ex, "Auto-reconnect loop failed");
+            }
+            finally
+            {
+                lock (_autoReconnectLock)
+                {
+                    if (_autoReconnectCts != null && ReferenceEquals(_autoReconnectCts.Token, token))
+                    {
+                        _autoReconnectCts.Dispose();
+                        _autoReconnectCts = null;
+                    }
+                }
             }
         }
 
@@ -1918,7 +2195,16 @@ namespace ModbusForge.Avalonia.ViewModels
                             break;
 
                         case "string":
+                            // A string write expands to one register per two characters. Without a cap a
+                            // long string would silently clobber every register after the target address
+                            // (or fail deep in NModbus past the FC16 limit with a cryptic error).
                             var stringWords = DataTypeConverter.ToUInt16(text);
+                            if (stringWords.Length > ModbusAddressValidator.MaxWriteRegisters)
+                            {
+                                _dispatcher.Invoke(() => StatusMessage =
+                                    $"String write too large: {stringWords.Length} registers (max {ModbusAddressValidator.MaxWriteRegisters}).");
+                                return;
+                            }
                             await ActiveService.WriteRegistersAsync(unitId, entry.Address, stringWords);
                             break;
 
@@ -2047,6 +2333,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private async Task PollLoopAsync(CancellationTokenSource loopCts)
         {
             var token = loopCts.Token;
+            var hadError = false;
             try
             {
                 while (!token.IsCancellationRequested && ActiveProfile is { IsConnected: true } && AnyMonitorEnabled())
@@ -2063,6 +2350,7 @@ namespace ModbusForge.Avalonia.ViewModels
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
+                hadError = true;
                 _logger.LogError(ex, "Avalonia polling loop failed");
                 await _dispatcher.InvokeAsync(() => StatusMessage = $"Poll error: {ex.Message}");
             }
@@ -2081,9 +2369,37 @@ namespace ModbusForge.Avalonia.ViewModels
                 loopCts.Dispose();
                 if (restart)
                 {
-                    StartPolling();
+                    // A clean stop (disconnected, monitors disabled) restarts immediately;
+                    // an error exit backs off first so a persistently failing service
+                    // cannot spin a tight error → restart loop.
+                    if (hadError)
+                        RestartPollingAfterBackoff();
+                    else
+                        StartPolling();
                 }
             }
+        }
+
+        private void RestartPollingAfterBackoff()
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(PollRestartBackoffMs);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+
+                // Re-evaluate after the pause: the connection may have dropped (or the
+                // view model been disposed) in the meantime.
+                if (!_disposed && ActiveProfile is { IsConnected: true } && AnyMonitorEnabled())
+                {
+                    StartPolling();
+                }
+            });
         }
 
         private void QueueDueAreaReads(DateTime now)
@@ -2351,10 +2667,17 @@ namespace ModbusForge.Avalonia.ViewModels
             bool isPartialRead = false)
         {
             target ??= new ObservableCollection<RegisterEntry>();
-            var metadataByAddress = metadata?.ToDictionary(item => item.Address)
+            var metadataByAddress = metadata?.GroupBy(item => item.Address)
+                                    .ToDictionary(g => g.Key, g => g.First())
                                     ?? new Dictionary<int, RegisterMetadata>();
 
-            var entriesByAddress = target.ToDictionary(e => e.Address);
+            // Duplicate addresses in the grid (user editing) must not crash the read path;
+            // the first entry wins and is the one updated below.
+            var entriesByAddress = new Dictionary<int, RegisterEntry>();
+            foreach (var existing in target)
+            {
+                entriesByAddress.TryAdd(existing.Address, existing);
+            }
             var usedAddresses = new HashSet<int>();
 
             int idx = 0;
@@ -2891,7 +3214,14 @@ namespace ModbusForge.Avalonia.ViewModels
                             return false;
 
                         case "string":
+                            // Same FC16 cap as the register grid: reject oversized strings with a clear
+                            // message (surfaced by the caller) instead of clobbering adjacent registers.
                             var stringWords = DataTypeConverter.ToUInt16(entry.WriteValue ?? string.Empty);
+                            if (stringWords.Length > ModbusAddressValidator.MaxWriteRegisters)
+                            {
+                                throw new ArgumentException(
+                                    $"String write too large: {stringWords.Length} registers (max {ModbusAddressValidator.MaxWriteRegisters}).");
+                            }
                             await service.WriteRegistersAsync(unitId, entry.Address, stringWords);
                             return true;
 
@@ -3627,6 +3957,10 @@ namespace ModbusForge.Avalonia.ViewModels
                 return;
             }
 
+            // Loading a project replaces the whole profile set - stop any pending reconnects.
+            // (The per-profile "still in the manager" check in HandleProfileDisconnected
+            // prevents auto-reconnect for the old profiles.)
+            StopAutoReconnect();
             foreach (var connectedProfile in _connectionManager.Profiles.Where(profile => profile.IsConnected).ToList())
             {
                 _ = _connectionManager.DisconnectProfileAsync(connectedProfile);
@@ -3969,18 +4303,30 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
-        private static void OpenUrl(string url)
+        private void OpenUrl(string url)
         {
+            // Only open absolute http(s) URLs - never an arbitrary string (which
+            // UseShellExecute would hand to the shell as a document/protocol).
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            {
+                _logger.LogWarning("Refusing to open non-http(s) URL: {Url}", url);
+                StatusMessage = "The update URL is invalid.";
+                return;
+            }
+
             try
             {
-                using var process = new System.Diagnostics.Process();
-                process.StartInfo.UseShellExecute = true;
-                process.StartInfo.FileName = url;
-                process.Start();
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // ignore
+                _logger.LogWarning(ex, "Failed to open URL {Url}", url);
+                StatusMessage = $"Could not open the browser: {ex.Message}";
             }
         }
 
@@ -4008,6 +4354,24 @@ namespace ModbusForge.Avalonia.ViewModels
             _trendLogger?.Stop();
             StopPolling();
             StopCustomWatchMonitoring();
+            StopAutoReconnect();
+
+            // The MQTT gateway is a long-lived singleton: its SnapshotProvider delegate
+            // captures this view model, so it must be cleared or the whole view-model
+            // graph stays alive after the window closes.
+            if (_mqttGateway != null)
+            {
+                _mqttGateway.SnapshotProvider = null;
+            }
+
+            // Same retention problem via the cross-VM PropertyChanged subscription.
+            if (VisualNodeEditorViewModel != null)
+            {
+                VisualNodeEditorViewModel.PropertyChanged -= OnVisualNodeEditorViewModelPropertyChanged;
+            }
+
+            // Release the per-entry PropertyChanged hooks so the custom entries can be collected.
+            UnhookCustomEntries();
         }
     }
 }

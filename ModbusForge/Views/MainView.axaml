@@ -9,7 +9,6 @@
              x:CompileBindings="False">
 
   <UserControl.Resources>
-    <converters:NavigationIndexConverter x:Key="NavigationIndexConverter" />
     <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" />
     <x:Int32 x:Key="CountFallback">1</x:Int32>
   </UserControl.Resources>
@@ -48,8 +47,7 @@
       <TextBlock VerticalAlignment="Center" Text="Active ID:" Margin="16,0,0,0" IsVisible="{Binding ShowServerFields}" />
       <ComboBox x:Name="ActiveUnitIdComboBox"
                 ItemsSource="{Binding AvailableUnitIds}"
-                SelectedItem="{Binding SelectedUnitId, Mode=OneWay}"
-                SelectionChanged="ActiveUnitIdComboBox_SelectionChanged"
+                SelectedItem="{Binding SelectedUnitId, Mode=TwoWay}"
                 Width="100" Height="24" MinHeight="0" FontSize="10" VerticalAlignment="Center" VerticalContentAlignment="Center"
                 IsVisible="{Binding ShowServerFields}" />
       <Button Content="{Binding ToggleConnectionButtonText, FallbackValue='Connect'}" Command="{Binding ToggleConnectionCommand}" Width="100" Height="24" MinHeight="0" Padding="8,0" FontSize="10" VerticalAlignment="Center" VerticalContentAlignment="Center" />
@@ -67,28 +65,16 @@
                      BorderThickness="0"
                      Background="Transparent"
                      Padding="0"
-                     SelectedIndex="{Binding SelectedTabIndex, Converter={StaticResource NavigationIndexConverter}, Mode=TwoWay}">
+                     ItemsSource="{Binding NavigationItems}"
+                     SelectedItem="{Binding SelectedNavigationItem, Mode=TwoWay}">
               <ListBox.Styles>
                 <Style Selector="ListBoxItem">
                   <Setter Property="Padding" Value="8,5" />
                   <Setter Property="HorizontalContentAlignment" Value="Left" />
+                  <!-- Hidden tabs are removed from the navigation list, not just the tab strip -->
+                  <Setter Property="IsVisible" Value="{Binding IsVisible}" />
                 </Style>
               </ListBox.Styles>
-              <ListBoxItem Content="Dashboard" />
-              <ListBoxItem Content="Trends" />
-              <ListBoxItem Content="Frame Inspector" />
-              <ListBoxItem Content="MQTT" />
-              <ListBoxItem Content="Script Editor" />
-              <ListBoxItem Content="Signal Generator" />
-              <ListBoxItem Content="Simulation" />
-              <ListBoxItem Content="Registers" Margin="0,16,0,0" />
-              <ListBoxItem Content="Input Registers" />
-              <ListBoxItem Content="Coils" />
-              <ListBoxItem Content="Discrete Inputs" />
-              <ListBoxItem Content="Custom Watch" />
-              <ListBoxItem Content="Decode" />
-              <ListBoxItem Content="Console" />
-              <ListBoxItem Content="Debug" />
             </ListBox>
           </StackPanel>
         </ScrollViewer>
@@ -126,7 +112,7 @@
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <TextBlock Text="Quick actions:" VerticalAlignment="Center" Margin="0,0,8,0" />
                 <Button Content="Read Holding Registers" Command="{Binding ReadHoldingRegistersCommand}" />
-                <Button Content="Open Script Editor" Click="ScriptEditor_Click" />
+                <Button Content="Open Script Editor" Command="{Binding OpenScriptEditorCommand}" />
                 <Button Content="Open Trends" Command="{Binding OpenTrendsCommand}" />
               </StackPanel>
             </Border>

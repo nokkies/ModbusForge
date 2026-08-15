@@ -46,14 +46,6 @@ namespace ModbusForge.Avalonia.Views
             }
         }
 
-        private void ScriptEditor_Click(object? sender, RoutedEventArgs e)
-        {
-            if (ViewModel is not null)
-            {
-                ViewModel.SelectedTabIndex = 4;
-            }
-        }
-
         private void AdvancedFunctions_Click(object? sender, RoutedEventArgs e)
         {
             var app = global::Avalonia.Application.Current as App;

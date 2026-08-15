@@ -647,6 +647,12 @@ namespace ModbusForge.Avalonia.Views
             {
                 await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
             }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
+            {
+                // async void would otherwise swallow the exception silently.
+                if (ViewModel != null)
+                    ViewModel.StatusText = $"Palette drag failed: {ex.Message}";
+            }
             finally
             {
                 ResetPaletteDrag(e.Pointer);
@@ -1142,6 +1148,12 @@ namespace ModbusForge.Avalonia.Views
             try
             {
                 await DragDrop.DoDragDrop(e, data, DragDropEffects.Move);
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
+            {
+                // async void would otherwise swallow the exception silently.
+                if (ViewModel != null)
+                    ViewModel.StatusText = $"Program tree drag failed: {ex.Message}";
             }
             finally
             {
