@@ -690,7 +690,9 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 lock (_autoReconnectLock)
                 {
-                    if (_autoReconnectCts != null && ReferenceEquals(_autoReconnectCts.Token, token))
+                    // Value equality: true only when this loop's token came from the CTS that
+                    // is still the current one (a newer reconnect attempt replaced it).
+                    if (_autoReconnectCts != null && _autoReconnectCts.Token == token)
                     {
                         _autoReconnectCts.Dispose();
                         _autoReconnectCts = null;

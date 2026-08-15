@@ -120,7 +120,7 @@ namespace ModbusForge.Tests.Services
 
             Assert.True(readTask.IsCompletedSuccessfully || readTask.IsFaulted);
             if (readTask.IsCompletedSuccessfully)
-                Assert.Equal(0, readTask.Result);
+                Assert.Equal(0, await readTask);
         }
 
         private static async Task<(TcpClient Client, NetworkStream Stream)> ConnectAsync(int port)
