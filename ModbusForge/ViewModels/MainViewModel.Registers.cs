@@ -41,39 +41,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ReadCommand))]
-        private int _startAddress = 0;
-
-
-        [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(ReadCommand))]
-        private int _registerCount = 20;
-
-
-        [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(ReadCommand))]
-        private bool _isContinuousRead = true;
-
-
-        [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(ReadCommand))]
         [NotifyCanExecuteChangedFor(nameof(WriteCommand))]
         private PlcArea _selectedArea = PlcArea.HoldingRegister;
-
-
-        [ObservableProperty]
-        private int _selectedAreaIndex;
-
-
-        [ObservableProperty]
-        private string _globalType = "int";
-
-
-        [ObservableProperty]
-        private bool _swapBytes;
-
-
-        [ObservableProperty]
-        private bool _swapWords;
 
 
         [ObservableProperty]
@@ -203,59 +172,9 @@ namespace ModbusForge.Avalonia.ViewModels
         partial void OnSelectedAreaChanged(PlcArea value)
         {
             IsRegisterGridEditing = false;
-            SelectedAreaIndex = (int)value;
             OnPropertyChanged(nameof(IsRegisterArea));
             OnPropertyChanged(nameof(CanWrite));
             WriteCommand.NotifyCanExecuteChanged();
-
-            // Keep legacy global properties in sync with the newly selected area
-            StartAddress = GetAreaStart(value);
-            RegisterCount = GetAreaCount(value);
-            GlobalType = GetAreaGlobalType(value);
-            SwapBytes = GetAreaSwapBytes(value);
-            SwapWords = GetAreaSwapWords(value);
-        }
-
-
-        partial void OnSelectedAreaIndexChanged(int value)
-        {
-            SelectedArea = (PlcArea)value;
-        }
-
-
-        partial void OnIsContinuousReadChanged(bool value)
-        {
-            HoldingMonitorEnabled = value;
-        }
-
-
-        partial void OnStartAddressChanged(int value)
-        {
-            SetAreaStart(SelectedArea, value);
-        }
-
-
-        partial void OnRegisterCountChanged(int value)
-        {
-            SetAreaCount(SelectedArea, value);
-        }
-
-
-        partial void OnGlobalTypeChanged(string value)
-        {
-            SetAreaGlobalType(SelectedArea, value);
-        }
-
-
-        partial void OnSwapBytesChanged(bool value)
-        {
-            SetAreaSwapBytes(SelectedArea, value);
-        }
-
-
-        partial void OnSwapWordsChanged(bool value)
-        {
-            SetAreaSwapWords(SelectedArea, value);
         }
 
 

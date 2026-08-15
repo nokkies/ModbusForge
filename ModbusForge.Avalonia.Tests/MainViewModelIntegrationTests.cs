@@ -40,8 +40,9 @@ namespace ModbusForge.Avalonia.Tests
             var dispatcher = new SyncDispatcher();
             var vm = new MainViewModel(connectionManager, NullLogger<MainViewModel>.Instance, dispatcher);
 
-            vm.StartAddress = 0;
-            vm.RegisterCount = 5;
+            // Per-area configuration (the selected area defaults to HoldingRegister).
+            vm.HoldingRegisterStart = 0;
+            vm.HoldingRegisterCount = 5;
 
             // Act: connect, then wait for the first poll cycle to land (event-style
             // polling with a deadline instead of a fixed 1.5 s sleep).
