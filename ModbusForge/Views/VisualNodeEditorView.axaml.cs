@@ -190,6 +190,9 @@ namespace ModbusForge.Avalonia.Views
 
             ViewModel.StartMarquee(logicalPosition.X, logicalPosition.Y, extendSelection);
             e.Handled = true;
+
+            // Same as for node clicks: keep keyboard shortcuts active on the canvas.
+            _nodeCanvas.Focus();
         }
 
         private void Canvas_PointerMoved(object? sender, PointerEventArgs e)
@@ -861,6 +864,10 @@ namespace ModbusForge.Avalonia.Views
             _isDraggingNode = true;
             e.Pointer.Capture(border);
             e.Handled = true;
+
+            // The node itself is not focusable; give the canvas focus so the view's
+            // keyboard shortcuts (Ctrl+Z / Ctrl+Y) keep working after a node click.
+            _nodeCanvas?.Focus();
         }
 
         private void Node_PointerMoved(object? sender, PointerEventArgs e)

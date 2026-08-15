@@ -1,5 +1,11 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels" xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core" xmlns:shapes="using:Avalonia.Controls.Shapes" xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters" xmlns:views="clr-namespace:ModbusForge.Avalonia.Views" xmlns:behaviors="clr-namespace:ModbusForge.Avalonia.Behaviors" x:Class="ModbusForge.Avalonia.Views.VisualNodeEditorView" x:DataType="vm:VisualNodeEditorViewModel" Focusable="True">
 
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}"/>
+    <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}"/>
+    <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}"/>
+  </UserControl.KeyBindings>
+
   <UserControl.Styles>
     <Style Selector="Border.node">
       <Setter Property="BorderBrush" Value="Black"/>
@@ -215,7 +221,7 @@
     <!-- Preview canvas -->
     <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="1" Margin="0" Grid.Row="1">
       <ScrollViewer x:Name="CanvasScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" PointerWheelChanged="CanvasScrollViewer_PointerWheelChanged">
-        <Canvas x:Name="NodeCanvas" Width="{Binding ScaledCanvasWidth}" Height="{Binding ScaledCanvasHeight}" Background="#F5F5F5" PointerPressed="Canvas_PointerPressed" PointerMoved="Canvas_PointerMoved" PointerReleased="Canvas_PointerReleased" PointerCaptureLost="Canvas_PointerCaptureLost" DragDrop.AllowDrop="True" RenderTransformOrigin="0,0">
+        <Canvas x:Name="NodeCanvas" Focusable="True" Width="{Binding ScaledCanvasWidth}" Height="{Binding ScaledCanvasHeight}" Background="#F5F5F5" PointerPressed="Canvas_PointerPressed" PointerMoved="Canvas_PointerMoved" PointerReleased="Canvas_PointerReleased" PointerCaptureLost="Canvas_PointerCaptureLost" DragDrop.AllowDrop="True" RenderTransformOrigin="0,0">
           <Canvas.RenderTransform>
             <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
           </Canvas.RenderTransform>
@@ -471,3 +477,4 @@
 
     </Grid>
 </UserControl>
+
