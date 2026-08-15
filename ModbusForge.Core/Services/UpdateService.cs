@@ -58,7 +58,7 @@ namespace ModbusForge.Services
                     IsUpdateAvailable = isUpdateAvailable,
                     CurrentVersion = currentVersion.ToString(),
                     LatestVersion = latestVersionRaw?.ToString() ?? string.Empty,
-                    ReleaseUrl = releaseUrl,
+                    ReleaseUrl = releaseUrl ?? string.Empty,
                     ReleaseNotes = releaseNotes,
                     AssetDownloadUrl = assetDownloadUrl
                 };
