@@ -120,7 +120,7 @@
       <Border Classes="ToolGroup">
         <StackPanel Orientation="Horizontal" Spacing="2">
           <TextBlock Text="Sel" Classes="ToolGroupHeader"/>
-          <Button Content="Watch" Command="{Binding AddSelectedNodeToWatchCommand}" IsEnabled="{Binding SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}" ToolTip.Tip="Add selected node to watch"/>
+          <Button Content="Watch +" Command="{Binding AddSelectedNodeToWatchCommand}" IsEnabled="{Binding SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}" ToolTip.Tip="Add the selected node to the watch list"/>
           <TextBlock Text="{Binding SelectedNodeCount, StringFormat='Selected: {0}'}" VerticalAlignment="Center" Margin="4,0,0,0" MinWidth="60"/>
         </StackPanel>
       </Border>
@@ -423,55 +423,37 @@
             </StackPanel>
           </Expander>
 
-          <!-- Simulation Controls -->
-          <Expander Header="Simulation Controls" IsExpanded="True">
+          <!-- Nodes: a single list that merges the old "Active Nodes" list (name, address,
+               enable) with the editable "Live Values" list. One node, one row, no scrolling
+               between two near-identical panels. -->
+          <Expander Header="Nodes" IsExpanded="True">
             <StackPanel Spacing="4" Margin="0,4,0,0">
-              <CheckBox Content="Master Live Values" IsChecked="{Binding ShowLiveValues}"/>
-            </StackPanel>
-          </Expander>
-
-          <!-- Active Nodes -->
-          <Expander Header="Active Nodes" IsExpanded="True">
-            <StackPanel Spacing="4" Margin="0,4,0,0">
-              <ListBox ItemsSource="{Binding Nodes}" SelectedItem="{Binding SelectedNode}" MaxHeight="160" ScrollViewer.VerticalScrollBarVisibility="Auto">
+              <ListBox ItemsSource="{Binding Nodes}" SelectedItem="{Binding SelectedNode}" MaxHeight="240" ScrollViewer.VerticalScrollBarVisibility="Auto">
                 <ListBox.ItemTemplate>
                   <DataTemplate DataType="models:VisualNode">
-                    <StackPanel Orientation="Horizontal" Spacing="4">
-                      <TextBlock Text="{Binding Name}" FontSize="11"/>
-                      <TextBlock Text="(" FontSize="11" Foreground="Gray" IsVisible="{Binding AddressDisplay, Converter={x:Static converters:StringToBoolConverter.Instance}}"/>
-                      <TextBlock Text="{Binding AddressDisplay}" FontSize="10" Foreground="Gray" IsVisible="{Binding AddressDisplay, Converter={x:Static converters:StringToBoolConverter.Instance}}"/>
-                      <TextBlock Text=")" FontSize="11" Foreground="Gray" IsVisible="{Binding AddressDisplay, Converter={x:Static converters:StringToBoolConverter.Instance}}"/>
-                    </StackPanel>
+                    <Grid ColumnDefinitions="*,Auto,Auto" Margin="2,1,2,6">
+                      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold"/>
+                        <TextBlock Text="(" FontSize="10" Foreground="Gray" IsVisible="{Binding AddressDisplay, Converter={x:Static converters:StringToBoolConverter.Instance}}"/>
+                        <TextBlock Text="{Binding AddressDisplay}" FontSize="10" Foreground="Gray" IsVisible="{Binding AddressDisplay, Converter={x:Static converters:StringToBoolConverter.Instance}}"/>
+                        <TextBlock Text=")" FontSize="10" Foreground="Gray" IsVisible="{Binding AddressDisplay, Converter={x:Static converters:StringToBoolConverter.Instance}}"/>
+                      </StackPanel>
+                      <CheckBox Grid.Column="1" Margin="6,0" IsChecked="{Binding IsEnabled}" VerticalAlignment="Center"
+                                ToolTip.Tip="Enable / disable this node (disabled nodes freeze their outputs)"/>
+                      <TextBox Grid.Column="2" Margin="6,0,0,0" Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={x:Static converters:DoubleToStringConverter.Instance}}"
+                               FontSize="11" Width="64" Padding="3" VerticalAlignment="Center"
+                               IsVisible="{Binding ShowLiveValues}"
+                               GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" KeyDown="LiveValue_KeyDown"
+                               behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
+                    </Grid>
                   </DataTemplate>
                 </ListBox.ItemTemplate>
               </ListBox>
               <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Content="Enable" Command="{Binding EnableNodeCommand}" Width="80" HorizontalAlignment="Left"/>
-                <Button Content="Disable" Command="{Binding DisableNodeCommand}" Width="80" HorizontalAlignment="Left"/>
+                <Button Content="Enable" Command="{Binding EnableNodeCommand}" Width="80" HorizontalAlignment="Left" ToolTip.Tip="Enable the selected node"/>
+                <Button Content="Disable" Command="{Binding DisableNodeCommand}" Width="80" HorizontalAlignment="Left" ToolTip.Tip="Disable the selected node"/>
               </StackPanel>
             </StackPanel>
-          </Expander>
-
-          <!-- Live Values (capped so long node lists never push other panels off-screen) -->
-          <Expander Header="Live Values" IsExpanded="True">
-            <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding Nodes}" Margin="0,4,0,0">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="models:VisualNode">
-                  <Border BorderBrush="#C0C0C0" BorderThickness="1" CornerRadius="3" Padding="6" Margin="0,0,0,4">
-                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-                      <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center"/>
-                      <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding AddressDisplay}" FontSize="10" Foreground="Gray" VerticalAlignment="Center" IsVisible="{Binding AddressDisplay, Converter={x:Static converters:StringToBoolConverter.Instance}}"/>
-                      <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="4" Margin="0,3,0,0" IsVisible="{Binding ShowLiveValues}">
-                        <TextBlock Text="Value:" FontSize="10" VerticalAlignment="Center"/>
-                        <TextBox Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={x:Static converters:DoubleToStringConverter.Instance}}" FontSize="11" MinWidth="60" Padding="3" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" KeyDown="LiveValue_KeyDown" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
-                      </StackPanel>
-                    </Grid>
-                  </Border>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            </ScrollViewer>
           </Expander>
 
           <!-- Quick Actions -->

@@ -2074,6 +2074,9 @@ namespace ModbusForge.Avalonia.ViewModels
                     return;
                 }
 
+                // Preserve the session's running state across the load: a simulation that
+                // was running keeps running on the loaded program.
+                var wasLive = Config.ShowLiveValues;
                 Stop();
                 var json = await File.ReadAllTextAsync(path);
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -2092,6 +2095,15 @@ namespace ModbusForge.Avalonia.ViewModels
                 UndoRedo.Clear();
                 NotifyUndoRedoCommands();
                 SelectedConnection = null;
+
+                if (wasLive)
+                {
+                    if (Config.ShowLiveValues)
+                        StartSimulation();
+                    else
+                        Config.ShowLiveValues = true; // routes through OnConfigPropertyChanged
+                }
+
                 StatusText = $"Loaded {Path.GetFileName(path)}";
             }
             catch (Exception ex)
@@ -2110,6 +2122,9 @@ namespace ModbusForge.Avalonia.ViewModels
                 return;
             }
 
+            // The demo is a live showcase: preserve the session's running state across
+            // the load so a running simulation keeps running on the demo program.
+            var wasLive = Config.ShowLiveValues;
             Stop();
             Config.Nodes.Clear();
             Config.Connections.Clear();
@@ -2132,6 +2147,12 @@ namespace ModbusForge.Avalonia.ViewModels
 
             RefreshConnectionLines();
             NotifyUndoRedoCommands();
+
+            if (wasLive)
+            {
+                Config.ShowLiveValues = true; // Stop() cleared it; routes through OnConfigPropertyChanged
+            }
+
             StatusText = "Demo loaded";
         }
 
