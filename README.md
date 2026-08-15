@@ -318,7 +318,7 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 - **Startup Configuration Validation**: Schema validation for `appsettings.json`
 - **Validation Service**: Input validation for IP addresses, ports, unit IDs, and registers
 
-See [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md) for the full development roadmap.
+See [VERSIONED_ROADMAP.md](VERSIONED_ROADMAP.md) for the full development roadmap.
 
 ---
 
@@ -797,7 +797,7 @@ Compress-Archive -Path .\publish\avalonia\win-x64\* -DestinationPath .\ModbusFor
 ### Create an Installer
 
 ```powershell
-& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=2026.8.16 "setup\ModbusForge.iss"
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=2026.8.27 "setup\ModbusForge.iss"
 ```
 
 ---
@@ -805,8 +805,8 @@ Compress-Archive -Path .\publish\avalonia\win-x64\* -DestinationPath .\ModbusFor
 ## Versioning
 
 - The window title displays the application version from the assembly ProductVersion
-- Versions follow [Semantic Versioning](https://semver.org/)
-- See [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md) for planned releases
+- Versions use CalVer in the form `YYYY.M.INCREMENT` (e.g. `2026.8.27`) — see `AGENTS.md`
+- See [VERSIONED_ROADMAP.md](VERSIONED_ROADMAP.md) for planned releases
 
 ---
 
