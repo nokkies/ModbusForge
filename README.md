@@ -1,4 +1,4 @@
-# ModbusForge v2026.8.24
+# ModbusForge v2026.8.28
 
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows)](https://www.microsoft.com/windows)
@@ -77,6 +77,22 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 ---
 
 ## What's New
+
+### 2026.8.28 - Reliability, Validation & Housekeeping Release
+
+- **Unresponsive devices no longer freeze the app**: TCP reads/writes now have a bounded 5-second transport timeout (previously infinite). A dead or stuck device produces a visible error instead of hanging every operation behind it, including disconnect and app exit.
+- **Failed polls are visible**: a device that doesn't answer a poll used to be reported as a successful blank read; failures now show in the status bar and the per-area connection failure counter.
+- **Auto-reconnect is reliable**: enabled in Preferences, the app reconnects at the configured interval after a connection drop, and a resource leak in the reconnect loop is fixed.
+- **Script rules now actually trigger**: numeric `Equals`/`NotEquals` rule comparisons always evaluated false due to a .NET type-boxing bug, and slow reads could let a rule fire twice — both fixed.
+- **Server mode is spec-compliant**: unknown Unit IDs are rejected with a clear error instead of silently returning the primary unit's data; broadcast (Unit ID 0) writes apply to all units with no response; FC05 coil writes are validated; out-of-range and placeholder-address writes report a clear message.
+- **Input validation with feedback**: invalid connection settings (IP/hostname, port, unit ID, server Unit ID list) are flagged before connecting instead of failing cryptically later.
+- **Clean lifecycle**: disconnecting, removing a profile, and quitting the app always complete in bounded time even with a stuck connection; no orphaned poll loops.
+- **Frame inspector**: RTU frames are no longer misclassified as TCP, and frame timing is correct under concurrent logging.
+- **UI polish**: tabs hide/show correctly when features are toggled, duplicate Frame Inspector menu entry removed, console/debug panes have clear buttons and bounded history.
+- **Headless (Linux) runtime**: reconnects on connection loss, refuses to start with invalid configuration, correct log path.
+- **Release pipeline**: release workflow now fails fast when a tag's version disagrees with the project versions, GitHub Actions are pinned to commit SHAs, code signing is fixed (64-bit signtool, HTTPS timestamp), and the installer declares its Windows 10 minimum.
+- **Codebase**: the monolithic `MainViewModel` is split into responsibility-scoped partial files; automated test suite grew to 596 tests and the build is warning-free.
+- **Version bumped to `2026.8.28`** in all projects.
 
 ### 2026.8.27 - Server IP in Active Profile Display
 
@@ -797,7 +813,7 @@ Compress-Archive -Path .\publish\avalonia\win-x64\* -DestinationPath .\ModbusFor
 ### Create an Installer
 
 ```powershell
-& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=2026.8.27 "setup\ModbusForge.iss"
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=2026.8.28 "setup\ModbusForge.iss"
 ```
 
 ---

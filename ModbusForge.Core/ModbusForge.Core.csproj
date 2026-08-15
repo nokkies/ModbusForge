@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -6,9 +6,9 @@
     <Nullable>enable</Nullable>
     <RootNamespace>ModbusForge</RootNamespace>
     <AssemblyName>ModbusForge.Core</AssemblyName>
-    <Version>2026.8.27</Version>
-    <AssemblyVersion>2026.8.27</AssemblyVersion>
-    <FileVersion>2026.8.27</FileVersion>
+    <Version>2026.8.28</Version>
+    <AssemblyVersion>2026.8.28</AssemblyVersion>
+    <FileVersion>2026.8.28</FileVersion>
     <LangVersion>12.0</LangVersion>
   </PropertyGroup>
 
