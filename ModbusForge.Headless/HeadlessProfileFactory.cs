@@ -37,7 +37,16 @@ namespace ModbusForge.Headless
 
         public static MqttSettings CreateMqttSettings(IConfiguration configuration)
         {
-            return configuration.GetSection("Mqtt").Get<MqttSettings>() ?? new MqttSettings();
+            var settings = configuration.GetSection("Mqtt").Get<MqttSettings>() ?? new MqttSettings();
+
+            // Headless deployments identify as ModbusForge-Headless so their MQTT traffic can be
+            // distinguished from the desktop app, unless the user configured an explicit ClientId.
+            if (string.IsNullOrWhiteSpace(configuration["Mqtt:ClientId"]))
+            {
+                settings.ClientId = "ModbusForge-Headless";
+            }
+
+            return settings;
         }
 
         private static TransportType ParseTransport(string? value)

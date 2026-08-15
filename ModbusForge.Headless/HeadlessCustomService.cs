@@ -21,6 +21,9 @@ namespace ModbusForge.Headless
     /// </summary>
     public sealed class HeadlessCustomService : BackgroundService
     {
+        /// <summary>Default delay before a reconnect attempt, giving transient network issues time to clear.</summary>
+        private const int DefaultReconnectBackoffMs = 5000;
+
         private readonly IModbusService _modbusService;
         private readonly MqttGatewayService? _mqttService;
         private readonly IHostApplicationLifetime _lifetime;
@@ -29,6 +32,7 @@ namespace ModbusForge.Headless
         private readonly int _tickMs;
         private readonly string _customFile;
         private readonly MqttSettings _mqttSettings;
+        private readonly int _reconnectBackoffMs;
 
         public HeadlessCustomService(
             IModbusService modbusService,
@@ -46,14 +50,27 @@ namespace ModbusForge.Headless
             _tickMs = configuration.GetValue<int?>("Custom:TickMs") ?? 100;
             _customFile = configuration["Custom:Path"] ?? string.Empty;
             _mqttSettings = HeadlessProfileFactory.CreateMqttSettings(configuration);
+            _reconnectBackoffMs = configuration.GetValue<int?>("Custom:ReconnectBackoffMs") ?? DefaultReconnectBackoffMs;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            var entries = await LoadCustomEntriesAsync(_customFile, stoppingToken);
+            List<CustomEntry>? entries;
+            try
+            {
+                entries = await LoadCustomEntriesAsync(_customFile, stoppingToken);
+            }
+            catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+            {
+                _logger.LogError(ex, "Could not load custom watch file {File}", _customFile);
+                _lifetime.StopApplication();
+                return;
+            }
+
             if (entries is null || entries.Count == 0)
             {
                 _logger.LogError("No custom entries found in {File}", _customFile);
+                _lifetime.StopApplication();
                 return;
             }
 
@@ -83,6 +100,11 @@ namespace ModbusForge.Headless
 
             while (!stoppingToken.IsCancellationRequested)
             {
+                if (!_modbusService.IsConnected)
+                {
+                    await TryReconnectAsync(stoppingToken);
+                }
+
                 var now = DateTime.UtcNow;
 
                 foreach (var entry in entries)
@@ -125,9 +147,61 @@ namespace ModbusForge.Headless
                 }
             }
 
-            await (_mqttService?.DisconnectAsync() ?? Task.CompletedTask);
-            await _modbusService.DisconnectAsync();
+            await StopServicesAsync();
             _lifetime.StopApplication();
+        }
+
+        /// <summary>Test seam: runs the service loop directly (visible to ModbusForge.Headless.Tests).</summary>
+        internal Task ExecuteForTest(CancellationToken token) => ExecuteAsync(token);
+
+        private async Task TryReconnectAsync(CancellationToken token)
+        {
+            _logger.LogWarning("Connection lost - attempting reconnect in {BackoffMs} ms", _reconnectBackoffMs);
+
+            try
+            {
+                await _modbusService.DisconnectAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error while disconnecting before reconnect");
+            }
+
+            await Task.Delay(_reconnectBackoffMs, token);
+
+            var connected = await _modbusService.ConnectAsync(_profile, token);
+            if (connected)
+            {
+                _logger.LogInformation("Reconnected to the Modbus device.");
+            }
+            else
+            {
+                _logger.LogError("Reconnect failed - will keep retrying on subsequent ticks.");
+            }
+        }
+
+        private async Task StopServicesAsync()
+        {
+            if (_mqttService is not null)
+            {
+                try
+                {
+                    await _mqttService.DisconnectAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error while disconnecting MQTT");
+                }
+            }
+
+            try
+            {
+                await _modbusService.DisconnectAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error while disconnecting Modbus");
+            }
         }
 
         private static async Task<List<CustomEntry>?> LoadCustomEntriesAsync(string path, CancellationToken token)
