@@ -82,13 +82,7 @@ namespace ModbusForge.Core.Simulation.Blocks
             }
 
             double progress = (double)state.AccumulatorMs / period;
-            double value = waveform switch
-            {
-                "Sine" => amplitude * Math.Sin(2 * Math.PI * progress) + offset,
-                "Triangle" => amplitude * (1.0 - 4.0 * Math.Abs(progress - 0.5)) + offset,
-                "Square" => (progress < 0.5 ? amplitude : 0) + offset,
-                "Ramp" or _ => amplitude * progress + offset
-            };
+            double value = WaveformMath.Evaluate(waveform, amplitude, offset, progress);
 
             var output = OutputDataType == SimulationDataType.Real
                 ? SimulationValue.Real(value)
