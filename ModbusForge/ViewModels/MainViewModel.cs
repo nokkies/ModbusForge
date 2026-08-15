@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,7 +44,6 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly object _pollLifecycleLock = new();
         private readonly object _pendingPollLock = new();
         private readonly HashSet<PlcArea> _pendingPollAreas = new();
-        private readonly ObservableCollection<string> _fallbackConsoleMessages = new();
         private CancellationTokenSource? _customWatchCts;
         private readonly object _customWatchLifecycleLock = new();
         private readonly SemaphoreSlim _modbusIoGate = new(1, 1);
@@ -2007,9 +2007,10 @@ namespace ModbusForge.Avalonia.ViewModels
                 return null;
             }
 
-            if (address < 0)
+            if (address is < ModbusAddressValidator.MinStartAddress or > ModbusAddressValidator.MaxStartAddress)
             {
-                _dispatcher.Invoke(() => StatusMessage = "Address cannot be negative.");
+                _dispatcher.Invoke(() => StatusMessage =
+                    $"Address must be between {ModbusAddressValidator.MinStartAddress} and {ModbusAddressValidator.MaxStartAddress}.");
                 return null;
             }
 
@@ -2260,8 +2261,12 @@ namespace ModbusForge.Avalonia.ViewModels
                 _lastMonitorFailureUtc[area] = failureTime;
             }
 
-            LastErrorTime = failureTime;
-            HasConnectionError = true;
+            // Runs on the poll thread - marshal observable property changes to the UI thread.
+            await _dispatcher.InvokeAsync(() =>
+            {
+                LastErrorTime = failureTime;
+                HasConnectionError = true;
+            });
             _logger.LogError(exception, "Error reading {Area} (failure {FailureCount})", area, failureCount);
 
             var message = $"Failed to read {area}: {exception.Message}";
@@ -2300,7 +2305,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
             if (allClear)
             {
-                HasConnectionError = false;
+                // May run on the poll thread - marshal the observable property change to the UI thread.
+                _dispatcher.Invoke(() => HasConnectionError = false);
             }
         }
 
@@ -3654,7 +3660,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 ProjectInfo = new ProjectInfo
                 {
                     Name = string.IsNullOrWhiteSpace(projectName) ? "ModbusForge Project" : projectName,
-                    Version = "2026.7.24",
+                    Version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? string.Empty,
                     Modified = DateTime.Now
                 },
                 GlobalSettings = new GlobalSettings

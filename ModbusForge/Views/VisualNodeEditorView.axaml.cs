@@ -144,7 +144,6 @@ namespace ModbusForge.Avalonia.Views
                 _isPanning = true;
                 _panStartPoint = _canvasScrollViewer != null ? e.GetPosition(_canvasScrollViewer) : e.GetPosition(_nodeCanvas);
                 _panStartOffset = _canvasScrollViewer?.Offset ?? new Vector(0, 0);
-                _panStartPoint = e.GetPosition(_canvasScrollViewer);
                 e.Pointer.Capture(_nodeCanvas);
                 _nodeCanvas.Cursor = new Cursor(StandardCursorType.Hand);
                 e.Handled = true;
