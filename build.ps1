@@ -12,11 +12,39 @@ param (
 )
 
 $ErrorActionPreference = "Stop"
-$ProjectRoot = Get-Location
+
+# Anchor at the script location so the script works no matter where it is invoked from.
+$ProjectRoot = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
 $SolutionFile = Join-Path $ProjectRoot "ModbusForge.sln"
 $ProjectFile = Join-Path $ProjectRoot "ModbusForge\ModbusForge.csproj"
 $PublishDir = Join-Path $ProjectRoot "publish"
-$Version = ((Get-Content $ProjectFile | Select-String '<Version>(.*)</Version>').Matches[0].Groups[1].Value)
+
+# Read the version from ALL three policy-tracked csproj files and assert they
+# agree; a silent drift would otherwise let the installer take the app's
+# version while the other assemblies ship a different one.
+$csprojFiles = @(
+    $ProjectFile,
+    (Join-Path $ProjectRoot "ModbusForge.Core\ModbusForge.Core.csproj"),
+    (Join-Path $ProjectRoot "ModbusForge.Headless\ModbusForge.Headless.csproj")
+)
+
+$versionByProject = @{}
+foreach ($csproj in $csprojFiles) {
+    $match = Select-String -Path $csproj -Pattern '<Version>([^<]+)</Version>' | Select-Object -First 1
+    if (-not $match) {
+        throw "No <Version> element found in $csproj"
+    }
+    $versionByProject[$csproj] = $match.Matches[0].Groups[1].Value
+}
+
+$Version = $versionByProject[$csprojFiles[0]]
+foreach ($csproj in $csprojFiles) {
+    if ($versionByProject[$csproj] -ne $Version) {
+        throw "Version mismatch: $(Split-Path $csproj -Leaf) is '$($versionByProject[$csproj])' but $ProjectFile is '$Version'. Update all three csproj files to the same version."
+    }
+}
+
+Write-Host "Version: $Version (all three csproj files agree)" -ForegroundColor Gray
 
 function Run-Restore {
     Write-Host "--- Restoring NuGet Packages ---" -ForegroundColor Cyan
@@ -42,8 +70,7 @@ function Run-Installer {
 
     $IssFile = Join-Path $ProjectRoot "setup\ModbusForge.iss"
     if (-not (Test-Path $IssFile)) {
-        Write-Error "Inno Setup script not found at $IssFile"
-        return
+        throw "Inno Setup script not found at $IssFile"
     }
 
     # Common Inno Setup locations
@@ -63,12 +90,15 @@ function Run-Installer {
     }
 
     if ($null -eq $Iscc) {
-        Write-Warning "Inno Setup Compiler (iscc.exe) not found. Please install Inno Setup or add it to PATH."
-        return
+        # The installer task must never report success without producing an installer.
+        throw "Inno Setup Compiler (iscc.exe) not found. Please install Inno Setup or add it to PATH."
     }
 
     Write-Host "Using Inno Setup Compiler: $Iscc" -ForegroundColor Gray
     & $Iscc "/DAppVersion=$Version" $IssFile
+    if ($LASTEXITCODE -ne 0) {
+        throw "Inno Setup compilation failed (exit code $LASTEXITCODE)."
+    }
 }
 
 # Main Execution Logic

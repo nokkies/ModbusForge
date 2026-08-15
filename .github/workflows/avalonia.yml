@@ -13,29 +13,35 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # The core + headless + avalonia test suites are cross-platform now
+        # (ModbusForge.Tests is net8.0; the FlaUI smoke tests live in
+        # ModbusForge.UITests, net8.0-windows, and are compiled but not
+        # executed here - they need a real desktop session).
         os: [windows-latest, ubuntu-latest]
+
+    timeout-minutes: 45
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
       with:
         dotnet-version: 8.0.x
 
     - name: Restore dependencies
-      run: |
-        dotnet restore ./ModbusForge/ModbusForge.csproj
-        dotnet restore ./ModbusForge.Avalonia.Tests/ModbusForge.Avalonia.Tests.csproj
+      run: dotnet restore ModbusForge.sln
 
-    - name: Build Avalonia
-      run: |
-        dotnet build ./ModbusForge/ModbusForge.csproj --configuration Release --no-restore
-        dotnet build ./ModbusForge.Avalonia.Tests/ModbusForge.Avalonia.Tests.csproj --configuration Release --no-restore
+    - name: Build
+      run: dotnet build ModbusForge.sln --configuration Release --no-restore
 
-    - name: Run Avalonia tests
-      run: dotnet test ./ModbusForge.Avalonia.Tests/ModbusForge.Avalonia.Tests.csproj --configuration Release --no-build --verbosity normal
+    - name: Run tests (core, headless, avalonia)
+      shell: pwsh
+      run: |
+        dotnet test ./ModbusForge.Tests/ModbusForge.Tests.csproj --configuration Release --no-build --verbosity normal
+        dotnet test ./ModbusForge.Headless.Tests/ModbusForge.Headless.Tests.csproj --configuration Release --no-build --verbosity normal
+        dotnet test ./ModbusForge.Avalonia.Tests/ModbusForge.Avalonia.Tests.csproj --configuration Release --no-build --verbosity normal
 
     - name: Restore and publish Headless (Linux)
       if: matrix.os == 'ubuntu-latest'
@@ -54,8 +60,10 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       shell: bash
       run: |
+        # Ask the OS for a free loopback port instead of hard-coding one.
+        PORT=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
         ./publish/headless/linux-x64/ModbusForge.Headless \
-          --host 127.0.0.1 --port 1502 --interval 1000 > headless-smoke.log 2>&1 &
+          --host 127.0.0.1 --port "$PORT" --interval 1000 > headless-smoke.log 2>&1 &
         HEADLESS_PID=$!
         sleep 5
         kill $HEADLESS_PID || true
