@@ -147,6 +147,34 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         }
 
         [Fact]
+        public void AddressReferenceSwap_UndoRestoresOriginalBinding()
+        {
+            using var vm = CreateVm();
+            var node = vm.AddNodeAt(PlcElementType.InputBool, 0, 0)!;
+            var original = node.Input1Address.Clone();
+
+            // Simulates BindTagToNodeInput: the reference object is replaced.
+            node.Input1Address = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 42 };
+
+            vm.UndoCommand.Execute(null);
+            Assert.Equal(original.Address, node.Input1Address.Address);
+            Assert.Equal(original.Area, node.Input1Address.Area);
+
+            // Edits on the (re-attached) replacement reference are tracked too: the swap
+            // and the follow-up address change coalesce into one undo step.
+            node.Input1Address = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 42 };
+            node.Input1Address.Address = 7;
+
+            vm.UndoCommand.Execute(null);
+            Assert.Equal(original.Address, node.Input1Address.Address);
+            Assert.Equal(original.Area, node.Input1Address.Area);
+
+            vm.RedoCommand.Execute(null);
+            Assert.Equal(7, node.Input1Address.Address);
+            Assert.Equal(PlcArea.HoldingRegister, node.Input1Address.Area);
+        }
+
+        [Fact]
         public void MixedEdits_SameNode_CoalesceIntoOneUndoStep()
         {
             using var vm = CreateVm();

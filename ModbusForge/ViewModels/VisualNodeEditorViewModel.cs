@@ -902,19 +902,50 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void AttachAddressReferenceHandlers(VisualNode node)
         {
-            var references = new (string Property, PlcAddressReference? Reference)[]
+            foreach (var property in UndoableAddressProperties)
             {
-                (nameof(VisualNode.Input1Address), node.Input1Address),
-                (nameof(VisualNode.Input2Address), node.Input2Address),
-                (nameof(VisualNode.OutputAddress), node.OutputAddress),
-            };
-
-            foreach (var (property, reference) in references)
-            {
-                if (reference == null) continue;
-                reference.PropertyChanged += OnAddressReferencePropertyChanged;
-                _addressReferenceOwners.Add((node, property, reference));
+                AttachAddressReferenceHandler(node, property);
             }
+        }
+
+        private void AttachAddressReferenceHandler(VisualNode node, string property)
+        {
+            PlcAddressReference? reference;
+            switch (property)
+            {
+                case nameof(VisualNode.Input1Address):
+                    reference = node.Input1Address;
+                    break;
+                case nameof(VisualNode.Input2Address):
+                    reference = node.Input2Address;
+                    break;
+                default:
+                    reference = node.OutputAddress;
+                    break;
+            }
+
+            if (reference == null) return;
+            reference.PropertyChanged += OnAddressReferencePropertyChanged;
+            _addressReferenceOwners.Add((node, property, reference));
+        }
+
+        /// <summary>
+        /// Swaps the observed reference instance for one property (used when the node's
+        /// address reference object is replaced, e.g. when a tag is bound to the node).
+        /// </summary>
+        private void ReattachAddressReferenceHandlers(VisualNode node, string property)
+        {
+            var previous = _addressReferenceOwners
+                .Where(owner => ReferenceEquals(owner.Node, node) && owner.Property == property)
+                .ToList();
+
+            foreach (var (_, _, reference) in previous)
+            {
+                reference.PropertyChanged -= OnAddressReferencePropertyChanged;
+            }
+
+            _addressReferenceOwners.RemoveAll(owner => ReferenceEquals(owner.Node, node) && owner.Property == property);
+            AttachAddressReferenceHandler(node, property);
         }
 
         private void OnAddressReferencePropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -1007,6 +1038,20 @@ namespace ModbusForge.Avalonia.ViewModels
                 && UndoableNodeProperties.Contains(e.PropertyName))
             {
                 RecordNodeEdit(editableNode, e.PropertyName);
+            }
+
+            if (sender is VisualNode addressNode
+                && e.PropertyName != null
+                && UndoableAddressProperties.Contains(e.PropertyName))
+            {
+                // The reference property changed: either the object was replaced (e.g.
+                // binding a tag) or re-set. Re-observe the current instance and record
+                // the change in the node-edit series so it undoes.
+                ReattachAddressReferenceHandlers(addressNode, e.PropertyName);
+                if (!_suppressingNodeEdits)
+                {
+                    RecordNodeEdit(addressNode, e.PropertyName);
+                }
             }
         }
 
