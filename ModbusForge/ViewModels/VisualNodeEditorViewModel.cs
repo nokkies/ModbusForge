@@ -176,6 +176,25 @@ namespace ModbusForge.Avalonia.ViewModels
         private ObservableCollection<NodeConnection>? _observedConnections;
         private readonly HashSet<VisualNode> _attachedNodes = new();
         private ProgramModel? _activeProgram;
+
+        /// <summary>
+        /// The in-flight coalesced parameter-edit series: every parameter change on one
+        /// node (e.g. dragging a numeric editor) merges into a single undo step until the
+        /// series is finalized by the next structural edit, undo/redo, or a different node.
+        /// </summary>
+        private VisualNode? _parameterEditNode;
+        private Dictionary<string, object?>? _parameterEditBefore;
+        private Dictionary<string, object?>? _parameterEditAfter;
+
+        /// <summary>
+        /// Last known value of every parameter-backed property on every attached node.
+        /// PropertyChanged does not carry the previous value, so the baselines are kept
+        /// here to build the "before" half of the undo series.
+        /// </summary>
+        private readonly Dictionary<(VisualNode Node, string Property), object?> _parameterLastKnown = new();
+
+        /// <summary>Set while applying an undo/redo so the resulting writes are not re-recorded.</summary>
+        private bool _suppressingParameterEdits;
         private bool _isSwitchingProgram;
         private bool _isUpdatingSelection;
         private bool _isDisposed;
@@ -300,7 +319,11 @@ namespace ModbusForge.Avalonia.ViewModels
         public ObservableCollection<NodeConnection> Connections => Config.Connections;
         public ObservableCollection<ConnectorConfiguration> ConnectorConfigs => Config.ConnectorConfigs;
 
-        public bool CanUndo => UndoRedo.CanUndo;
+        /// <summary>
+        /// True when there is a pushed edit OR an in-flight parameter series: the series
+        /// can always be undone immediately (undo finalizes it first).
+        /// </summary>
+        public bool CanUndo => UndoRedo.CanUndo || _parameterEditNode != null;
         public bool CanRedo => UndoRedo.CanRedo;
         public bool HasMultipleSelection => SelectedNodes.Count > 1;
         public int SelectedNodeCount => SelectedNodes.Count;
@@ -437,7 +460,7 @@ namespace ModbusForge.Avalonia.ViewModels
             SaveCommand = new AsyncRelayCommand(SaveAsync);
             LoadCommand = new AsyncRelayCommand(LoadAsync);
             LoadDemoCommand = new AsyncRelayCommand(LoadDemoAsync);
-            UndoCommand = new RelayCommand(Undo, () => UndoRedo.CanUndo);
+            UndoCommand = new RelayCommand(Undo, () => UndoRedo.CanUndo || _parameterEditNode != null);
             RedoCommand = new RelayCommand(Redo, () => UndoRedo.CanRedo);
             ZoomInCommand = new RelayCommand(ZoomIn);
             ZoomOutCommand = new RelayCommand(ZoomOut);
@@ -675,6 +698,10 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             if (_isSwitchingProgram || ReferenceEquals(value, _activeProgram)) return;
 
+            // Program switching clears the undo stack; a half-recorded parameter series
+            // would otherwise resurface after the switch.
+            DiscardPendingParameterEdit();
+
             _isSwitchingProgram = true;
             try
             {
@@ -852,6 +879,8 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 BuildParameterFields(node);
             }
+
+            InitializeParameterBaselines(node);
         }
 
         /// <summary>
@@ -881,6 +910,17 @@ namespace ModbusForge.Avalonia.ViewModels
             }
 
             node.ValueChangedCallback = null;
+
+            if (ReferenceEquals(_parameterEditNode, node))
+            {
+                // The node the series belongs to is gone; the edit can no longer be undone.
+                DiscardPendingParameterEdit();
+            }
+
+            foreach (var key in _parameterLastKnown.Keys.Where(k => ReferenceEquals(k.Node, node)).ToList())
+            {
+                _parameterLastKnown.Remove(key);
+            }
         }
 
         private void OnNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -905,6 +945,157 @@ namespace ModbusForge.Avalonia.ViewModels
                 if (sender is VisualNode node)
                     BuildParameterFields(node);
             }
+
+            if (!_suppressingParameterEdits
+                && sender is VisualNode parameterNode
+                && e.PropertyName != null
+                && ParameterPropertyNames.Contains(e.PropertyName))
+            {
+                RecordParameterEdit(parameterNode, e.PropertyName);
+            }
+        }
+
+        /// <summary>
+        /// <see cref="VisualNode"/> properties that back a configurable function-block
+        /// parameter (see <see cref="ParameterAccess"/>). Every property name doubles as a
+        /// valid parameter name, so values are read and written through that map.
+        /// </summary>
+        private static readonly HashSet<string> ParameterPropertyNames = new(StringComparer.Ordinal)
+        {
+            nameof(VisualNode.TimerPresetMs),
+            nameof(VisualNode.CounterPreset),
+            nameof(VisualNode.CompareValue),
+            nameof(VisualNode.CompareValueReal),
+            nameof(VisualNode.SetDominant),
+            nameof(VisualNode.Waveform),
+            nameof(VisualNode.PeriodMs),
+            nameof(VisualNode.Amplitude),
+            nameof(VisualNode.Offset),
+            nameof(VisualNode.ValveTravelTimeMs),
+            nameof(VisualNode.ValveNormallyOpen),
+            nameof(VisualNode.ValveLatching),
+            nameof(VisualNode.MotorDolRunDelayMs),
+            nameof(VisualNode.VsdMaxSpeed),
+            nameof(VisualNode.VsdRampUpMs),
+            nameof(VisualNode.VsdRampDownMs),
+            nameof(VisualNode.VsdAtSpeedTolerance),
+        };
+
+        private static object? ReadParameterProperty(VisualNode node, string property)
+            => ParameterAccess.TryGet(property)?.Getter(node);
+
+        private void InitializeParameterBaselines(VisualNode node)
+        {
+            foreach (var property in ParameterPropertyNames)
+            {
+                var value = ReadParameterProperty(node, property);
+                if (value != null)
+                    _parameterLastKnown[(node, property)] = value;
+            }
+        }
+
+        /// <summary>
+        /// Records one parameter change, coalescing it into the node's current undo series.
+        /// The "before" value comes from <see cref="_parameterLastKnown"/> because
+        /// PropertyChanged already fired with the new value in place.
+        /// </summary>
+        private void RecordParameterEdit(VisualNode node, string property)
+        {
+            if (_isSwitchingProgram) return;
+
+            var after = ReadParameterProperty(node, property);
+
+            if (_parameterEditNode is not null && !ReferenceEquals(_parameterEditNode, node))
+            {
+                FinalizeParameterEditSeries();
+            }
+
+            var afterValues = _parameterEditAfter;
+            if (afterValues == null)
+            {
+                // The baselines hold the pre-edit values: PropertyChanged already fired
+                // with the new value in place, so the node itself can no longer be read
+                // for the property that started this series.
+                var before = new Dictionary<string, object?>(StringComparer.Ordinal);
+                foreach (var name in ParameterPropertyNames)
+                {
+                    before[name] = _parameterLastKnown.GetValueOrDefault((node, name)) ?? ReadParameterProperty(node, name);
+                }
+
+                _parameterEditNode = node;
+                _parameterEditBefore = before;
+                _parameterEditAfter = afterValues = new Dictionary<string, object?>(StringComparer.Ordinal);
+
+                // The Undo button is enabled as soon as a series starts.
+                NotifyUndoRedoCommands();
+            }
+
+            afterValues[property] = after;
+            if (after != null)
+                _parameterLastKnown[(node, property)] = after;
+        }
+
+        /// <summary>
+        /// Pushes the in-flight parameter-edit series onto the undo stack as one command
+        /// (no-op when nothing was recorded).
+        /// </summary>
+        private void FinalizeParameterEditSeries()
+        {
+            if (_parameterEditNode is not { } node)
+            {
+                return;
+            }
+
+            if (_parameterEditBefore is { } before && _parameterEditAfter is { Count: > 0 } after)
+            {
+                UndoRedo.Push(new EditorCommand(
+                    () => ApplyParameterValues(node, after),
+                    () => ApplyParameterValues(node, before)));
+                NotifyUndoRedoCommands();
+            }
+
+            _parameterEditNode = null;
+            _parameterEditBefore = null;
+            _parameterEditAfter = null;
+        }
+
+        private void DiscardPendingParameterEdit()
+        {
+            var hadPending = _parameterEditNode != null;
+            _parameterEditNode = null;
+            _parameterEditBefore = null;
+            _parameterEditAfter = null;
+
+            if (hadPending)
+            {
+                NotifyUndoRedoCommands();
+            }
+        }
+
+        private void ApplyParameterValues(VisualNode node, IReadOnlyDictionary<string, object?> values)
+        {
+            _suppressingParameterEdits = true;
+            try
+            {
+                foreach (var (property, value) in values)
+                {
+                    if (ParameterAccess.TryGet(property) is { } access)
+                        access.Setter(node, value);
+                }
+            }
+            finally
+            {
+                _suppressingParameterEdits = false;
+            }
+
+            // Re-sync the editor fields and the undo baselines with the restored values.
+            if (node.ParameterFields != null)
+            {
+                foreach (var field in node.ParameterFields)
+                    field.LoadFromNode();
+            }
+
+            InitializeParameterBaselines(node);
         }
 
         private void OnNodeValueEditedByUser(VisualNode node, double value)
@@ -1167,6 +1358,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
             if (moved.Count == 0) return;
 
+            FinalizeParameterEditSeries();
+
             var command = new EditorCommand(
                 () =>
                 {
@@ -1278,6 +1471,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public VisualNode? AddNodeAt(PaletteItem paletteItem, double x, double y)
         {
+            FinalizeParameterEditSeries();
             if (paletteItem == null || !double.IsFinite(x) || !double.IsFinite(y)) return null;
 
             var descriptor = NodeDescriptors.Get(paletteItem.ElementType);
@@ -1485,6 +1679,8 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             if (SelectedNode == null) return;
 
+            FinalizeParameterEditSeries();
+
             var node = SelectedNode;
             var removedConnections = Config.Connections
                 .Where(c => c.SourceNodeId == node.Id || c.TargetNodeId == node.Id)
@@ -1595,6 +1791,7 @@ namespace ModbusForge.Avalonia.ViewModels
         public bool TryConnectNodes(VisualNode source, VisualNode target, string? targetConnector = null, string? sourceConnector = null)
         {
             if (!Config.Nodes.Contains(source) || !Config.Nodes.Contains(target)) return false;
+            FinalizeParameterEditSeries();
             if (ReferenceEquals(source, target))
             {
                 StatusText = "A node cannot connect to itself.";
@@ -1662,6 +1859,8 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             if (SelectedConnection == null) return;
 
+            FinalizeParameterEditSeries();
+
             var connection = SelectedConnection;
             var command = new EditorCommand(
                 () =>
@@ -1707,6 +1906,13 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void Undo()
         {
+            // Flush any in-flight parameter series so undo acts in chronological order.
+            FinalizeParameterEditSeries();
+            if (!UndoRedo.CanUndo)
+            {
+                return;
+            }
+
             UndoRedo.Undo();
             NotifyUndoRedoCommands();
             RefreshConnectionLines();
@@ -1715,6 +1921,13 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void Redo()
         {
+            // Flush any in-flight parameter series so redo acts in chronological order.
+            FinalizeParameterEditSeries();
+            if (!UndoRedo.CanRedo)
+            {
+                return;
+            }
+
             UndoRedo.Redo();
             NotifyUndoRedoCommands();
             RefreshConnectionLines();
@@ -1725,22 +1938,18 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             if (SelectedNode == null) return;
 
-            var command = new EditorCommand(
-                () =>
-                {
-                    SelectedNode.Waveform = SelectedWaveform;
-                    SelectedNode.PeriodMs = WaveformPeriodMs;
-                    SelectedNode.Amplitude = WaveformAmplitude;
-                    SelectedNode.Offset = WaveformOffset;
-                },
-                () =>
-                {
-                    // No-op undo for now; properties are mutable.
-                });
+            var node = SelectedNode;
 
-            command.Execute();
-            UndoRedo.Push(command);
-            StatusText = $"Applied {SelectedWaveform} waveform to {SelectedNode.Name}";
+            // The parameter-edit series records the before/after snapshot for these
+            // properties, so both undo and redo work (the previous dedicated command
+            // had a no-op unexecute).
+            node.Waveform = SelectedWaveform;
+            node.PeriodMs = WaveformPeriodMs;
+            node.Amplitude = WaveformAmplitude;
+            node.Offset = WaveformOffset;
+
+            FinalizeParameterEditSeries();
+            StatusText = $"Applied {SelectedWaveform} waveform to {node.Name}";
         }
 
         private void EnableNode()
@@ -1890,6 +2099,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 return;
             }
 
+            DiscardPendingParameterEdit();
             Config.Nodes.Clear();
             Config.Connections.Clear();
             Config.ConnectorConfigs.Clear();
@@ -1906,6 +2116,8 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             var nodes = Config.Nodes.ToList();
             if (nodes.Count == 0) return;
+
+            FinalizeParameterEditSeries();
 
             var indexById = nodes
                 .Select((node, index) => (node.Id, index))
@@ -2092,6 +2304,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 var activeProgramId = root["ActiveProgramId"]?.GetValue<string>();
 
                 ApplyLoadedProgramState(loaded, loadedTree, activeProgramId);
+                DiscardPendingParameterEdit();
                 UndoRedo.Clear();
                 NotifyUndoRedoCommands();
                 SelectedConnection = null;
@@ -2295,11 +2508,19 @@ namespace ModbusForge.Avalonia.ViewModels
             Config.Connections = program.Connections ?? new ObservableCollection<NodeConnection>();
             Config.ConnectorConfigs = program.ConnectorConfigs ?? new ObservableCollection<ConnectorConfiguration>();
             AttachConfigHandlers();
+            DiscardPendingParameterEdit();
             UndoRedo.Clear();
             NotifyUndoRedoCommands();
             SelectedNode = null;
             SelectedConnection = null;
             RefreshConnectionLines();
+
+            // The collections were swapped to the program's instances; the canvas binds
+            // to the property getters, so re-notify or it keeps showing the previous
+            // program's content.
+            OnPropertyChanged(nameof(Nodes));
+            OnPropertyChanged(nameof(Connections));
+            OnPropertyChanged(nameof(ConnectorConfigs));
         }
 
         private void NotifySelectionCommands()
