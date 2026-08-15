@@ -15,6 +15,12 @@ namespace ModbusForge.Core.Simulation.Core
         public IStateBag State { get; } = new StateBag();
 
         /// <summary>
+        /// When false the engine skips re-evaluating this node; its last outputs
+        /// remain visible downstream (frozen), so disabling a block does not drop the signal.
+        /// </summary>
+        public bool IsEnabled { get; set; } = true;
+
+        /// <summary>
         /// Values produced by the block for each output port during the last execution cycle.
         /// </summary>
         public Dictionary<string, ISimulationValue> OutputValues { get; } = new(StringComparer.Ordinal);

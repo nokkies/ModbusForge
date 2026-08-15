@@ -133,12 +133,27 @@ namespace ModbusForge.Models
         [ObservableProperty]
         private int _compareValue = 0;
 
+        /// <summary>
+        /// Constant/value parameter for the Real (double) comparator and math blocks.
+        /// Kept separate from <see cref="CompareValue"/> (int) so both variants can coexist
+        /// with full precision.
+        /// </summary>
+        [ObservableProperty]
+        private double _compareValueReal = 0.0;
+
         // Industrial device parameters
         [ObservableProperty]
         private int _valveTravelTimeMs = 5000;
 
         [ObservableProperty]
         private bool _valveNormallyOpen = false;
+
+        /// <summary>
+        /// Valve rest behavior: true = hold last commanded position (motor valve),
+        /// false = spring-return to the rest position when no command is active.
+        /// </summary>
+        [ObservableProperty]
+        private bool _valveLatching = true;
 
         [ObservableProperty]
         private int _motorDolRunDelayMs = 100;
@@ -156,18 +171,34 @@ namespace ModbusForge.Models
         [ObservableProperty]
         private double _vsdAtSpeedTolerance = 2.0;
         
-        // Runtime state (not persisted)
-        public int TimerAccumulatorMs { get; set; } = 0;
-        public bool TimerLastInput { get; set; } = false;
-        public bool TimerOutput { get; set; } = false;
-        public bool RsState { get; set; } = false;
-        public int CounterValue { get; set; } = 0;
-        public bool CounterLastInput { get; set; } = false;
-        
+        /// <summary>
+        /// Formatted display of the node's secondary output ports (e.g. "Fault: OFF · Speed: 42.5"),
+        /// refreshed by the simulation service each tick. Empty when the block has a single output.
+        /// </summary>
+        [ObservableProperty]
+        private string _secondaryOutputText = string.Empty;
+
         /// <summary>
         /// Cached integer value from the last simulation tick (used by the two-phase evaluator).
         /// </summary>
         public int IntValue { get; set; } = 0;
+
+        /// <summary>
+        /// Editor fields for this node's configurable parameters, built by the editor view model
+        /// from the function block's <c>IFunctionBlock.Parameters</c> declaration.
+        /// </summary>
+        [JsonIgnore]
+        public IReadOnlyList<ParameterField>? ParameterFields { get; set; }
+
+        /// <summary>
+        /// Replaces the secondary-output display text (no-op when unchanged).
+        /// </summary>
+        public void SetSecondaryOutputs(IReadOnlyList<KeyValuePair<string, string>> namedValues)
+        {
+            var text = string.Join("  \u00B7  ", namedValues.Select(kv => $"{kv.Key}: {kv.Value}"));
+            if (SecondaryOutputText != text)
+                SecondaryOutputText = text;
+        }
         
         public string DisplayName => NodeDescriptors.Get(ElementType).GetDisplayName(this);
 
@@ -427,9 +458,16 @@ namespace ModbusForge.Models
         
         [ObservableProperty]
         private double _zoomLevel = 1.0;
-        
+
         [ObservableProperty]
         private bool _showLiveValues = true;
+
+        /// <summary>
+        /// Simulation scan period in milliseconds (clamped to the supported range by the service).
+        /// </summary>
+        [ObservableProperty]
+        private int _scanIntervalMs = 100;
+
         
         [ObservableProperty]
         private bool _showGrid = true;

@@ -39,7 +39,20 @@ namespace ModbusForge.Models
         MATH_SUB,     // Subtraction
         MATH_MUL,     // Multiplication
         MATH_DIV,      // Division
+        // Real (double) math operations
+        MATH_ADD_REAL,     // Addition (Real)
+        MATH_SUB_REAL,     // Subtraction (Real)
+        MATH_MUL_REAL,     // Multiplication (Real)
+        MATH_DIV_REAL,     // Division (Real)
+        // Real (double) comparators
+        COMPARE_EQ_REAL,   // Equal (Real)
+        COMPARE_NE_REAL,   // Not Equal (Real)
+        COMPARE_GT_REAL,   // Greater Than (Real)
+        COMPARE_LT_REAL,   // Less Than (Real)
+        COMPARE_GE_REAL,   // Greater Than or Equal (Real)
+        COMPARE_LE_REAL,   // Less Than or Equal (Real)
         SignalGenerator, // Signal Generator
+        SignalGeneratorReal, // Signal Generator (Real output)
         // Industrial devices
         Valve,       // Motorised valve with open/close commands and travel time
         MotorDol,    // Direct-on-line motor with start/stop and pickup delay

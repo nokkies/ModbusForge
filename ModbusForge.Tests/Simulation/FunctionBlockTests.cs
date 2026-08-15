@@ -166,7 +166,7 @@ namespace ModbusForge.Tests.Simulation
             // Initial scan starts ramp.
             context.OverrideElapsed(TimeSpan.FromMilliseconds(10));
             block.Execute(context);
-            Assert.True(context.GetOutput("Output")!.AsBool());
+            Assert.True(context.GetOutput("Running")!.AsBool());
             var speed = context.GetOutput("SpeedFeedback")!.AsReal();
             Assert.Equal(1.0, speed, precision: 1);
             Assert.False(context.GetOutput("AtSpeed")!.AsBool());
@@ -205,7 +205,7 @@ namespace ModbusForge.Tests.Simulation
             context.OverrideElapsed(TimeSpan.FromMilliseconds(1000));
             block.Execute(context);
 
-            Assert.False(context.GetOutput("Output")!.AsBool());
+            Assert.False(context.GetOutput("Running")!.AsBool());
             Assert.Equal(0.0, context.GetOutput("SpeedFeedback")!.AsReal(), precision: 1);
         }
 
@@ -229,8 +229,10 @@ namespace ModbusForge.Tests.Simulation
         }
 
         [Fact]
-        public void MotorDolBlock_StopActive_DropsRunningAndSetsFault()
+        public void MotorDolBlock_StopActive_DropsRunning_WithoutFault()
         {
+            // Stop is a normal stop command: it de-energises the starter and
+            // de-asserts Running without tripping any fault output.
             var block = new MotorDolBlock();
             var context = new TestExecutionContext();
             context.Parameters["MotorDolRunDelayMs"] = 0;
@@ -240,22 +242,23 @@ namespace ModbusForge.Tests.Simulation
 
             block.Execute(context);
             Assert.True(context.GetOutput("Output")!.AsBool());
-            Assert.False(context.GetOutput("Fault")!.AsBool());
 
             context.SetInput("Stop", SimulationValue.Bool(true));
 
             block.Execute(context);
             Assert.False(context.GetOutput("Output")!.AsBool());
-            Assert.True(context.GetOutput("Fault")!.AsBool());
         }
 
         [Fact]
-        public void ValveBlock_NormallyOpen_RestPositionIsOpen()
+        public void ValveBlock_NormallyOpen_SpringReturn_RestPositionIsOpen()
         {
+            // Non-latching (spring-return) normally-open valve returns to its
+            // rest (open) position when no command is active.
             var block = new ValveBlock();
             var context = new TestExecutionContext();
             context.Parameters["ValveTravelTimeMs"] = 0;
             context.Parameters["ValveNormallyOpen"] = true;
+            context.Parameters["ValveLatching"] = false;
 
             // No commands active.
             context.SetInput("OpenCmd", SimulationValue.Bool(false));
@@ -263,6 +266,30 @@ namespace ModbusForge.Tests.Simulation
 
             block.Execute(context);
 
+            Assert.True(context.GetOutput("Output")!.AsBool());
+            Assert.False(context.GetOutput("Fault")!.AsBool());
+        }
+
+        [Fact]
+        public void ValveBlock_Latching_NoCommand_HoldsLastPosition()
+        {
+            // Latching (default) valve holds its last commanded position when
+            // both commands are de-asserted — it does not spring back.
+            var block = new ValveBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["ValveTravelTimeMs"] = 0;
+            context.Parameters["ValveNormallyOpen"] = false;
+            context.Parameters["ValveLatching"] = true;
+
+            // Command the valve open.
+            context.SetInput("OpenCmd", SimulationValue.Bool(true));
+            context.SetInput("CloseCmd", SimulationValue.Bool(false));
+            block.Execute(context);
+            Assert.True(context.GetOutput("Output")!.AsBool());
+
+            // De-assert the command: a latching valve stays open.
+            context.SetInput("OpenCmd", SimulationValue.Bool(false));
+            block.Execute(context);
             Assert.True(context.GetOutput("Output")!.AsBool());
             Assert.False(context.GetOutput("Fault")!.AsBool());
         }

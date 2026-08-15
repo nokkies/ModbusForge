@@ -19,6 +19,10 @@ namespace ModbusForge.Core.Simulation.Blocks
             new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
         };
 
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => EmptyParameters;
+
+        public static readonly BlockParameterDescriptor[] EmptyParameters = System.Array.Empty<BlockParameterDescriptor>();
+
         public void Execute(IExecutionContext context)
         {
             var in1 = context.ReadInput("Input1")?.AsBool() ?? false;
@@ -40,6 +44,8 @@ namespace ModbusForge.Core.Simulation.Blocks
             new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
             new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
         };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => BooleanLogicBlock.EmptyParameters;
 
         public void Execute(IExecutionContext context)
         {
@@ -73,6 +79,17 @@ namespace ModbusForge.Core.Simulation.Blocks
             new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
             new PortDefinition("Input2", PortDirection.Input, SimulationDataType.Bool),
             new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
+        };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters { get; } = new[]
+        {
+            new BlockParameterDescriptor
+            {
+                Name = "SetDominant",
+                DisplayName = "Set dominant",
+                Kind = BlockParameterKind.Bool,
+                DefaultValue = true
+            }
         };
 
         public void Execute(IExecutionContext context)

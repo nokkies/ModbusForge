@@ -5,6 +5,19 @@ namespace ModbusForge.Core.Simulation.Blocks
 {
     public sealed class CtuBlock : IFunctionBlock
     {
+        public static readonly BlockParameterDescriptor[] CounterParameters =
+        {
+            new()
+            {
+                Name = "CounterPreset",
+                DisplayName = "Preset",
+                Kind = BlockParameterKind.Int32,
+                DefaultValue = 10,
+                Minimum = 0,
+                Maximum = 100000
+            }
+        };
+
         public string TypeId => "CTU";
         public string DisplayName => "CTU Counter";
         public string Category => "Counters";
@@ -14,6 +27,8 @@ namespace ModbusForge.Core.Simulation.Blocks
             new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
             new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
         };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => CounterParameters;
 
         public void Execute(IExecutionContext context)
         {
@@ -43,6 +58,8 @@ namespace ModbusForge.Core.Simulation.Blocks
             new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
         };
 
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => CtuBlock.CounterParameters;
+
         public void Execute(IExecutionContext context)
         {
             var input = context.ReadInput("Input1")?.AsBool() ?? false;
@@ -71,6 +88,8 @@ namespace ModbusForge.Core.Simulation.Blocks
             new PortDefinition("Input2", PortDirection.Input, SimulationDataType.Bool),
             new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
         };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => CtuBlock.CounterParameters;
 
         public void Execute(IExecutionContext context)
         {

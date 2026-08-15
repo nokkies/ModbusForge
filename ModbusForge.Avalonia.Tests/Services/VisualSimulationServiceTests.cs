@@ -1,5 +1,7 @@
+using System;
 using System.Collections.ObjectModel;
 using System.Reflection;
+using System.Threading.Tasks;
 using ModbusForge.Data;
 using ModbusForge.Models;
 using ModbusForge.Services;
@@ -104,6 +106,67 @@ namespace ModbusForge.Avalonia.Tests.Services
             var ex = Record.Exception(() => service.WriteNodeValue("input1", 42));
 
             Assert.Null(ex);
+        }
+
+        [Fact]
+        public async Task Start_EditNodeWhileRunning_PreservesBlockState()
+        {
+            // Renaming a node changes the graph hash and triggers a rebuild. The rebuild
+            // must REUSE the SimulationNode (keyed by visual node id) so timer state
+            // survives the edit instead of being silently reset.
+            var service = new AvaloniaVisualSimulationService();
+            var config = new VisualNodeEditorConfig
+            {
+                Nodes = new ObservableCollection<VisualNode>
+                {
+                    new()
+                    {
+                        Id = "in1",
+                        Name = "IN",
+                        ElementType = PlcElementType.InputBool,
+                        Input1Address = new PlcAddressReference
+                        {
+                            Area = PlcArea.Coil,
+                            Address = 1
+                        }
+                    },
+                    new()
+                    {
+                        Id = "ton1",
+                        Name = "Timer1",
+                        ElementType = PlcElementType.TON,
+                        TimerPresetMs = 1000
+                    }
+                },
+                Connections = new ObservableCollection<NodeConnection>
+                {
+                    new NodeConnection("in1", "ton1", "Input1")
+                }
+            };
+
+            service.Start(config);
+
+            var dataStore = GetDataStore(service);
+            Assert.NotNull(dataStore);
+            dataStore!.CoilDiscretes[1] = true;
+
+            // Let ~500ms accumulate toward the 1000ms preset.
+            service.UpdateNodeValues();
+            await Task.Delay(500);
+            service.UpdateNodeValues();
+            Assert.False(service.GetNodeValue("ton1"));
+
+            // The rename forces a graph rebuild mid-run.
+            config.Nodes[1].Name = "Timer renamed";
+            service.UpdateNodeValues(); // rebuild happens here (fresh engine tick clock)
+            await Task.Delay(600);
+            service.UpdateNodeValues();
+
+            // ~1100ms total (> preset) => the TON completes only if its accumulator
+            // survived the rebuild. A state reset would leave ~600ms (< preset).
+            Assert.True(service.GetNodeValue("ton1"));
+
+            service.Stop();
         }
 
         private static DataStore? GetDataStore(AvaloniaVisualSimulationService service)

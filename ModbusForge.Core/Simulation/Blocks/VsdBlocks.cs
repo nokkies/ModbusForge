@@ -6,6 +6,8 @@ namespace ModbusForge.Core.Simulation.Blocks
 {
     /// <summary>
     /// Variable speed drive block with ramped speed reference and feedback.
+    /// "Running" is the drive command state (true while Run is active, including ramp),
+    /// "SpeedFeedback" is the ramped speed and "AtSpeed" flags reference tracking.
     /// </summary>
     public sealed class VsdBlock : IFunctionBlock
     {
@@ -17,9 +19,51 @@ namespace ModbusForge.Core.Simulation.Blocks
         {
             new PortDefinition("Run", PortDirection.Input, SimulationDataType.Bool),
             new PortDefinition("SpeedReference", PortDirection.Input, SimulationDataType.Real),
-            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool),
+            new PortDefinition("Running", PortDirection.Output, SimulationDataType.Bool),
             new PortDefinition("SpeedFeedback", PortDirection.Output, SimulationDataType.Real),
             new PortDefinition("AtSpeed", PortDirection.Output, SimulationDataType.Bool)
+        };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters { get; } = new[]
+        {
+            new BlockParameterDescriptor
+            {
+                Name = "VsdMaxSpeed",
+                DisplayName = "Max speed",
+                Kind = BlockParameterKind.Real,
+                DefaultValue = 100.0,
+                Minimum = 0.0,
+                Maximum = 100000.0
+            },
+            new BlockParameterDescriptor
+            {
+                Name = "VsdRampUpMs",
+                DisplayName = "Ramp up",
+                Kind = BlockParameterKind.Int32,
+                DefaultValue = 2000,
+                Minimum = 0,
+                Maximum = 100000,
+                Suffix = "ms"
+            },
+            new BlockParameterDescriptor
+            {
+                Name = "VsdRampDownMs",
+                DisplayName = "Ramp down",
+                Kind = BlockParameterKind.Int32,
+                DefaultValue = 2000,
+                Minimum = 0,
+                Maximum = 100000,
+                Suffix = "ms"
+            },
+            new BlockParameterDescriptor
+            {
+                Name = "VsdAtSpeedTolerance",
+                DisplayName = "Tolerance",
+                Kind = BlockParameterKind.Real,
+                DefaultValue = 2.0,
+                Minimum = 0.0,
+                Maximum = 100000.0
+            }
         };
 
         public void Execute(IExecutionContext context)
@@ -67,7 +111,7 @@ namespace ModbusForge.Core.Simulation.Blocks
 
             var atSpeed = Math.Abs(state.CurrentSpeed - targetSpeed) <= atSpeedTolerance;
 
-            context.WriteOutput("Output", SimulationValue.Bool(run));
+            context.WriteOutput("Running", SimulationValue.Bool(run));
             context.WriteOutput("SpeedFeedback", SimulationValue.Real(state.CurrentSpeed));
             context.WriteOutput("AtSpeed", SimulationValue.Bool(atSpeed));
         }

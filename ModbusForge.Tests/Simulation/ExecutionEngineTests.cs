@@ -209,6 +209,89 @@ namespace ModbusForge.Tests.Simulation
             Assert.Equal(13, dataStore.HoldingRegisters[20]);
         }
 
+        [Fact]
+        public void Execute_DolMotor_WireToInput1_MapsToStartPort()
+        {
+            // The editor wires to generic "Input1"/"Input2" connectors, but the DOL block
+            // declares "Start"/"Stop". The engine must resolve the wire positionally.
+            var catalog = new FunctionBlockCatalog();
+            catalog.Register(new InputBoolBlock());
+            catalog.Register(new MotorDolBlock());
+
+            var engine = new ExecutionEngine(catalog);
+
+            var input = CreateNode("in", new InputBoolBlock());
+            input.InputBindings["Input1"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 };
+
+            var motor = CreateNode("motor", new MotorDolBlock());
+            motor.Parameters["MotorDolRunDelayMs"] = 0;
+
+            engine.LoadGraph(
+                new[] { input, motor },
+                new[] { new SimulationConnection("in", "Output", "motor", "Input1") });
+
+            var dataStore = CreateDataStore();
+            dataStore.CoilDiscretes[1] = true;
+
+            engine.Execute(dataStore);
+
+            Assert.True(motor.OutputValues["Output"].AsBool());
+        }
+
+        [Fact]
+        public void Execute_DolMotor_Input1AddressBinding_BindsStartPort()
+        {
+            // Address bindings must also land on the declared port names, not "Input1".
+            var catalog = new FunctionBlockCatalog();
+            catalog.Register(new MotorDolBlock());
+
+            var engine = new ExecutionEngine(catalog);
+
+            var motor = CreateNode("motor", new MotorDolBlock());
+            motor.Parameters["MotorDolRunDelayMs"] = 0;
+            motor.InputBindings["Start"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 5 };
+
+            engine.LoadGraph(new[] { motor }, Array.Empty<SimulationConnection>());
+
+            var dataStore = CreateDataStore();
+            dataStore.CoilDiscretes[5] = true;
+
+            engine.Execute(dataStore);
+
+            Assert.True(motor.OutputValues["Output"].AsBool());
+        }
+
+        [Fact]
+        public void Execute_Vsd_WireFromOutput_MapsToRunningPort()
+        {
+            // The VSD declares "Running" (no literal "Output" port); the editor's "Output"
+            // connector must resolve to the primary output port.
+            var catalog = new FunctionBlockCatalog();
+            catalog.Register(new OutputBoolBlock());
+            catalog.Register(new VsdBlock());
+
+            var engine = new ExecutionEngine(catalog);
+
+            var vsd = CreateNode("vsd", new VsdBlock());
+            vsd.InputBindings["Run"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 };
+            vsd.Parameters["VsdRampUpMs"] = 0;
+            vsd.Parameters["VsdRampDownMs"] = 0;
+
+            var output = CreateNode("out", new OutputBoolBlock());
+            output.OutputBindings["Output"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 };
+
+            engine.LoadGraph(
+                new[] { vsd, output },
+                new[] { new SimulationConnection("vsd", "Output", "out", "Input1") });
+
+            var dataStore = CreateDataStore();
+            dataStore.CoilDiscretes[1] = true;
+
+            engine.Execute(dataStore);
+
+            Assert.True(dataStore.CoilDiscretes[10]);
+        }
+
         private static SimulationNode CreateNode(string id, IFunctionBlock block)
         {
             return new SimulationNode(id, id, block);

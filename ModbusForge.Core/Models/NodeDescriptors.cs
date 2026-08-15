@@ -22,6 +22,23 @@ namespace ModbusForge.Models
         public bool HasSecondInput { get; init; }
         public bool HasParameters { get; init; }
         public bool HasSetDominant { get; init; }
+
+        /// <summary>
+        /// The node exposes (and the simulation honors) a Modbus address binding for its
+        /// first input slot. Types without this flag are driven by wires only, so their
+        /// default (unedited) address references stay inert.
+        /// </summary>
+        public bool HasInput1Address { get; init; }
+
+        /// <summary>
+        /// The node exposes a Modbus address binding for its second input slot.
+        /// </summary>
+        public bool HasInput2Address { get; init; }
+
+        /// <summary>
+        /// The node exposes a Modbus address binding for its primary output.
+        /// </summary>
+        public bool HasOutputAddress { get; init; }
         public Func<VisualNode, string>? DisplayNameFormatter { get; init; }
         public Func<VisualNode, string>? ParameterDisplayFormatter { get; init; }
 
@@ -44,17 +61,17 @@ namespace ModbusForge.Models
         {
             // I/O
             Add(PlcElementType.Input, "Input", "IN", "Input", "I/O", RgbColor.FromRgb(76, 175, 80), "?",
-                showInPalette: false, isInput: true);
+                showInPalette: false, isInput: true, hasInput1Address: true);
             Add(PlcElementType.Output, "Output", "OUT", "Output", "I/O", RgbColor.FromRgb(255, 87, 34), "?",
-                showInPalette: false, isOutput: true);
+                showInPalette: false, isOutput: true, hasOutputAddress: true);
             Add(PlcElementType.InputBool, "InputBool", "IN BOOL", "Input BOOL", "I/O", RgbColor.FromRgb(76, 175, 80), "B",
-                isInput: true);
+                isInput: true, hasInput1Address: true);
             Add(PlcElementType.InputInt, "InputInt", "IN INT", "Input INT", "I/O", RgbColor.FromRgb(76, 175, 80), "I",
-                isInput: true);
+                isInput: true, hasInput1Address: true);
             Add(PlcElementType.OutputBool, "OutputBool", "OUT BOOL", "Output BOOL", "I/O", RgbColor.FromRgb(255, 87, 34), "B",
-                isOutput: true);
+                isOutput: true, hasOutputAddress: true);
             Add(PlcElementType.OutputInt, "OutputInt", "OUT INT", "Output INT", "I/O", RgbColor.FromRgb(255, 87, 34), "I",
-                isOutput: true);
+                isOutput: true, hasOutputAddress: true);
 
             // Logic
             Add(PlcElementType.NOT, "NOT", "NOT", "NOT Gate", "Logic Gates", RgbColor.FromRgb(156, 39, 176), "NOT");
@@ -93,60 +110,98 @@ namespace ModbusForge.Models
                 displayNameFormatter: n => $"CTC ({n.CounterPreset})",
                 parameterDisplayFormatter: n => $"Preset: {n.CounterPreset}");
 
-            // Comparators
+            // Comparators (the second input can be a wire or a bound Modbus address)
             Add(PlcElementType.COMPARE_EQ, "COMPARE_EQ", "EQ", "Equal (==)", "Comparators", RgbColor.FromRgb(255, 87, 34), "==",
-                hasSecondInput: true, hasParameters: true,
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true,
                 parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
             Add(PlcElementType.COMPARE_NE, "COMPARE_NE", "NE", "Not Equal (!=)", "Comparators", RgbColor.FromRgb(255, 87, 34), "!=",
-                hasSecondInput: true, hasParameters: true,
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true,
                 parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
             Add(PlcElementType.COMPARE_GT, "COMPARE_GT", "GT", "Greater Than (>)", "Comparators", RgbColor.FromRgb(233, 30, 99), ">",
-                hasSecondInput: true, hasParameters: true,
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true,
                 parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
             Add(PlcElementType.COMPARE_LT, "COMPARE_LT", "LT", "Less Than (<)", "Comparators", RgbColor.FromRgb(233, 30, 99), "<",
-                hasSecondInput: true, hasParameters: true,
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true,
                 parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
             Add(PlcElementType.COMPARE_GE, "COMPARE_GE", "GE", "Greater Equal (>=)", "Comparators", RgbColor.FromRgb(156, 39, 176), ">=",
-                hasSecondInput: true, hasParameters: true,
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true,
                 parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
             Add(PlcElementType.COMPARE_LE, "COMPARE_LE", "LE", "Less Equal (<=)", "Comparators", RgbColor.FromRgb(156, 39, 176), "<=",
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true,
+                parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
+
+            // Real (double) comparators
+            Add(PlcElementType.COMPARE_EQ_REAL, "COMPARE_EQ_REAL", "EQ (R)", "Equal (==) (Real)", "Comparators (Real)", RgbColor.FromRgb(255, 87, 34), "==",
+                hasSecondInput: true, hasParameters: true,
+                parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
+            Add(PlcElementType.COMPARE_NE_REAL, "COMPARE_NE_REAL", "NE (R)", "Not Equal (!=) (Real)", "Comparators (Real)", RgbColor.FromRgb(255, 87, 34), "!=",
+                hasSecondInput: true, hasParameters: true,
+                parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
+            Add(PlcElementType.COMPARE_GT_REAL, "COMPARE_GT_REAL", "GT (R)", "Greater Than (>) (Real)", "Comparators (Real)", RgbColor.FromRgb(233, 30, 99), ">",
+                hasSecondInput: true, hasParameters: true,
+                parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
+            Add(PlcElementType.COMPARE_LT_REAL, "COMPARE_LT_REAL", "LT (R)", "Less Than (<) (Real)", "Comparators (Real)", RgbColor.FromRgb(233, 30, 99), "<",
+                hasSecondInput: true, hasParameters: true,
+                parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
+            Add(PlcElementType.COMPARE_GE_REAL, "COMPARE_GE_REAL", "GE (R)", "Greater Equal (>=) (Real)", "Comparators (Real)", RgbColor.FromRgb(156, 39, 176), ">=",
+                hasSecondInput: true, hasParameters: true,
+                parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
+            Add(PlcElementType.COMPARE_LE_REAL, "COMPARE_LE_REAL", "LE (R)", "Less Equal (<=) (Real)", "Comparators (Real)", RgbColor.FromRgb(156, 39, 176), "<=",
                 hasSecondInput: true, hasParameters: true,
                 parameterDisplayFormatter: n => $"Value: {n.CompareValue}");
 
-            // Math
+            // Math (inputs/outputs can be wires or bound Modbus addresses)
             Add(PlcElementType.MATH_ADD, "MATH_ADD", "ADD", "Add (+)", "Math Operations", RgbColor.FromRgb(63, 81, 181), "+",
-                hasSecondInput: true, hasParameters: true,
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true, hasOutputAddress: true,
                 parameterDisplayFormatter: n => $"Const: {n.CompareValue}");
             Add(PlcElementType.MATH_SUB, "MATH_SUB", "SUB", "Subtract (-)", "Math Operations", RgbColor.FromRgb(63, 81, 181), "-",
-                hasSecondInput: true, hasParameters: true,
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true, hasOutputAddress: true,
                 parameterDisplayFormatter: n => $"Const: {n.CompareValue}");
             Add(PlcElementType.MATH_MUL, "MATH_MUL", "MUL", "Multiply (*)", "Math Operations", RgbColor.FromRgb(121, 85, 72), "x",
-                hasSecondInput: true, hasParameters: true,
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true, hasOutputAddress: true,
                 parameterDisplayFormatter: n => $"Const: {n.CompareValue}");
             Add(PlcElementType.MATH_DIV, "MATH_DIV", "DIV", "Divide (/)", "Math Operations", RgbColor.FromRgb(121, 85, 72), "/",
-                hasSecondInput: true, hasParameters: true,
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true, hasOutputAddress: true,
                 parameterDisplayFormatter: n => $"Const: {n.CompareValue}");
 
-            // Industrial devices
+            // Real (double) math
+            Add(PlcElementType.MATH_ADD_REAL, "MATH_ADD_REAL", "ADD (R)", "Add (+) (Real)", "Math Operations (Real)", RgbColor.FromRgb(63, 81, 181), "+",
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true, hasOutputAddress: true,
+                parameterDisplayFormatter: n => $"Const: {n.CompareValueReal:0.##}");
+            Add(PlcElementType.MATH_SUB_REAL, "MATH_SUB_REAL", "SUB (R)", "Subtract (-) (Real)", "Math Operations (Real)", RgbColor.FromRgb(63, 81, 181), "-",
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true, hasOutputAddress: true,
+                parameterDisplayFormatter: n => $"Const: {n.CompareValueReal:0.##}");
+            Add(PlcElementType.MATH_MUL_REAL, "MATH_MUL_REAL", "MUL (R)", "Multiply (*) (Real)", "Math Operations (Real)", RgbColor.FromRgb(121, 85, 72), "x",
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true, hasOutputAddress: true,
+                parameterDisplayFormatter: n => $"Const: {n.CompareValueReal:0.##}");
+            Add(PlcElementType.MATH_DIV_REAL, "MATH_DIV_REAL", "DIV (R)", "Divide (/) (Real)", "Math Operations (Real)", RgbColor.FromRgb(121, 85, 72), "/",
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true, hasOutputAddress: true,
+                parameterDisplayFormatter: n => $"Const: {n.CompareValueReal:0.##}");
+
+            // Industrial devices (command + feedback ports can be wires or bound addresses)
             Add(PlcElementType.Valve, "Valve", "Valve", "Valve", "Valves & Motors", RgbColor.FromRgb(69, 90, 100), "VLV",
-                hasSecondInput: true, hasParameters: true,
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true, hasOutputAddress: true,
                 displayNameFormatter: n => $"Valve ({n.ValveTravelTimeMs}ms)",
-                parameterDisplayFormatter: n => $"Travel: {n.ValveTravelTimeMs}ms, NO: {n.ValveNormallyOpen}");
+                parameterDisplayFormatter: n => $"Travel: {n.ValveTravelTimeMs}ms, Rest: {(n.ValveNormallyOpen ? "open" : "closed")}, {(n.ValveLatching ? "latching" : "spring-return")}");
 
             Add(PlcElementType.MotorDol, "MotorDol", "DOL Motor", "DOL Motor", "Valves & Motors", RgbColor.FromRgb(55, 71, 79), "MTR",
-                hasSecondInput: true, hasParameters: true,
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true, hasOutputAddress: true,
                 displayNameFormatter: n => $"DOL Motor ({n.MotorDolRunDelayMs}ms)",
                 parameterDisplayFormatter: n => $"Run delay: {n.MotorDolRunDelayMs}ms");
 
             Add(PlcElementType.Vsd, "Vsd", "VSD", "VSD", "Valves & Motors", RgbColor.FromRgb(121, 85, 72), "VSD",
-                hasSecondInput: true, hasParameters: true,
+                hasSecondInput: true, hasParameters: true, hasInput1Address: true, hasInput2Address: true, hasOutputAddress: true,
                 displayNameFormatter: n => $"VSD ({n.VsdMaxSpeed}max)",
                 parameterDisplayFormatter: n => $"Max: {n.VsdMaxSpeed}, RUp: {n.VsdRampUpMs}ms, RDown: {n.VsdRampDownMs}ms, Tol: {n.VsdAtSpeedTolerance}");
 
-            // Sources
+            // Sources (the signal generator has no input ports - only an output).
             Add(PlcElementType.SignalGenerator, "SignalGenerator", "SignalGen", "Signal Generator", "Sources", RgbColor.FromRgb(141, 110, 189), "SIG",
-                hasSecondInput: true,
+                hasParameters: true,
                 displayNameFormatter: n => $"SignalGen ({n.Waveform}, {n.PeriodMs}ms)",
+                parameterDisplayFormatter: n => $"{n.Waveform}: H={n.Amplitude}, T={n.PeriodMs}ms");
+            Add(PlcElementType.SignalGeneratorReal, "SignalGeneratorReal", "SignalGen (R)", "Signal Generator (Real)", "Sources", RgbColor.FromRgb(141, 110, 189), "SIG",
+                hasParameters: true,
+                displayNameFormatter: n => $"SignalGen (R) ({n.Waveform}, {n.PeriodMs}ms)",
                 parameterDisplayFormatter: n => $"{n.Waveform}: H={n.Amplitude}, T={n.PeriodMs}ms");
         }
 
@@ -164,6 +219,9 @@ namespace ModbusForge.Models
             bool hasSecondInput = false,
             bool hasParameters = false,
             bool hasSetDominant = false,
+            bool hasInput1Address = false,
+            bool hasInput2Address = false,
+            bool hasOutputAddress = false,
             Func<VisualNode, string>? displayNameFormatter = null,
             Func<VisualNode, string>? parameterDisplayFormatter = null)
         {
@@ -182,6 +240,9 @@ namespace ModbusForge.Models
                 HasSecondInput = hasSecondInput,
                 HasParameters = hasParameters,
                 HasSetDominant = hasSetDominant,
+                HasInput1Address = hasInput1Address,
+                HasInput2Address = hasInput2Address,
+                HasOutputAddress = hasOutputAddress,
                 DisplayNameFormatter = displayNameFormatter,
                 ParameterDisplayFormatter = parameterDisplayFormatter
             };
@@ -189,9 +250,19 @@ namespace ModbusForge.Models
 
         public static NodeDescriptor Get(PlcElementType elementType)
         {
-            return Descriptors.TryGetValue(elementType, out var descriptor)
+            return TryGet(elementType, out var descriptor)
                 ? descriptor
                 : Descriptors[PlcElementType.Input];
+        }
+
+        /// <summary>
+        /// Returns the descriptor for <paramref name="elementType"/>, or null when the type
+        /// is unknown. Use this (instead of <see cref="Get"/>) when "no descriptor" must be
+        /// distinguishable, e.g. when gating simulation behavior.
+        /// </summary>
+        public static bool TryGet(PlcElementType elementType, out NodeDescriptor descriptor)
+        {
+            return Descriptors.TryGetValue(elementType, out descriptor!);
         }
 
         public static IReadOnlyCollection<NodeDescriptor> All => Descriptors.Values;

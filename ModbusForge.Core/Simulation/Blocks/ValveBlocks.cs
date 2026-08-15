@@ -6,6 +6,13 @@ namespace ModbusForge.Core.Simulation.Blocks
 {
     /// <summary>
     /// Motorised valve block with open/close commands and configurable stroke time.
+    ///
+    /// Two rest behaviors, selected by the "Latching" parameter:
+    /// - Latching (default, real motor valve): with no command the valve HOLDS its
+    ///   last commanded position.
+    /// - Non-latching (spring-return style): with no command the valve moves back to
+    ///   its rest position ("Normally open").
+    /// Simultaneous Open + Close commands latch a fault until the commands are resolved.
     /// </summary>
     public sealed class ValveBlock : IFunctionBlock
     {
@@ -21,6 +28,34 @@ namespace ModbusForge.Core.Simulation.Blocks
             new PortDefinition("Fault", PortDirection.Output, SimulationDataType.Bool)
         };
 
+        public IReadOnlyList<BlockParameterDescriptor> Parameters { get; } = new[]
+        {
+            new BlockParameterDescriptor
+            {
+                Name = "ValveTravelTimeMs",
+                DisplayName = "Travel",
+                Kind = BlockParameterKind.Int32,
+                DefaultValue = 5000,
+                Minimum = 0,
+                Maximum = 100000,
+                Suffix = "ms"
+            },
+            new BlockParameterDescriptor
+            {
+                Name = "ValveNormallyOpen",
+                DisplayName = "Rest open",
+                Kind = BlockParameterKind.Bool,
+                DefaultValue = false
+            },
+            new BlockParameterDescriptor
+            {
+                Name = "ValveLatching",
+                DisplayName = "Latching",
+                Kind = BlockParameterKind.Bool,
+                DefaultValue = true
+            }
+        };
+
         public void Execute(IExecutionContext context)
         {
             var openCmd = context.ReadInput("OpenCmd")?.AsBool() ?? false;
@@ -28,6 +63,7 @@ namespace ModbusForge.Core.Simulation.Blocks
 
             var travelTimeMs = context.ReadParameter("ValveTravelTimeMs", 5000);
             var normallyOpen = context.ReadParameter("ValveNormallyOpen", false);
+            var latching = context.ReadParameter("ValveLatching", true);
 
             var state = context.State.GetOrCreate<ValveState>(nameof(ValveState));
 
@@ -46,7 +82,8 @@ namespace ModbusForge.Core.Simulation.Blocks
                     newTarget = true;
                 else if (closeCmd && !openCmd)
                     newTarget = false;
-                else
+                else if (!latching)
+                    // No command: spring-return to the rest position. Latching valves hold.
                     newTarget = normallyOpen;
             }
 

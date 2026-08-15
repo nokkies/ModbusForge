@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 
 namespace ModbusForge.Models
 {
@@ -13,9 +12,11 @@ namespace ModbusForge.Models
     }
 
     /// <summary>
-    /// A single captured Modbus request or response frame.
+    /// A single captured Modbus request or response frame. Immutable once captured:
+    /// rows are added to the log collection and never mutated in place, so per-property
+    /// change notifications are not required (the parent collection raises the changes).
     /// </summary>
-    public class ModbusFrameLog : INotifyPropertyChanged
+    public class ModbusFrameLog
     {
         public DateTime Timestamp { get; set; } = DateTime.Now;
 
@@ -41,8 +42,6 @@ namespace ModbusForge.Models
         public byte UnitId { get; set; }
 
         public byte FunctionCode { get; set; }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
         /// Returns the raw bytes as a space-delimited hex string.

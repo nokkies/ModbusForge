@@ -20,9 +20,14 @@ namespace ModbusForge.Services
             IConnectionManager? connectionManager = null)
             : base(logger, consoleLoggerService, connectionManager)
         {
-            _timer = new Timer(100);
+            _timer = new Timer(ScanIntervalMs);
             _timer.Elapsed += Timer_Elapsed;
             _timer.AutoReset = true;
+        }
+
+        protected override void OnScanIntervalChanged()
+        {
+            _timer.Interval = ScanIntervalMs;
         }
 
         private void Timer_Elapsed(object? sender, ElapsedEventArgs e)

@@ -5,6 +5,8 @@ namespace ModbusForge.Core.Simulation.Blocks
 {
     /// <summary>
     /// Direct-on-line motor starter block with start/stop control and pickup delay.
+    /// Stop is a normal stop command: it de-energises the starter without asserting
+    /// a fault, so routine stop/start cycles do not trip alarm logic.
     /// </summary>
     public sealed class MotorDolBlock : IFunctionBlock
     {
@@ -16,8 +18,21 @@ namespace ModbusForge.Core.Simulation.Blocks
         {
             new PortDefinition("Start", PortDirection.Input, SimulationDataType.Bool),
             new PortDefinition("Stop", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool),
-            new PortDefinition("Fault", PortDirection.Output, SimulationDataType.Bool)
+            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
+        };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters { get; } = new[]
+        {
+            new BlockParameterDescriptor
+            {
+                Name = "MotorDolRunDelayMs",
+                DisplayName = "Run delay",
+                Kind = BlockParameterKind.Int32,
+                DefaultValue = 100,
+                Minimum = 0,
+                Maximum = 100000,
+                Suffix = "ms"
+            }
         };
 
         public void Execute(IExecutionContext context)
@@ -30,24 +45,14 @@ namespace ModbusForge.Core.Simulation.Blocks
 
             if (stop)
             {
+                // Normal stop: open the sealed contactor, no fault.
                 state.Sealed = false;
-                state.FaultActive = true;
                 state.Running = false;
                 state.DelayAccumulatorMs = 0;
             }
-            else
+            else if (start)
             {
-                if (start && !state.FaultActive)
-                {
-                    state.Sealed = true;
-                }
-                else if (start && state.FaultActive)
-                {
-                    state.FaultActive = false;
-                    state.Sealed = false;
-                }
-
-                state.LastStart = start;
+                state.Sealed = true;
             }
 
             if (state.Sealed && !state.Running)
@@ -66,15 +71,12 @@ namespace ModbusForge.Core.Simulation.Blocks
             }
 
             context.WriteOutput("Output", SimulationValue.Bool(state.Running));
-            context.WriteOutput("Fault", SimulationValue.Bool(state.FaultActive));
         }
 
         private sealed class MotorDolState
         {
             public bool Sealed { get; set; }
-            public bool LastStart { get; set; }
             public bool Running { get; set; }
-            public bool FaultActive { get; set; }
             public double DelayAccumulatorMs { get; set; }
         }
     }

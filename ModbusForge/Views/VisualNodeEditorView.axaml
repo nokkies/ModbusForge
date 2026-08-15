@@ -46,10 +46,10 @@
           <Button Content="Clear" Command="{Binding ClearAllCommand}" ToolTip.Tip="Remove all nodes and connections"/>
         </StackPanel>
       </Border>
-      <Border Classes="ToolGroup">
+      <Border Classes="ToolGroup" IsVisible="{Binding IsConnectMode}" ToolTip.Tip="Target connector for connect mode">
         <StackPanel Orientation="Horizontal" Spacing="2">
           <TextBlock Text="Connect" Classes="ToolGroupHeader"/>
-          <ComboBox ItemsSource="{Binding TargetConnectorOptions}" SelectedItem="{Binding SelectedTargetConnector}" Width="70" ToolTip.Tip="Target connector for connect mode" VerticalAlignment="Center" Padding="4,0"/>
+          <ComboBox ItemsSource="{Binding TargetConnectorOptions}" SelectedItem="{Binding SelectedTargetConnector}" Width="70" VerticalAlignment="Center" Padding="4,0"/>
           <TextBlock Text="{Binding ConnectionSourceText}" VerticalAlignment="Center" Margin="2,0" FontSize="11" MaxWidth="120" TextTrimming="CharacterEllipsis"/>
         </StackPanel>
       </Border>
@@ -74,6 +74,11 @@
           <TextBlock Text="Sim" Classes="ToolGroupHeader"/>
           <Button Content="Run" Command="{Binding RunCommand}"/>
           <Button Content="Stop" Command="{Binding StopCommand}"/>
+          <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" ToolTip.Tip="Simulation scan period in milliseconds">
+            <TextBlock Text="Scan" FontSize="10" VerticalAlignment="Center"/>
+            <NumericUpDown Value="{Binding ScanIntervalMs}" Minimum="10" Maximum="10000" Increment="10" ShowButtonSpinner="False" Width="52" VerticalAlignment="Center" Padding="2,0" FontSize="10"/>
+          </StackPanel>
+          <TextBlock Text="{Binding SimulationStoreMode}" FontSize="10" Foreground="#00695C" VerticalAlignment="Center" ToolTip.Tip="Where bound addresses read/write: device store = connected Modbus server, local store = offline simulation" IsVisible="{Binding SimulationStoreMode, Converter={x:Static converters:StringToBoolConverter.Instance}}"/>
           <Button Content="Save" Command="{Binding SaveCommand}"/>
           <Button Content="Load" Command="{Binding LoadCommand}"/>
           <Button Content="Demo" Command="{Binding LoadDemoCommand}" ToolTip.Tip="Load demo program"/>
@@ -210,7 +215,7 @@
     <!-- Preview canvas -->
     <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="1" Margin="0" Grid.Row="1">
       <ScrollViewer x:Name="CanvasScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" PointerWheelChanged="CanvasScrollViewer_PointerWheelChanged">
-        <Canvas x:Name="NodeCanvas" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}" Background="#F5F5F5" PointerPressed="Canvas_PointerPressed" PointerMoved="Canvas_PointerMoved" PointerReleased="Canvas_PointerReleased" PointerCaptureLost="Canvas_PointerCaptureLost" DragDrop.AllowDrop="True" RenderTransformOrigin="0,0">
+        <Canvas x:Name="NodeCanvas" Width="{Binding ScaledCanvasWidth}" Height="{Binding ScaledCanvasHeight}" Background="#F5F5F5" PointerPressed="Canvas_PointerPressed" PointerMoved="Canvas_PointerMoved" PointerReleased="Canvas_PointerReleased" PointerCaptureLost="Canvas_PointerCaptureLost" DragDrop.AllowDrop="True" RenderTransformOrigin="0,0">
           <Canvas.RenderTransform>
             <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
           </Canvas.RenderTransform>
@@ -270,64 +275,31 @@
 
                       <TextBox Grid.Row="4" Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={x:Static converters:DoubleToStringConverter.Instance}}" IsVisible="{Binding ShowLiveValues}" HorizontalContentAlignment="Center" VerticalAlignment="Center" Height="22" FontSize="10" Padding="2,0" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" KeyDown="LiveValue_KeyDown" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
 
-                      <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Spacing="3" Margin="0,0,0,4"
-                                  IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP,CTU,CTD,CTC,COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE,MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV,RS,Valve,MotorDol,Vsd'}">
-                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP'}">
-                          <TextBlock Text="ms:" FontSize="9" VerticalAlignment="Center"/>
-                          <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
-                            <NumericUpDown Value="{Binding TimerPresetMs}" Minimum="0" Maximum="100000" Increment="1" Width="50" Classes="nodeValue"/>
-
-                          </StackPanel>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='CTU,CTD,CTC'}">
-                          <TextBlock Text="Pre:" FontSize="9" VerticalAlignment="Center"/>
-                          <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
-                            <NumericUpDown Value="{Binding CounterPreset}" Minimum="0" Maximum="100000" Increment="1" Width="50" Classes="nodeValue"/>
-
-                          </StackPanel>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE'}">
-                          <TextBlock Text="Val:" FontSize="9" VerticalAlignment="Center"/>
-                          <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
-                            <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Increment="1" Width="50" Classes="nodeValue"/>
-
-                          </StackPanel>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV'}">
-                          <TextBlock Text="Const:" FontSize="9" VerticalAlignment="Center" ToolTip.Tip="Constant used when Input2 is not connected"/>
-                          <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
-                            <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Increment="1" Width="50" Classes="nodeValue"/>
-
-                          </StackPanel>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='RS'}">
-                          <TextBlock Text="Set Dom:" FontSize="9" VerticalAlignment="Center"/>
-                          <CheckBox IsChecked="{Binding SetDominant}" VerticalAlignment="Center"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Valve'}">
-                          <TextBlock Text="Travel:" FontSize="9" VerticalAlignment="Center"/>
-                          <TextBlock Text="{Binding ValveTravelTimeMs}" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
-                          <TextBlock Text="ms" FontSize="9" VerticalAlignment="Center" Margin="1,0,4,0"/>
-                          <TextBlock Text="NO" FontSize="9" VerticalAlignment="Center"/>
-                          <TextBlock Text="{Binding ValveNormallyOpen}" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='MotorDol'}">
-                          <TextBlock Text="Run delay:" FontSize="9" VerticalAlignment="Center"/>
-                          <TextBlock Text="{Binding MotorDolRunDelayMs}" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
-                          <TextBlock Text="ms" FontSize="9" VerticalAlignment="Center" Margin="1,0,0,0"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Vsd'}">
-                          <TextBlock Text="Max:" FontSize="9" VerticalAlignment="Center"/>
-                          <TextBlock Text="{Binding VsdMaxSpeed}" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
-                          <TextBlock Text="RUp:" FontSize="9" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                          <TextBlock Text="{Binding VsdRampUpMs}" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
-                          <TextBlock Text="ms" FontSize="9" VerticalAlignment="Center" Margin="1,0,4,0"/>
-                          <TextBlock Text="RDown:" FontSize="9" VerticalAlignment="Center"/>
-                          <TextBlock Text="{Binding VsdRampDownMs}" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
-                          <TextBlock Text="ms" FontSize="9" VerticalAlignment="Center" Margin="1,0,4,0"/>
-                          <TextBlock Text="Tol:" FontSize="9" VerticalAlignment="Center"/>
-                          <TextBlock Text="{Binding VsdAtSpeedTolerance}" FontSize="9" VerticalAlignment="Center" Margin="2,0,0,0"/>
-                        </StackPanel>
+                      <StackPanel Grid.Row="5" Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="2,0,2,3"
+                                  IsVisible="{Binding ParameterFields.Count, Converter={x:Static converters:CountToBoolConverter.Instance}}">
+                        <TextBlock Text="{Binding SecondaryOutputText}" FontSize="8" Opacity="0.9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="220"
+                                   IsVisible="{Binding SecondaryOutputText, Converter={x:Static converters:StringToBoolConverter.Instance}}"
+                                   ToolTip.Tip="Secondary output ports"/>
+                        <ItemsControl ItemsSource="{Binding ParameterFields}" HorizontalAlignment="Center">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <WrapPanel HorizontalAlignment="Center" MaxWidth="230"/>
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="models:ParameterField">
+                              <StackPanel Orientation="Horizontal" Spacing="2" Margin="1,0">
+                                <TextBlock Text="{Binding DisplayName}" FontSize="9" Opacity="0.8" VerticalAlignment="Center"/>
+                                <NumericUpDown Value="{Binding Numeric}" Minimum="{Binding EditorMinimum}" Maximum="{Binding EditorMaximum}"
+                                               Increment="1" Width="54" Classes="nodeValue" FormatString="{Binding NumericFormat}"
+                                               IsVisible="{Binding IsNumeric}" ToolTip.Tip="{Binding DisplayName}"/>
+                                <CheckBox IsChecked="{Binding Flag}" VerticalAlignment="Center" IsVisible="{Binding IsBool}" ToolTip.Tip="{Binding DisplayName}"/>
+                                <ComboBox ItemsSource="{Binding Options}" SelectedItem="{Binding Choice}" Width="64" FontSize="9"
+                                          IsVisible="{Binding IsChoice}" ToolTip.Tip="{Binding DisplayName}"/>
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                       </StackPanel>
                     </Grid>
 
@@ -414,21 +386,6 @@
             </StackPanel>
           </Expander>
 
-          <!-- Waveform Presets -->
-          <Expander Header="Waveform Presets" IsExpanded="True">
-            <StackPanel Spacing="4" Margin="0,4,0,0">
-              <TextBlock Text="Waveform:" FontSize="11"/>
-              <ComboBox ItemsSource="{x:Static vm:VisualNodeEditorViewModel.WaveformOptions}" SelectedItem="{Binding SelectedWaveform}"/>
-              <TextBlock Text="Period (ms):" FontSize="11"/>
-              <NumericUpDown Value="{Binding WaveformPeriodMs}" Minimum="0" Maximum="60000" Increment="1" FormatString="0" Width="140" HorizontalAlignment="Left"/>
-              <TextBlock Text="Amplitude:" FontSize="11"/>
-              <NumericUpDown Value="{Binding WaveformAmplitude}" Minimum="-100000" Maximum="100000" Width="140" HorizontalAlignment="Left"/>
-              <TextBlock Text="Offset:" FontSize="11"/>
-              <NumericUpDown Value="{Binding WaveformOffset}" Minimum="-100000" Maximum="100000" Width="140" HorizontalAlignment="Left"/>
-              <Button Content="Apply to Selected Node" Command="{Binding ApplyWaveformCommand}" HorizontalAlignment="Left" Margin="0,4,0,0"/>
-            </StackPanel>
-          </Expander>
-
           <!-- Active Nodes -->
           <Expander Header="Active Nodes" IsExpanded="True">
             <StackPanel Spacing="4" Margin="0,4,0,0">
@@ -462,7 +419,7 @@
                       <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding AddressDisplay}" FontSize="10" Foreground="Gray" VerticalAlignment="Center" IsVisible="{Binding AddressDisplay, Converter={x:Static converters:StringToBoolConverter.Instance}}"/>
                       <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="4" Margin="0,3,0,0" IsVisible="{Binding ShowLiveValues}">
                         <TextBlock Text="Value:" FontSize="10" VerticalAlignment="Center"/>
-                        <TextBox Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={x:Static converters:DoubleToStringConverter.Instance}}" FontSize="11" MinWidth="60" Padding="3" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" KeyDown="LiveValue_KeyDown" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
+                        <TextBox Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={x:Static converters:DoubleToStringConverter.Instance}}" FontSize="11" MinWidth="60" Padding="3" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" KeyDown="LiveValue_KeyDown" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
                       </StackPanel>
                     </Grid>
                   </Border>
@@ -493,58 +450,34 @@
                   <TextBlock Text="Live value:" VerticalAlignment="Center" Width="80"/>
                   <TextBox Text="{Binding CurrentValueDouble, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={x:Static converters:DoubleToStringConverter.Instance}}" Width="80" GotFocus="LiveValue_GotFocus" LostFocus="LiveValue_LostFocus" KeyDown="LiveValue_KeyDown" behaviors:NumericTextBoxBehavior.IsNumeric="True" behaviors:NumericTextBoxBehavior.Format="Decimal"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Input,InputBool,InputInt,COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE,MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV'}">
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Input,InputBool,InputInt,COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE,MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV,COMPARE_EQ_REAL,COMPARE_NE_REAL,COMPARE_GT_REAL,COMPARE_LT_REAL,COMPARE_GE_REAL,COMPARE_LE_REAL,MATH_ADD_REAL,MATH_SUB_REAL,MATH_MUL_REAL,MATH_DIV_REAL'}">
                   <TextBlock Text="Input addr:" VerticalAlignment="Center" Width="80"/>
                   <NumericUpDown Value="{Binding Input1Address.Address}" Minimum="-1" Maximum="65535" Increment="1" FormatString="0" Width="100"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV,COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE'}">
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV,COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE,COMPARE_EQ_REAL,COMPARE_NE_REAL,COMPARE_GT_REAL,COMPARE_LT_REAL,COMPARE_GE_REAL,COMPARE_LE_REAL,MATH_ADD_REAL,MATH_SUB_REAL,MATH_MUL_REAL,MATH_DIV_REAL'}">
                   <TextBlock Text="Input 2 addr:" VerticalAlignment="Center" Width="80"/>
                   <NumericUpDown Value="{Binding Input2Address.Address}" Minimum="-1" Maximum="65535" Increment="1" FormatString="0" Width="100"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Output,OutputBool,OutputInt,MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV'}">
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Output,OutputBool,OutputInt,MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV,MATH_ADD_REAL,MATH_SUB_REAL,MATH_MUL_REAL,MATH_DIV_REAL'}">
                   <TextBlock Text="Output addr:" VerticalAlignment="Center" Width="80"/>
                   <NumericUpDown Value="{Binding OutputAddress.Address}" Minimum="-1" Maximum="65535" Increment="1" FormatString="0" Width="100"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='SignalGenerator'}">
-                  <TextBlock Text="Waveform:" VerticalAlignment="Center" Width="80"/>
-                  <TextBox Text="{Binding Waveform, UpdateSourceTrigger=PropertyChanged}" Width="80"/>
-                  <TextBlock Text="Period ms:" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                  <NumericUpDown Value="{Binding PeriodMs}" Minimum="0" Maximum="60000" Width="80"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='SignalGenerator'}">
-                  <TextBlock Text="Amplitude:" VerticalAlignment="Center" Width="80"/>
-                  <NumericUpDown Value="{Binding Amplitude}" Minimum="-100000" Maximum="100000" Width="80"/>
-                  <TextBlock Text="Offset:" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                  <NumericUpDown Value="{Binding Offset}" Minimum="-100000" Maximum="100000" Width="80"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='TON,TOF,TP,CTU,CTD,CTC,SignalGenerator'}">
-                  <TextBlock Text="Preset:" VerticalAlignment="Center" Width="80"/>
-                  <NumericUpDown Value="{Binding TimerPresetMs}" Minimum="0" Maximum="100000" Width="100"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='COMPARE_EQ,COMPARE_NE,COMPARE_GT,COMPARE_LT,COMPARE_GE,COMPARE_LE,MATH_ADD,MATH_SUB,MATH_MUL,MATH_DIV,SignalGenerator'}">
-                  <TextBlock Text="Compare:" VerticalAlignment="Center" Width="80"/>
-                  <NumericUpDown Value="{Binding CompareValue}" Minimum="-100000" Maximum="100000" Width="100"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Valve'}">
-                  <TextBlock Text="Travel ms:" VerticalAlignment="Center" Width="80"/>
-                  <NumericUpDown Value="{Binding ValveTravelTimeMs}" Minimum="0" Maximum="100000" Width="100"/>
-                  <TextBlock Text="NO:" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                  <CheckBox IsChecked="{Binding ValveNormallyOpen}" VerticalAlignment="Center"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='MotorDol'}">
-                  <TextBlock Text="Run delay ms:" VerticalAlignment="Center" Width="80"/>
-                  <NumericUpDown Value="{Binding MotorDolRunDelayMs}" Minimum="0" Maximum="100000" Width="100"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ElementType, Converter={x:Static converters:ElementTypeToBoolConverter.Instance}, ConverterParameter='Vsd'}">
-                  <TextBlock Text="Max:" VerticalAlignment="Center" Width="80"/>
-                  <NumericUpDown Value="{Binding VsdMaxSpeed}" Minimum="0" Maximum="100000" Width="80"/>
-                  <TextBlock Text="RUp:" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                  <NumericUpDown Value="{Binding VsdRampUpMs}" Minimum="0" Maximum="100000" Width="80"/>
-                  <TextBlock Text="RDown:" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                  <NumericUpDown Value="{Binding VsdRampDownMs}" Minimum="0" Maximum="100000" Width="80"/>
-                  <TextBlock Text="Tol:" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                  <NumericUpDown Value="{Binding VsdAtSpeedTolerance}" Minimum="0" Maximum="100000" Width="80"/>
-                </StackPanel>
+                <!-- Parameters: data-driven from the function block's declared parameter list,
+                     so every block type (int and real) is editable without per-type XAML. -->
+                <ItemsControl ItemsSource="{Binding ParameterFields}" Margin="0,4,0,0">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="models:ParameterField">
+                      <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+                        <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" Width="80"/>
+                        <NumericUpDown Value="{Binding Numeric}" Minimum="{Binding EditorMinimum}" Maximum="{Binding EditorMaximum}"
+                                       Increment="1" Width="110" FormatString="{Binding NumericFormat}"
+                                       IsVisible="{Binding IsNumeric}"/>
+                        <CheckBox IsChecked="{Binding Flag}" VerticalAlignment="Center" IsVisible="{Binding IsBool}"/>
+                        <ComboBox ItemsSource="{Binding Options}" SelectedItem="{Binding Choice}" Width="110" IsVisible="{Binding IsChoice}"/>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
               </StackPanel>
             </ScrollViewer>
           </Expander>

@@ -17,6 +17,8 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public IReadOnlyList<IPort> Ports { get; }
 
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => BooleanLogicBlock.EmptyParameters;
+
         protected InputBlockBase(string typeId, string displayName, SimulationDataType outputDataType)
         {
             TypeId = typeId;
@@ -69,6 +71,8 @@ namespace ModbusForge.Core.Simulation.Blocks
         public SimulationDataType InputDataType { get; }
 
         public IReadOnlyList<IPort> Ports { get; }
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => BooleanLogicBlock.EmptyParameters;
 
         protected OutputBlockBase(string typeId, string displayName, SimulationDataType inputDataType)
         {

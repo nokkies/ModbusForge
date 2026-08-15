@@ -5,6 +5,20 @@ namespace ModbusForge.Core.Simulation.Blocks
 {
     public sealed class TonBlock : IFunctionBlock
     {
+        public static readonly BlockParameterDescriptor[] TimerParameters =
+        {
+            new()
+            {
+                Name = "TimerPresetMs",
+                DisplayName = "Preset",
+                Kind = BlockParameterKind.Int32,
+                DefaultValue = 1000,
+                Minimum = 0,
+                Maximum = 100000,
+                Suffix = "ms"
+            }
+        };
+
         public string TypeId => "TON";
         public string DisplayName => "TON Timer";
         public string Category => "Timers";
@@ -14,6 +28,8 @@ namespace ModbusForge.Core.Simulation.Blocks
             new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
             new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
         };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => TimerParameters;
 
         public void Execute(IExecutionContext context)
         {
@@ -49,6 +65,8 @@ namespace ModbusForge.Core.Simulation.Blocks
             new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
             new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
         };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => TonBlock.TimerParameters;
 
         public void Execute(IExecutionContext context)
         {
@@ -87,6 +105,8 @@ namespace ModbusForge.Core.Simulation.Blocks
             new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
             new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
         };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => TonBlock.TimerParameters;
 
         public void Execute(IExecutionContext context)
         {

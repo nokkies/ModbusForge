@@ -94,7 +94,7 @@ namespace ModbusForge.Avalonia.ViewModels
             if (points.Count == 2)
             {
                 var (c1, c2) = ComputeBezierControlPoints(points[0], points[1]);
-                figure.Segments.Add(new BezierSegment
+                figure.Segments!.Add(new BezierSegment
                 {
                     Point1 = c1,
                     Point2 = c2,
@@ -109,11 +109,11 @@ namespace ModbusForge.Avalonia.ViewModels
                     segment.Points.Add(points[i]);
                 }
 
-                figure.Segments.Add(segment);
+                figure.Segments!.Add(segment);
             }
 
             var geometry = new PathGeometry();
-            geometry.Figures.Add(figure);
+            geometry.Figures!.Add(figure);
             PathData = geometry;
         }
 
@@ -231,6 +231,15 @@ namespace ModbusForge.Avalonia.ViewModels
             new[] { "Ramp", "Sine", "Triangle", "Square" };
 
         [ObservableProperty]
+        private string _simulationStoreMode = string.Empty;
+
+        [ObservableProperty]
+        private double _scaledCanvasWidth = 1200;
+
+        [ObservableProperty]
+        private double _scaledCanvasHeight = 800;
+
+        [ObservableProperty]
         private bool _isConnectMode;
 
         [ObservableProperty]
@@ -343,8 +352,20 @@ namespace ModbusForge.Avalonia.ViewModels
                 Config.ZoomLevel = normalized;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(ZoomText));
+                UpdateScaledCanvasSize();
                 UpdateConnectionLines();
             }
+        }
+
+        /// <summary>
+        /// Keeps the canvas layout size in step with the zoom level so the ScrollViewer
+        /// extents follow the zoom (no dead space zoomed out, no clipping zoomed in).
+        /// </summary>
+        private void UpdateScaledCanvasSize()
+        {
+            var zoom = ZoomLevel;
+            ScaledCanvasWidth = Config.CanvasWidth * zoom;
+            ScaledCanvasHeight = Config.CanvasHeight * zoom;
         }
 
         public bool ShowGrid
@@ -359,6 +380,11 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
+        /// <summary>
+        /// Single source of truth for "is the simulation running": the Run/Stop buttons and
+        /// the Live checkbox all flip this. Start/stop is handled in one place
+        /// (<see cref="OnConfigPropertyChanged"/>) so the states can never diverge.
+        /// </summary>
         public bool ShowLiveValues
         {
             get => Config.ShowLiveValues;
@@ -366,22 +392,20 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 if (Config.ShowLiveValues == value) return;
                 Config.ShowLiveValues = value;
-                foreach (var node in Config.Nodes)
-                {
-                    node.ShowLiveValues = value;
-                }
+                OnPropertyChanged();
+            }
+        }
 
-                if (value)
-                {
-                    _visualSimulation.Start(Config);
-                    IsRunning = true;
-                }
-                else
-                {
-                    _visualSimulation.Stop();
-                    IsRunning = false;
-                }
-
+        /// <summary>
+        /// Simulation scan period in milliseconds (clamped by the service to its supported range).
+        /// </summary>
+        public int ScanIntervalMs
+        {
+            get => Config.ScanIntervalMs;
+            set
+            {
+                if (Config.ScanIntervalMs == value) return;
+                Config.ScanIntervalMs = value;
                 OnPropertyChanged();
             }
         }
@@ -412,7 +436,7 @@ namespace ModbusForge.Avalonia.ViewModels
             StopCommand = new RelayCommand(Stop, () => IsRunning);
             SaveCommand = new AsyncRelayCommand(SaveAsync);
             LoadCommand = new AsyncRelayCommand(LoadAsync);
-            LoadDemoCommand = new RelayCommand(LoadDemo);
+            LoadDemoCommand = new AsyncRelayCommand(LoadDemoAsync);
             UndoCommand = new RelayCommand(Undo, () => UndoRedo.CanUndo);
             RedoCommand = new RelayCommand(Redo, () => UndoRedo.CanRedo);
             ZoomInCommand = new RelayCommand(ZoomIn);
@@ -425,8 +449,8 @@ namespace ModbusForge.Avalonia.ViewModels
             AlignLeftCommand = new RelayCommand(AlignLeft, () => SelectedNodes.Count >= 2);
             AlignTopCommand = new RelayCommand(AlignTop, () => SelectedNodes.Count >= 2);
             DistributeHorizontallyCommand = new RelayCommand(DistributeHorizontally, () => SelectedNodes.Count >= 3);
-            ClearAllCommand = new RelayCommand(ClearAll);
-            ApplyWaveformCommand = new RelayCommand(ApplyWaveform, () => SelectedNode != null);
+            ClearAllCommand = new AsyncRelayCommand(ClearAllAsync);
+            ApplyWaveformCommand = new RelayCommand(ApplyWaveformToSelectedNode, () => SelectedNode != null);
             EnableNodeCommand = new RelayCommand(EnableNode, () => SelectedNode != null && !SelectedNode.IsEnabled);
             DisableNodeCommand = new RelayCommand(DisableNode, () => SelectedNode != null && SelectedNode.IsEnabled);
             ResetValuesCommand = new RelayCommand(ResetValues, () => Config.Nodes.Count > 0);
@@ -440,16 +464,88 @@ namespace ModbusForge.Avalonia.ViewModels
             SelectedProgram = defaultProgram;
             SelectedTreeItem = defaultProgram;
 
+            Config.PropertyChanged += OnConfigPropertyChanged;
+
             AttachConfigHandlers();
             NormalizeViewSettings();
+            UpdateScaledCanvasSize();
             RefreshConnectionLines();
             RefreshGridLines();
 
+            _visualSimulation.CyclesChanged += OnSimulationCyclesChanged;
+
             if (Config.ShowLiveValues)
             {
-                _visualSimulation.Start(Config);
-                IsRunning = true;
+                StartSimulation();
             }
+        }
+
+        /// <summary>
+        /// Responds to property changes on the active <see cref="VisualNodeEditorConfig"/>:
+        /// starts/stops the simulation when the master Live flag flips and applies scan
+        /// period changes while running.
+        /// </summary>
+        private void OnConfigPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(VisualNodeEditorConfig.ShowLiveValues))
+            {
+                if (Config.ShowLiveValues && !IsRunning)
+                {
+                    StartSimulation();
+                }
+                else if (!Config.ShowLiveValues && IsRunning)
+                {
+                    StopSimulation();
+                }
+            }
+            else if (e.PropertyName == nameof(VisualNodeEditorConfig.ScanIntervalMs) && IsRunning)
+            {
+                _visualSimulation.SetScanIntervalMs(Config.ScanIntervalMs);
+            }
+
+            foreach (var node in Config.Nodes)
+            {
+                node.ShowLiveValues = Config.ShowLiveValues;
+            }
+        }
+
+        private void OnSimulationCyclesChanged(IReadOnlyList<string> cycleNodeIds)
+        {
+            if (cycleNodeIds.Count == 0) return;
+
+            var names = cycleNodeIds
+                .Select(id => Config.Nodes.FirstOrDefault(n => n.Id == id)?.Name ?? id)
+                .ToList();
+            StatusText = $"Warning: {names.Count} node(s) form a loop and will not run: {string.Join(", ", names)}";
+        }
+
+        private void StartSimulation()
+        {
+            foreach (var node in Config.Nodes)
+            {
+                node.ShowLiveValues = Config.ShowLiveValues;
+            }
+
+            _visualSimulation.SetScanIntervalMs(Config.ScanIntervalMs);
+            _visualSimulation.Start(Config);
+            IsRunning = true;
+            SimulationStoreMode = _visualSimulation.StoreMode == "local"
+                ? "local store (offline)"
+                : "device store";
+            StatusText = $"Simulation running — {SimulationStoreMode}";
+        }
+
+        private void StopSimulation()
+        {
+            _visualSimulation.Stop();
+            foreach (var node in Config.Nodes)
+            {
+                node.ShowLiveValues = Config.ShowLiveValues;
+            }
+
+            IsRunning = false;
+            SimulationStoreMode = string.Empty;
+            StatusText = "Simulation stopped";
         }
 
         partial void OnConfigChanged(VisualNodeEditorConfig value)
@@ -466,6 +562,7 @@ namespace ModbusForge.Avalonia.ViewModels
             OnPropertyChanged(nameof(ZoomText));
             OnPropertyChanged(nameof(ShowGrid));
             OnPropertyChanged(nameof(ShowLiveValues));
+            UpdateScaledCanvasSize();
             ClearSelection();
             CancelConnection(false);
             RefreshConnectionLines();
@@ -476,18 +573,36 @@ namespace ModbusForge.Avalonia.ViewModels
                 node.ShowLiveValues = Config.ShowLiveValues;
             }
 
-            if (Config.ShowLiveValues && !IsRunning)
+            if (IsRunning && Config.ShowLiveValues)
             {
-                _visualSimulation.Start(Config);
-                IsRunning = true;
+                // The service is still bound to the previous graph; re-attach it so the
+                // newly selected program actually runs.
+                _visualSimulation.Stop();
+                StartSimulation();
+            }
+            else if (Config.ShowLiveValues && !IsRunning)
+            {
+                StartSimulation();
             }
             else if (!Config.ShowLiveValues && IsRunning)
             {
-                _visualSimulation.Stop();
-                IsRunning = false;
+                StopSimulation();
             }
 
+            RefreshAllParameterFields();
+
             ((IRelayCommand)AutoLayoutCommand).NotifyCanExecuteChanged();
+        }
+
+        private void RefreshAllParameterFields()
+        {
+            // Rebuild every node's parameter editor fields so the right panel and the
+            // node footers track the active blocks' declared parameters (after a program
+            // load, demo, or clear the node set has changed).
+            foreach (var node in Config.Nodes)
+            {
+                BuildParameterFields(node);
+            }
         }
 
         partial void OnSelectedNodeChanged(VisualNode? value)
@@ -732,6 +847,30 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 node.PropertyChanged += OnNodePropertyChanged;
             }
+
+            if (node.ParameterFields == null)
+            {
+                BuildParameterFields(node);
+            }
+        }
+
+        /// <summary>
+        /// Builds the node's data-driven parameter editor fields from the function block's
+        /// declarative <c>Parameters</c> list (via <see cref="ParameterAccess"/>), so the UI
+        /// and the simulation engine share one source of truth.
+        /// </summary>
+        private void BuildParameterFields(VisualNode node)
+        {
+            var prototype = _visualSimulation.Catalog.Create(node.ElementType.ToString());
+
+            var fields = new List<ParameterField>();
+            foreach (var spec in prototype.Parameters)
+            {
+                if (ParameterAccess.TryGet(spec.Name) is { } access)
+                    fields.Add(new ParameterField(node, spec, access.Getter, access.Setter));
+            }
+
+            node.ParameterFields = fields;
         }
 
         private void DetachNode(VisualNode node)
@@ -759,6 +898,13 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 OnPropertyChanged(nameof(ConnectionSourceText));
             }
+
+            if (e.PropertyName == nameof(VisualNode.ElementType))
+            {
+                // The block type changed: rebuild the data-driven parameter fields.
+                if (sender is VisualNode node)
+                    BuildParameterFields(node);
+            }
         }
 
         private void OnNodeValueEditedByUser(VisualNode node, double value)
@@ -770,7 +916,7 @@ namespace ModbusForge.Avalonia.ViewModels
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Live value write failed for node {NodeId} with value {Value}", node.Id, value);
-                StatusText = ex.ToString();
+                StatusText = $"Live value write failed: {ex.Message}";
             }
         }
 
@@ -1231,6 +1377,10 @@ namespace ModbusForge.Avalonia.ViewModels
                 case PlcElementType.MATH_SUB:
                 case PlcElementType.MATH_MUL:
                 case PlcElementType.MATH_DIV:
+                case PlcElementType.MATH_ADD_REAL:
+                case PlcElementType.MATH_SUB_REAL:
+                case PlcElementType.MATH_MUL_REAL:
+                case PlcElementType.MATH_DIV_REAL:
                     node.Input2Address = new PlcAddressReference { Area = IntIoArea, Address = -1 };
                     node.OutputAddress = new PlcAddressReference
                     {
@@ -1244,6 +1394,12 @@ namespace ModbusForge.Avalonia.ViewModels
                 case PlcElementType.COMPARE_LT:
                 case PlcElementType.COMPARE_GE:
                 case PlcElementType.COMPARE_LE:
+                case PlcElementType.COMPARE_EQ_REAL:
+                case PlcElementType.COMPARE_NE_REAL:
+                case PlcElementType.COMPARE_GT_REAL:
+                case PlcElementType.COMPARE_LT_REAL:
+                case PlcElementType.COMPARE_GE_REAL:
+                case PlcElementType.COMPARE_LE_REAL:
                     node.Input2Address = new PlcAddressReference { Area = IntIoArea, Address = -1 };
                     break;
                 case PlcElementType.Valve:
@@ -1258,7 +1414,6 @@ namespace ModbusForge.Avalonia.ViewModels
                     node.Input1Address = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
                     node.Input2Address = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
                     node.OutputAddress = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
-                    node.OutputPortBindings["Fault"] = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
                     node.MotorDolRunDelayMs = 100;
                     break;
                 case PlcElementType.Vsd:
@@ -1296,11 +1451,14 @@ namespace ModbusForge.Avalonia.ViewModels
             foreach (var stale in node.OutputPortBindings.Keys.Where(k => !names.Contains(k, StringComparer.Ordinal)).ToList())
                 node.OutputPortBindings.Remove(stale);
 
-            node.OutputPortBindings.Remove("Output");
+            // The primary output ("Output" when present, else the first output, e.g. the
+            // VSD's "Running") is addressed via the node's main OutputAddress, so it gets
+            // no per-port binding.
+            var primary = names.FirstOrDefault(n => n == "Output") ?? names.FirstOrDefault();
 
             foreach (var name in names)
             {
-                if (name == "Output") continue;
+                if (name == primary) continue;
                 if (!node.OutputPortBindings.ContainsKey(name))
                     node.OutputPortBindings[name] = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
             }
@@ -1464,13 +1622,14 @@ namespace ModbusForge.Avalonia.ViewModels
                 return false;
             }
 
-            if (Config.Connections.Any(connection =>
-                    connection.SourceNodeId == source.Id
-                    && connection.SourceConnector == sourcePort
-                    && connection.TargetNodeId == target.Id
-                    && connection.TargetConnector == connector))
+            var existingDriver = Config.Connections.FirstOrDefault(connection =>
+                    connection.TargetNodeId == target.Id
+                    && connection.TargetConnector == connector);
+            if (existingDriver != null)
             {
-                StatusText = $"{target.Name} {connector} is already connected.";
+                var driverName = Config.Nodes.FirstOrDefault(n => n.Id == existingDriver.SourceNodeId)?.Name
+                                  ?? existingDriver.SourceNodeId;
+                StatusText = $"{target.Name} {connector} already has a driver ({driverName}); remove it first.";
                 return false;
             }
 
@@ -1524,26 +1683,26 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void Run()
         {
-            foreach (var node in Config.Nodes)
+            if (IsRunning) return;
+            if (!Config.ShowLiveValues)
             {
-                node.ShowLiveValues = Config.ShowLiveValues;
+                Config.ShowLiveValues = true; // routes through OnConfigPropertyChanged
+                return;
             }
 
-            _visualSimulation.Start(Config);
-            IsRunning = true;
-            StatusText = "Simulation running";
+            StartSimulation();
         }
 
         private void Stop()
         {
-            _visualSimulation.Stop();
-            foreach (var node in Config.Nodes)
+            if (!IsRunning) return;
+            if (Config.ShowLiveValues)
             {
-                node.ShowLiveValues = Config.ShowLiveValues;
+                Config.ShowLiveValues = false; // routes through OnConfigPropertyChanged
+                return;
             }
 
-            IsRunning = false;
-            StatusText = "Simulation stopped";
+            StopSimulation();
         }
 
         private void Undo()
@@ -1562,7 +1721,7 @@ namespace ModbusForge.Avalonia.ViewModels
             StatusText = "Redid last edit";
         }
 
-        private void ApplyWaveform()
+        private void ApplyWaveformToSelectedNode()
         {
             if (SelectedNode == null) return;
 
@@ -1600,10 +1759,19 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             foreach (var node in Config.Nodes)
             {
-                node.CurrentValueDouble = 0;
+                // Display-only: do not write back into bound Modbus addresses.
+                node.SuppressWriteBack = true;
+                try
+                {
+                    node.CurrentValueDouble = 0;
+                }
+                finally
+                {
+                    node.SuppressWriteBack = false;
+                }
             }
 
-            StatusText = "All live values reset";
+            StatusText = "Display values reset (block state and bound addresses unchanged)";
         }
 
         private void RandomizeValues()
@@ -1611,10 +1779,19 @@ namespace ModbusForge.Avalonia.ViewModels
             var random = new Random();
             foreach (var node in Config.Nodes)
             {
-                node.CurrentValueDouble = random.NextDouble() * 100;
+                // Display-only: do not write back into bound Modbus addresses.
+                node.SuppressWriteBack = true;
+                try
+                {
+                    node.CurrentValueDouble = random.NextDouble() * 100;
+                }
+                finally
+                {
+                    node.SuppressWriteBack = false;
+                }
             }
 
-            StatusText = "All live values randomized";
+            StatusText = "Display values randomized (block state and bound addresses unchanged)";
         }
 
         private async Task ExportConfigAsync()
@@ -1690,13 +1867,39 @@ namespace ModbusForge.Avalonia.ViewModels
             StatusText = "Distributed horizontally.";
         }
 
-        private void ClearAll()
+        /// <summary>
+        /// Asks the user to confirm a destructive action. Proceeds without prompting when
+        /// no message box service is available (headless / automated scenarios).
+        /// </summary>
+        private async Task<bool> ConfirmAsync(string message, string title)
         {
+            if (_messageBoxService == null) return true;
+
+            var result = await _messageBoxService.ShowAsync(message, title, DialogButton.YesNo, DialogIcon.Question);
+            return result == DialogResult.Yes;
+        }
+
+        private async Task ClearAllAsync()
+        {
+            if (Config.Nodes.Count == 0 && Config.Connections.Count == 0) return;
+
+            if (!await ConfirmAsync(
+                    "Clear all nodes and connections from the current program?",
+                    "Clear Program"))
+            {
+                return;
+            }
+
             Config.Nodes.Clear();
             Config.Connections.Clear();
             Config.ConnectorConfigs.Clear();
             ClearSelection();
             StatusText = "Cleared all nodes and connections.";
+        }
+
+        private void ClearAll()
+        {
+            _ = ClearAllAsync(); // fire-and-forge; kept for old XAML command binding fallback
         }
 
         private void AutoLayout()
@@ -1863,6 +2066,14 @@ namespace ModbusForge.Avalonia.ViewModels
 
             try
             {
+                if (Config.Nodes.Count > 0 &&
+                    !await ConfirmAsync(
+                        $"Replace the current program with the contents of {Path.GetFileName(path)}?",
+                        "Load Simulation"))
+                {
+                    return;
+                }
+
                 Stop();
                 var json = await File.ReadAllTextAsync(path);
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -1889,8 +2100,16 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
-        private void LoadDemo()
+        private async Task LoadDemoAsync()
         {
+            if (Config.Nodes.Count > 0 &&
+                !await ConfirmAsync(
+                    "Replace the current program with the demo?",
+                    "Load Demo"))
+            {
+                return;
+            }
+
             Stop();
             Config.Nodes.Clear();
             Config.Connections.Clear();
@@ -1914,6 +2133,11 @@ namespace ModbusForge.Avalonia.ViewModels
             RefreshConnectionLines();
             NotifyUndoRedoCommands();
             StatusText = "Demo loaded";
+        }
+
+        private void LoadDemo()
+        {
+            _ = LoadDemoAsync(); // fire-and-forge; kept for old XAML command binding fallback
         }
 
         private static IEnumerable<ProgramModel> EnumeratePrograms(ProgramFolder folder)

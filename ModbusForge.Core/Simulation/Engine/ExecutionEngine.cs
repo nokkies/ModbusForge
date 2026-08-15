@@ -15,7 +15,7 @@ namespace ModbusForge.Core.Simulation.Engine
     /// </summary>
     public sealed class ExecutionEngine : IExecutionEngine
     {
-        private readonly ILogger<ExecutionEngine> _logger;
+        private readonly ILogger _logger;
         private readonly FunctionBlockCatalog _catalog;
         private readonly IConsoleLoggerService? _consoleLoggerService;
 
@@ -26,10 +26,10 @@ namespace ModbusForge.Core.Simulation.Engine
         private Dictionary<string, SimulationNode> _nodeById = new();
         private DateTimeOffset _lastExecutionTime = DateTimeOffset.UtcNow;
 
-        public ExecutionEngine(FunctionBlockCatalog catalog, ILogger<ExecutionEngine>? logger = null, IConsoleLoggerService? consoleLoggerService = null)
+        public ExecutionEngine(FunctionBlockCatalog catalog, ILogger? logger = null, IConsoleLoggerService? consoleLoggerService = null)
         {
             _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
-            _logger = logger ?? NullLogger<ExecutionEngine>.Instance;
+            _logger = logger ?? NullLogger.Instance;
             _consoleLoggerService = consoleLoggerService;
         }
 
@@ -82,9 +82,13 @@ namespace ModbusForge.Core.Simulation.Engine
             var elapsed = currentTime - _lastExecutionTime;
             if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
 
-            // Phase 1: Evaluate all nodes.
+            // Phase 1: Evaluate all nodes. Disabled nodes are skipped so their last
+            // outputs stay frozen and visible to downstream nodes.
             foreach (var node in _executionOrder)
             {
+                if (!node.IsEnabled)
+                    continue;
+
                 try
                 {
                     EvaluateNode(node, dataStore, currentTime, elapsed, CycleCount);
@@ -192,9 +196,9 @@ namespace ModbusForge.Core.Simulation.Engine
             foreach (var connection in incoming)
             {
                 if (_nodeById.TryGetValue(connection.SourceNodeId, out var sourceNode) &&
-                    sourceNode.OutputValues.TryGetValue(connection.SourcePortName, out var value))
+                    sourceNode.OutputValues.TryGetValue(MapOutputPort(sourceNode, connection.SourcePortName), out var value))
                 {
-                    inputs[connection.TargetPortName] = value;
+                    inputs[MapInputPort(node, connection.TargetPortName)] = value;
                 }
             }
 
@@ -212,6 +216,45 @@ namespace ModbusForge.Core.Simulation.Engine
             }
 
             return inputs;
+        }
+
+        /// <summary>
+        /// Maps the editor's generic connector names onto a block's declared input port names.
+        /// The editor exposes "Input1"/"Input2" connectors, but blocks may declare
+        /// meaningful names instead ("Start"/"Stop", "Run"/"SpeedReference"). "Input1" and
+        /// "Input2" resolve positionally among the declared input ports; exact port names
+        /// always win when the block declares them.
+        /// </summary>
+        private static string MapInputPort(SimulationNode node, string connectorName)
+        {
+            if (node.Block.Ports.Any(p => p.Direction == PortDirection.Input && p.Name == connectorName))
+                return connectorName;
+
+            var inputPorts = node.Block.Ports.Where(p => p.Direction == PortDirection.Input).ToList();
+            var index = connectorName == "Input1" ? 0 : connectorName == "Input2" ? 1 : -1;
+            return index >= 0 && index < inputPorts.Count ? inputPorts[index].Name : connectorName;
+        }
+
+        /// <summary>
+        /// Maps the editor's generic "Output" connector onto a block's primary declared
+        /// output port when the block does not declare a port literally named "Output"
+        /// (e.g. the VSD's "Running"). Named outputs (Fault, SpeedFeedback, ...) pass through.
+        /// </summary>
+        private static string MapOutputPort(SimulationNode node, string connectorName)
+        {
+            if (node.OutputValues.ContainsKey(connectorName))
+                return connectorName;
+
+            if (connectorName == "Output")
+            {
+                var outputs = node.Block.Ports.Where(p => p.Direction == PortDirection.Output).ToList();
+                var primary = outputs.FirstOrDefault(p => p.Name == "Output")?.Name
+                              ?? outputs.FirstOrDefault()?.Name;
+                if (primary != null && node.OutputValues.ContainsKey(primary))
+                    return primary;
+            }
+
+            return connectorName;
         }
 
         private void WriteNodeOutputs(SimulationNode node, DataStore? dataStore)

@@ -28,6 +28,12 @@ namespace ModbusForge.Core.Simulation.Core
         IReadOnlyList<IPort> Ports { get; }
 
         /// <summary>
+        /// Configurable parameters exposed for this block type. Empty for blocks without settings.
+        /// Editors and the graph mapper use this list instead of per-type hard-coded switches.
+        /// </summary>
+        IReadOnlyList<BlockParameterDescriptor> Parameters { get; }
+
+        /// <summary>
         /// Executes the block using the provided context.
         /// </summary>
         void Execute(IExecutionContext context);
