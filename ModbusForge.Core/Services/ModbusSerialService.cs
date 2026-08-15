@@ -31,6 +31,9 @@ namespace ModbusForge.Services
         /// </summary>
         private const int IoTimeoutMs = 5000;
 
+        /// <summary>Shorter timeout used by the connection diagnostics probe.</summary>
+        private const int DiagnosticTimeoutMs = 1000;
+
         private const byte DeviceIdMoreFollows = 0xFF;
         private const int MaxDeviceIdTransactions = 16;
 
@@ -126,8 +129,8 @@ namespace ModbusForge.Services
 
                     var adapter = ModbusStreamAdapterFactory.CreateSerialAdapter(_serialPort);
                     var transport = Transport == TransportType.Rtu
-                        ? (IModbusSerialTransport)_factory.CreateRtuTransport(new LoggingStreamResource(adapter, _frameLogger))
-                        : (IModbusSerialTransport)_factory.CreateAsciiTransport(new LoggingStreamResource(adapter, _frameLogger));
+                        ? (IModbusSerialTransport)_factory.CreateRtuTransport(new LoggingStreamResource(adapter, _frameLogger, Transport))
+                        : (IModbusSerialTransport)_factory.CreateAsciiTransport(new LoggingStreamResource(adapter, _frameLogger, Transport));
 
                     _client = _factory.CreateMaster(transport);
 
@@ -578,20 +581,21 @@ namespace ModbusForge.Services
 
         private void DisconnectCore()
         {
-            try { (_client as IDisposable)?.Dispose(); } catch { }
+            try { (_client as IDisposable)?.Dispose(); }
+            catch (Exception ex) { _logger.LogDebug(ex, "Error disposing serial Modbus client during disconnect"); }
             _client = null;
 
             try
             {
                 _serialPort?.Close();
             }
-            catch { }
+            catch (Exception ex) { _logger.LogDebug(ex, "Error closing serial port during disconnect"); }
 
             try
             {
                 _serialPort?.Dispose();
             }
-            catch { }
+            catch (Exception ex) { _logger.LogDebug(ex, "Error disposing serial port during disconnect"); }
 
             _serialPort = null;
             _connectionProfile = null;
@@ -599,41 +603,48 @@ namespace ModbusForge.Services
 
         public virtual Task<ConnectionDiagnosticResult> RunDiagnosticsAsync(string ipAddress, int port, byte unitId)
         {
-            var result = new ConnectionDiagnosticResult { IsSerialConnection = true, RemoteEndpoint = ipAddress };
-
-            // For diagnostics through the legacy IP/port signature, treat ipAddress as the COM port
-            // and port as the baud rate. All other serial settings use defaults.
-            var profile = new ConnectionProfile("Diagnostics", "127.0.0.1", 502, unitId)
+            // The diagnostics open a real COM port and perform blocking Modbus I/O, so they
+            // must run on the thread pool, not the (UI) calling thread.
+            return Task.Run(() =>
             {
-                Transport = Transport,
-                ComPort = ipAddress,
-                BaudRate = port > 0 ? port : 9600
-            };
+                var result = new ConnectionDiagnosticResult { IsSerialConnection = true, RemoteEndpoint = ipAddress };
 
-            var validation = _validationService?.ValidateSerialSettings(profile);
-            if (validation is { IsValid: false })
-            {
-                result.TcpError = validation.ErrorMessage;
-                return Task.FromResult(result);
-            }
+                // For diagnostics through the legacy IP/port signature, treat ipAddress as the COM port
+                // and port as the baud rate. All other serial settings use defaults.
+                var profile = new ConnectionProfile("Diagnostics", "127.0.0.1", 502, unitId)
+                {
+                    Transport = Transport,
+                    ComPort = ipAddress,
+                    BaudRate = port > 0 ? port : 9600
+                };
 
-            var testPort = TryOpenDiagnosticPort(profile, result);
-            if (testPort == null)
-            {
-                return Task.FromResult(result);
-            }
+                var validation = _validationService?.ValidateSerialSettings(profile);
+                if (validation is { IsValid: false })
+                {
+                    result.TcpError = validation.ErrorMessage;
+                    return result;
+                }
 
-            try
-            {
-                RunModbusDiagnostic(testPort, unitId, result);
-            }
-            finally
-            {
-                try { testPort.Close(); } catch { }
-                try { testPort.Dispose(); } catch { }
-            }
+                var testPort = TryOpenDiagnosticPort(profile, result);
+                if (testPort == null)
+                {
+                    return result;
+                }
 
-            return Task.FromResult(result);
+                try
+                {
+                    RunModbusDiagnostic(testPort, unitId, result);
+                }
+                finally
+                {
+                    try { testPort.Close(); }
+                    catch (Exception ex) { _logger.LogDebug(ex, "Error closing diagnostic serial port"); }
+                    try { testPort.Dispose(); }
+                    catch (Exception ex) { _logger.LogDebug(ex, "Error disposing diagnostic serial port"); }
+                }
+
+                return result;
+            });
         }
 
         private SerialPort? TryOpenDiagnosticPort(ConnectionProfile profile, ConnectionDiagnosticResult result)
@@ -672,13 +683,13 @@ namespace ModbusForge.Services
             {
                 var adapter = ModbusStreamAdapterFactory.CreateSerialAdapter(port);
                 var transport = Transport == TransportType.Rtu
-                    ? (IModbusSerialTransport)_factory.CreateRtuTransport(new LoggingStreamResource(adapter, _frameLogger))
-                    : (IModbusSerialTransport)_factory.CreateAsciiTransport(new LoggingStreamResource(adapter, _frameLogger));
+                    ? (IModbusSerialTransport)_factory.CreateRtuTransport(new LoggingStreamResource(adapter, _frameLogger, Transport))
+                    : (IModbusSerialTransport)_factory.CreateAsciiTransport(new LoggingStreamResource(adapter, _frameLogger, Transport));
                 var master = _factory.CreateMaster(transport);
                 try
                 {
-                    master.Transport.ReadTimeout = 1000;
-                    master.Transport.WriteTimeout = 1000;
+                    master.Transport.ReadTimeout = DiagnosticTimeoutMs;
+                    master.Transport.WriteTimeout = DiagnosticTimeoutMs;
 
                     sw.Restart();
                     EvaluateModbusRead(master.ReadHoldingRegisters(unitId, 0, 1), sw, result);

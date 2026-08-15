@@ -301,12 +301,6 @@ public class ConnectionManager : IConnectionManager, IDisposable
     {
         try
         {
-            var directory = Path.GetDirectoryName(ProfilesFilePath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
             var data = new ProfilesData
             {
                 ActiveProfileId = _activeProfile?.Id,
@@ -330,7 +324,7 @@ public class ConnectionManager : IConnectionManager, IDisposable
             };
 
             var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(ProfilesFilePath, json);
+            AtomicFileWriter.WriteAllText(ProfilesFilePath, json);
             _logger.LogInformation("Saved {Count} connection profiles", Profiles.Count);
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
