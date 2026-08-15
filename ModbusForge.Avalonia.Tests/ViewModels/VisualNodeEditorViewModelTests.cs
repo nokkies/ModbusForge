@@ -106,6 +106,45 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         }
 
         [Fact]
+        public void Rename_UndoRestoresOriginalName()
+        {
+            using var vm = CreateVm();
+            var node = vm.AddNodeAt(PlcElementType.TON, 0, 0)!;
+            var original = node.Name;
+
+            // Keystroke-style sequence on the name editor.
+            node.Name = "T";
+            node.Name = "TO";
+            node.Name = "Timer 2";
+
+            // All keystrokes coalesce into one undo step.
+            vm.UndoCommand.Execute(null);
+            Assert.Equal(original, node.Name);
+
+            vm.RedoCommand.Execute(null);
+            Assert.Equal("Timer 2", node.Name);
+        }
+
+        [Fact]
+        public void MixedEdits_SameNode_CoalesceIntoOneUndoStep()
+        {
+            using var vm = CreateVm();
+            var node = vm.AddNodeAt(PlcElementType.TON, 0, 0)!;
+            var originalName = node.Name;
+            var originalPreset = node.TimerPresetMs;
+
+            node.Name = "Renamed";
+            node.IsEnabled = false;
+            Field(node, "TimerPresetMs").Numeric = originalPreset + 100;
+
+            vm.UndoCommand.Execute(null);
+
+            Assert.Equal(originalName, node.Name);
+            Assert.True(node.IsEnabled);
+            Assert.Equal(originalPreset, node.TimerPresetMs);
+        }
+
+        [Fact]
         public async Task LoadDemo_WhileRunning_KeepsSimulationRunning()
         {
             using var vm = CreateVm();
