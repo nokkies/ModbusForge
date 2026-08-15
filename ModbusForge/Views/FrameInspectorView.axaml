@@ -9,13 +9,13 @@
       <Button Content="Clear" Command="{Binding ClearCommand}" />
       <Button Content="Import Pcap" Command="{Binding ImportPcapCommand}" />
       <CheckBox Content="Auto Scroll" IsChecked="{Binding IsAutoScroll}" />
-      <TextBlock VerticalAlignment="Center" Text="{Binding FrameLogger.Frames.Count, StringFormat='Frames: {0}'}" />
+      <TextBlock VerticalAlignment="Center" Text="{Binding Frames.Count, StringFormat='Frames: {0}'}" />
     </StackPanel>
 
     <TextBlock Grid.Row="1" Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" Margin="0,0,0,8" />
 
     <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="1">
-      <DataGrid ItemsSource="{Binding FrameLogger.Frames}"
+      <DataGrid ItemsSource="{Binding Frames}"
                 AutoGenerateColumns="False"
                 IsReadOnly="True"
                 GridLinesVisibility="All"

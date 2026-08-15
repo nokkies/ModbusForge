@@ -5,8 +5,7 @@
              xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core"
              xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters"
              x:Class="ModbusForge.Avalonia.Views.MainView"
-             x:DataType="vm:MainViewModel"
-             x:CompileBindings="False">
+             x:DataType="vm:MainViewModel">
 
   <UserControl.Resources>
     <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" />
@@ -71,8 +70,6 @@
                 <Style Selector="ListBoxItem">
                   <Setter Property="Padding" Value="8,5" />
                   <Setter Property="HorizontalContentAlignment" Value="Left" />
-                  <!-- Hidden tabs are removed from the navigation list, not just the tab strip -->
-                  <Setter Property="IsVisible" Value="{Binding IsVisible}" />
                 </Style>
               </ListBox.Styles>
             </ListBox>
@@ -394,7 +391,22 @@
                     GridLinesVisibility="All">
             <DataGrid.Columns>
               <DataGridTextColumn Header="Name" Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="120" />
-              <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+              <!-- Bounded numeric columns: out-of-range or non-numeric input is clamped and
+                   visibly corrected instead of being silently discarded by ConvertBack. -->
+              <DataGridTemplateColumn Header="Address" Width="90">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="models:CustomEntry">
+                    <NumericUpDown Value="{Binding Address, Mode=TwoWay}" Minimum="0" Maximum="65535"
+                                   ShowButtonSpinner="False" FontSize="10" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+                <DataGridTemplateColumn.CellEditingTemplate>
+                  <DataTemplate x:DataType="models:CustomEntry">
+                    <NumericUpDown Value="{Binding Address, Mode=TwoWay}" Minimum="0" Maximum="65535"
+                                   ShowButtonSpinner="False" FontSize="10" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellEditingTemplate>
+              </DataGridTemplateColumn>
               <DataGridTemplateColumn Header="Area" Width="120">
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate x:DataType="models:CustomEntry">
@@ -430,9 +442,35 @@
               <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="120" IsReadOnly="True" />
               <DataGridTextColumn Header="Write Value" Binding="{Binding WriteValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="120" />
               <DataGridCheckBoxColumn Header="Continuous Write" Binding="{Binding Continuous, Mode=TwoWay}" Width="110" />
-              <DataGridTextColumn Header="Write Period (ms)" Binding="{Binding PeriodMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="110" />
+              <DataGridTemplateColumn Header="Write Period (ms)" Width="120">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="models:CustomEntry">
+                    <NumericUpDown Value="{Binding PeriodMs, Mode=TwoWay}" Minimum="1" Maximum="600000"
+                                   ShowButtonSpinner="False" FontSize="10" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+                <DataGridTemplateColumn.CellEditingTemplate>
+                  <DataTemplate x:DataType="models:CustomEntry">
+                    <NumericUpDown Value="{Binding PeriodMs, Mode=TwoWay}" Minimum="1" Maximum="600000"
+                                   ShowButtonSpinner="False" FontSize="10" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellEditingTemplate>
+              </DataGridTemplateColumn>
               <DataGridCheckBoxColumn Header="Read" Binding="{Binding Monitor, Mode=TwoWay}" Width="70" />
-              <DataGridTextColumn Header="Read Period (ms)" Binding="{Binding ReadPeriodMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="110" />
+              <DataGridTemplateColumn Header="Read Period (ms)" Width="120">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="models:CustomEntry">
+                    <NumericUpDown Value="{Binding ReadPeriodMs, Mode=TwoWay}" Minimum="1" Maximum="600000"
+                                   ShowButtonSpinner="False" FontSize="10" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+                <DataGridTemplateColumn.CellEditingTemplate>
+                  <DataTemplate x:DataType="models:CustomEntry">
+                    <NumericUpDown Value="{Binding ReadPeriodMs, Mode=TwoWay}" Minimum="1" Maximum="600000"
+                                   ShowButtonSpinner="False" FontSize="10" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellEditingTemplate>
+              </DataGridTemplateColumn>
               <DataGridCheckBoxColumn Header="Trend" Binding="{Binding Trend, Mode=TwoWay}" Width="70" />
               <DataGridTemplateColumn Header="Actions" Width="Auto">
                 <DataGridTemplateColumn.CellTemplate>

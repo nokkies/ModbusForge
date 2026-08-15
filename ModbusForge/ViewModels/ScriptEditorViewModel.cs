@@ -7,19 +7,25 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using ModbusForge;
 using ModbusForge.Models;
 using ModbusForge.Services;
 
 namespace ModbusForge.Avalonia.ViewModels
 {
-    public partial class ScriptEditorViewModel : ObservableObject
+    public partial class ScriptEditorViewModel : ObservableObject, IDisposable
     {
         private readonly IScriptRunner _scriptRunner;
         private readonly IConnectionManager _connectionManager;
         private readonly IDispatcher _dispatcher;
         private readonly IFileDialogService? _fileDialogService;
         private readonly IMessageBoxService? _messageBoxService;
+        private readonly ILogger<ScriptEditorViewModel> _logger;
+
+        /// <summary>The script whose Commands collection we currently have CollectionChanged on.</summary>
+        private Script? _trackedScript;
 
         [ObservableProperty]
         private Script _script;
@@ -60,13 +66,15 @@ namespace ModbusForge.Avalonia.ViewModels
             IConnectionManager connectionManager,
             IDispatcher dispatcher,
             IFileDialogService? fileDialogService = null,
-            IMessageBoxService? messageBoxService = null)
+            IMessageBoxService? messageBoxService = null,
+            ILogger<ScriptEditorViewModel>? logger = null)
         {
             _scriptRunner = scriptRunner ?? throw new ArgumentNullException(nameof(scriptRunner));
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
             _fileDialogService = fileDialogService;
             _messageBoxService = messageBoxService;
+            _logger = logger ?? NullLogger<ScriptEditorViewModel>.Instance;
 
             _script = new Script("New Script");
 
@@ -85,7 +93,9 @@ namespace ModbusForge.Avalonia.ViewModels
             _scriptRunner.ScriptStarted += OnScriptStarted;
             _scriptRunner.ScriptCompleted += OnScriptCompleted;
             _scriptRunner.CommandExecuted += OnCommandExecuted;
-            _script.Commands.CollectionChanged += Commands_CollectionChanged;
+
+            _trackedScript = Script;
+            Script.Commands.CollectionChanged += Commands_CollectionChanged;
         }
 
         partial void OnSelectedCommandChanged(ScriptCommand? value)
@@ -100,6 +110,25 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             RunScriptCommand.NotifyCanExecuteChanged();
             StopScriptCommand.NotifyCanExecuteChanged();
+        }
+
+        partial void OnScriptChanged(Script value)
+        {
+            // A loaded script replaces the collection - resubscribe so the new list is
+            // tracked and the old one (and its handlers) can be collected.
+            if (_trackedScript != null)
+            {
+                _trackedScript.Commands.CollectionChanged -= Commands_CollectionChanged;
+            }
+
+            _trackedScript = value;
+            if (value != null)
+            {
+                value.Commands.CollectionChanged += Commands_CollectionChanged;
+            }
+
+            OnPropertyChanged(nameof(CanRun));
+            RunScriptCommand.NotifyCanExecuteChanged();
         }
 
         private void Commands_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
@@ -179,7 +208,21 @@ namespace ModbusForge.Avalonia.ViewModels
             StatusText = "Running...";
 
             var unitId = (byte)(_connectionManager.ActiveProfile?.UnitId ?? 1);
-            await _scriptRunner.RunScriptAsync(Script, service, unitId, CancellationToken.None);
+            try
+            {
+                await _scriptRunner.RunScriptAsync(Script, service, unitId, CancellationToken.None);
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogError(ex, "Script execution failed");
+                StatusText = $"Script failed: {ex.Message}";
+            }
+            finally
+            {
+                // If the runner's ScriptCompleted event never fired (error path), the
+                // buttons would otherwise stay stuck in the "running" state.
+                IsRunning = false;
+            }
         }
 
         private void StopScript()
@@ -206,6 +249,7 @@ namespace ModbusForge.Avalonia.ViewModels
             }
             catch (Exception ex)
             {
+                _logger.LogWarning(ex, "Failed to save script to {Path}", path);
                 StatusText = $"Save failed: {ex.Message}";
             }
         }
@@ -226,15 +270,14 @@ namespace ModbusForge.Avalonia.ViewModels
                 var loaded = JsonSerializer.Deserialize<Script>(json);
                 if (loaded != null)
                 {
+                    // The CollectionChanged resubscription happens in OnScriptChanged.
                     Script = loaded;
-                    Script.Commands.CollectionChanged += Commands_CollectionChanged;
-                    OnPropertyChanged(nameof(CanRun));
-                    RunScriptCommand.NotifyCanExecuteChanged();
                     StatusText = $"Loaded {Path.GetFileName(path)}";
                 }
             }
             catch (Exception ex)
             {
+                _logger.LogWarning(ex, "Failed to load script from {Path}", path);
                 StatusText = $"Load failed: {ex.Message}";
             }
         }
@@ -275,6 +318,21 @@ namespace ModbusForge.Avalonia.ViewModels
                 e.Command.LastSuccess = e.Success;
                 e.Command.LastResult = e.Result;
             });
+        }
+
+        public void Dispose()
+        {
+            // The script runner is a long-lived shared service: without these
+            // unsubscriptions it keeps this view model (and its output log) alive,
+            // and events keep firing after the editor is closed.
+            _scriptRunner.LogMessage -= OnLogMessage;
+            _scriptRunner.ScriptStarted -= OnScriptStarted;
+            _scriptRunner.ScriptCompleted -= OnScriptCompleted;
+            _scriptRunner.CommandExecuted -= OnCommandExecuted;
+            if (_trackedScript != null)
+            {
+                _trackedScript.Commands.CollectionChanged -= Commands_CollectionChanged;
+            }
         }
     }
 }

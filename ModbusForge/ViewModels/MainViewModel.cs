@@ -543,25 +543,26 @@ namespace ModbusForge.Avalonia.ViewModels
 
             // Navigation list entries in user-facing order; TabIndex points into the
             // MainTabControl item order, and IsVisible mirrors the tab-visibility flag.
-            NavigationItems = new List<NavigationItem>
+            _allNavigationItems.AddRange(new[]
             {
-                new("Dashboard", DashboardTabIndex, () => true),
-                new("Trends", TrendsTabIndex, () => IsTrendTabVisible),
-                new("Frame Inspector", FrameInspectorTabIndex, () => true),
-                new("MQTT", MqttTabIndex, () => true),
-                new("Script Editor", ScriptEditorTabIndex, () => true),
-                new("Signal Generator", SignalGeneratorTabIndex, () => true),
-                new("Simulation", SimulationTabIndex, () => IsSimulationTabVisible),
-                new("Registers", HoldingRegistersTabIndex, () => IsRegistersTabVisible),
-                new("Input Registers", InputRegistersTabIndex, () => IsInputRegistersTabVisible),
-                new("Coils", CoilsTabIndex, () => IsCoilsTabVisible),
-                new("Discrete Inputs", DiscreteInputsTabIndex, () => IsDiscreteInputsTabVisible),
-                new("Custom Watch", CustomWatchTabIndex, () => IsCustomWatchTabVisible),
-                new("Decode", DecodeTabIndex, () => IsDecodeTabVisible),
-                new("Console", ConsoleTabIndex, () => IsConsoleTabVisible),
-                new("Debug", DebugTabIndex, () => IsDebugTabVisible),
-            };
-            SelectedNavigationItem = NavigationItems[0];
+                new NavigationItem("Dashboard", DashboardTabIndex, () => true),
+                new NavigationItem("Trends", TrendsTabIndex, () => IsTrendTabVisible),
+                new NavigationItem("Frame Inspector", FrameInspectorTabIndex, () => true),
+                new NavigationItem("MQTT", MqttTabIndex, () => true),
+                new NavigationItem("Script Editor", ScriptEditorTabIndex, () => true),
+                new NavigationItem("Signal Generator", SignalGeneratorTabIndex, () => true),
+                new NavigationItem("Simulation", SimulationTabIndex, () => IsSimulationTabVisible),
+                new NavigationItem("Registers", HoldingRegistersTabIndex, () => IsRegistersTabVisible),
+                new NavigationItem("Input Registers", InputRegistersTabIndex, () => IsInputRegistersTabVisible),
+                new NavigationItem("Coils", CoilsTabIndex, () => IsCoilsTabVisible),
+                new NavigationItem("Discrete Inputs", DiscreteInputsTabIndex, () => IsDiscreteInputsTabVisible),
+                new NavigationItem("Custom Watch", CustomWatchTabIndex, () => IsCustomWatchTabVisible),
+                new NavigationItem("Decode", DecodeTabIndex, () => IsDecodeTabVisible),
+                new NavigationItem("Console", ConsoleTabIndex, () => IsConsoleTabVisible),
+                new NavigationItem("Debug", DebugTabIndex, () => IsDebugTabVisible),
+            });
+            RefreshNavigationItems();
+            SelectedNavigationItem = NavigationItems.FirstOrDefault() ?? _allNavigationItems[0];
 
             if (_themeService != null)
             {
@@ -685,8 +686,14 @@ namespace ModbusForge.Avalonia.ViewModels
         [ObservableProperty]
         private int _selectedTabIndex;
 
-        /// <summary>Left navigation list entries (see MainView.axaml).</summary>
-        public IReadOnlyList<NavigationItem> NavigationItems { get; }
+        /// <summary>
+        /// Left navigation list entries (see MainView.axaml). Only entries whose tab is
+        /// currently visible are present - hidden tabs are removed from the list, so the
+        /// view does not need per-item visibility bindings.
+        /// </summary>
+        public ObservableCollection<NavigationItem> NavigationItems { get; } = new();
+
+        private readonly List<NavigationItem> _allNavigationItems = new();
 
         [ObservableProperty]
         private NavigationItem? _selectedNavigationItem;
@@ -964,7 +971,7 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             if (IsTabIndexVisible(SelectedTabIndex)) return;
 
-            SelectedTabIndex = Enumerable.Range(0, NavigationItems.Count).FirstOrDefault(IsTabIndexVisible);
+            SelectedTabIndex = Enumerable.Range(0, _allNavigationItems.Count).FirstOrDefault(IsTabIndexVisible);
         }
 
         private bool IsTabIndexVisible(int index)
@@ -1011,7 +1018,7 @@ namespace ModbusForge.Avalonia.ViewModels
             IsRegisterGridEditing = false;
 
             // Keep the navigation list in sync when the tab is changed programmatically.
-            var item = NavigationItems.FirstOrDefault(i => i.TabIndex == value && i.IsVisible);
+            var item = _allNavigationItems.FirstOrDefault(i => i.TabIndex == value && i.IsVisible);
             if (!ReferenceEquals(item, SelectedNavigationItem))
             {
                 SelectedNavigationItem = item;
@@ -1020,18 +1027,34 @@ namespace ModbusForge.Avalonia.ViewModels
 
         /// <summary>
         /// Shared handler for the tab-visibility flags: re-anchors the selection if the
-        /// current tab was hidden and raises the navigation list's visibility change.
+        /// current tab was hidden and updates the (filtered) navigation list.
         /// </summary>
         private void OnTabVisibilityChanged(int tabIndex)
         {
             EnsureSelectedTabIsVisible();
+            RefreshNavigationItems();
 
-            var item = NavigationItems.First(i => i.TabIndex == tabIndex);
-            item.RaiseVisibilityChanged();
-
-            if (SelectedNavigationItem is { } selected && selected.TabIndex == tabIndex && !selected.IsVisible)
+            if (SelectedNavigationItem is { IsVisible: false })
             {
-                SelectedNavigationItem = null;
+                // The selected entry just disappeared from the list - re-select to match
+                // the (re-anchored) tab.
+                OnSelectedTabIndexChanged(SelectedTabIndex);
+            }
+        }
+
+        /// <summary>Rebuilds the visible subset of the navigation list in place.</summary>
+        private void RefreshNavigationItems()
+        {
+            foreach (var item in _allNavigationItems)
+            {
+                if (item.IsVisible && !NavigationItems.Contains(item))
+                {
+                    NavigationItems.Add(item);
+                }
+                else if (!item.IsVisible)
+                {
+                    NavigationItems.Remove(item);
+                }
             }
         }
 

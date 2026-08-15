@@ -1,14 +1,13 @@
 using System;
-using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ModbusForge.Avalonia.ViewModels
 {
     /// <summary>
     /// One entry in the main window's left navigation list. Its visibility mirrors the
-    /// corresponding MainTabControl tab, so tabs the user has hidden never appear in
-    /// the navigation list (and cannot be selected from it).
+    /// corresponding MainTabControl tab; the navigation list only ever contains entries
+    /// whose tab is currently visible.
     /// </summary>
-    public sealed class NavigationItem : ObservableObject
+    public sealed class NavigationItem
     {
         public string Title { get; }
 
@@ -26,7 +25,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public bool IsVisible => _isVisible();
 
-        /// <summary>Raises the IsVisible change after the underlying tab flag changed.</summary>
-        internal void RaiseVisibilityChanged() => OnPropertyChanged(nameof(IsVisible));
+        /// <summary>The navigation ListBox renders entries through ToString.</summary>
+        public override string ToString() => Title;
     }
 }

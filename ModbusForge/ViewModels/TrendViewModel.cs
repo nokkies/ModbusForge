@@ -25,6 +25,13 @@ namespace ModbusForge.Avalonia.ViewModels
         private const int MaxPoints = 10000;
         private const int LiveWindowMilliseconds = 60000;
 
+        /// <summary>
+        /// Defensive upper bound on samples waiting for a UI flush. If the UI thread
+        /// is stalled the polling thread would otherwise keep the queue (and memory)
+        /// growing without limit.
+        /// </summary>
+        private const int MaxPendingSamples = 50000;
+
         private readonly ITrendLogger _trendLogger;
         private readonly IFileDialogService? _fileDialogService;
         private readonly ILogger<TrendViewModel> _logger;
@@ -49,6 +56,9 @@ namespace ModbusForge.Avalonia.ViewModels
         private int _paletteCursor;
         private bool _followLive;
         private int _playWindowPoints;
+        private readonly Queue<(string key, double value, DateTime ts)> _pendingSamples = new();
+        private readonly object _sampleQueueLock = new();
+        private int _sampleFlushScheduled;
 
         public ObservableCollection<ISeries> Series { get; } = new();
         public ObservableCollection<TrendSeriesItem> SeriesItems { get; } = new();
@@ -436,32 +446,91 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void OnSampled(string key, double value, DateTime timestampUtc)
         {
-            _dispatcher.Invoke(() =>
+            // Samples arrive per series per poll cycle from a background thread. Queue them
+            // and flush on the UI thread in one batch - the previous per-sample blocking
+            // dispatcher.Invoke made every poll iteration pay a full cross-thread round trip
+            // per series (and re-trimmed/re-aligned the chart per sample).
+            lock (_sampleQueueLock)
             {
-                if (!_valuesByKey.ContainsKey(key))
+                _pendingSamples.Enqueue((key, value, timestampUtc.ToUniversalTime()));
+                while (_pendingSamples.Count > MaxPendingSamples)
                 {
-                    var displayName = _trendLogger.ActiveKeys.TryGetValue(key, out var name) ? name : key;
-                    AddSeries(key, displayName);
+                    _pendingSamples.Dequeue();
+                }
+            }
+
+            if (System.Threading.Interlocked.Exchange(ref _sampleFlushScheduled, 1) == 1)
+                return; // a flush is already scheduled and will pick this batch up
+
+            _ = _dispatcher.InvokeAsync(FlushPendingSamples);
+        }
+
+        private void FlushPendingSamples()
+        {
+            try
+            {
+                List<(string key, double value, DateTime ts)> batch;
+                lock (_sampleQueueLock)
+                {
+                    batch = new List<(string, double, DateTime)>(_pendingSamples.Count);
+                    while (_pendingSamples.Count > 0)
+                    {
+                        batch.Add(_pendingSamples.Dequeue());
+                    }
                 }
 
-                if (!_valuesByKey.TryGetValue(key, out var values) || !_samplesByKey.TryGetValue(key, out var samples)) return;
-
-                var timestamp = timestampUtc.ToUniversalTime();
-                values.Add(new DateTimePoint(timestamp, value));
-                samples.Add((timestamp, value));
-                TrimSeriesToRetention(key);
-
-                while (values.Count > MaxPoints && samples.Count > 0)
+                foreach (var (key, value, timestamp) in batch)
                 {
-                    values.RemoveAt(0);
-                    samples.RemoveAt(0);
+                    if (!_valuesByKey.ContainsKey(key))
+                    {
+                        var displayName = _trendLogger.ActiveKeys.TryGetValue(key, out var name) ? name : key;
+                        AddSeries(key, displayName);
+                    }
+
+                    if (!_valuesByKey.TryGetValue(key, out var values) || !_samplesByKey.TryGetValue(key, out var samples))
+                        continue;
+
+                    values.Add(new DateTimePoint(timestamp, value));
+                    samples.Add((timestamp, value));
+                }
+
+                // Trim once per series per batch, not once per sample.
+                foreach (var key in _valuesByKey.Keys.ToList())
+                {
+                    TrimSeriesToRetention(key);
+
+                    if (_valuesByKey.TryGetValue(key, out var values) && _samplesByKey.TryGetValue(key, out var samples))
+                    {
+                        while (values.Count > MaxPoints && samples.Count > 0)
+                        {
+                            values.RemoveAt(0);
+                            samples.RemoveAt(0);
+                        }
+                    }
                 }
 
                 if (_followLive)
                 {
                     AlignLiveWindow();
                 }
-            });
+            }
+            finally
+            {
+                _sampleFlushScheduled = 0;
+
+                // A sample may have been queued between the snapshot and the flag reset:
+                // reschedule rather than drop it. (On the UI thread this runs inline.)
+                bool hasMore;
+                lock (_sampleQueueLock)
+                {
+                    hasMore = _pendingSamples.Count > 0;
+                }
+                if (hasMore)
+                {
+                    System.Threading.Interlocked.Exchange(ref _sampleFlushScheduled, 1);
+                    _ = _dispatcher.InvokeAsync(FlushPendingSamples);
+                }
+            }
         }
 
         private bool CanDeleteSelected() => SelectedSeriesItem is not null;

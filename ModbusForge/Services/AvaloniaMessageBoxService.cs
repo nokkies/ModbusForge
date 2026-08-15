@@ -16,6 +16,12 @@ namespace ModbusForge.Avalonia.Services
     {
         public async Task<DialogResult> ShowAsync(string message, string title, DialogButton button, DialogIcon icon)
         {
+            // No UI at all (unit tests, headless context): nothing can be shown.
+            if (Application.Current is null)
+            {
+                return DialogResult.None;
+            }
+
             var viewModel = new MessageBoxViewModel(title, message, button, icon);
             var window = new MessageBoxWindow
             {
@@ -28,11 +34,16 @@ namespace ModbusForge.Avalonia.Services
             var owner = GetOwner();
             if (owner != null)
             {
+                // Normal path: modeless-free, owner-anchored modal dialog.
                 await window.ShowDialog(owner);
             }
             else
             {
+                // Fallback (no main window yet): show as an active top-level window so
+                // the message is not silently lost, and still await its result.
+                window.Topmost = true;
                 window.Show();
+                window.Activate();
             }
 
             return await viewModel.ResultTask;

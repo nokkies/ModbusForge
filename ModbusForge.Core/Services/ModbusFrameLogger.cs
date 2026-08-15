@@ -91,6 +91,18 @@ namespace ModbusForge.Services
             FrameLogged?.Invoke(log);
         }
 
+        /// <summary>
+        /// Thread-safe snapshot of the current ring buffer contents, for UI consumers
+        /// that need the history without enumerating the live (cross-thread) collection.
+        /// </summary>
+        public ModbusFrameLog[] Snapshot()
+        {
+            lock (_sync)
+            {
+                return Frames.ToArray();
+            }
+        }
+
         public void Clear()
         {
             lock (_sync)
