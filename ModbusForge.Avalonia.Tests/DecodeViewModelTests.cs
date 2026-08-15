@@ -183,6 +183,7 @@ namespace ModbusForge.Avalonia.Tests
             public bool IsConnected { get; set; }
             public string BoundEndpoint => "test";
             public ModbusFrameLogger FrameLogger { get; } = new();
+            public event EventHandler? ConnectionLost { add { } remove { } }
             public string? LastOperation { get; private set; }
             public byte LastUnitId { get; private set; }
             public int LastAddress { get; private set; }

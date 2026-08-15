@@ -6,6 +6,7 @@ using System.IO;
 using System.IO.Ports;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using ModbusForge.Models;
@@ -133,6 +134,7 @@ public class ConnectionManager : IConnectionManager
 
             if (success)
             {
+                AttachConnectionLostHandler(service, profile);
                 profile.IsConnected = true;
                 profile.Status = "Connected";
                 ProfileConnected?.Invoke(this, profile);
@@ -162,6 +164,7 @@ public class ConnectionManager : IConnectionManager
         {
             if (_services.TryGetValue(profile.Id, out var service))
             {
+                service.ConnectionLost -= OnServiceConnectionLost;
                 await service.DisconnectAsync();
             }
 
@@ -244,6 +247,41 @@ public class ConnectionManager : IConnectionManager
         return service is ModbusSerialService serial && serial.Transport == transport;
     }
 
+    private void AttachConnectionLostHandler(IModbusService service, ConnectionProfile profile)
+    {
+        service.ConnectionLost -= OnServiceConnectionLost;
+        service.ConnectionLost += OnServiceConnectionLost;
+    }
+
+    private void OnServiceConnectionLost(object? sender, EventArgs e)
+    {
+        // Raised from a worker thread by the service when its transport dies.
+        if (sender is not IModbusService lostService)
+        {
+            return;
+        }
+
+        ConnectionProfile? profile = null;
+        foreach (var candidate in Profiles)
+        {
+            if (_services.TryGetValue(candidate.Id, out var stored) && ReferenceEquals(stored, lostService))
+            {
+                profile = candidate;
+                break;
+            }
+        }
+
+        if (profile == null || !profile.IsConnected)
+        {
+            return;
+        }
+
+        _logger.LogWarning("Connection lost for profile {Name}", profile.Name);
+        profile.IsConnected = false;
+        profile.Status = "Connection lost";
+        ProfileDisconnected?.Invoke(this, profile);
+    }
+
     public void SaveProfiles()
     {
         try
@@ -286,6 +324,15 @@ public class ConnectionManager : IConnectionManager
         }
     }
 
+    private static readonly JsonSerializerOptions _profileJsonOptions = new()
+    {
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true,
+        // Accept enum values written as strings (hand-edited files) as well as
+        // the numeric form produced by the default serialization.
+        Converters = { new JsonStringEnumConverter() }
+    };
+
     public void LoadProfiles()
     {
         try
@@ -296,7 +343,7 @@ public class ConnectionManager : IConnectionManager
             }
 
             var json = File.ReadAllText(ProfilesFilePath);
-            var data = JsonSerializer.Deserialize<ProfilesData>(json);
+            var data = JsonSerializer.Deserialize<ProfilesData>(json, _profileJsonOptions);
 
             if (data?.Profiles != null)
             {

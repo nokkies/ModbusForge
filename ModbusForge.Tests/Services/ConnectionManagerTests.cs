@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Ports;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -110,6 +111,63 @@ public class ConnectionManagerTests : IDisposable
         Assert.Equal("127.0.0.1", defaultProfile.IpAddress);
         Assert.Equal(502, defaultProfile.Port);
         Assert.Equal(1, defaultProfile.UnitId);
+    }
+
+    [Fact]
+    public void LoadProfiles_WhenEnumValuesAreStrings_LoadsProfiles()
+    {
+        // Regression: a profiles file whose enums are written as strings
+        // (e.g. hand-edited) must load; previously the whole file was
+        // silently dropped and the code-default profile was used instead.
+        var profilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "ModbusForge",
+            "connection-profiles.json");
+
+        var json = """
+        {
+          "ActiveProfileId": "str-enum-test",
+          "Profiles": [
+            {
+              "Id": "str-enum-test",
+              "Name": "String Enums",
+              "IpAddress": "127.0.0.1",
+              "Port": 1502,
+              "UnitId": 2,
+              "Mode": "Client",
+              "ServerUnitIds": "1",
+              "Transport": "Tcp",
+              "ComPort": "COM3",
+              "BaudRate": 19200,
+              "Parity": "Even",
+              "DataBits": 7,
+              "StopBits": "Two",
+              "RtsEnable": false
+            }
+          ]
+        }
+        """;
+        File.WriteAllText(profilePath, json);
+
+        try
+        {
+            // Act: a fresh manager loads the file created above.
+            var manager = new ConnectionManager(_mockLogger.Object, _mockLoggerFactory.Object);
+
+            // Assert
+            var profile = Assert.Single(manager.Profiles);
+            Assert.Equal("String Enums", profile.Name);
+            Assert.Equal(1502, profile.Port);
+            Assert.Equal("Client", profile.Mode);
+            Assert.Equal(TransportType.Tcp, profile.Transport);
+            Assert.Equal(Parity.Even, profile.Parity);
+            Assert.Equal(StopBits.Two, profile.StopBits);
+            Assert.Same(profile, manager.ActiveProfile);
+        }
+        finally
+        {
+            File.Delete(profilePath);
+        }
     }
 
     [Fact]
@@ -260,6 +318,55 @@ public class ConnectionManagerTests : IDisposable
             Assert.True(profile.IsConnected);
             Assert.Equal("Connected", profile.Status);
             Assert.Equal(profile, connectedProfile);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task ConnectProfileAsync_WhenPeerClosesSocket_MarksProfileDisconnected()
+    {
+        // Arrange
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+        try
+        {
+            var profile = new ConnectionProfile("Loss Test", "127.0.0.1", port, 1);
+            _manager.AddProfile(profile);
+
+            var disconnectedProfiles = new List<ConnectionProfile>();
+            _manager.ProfileDisconnected += (s, p) => disconnectedProfiles.Add(p);
+
+            // Connect (the listener completes the TCP handshake automatically).
+            var connected = await _manager.ConnectProfileAsync(profile);
+            Assert.True(connected);
+
+            // Retrieve the peer side and close it to simulate the device
+            // dropping the connection out from under the client.
+            var peer = await Task.Run(() => listener.AcceptTcpClientAsync());
+            peer.Close();
+
+            // Act: the service detects the loss on its next request. The in-flight
+            // request itself fails because the peer vanished — that is expected.
+            try
+            {
+                await _manager.ActiveService!.ReadHoldingRegistersAsync(1, 0, 10);
+            }
+            catch
+            {
+                // Expected: the request fails on the dead transport.
+            }
+
+            // Assert: the profile is flipped to disconnected and the event fired,
+            // even though nobody explicitly disconnected.
+            await Task.Delay(250);
+            Assert.False(profile.IsConnected);
+            Assert.Equal("Connection lost", profile.Status);
+            Assert.Contains(profile, disconnectedProfiles);
         }
         finally
         {

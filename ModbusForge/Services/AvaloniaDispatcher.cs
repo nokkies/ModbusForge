@@ -9,6 +9,8 @@ namespace ModbusForge.Avalonia.Services
     /// </summary>
     public sealed class AvaloniaDispatcher : IDispatcher
     {
+        public bool CheckAccess => global::Avalonia.Threading.Dispatcher.UIThread.CheckAccess();
+
         public void Invoke(Action action)
         {
             if (global::Avalonia.Threading.Dispatcher.UIThread.CheckAccess())

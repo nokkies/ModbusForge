@@ -460,7 +460,7 @@ namespace ModbusForge.Tests.Services
             var dispatcher = new ImmediateDispatcher();
             var svc = new ApiApplicationService(
                 fakeAccessor,
-                new Mock<IModbusService>().Object,
+                new Mock<IConnectionManager>().Object,
                 new Mock<IScriptRuleService>().Object,
                 new Mock<IConsoleLoggerService>().Object,
                 new Mock<ITrendLogger>().Object,
@@ -485,7 +485,7 @@ namespace ModbusForge.Tests.Services
             var dispatcher = new ImmediateDispatcher();
             var svc = new ApiApplicationService(
                 fakeAccessor,
-                new Mock<IModbusService>().Object,
+                new Mock<IConnectionManager>().Object,
                 new Mock<IScriptRuleService>().Object,
                 new Mock<IConsoleLoggerService>().Object,
                 new Mock<ITrendLogger>().Object,

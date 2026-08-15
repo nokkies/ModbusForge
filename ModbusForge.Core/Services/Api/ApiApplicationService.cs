@@ -21,7 +21,7 @@ public sealed class ApiApplicationService : IApiApplicationService
     private const int ConnectionStateTimeoutMs = 30_000;
 
     private readonly IAppStateAccessor _appState;
-    private readonly IModbusService _modbusService;
+    private readonly IConnectionManager _connectionManager;
     private readonly IScriptRuleService _scriptRuleService;
     private readonly IConsoleLoggerService _consoleLoggerService;
     private readonly ITrendLogger _trendLogger;
@@ -33,7 +33,7 @@ public sealed class ApiApplicationService : IApiApplicationService
 
     public ApiApplicationService(
         IAppStateAccessor appState,
-        IModbusService modbusService,
+        IConnectionManager connectionManager,
         IScriptRuleService scriptRuleService,
         IConsoleLoggerService consoleLoggerService,
         ITrendLogger trendLogger,
@@ -41,13 +41,20 @@ public sealed class ApiApplicationService : IApiApplicationService
         ILogger<ApiApplicationService> logger)
     {
         _appState = appState ?? throw new ArgumentNullException(nameof(appState));
-        _modbusService = modbusService ?? throw new ArgumentNullException(nameof(modbusService));
+        _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
         _scriptRuleService = scriptRuleService ?? throw new ArgumentNullException(nameof(scriptRuleService));
         _consoleLoggerService = consoleLoggerService ?? throw new ArgumentNullException(nameof(consoleLoggerService));
         _trendLogger = trendLogger ?? throw new ArgumentNullException(nameof(trendLogger));
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
+
+    /// <summary>
+    /// The service backing the currently active connection profile. Resolved per
+    /// call so API operations always follow the UI's connection (including
+    /// profile switches and reconnections).
+    /// </summary>
+    private IModbusService? ActiveModbusService => _connectionManager.ActiveService;
 
     // ──────────────────────────────────────────────────────────────────────────
     // Status
@@ -185,10 +192,10 @@ public sealed class ApiApplicationService : IApiApplicationService
     // ──────────────────────────────────────────────────────────────────────────
 
     public Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, ushort address, ushort count, CancellationToken token)
-        => _modbusService.ReadHoldingRegistersAsync(unitId, address, count);
+        => ActiveModbusService?.ReadHoldingRegistersAsync(unitId, address, count) ?? Task.FromResult<ushort[]?>(null);
 
     public Task<bool[]?> ReadCoilsAsync(byte unitId, ushort address, ushort count, CancellationToken token)
-        => _modbusService.ReadCoilsAsync(unitId, address, count);
+        => ActiveModbusService?.ReadCoilsAsync(unitId, address, count) ?? Task.FromResult<bool[]?>(null);
 
     // ──────────────────────────────────────────────────────────────────────────
     // Custom tags

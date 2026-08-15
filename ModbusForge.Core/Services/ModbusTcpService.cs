@@ -27,6 +27,8 @@ namespace ModbusForge.Services
         private int _lastPort;
 
         private const int DisposeLockTimeoutMs = 5000;
+
+        private static readonly TimeSpan DisconnectLockTimeout = TimeSpan.FromSeconds(10);
         private const byte DeviceIdMoreFollows = 0xFF;
         private const int MaxDeviceIdTransactions = 16;
 
@@ -96,6 +98,8 @@ namespace ModbusForge.Services
 
         public virtual string BoundEndpoint => string.Empty;
 
+        public event EventHandler? ConnectionLost;
+
         public ModbusFrameLogger FrameLogger => _frameLogger;
 
         public virtual bool IsConnected
@@ -156,10 +160,29 @@ namespace ModbusForge.Services
 
         public virtual async Task DisconnectAsync()
         {
-            await _ioLock.WaitAsync().ConfigureAwait(false);
+            // Bound the wait: a request stuck on a half-open socket must not
+            // block the disconnect forever. If we time out, tear the transport
+            // down anyway — the in-flight request will fail on the closed socket
+            // and release the lock on its own.
+            var acquired = await _ioLock.WaitAsync(DisconnectLockTimeout).ConfigureAwait(false);
+            if (!acquired)
+            {
+                _logger.LogWarning("Timed out waiting for an in-flight request before disconnect; closing the transport anyway.");
+                try
+                {
+                    (_client as IDisposable)?.Dispose();
+                    _client = null;
+                    _tcpClient?.Close();
+                    _tcpClient = null;
+                }
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                {
+                    _logger.LogError(ex, "Error closing the transport after a disconnect timeout.");
+                }
+            }
             try
             {
-                if (IsConnected)
+                if (acquired && IsConnected)
                 {
                     var message = $"Disconnecting from Modbus server at {_lastIpAddress}:{_lastPort}";
                     _logger.LogInformation(message);
@@ -180,7 +203,10 @@ namespace ModbusForge.Services
             }
             finally
             {
-                _ioLock.Release();
+                if (acquired)
+                {
+                    _ioLock.Release();
+                }
             }
         }
 
@@ -458,6 +484,7 @@ namespace ModbusForge.Services
         private void HandleConnectionLoss()
         {
             _logger.LogInformation("Client is disconnected. Cleaning up connection.");
+            bool wasConnected = _client != null;
             try
             {
                 (_client as IDisposable)?.Dispose();
@@ -468,6 +495,11 @@ namespace ModbusForge.Services
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error during explicit disconnect after connection loss.");
+            }
+
+            if (wasConnected)
+            {
+                ConnectionLost?.Invoke(this, EventArgs.Empty);
             }
         }
 

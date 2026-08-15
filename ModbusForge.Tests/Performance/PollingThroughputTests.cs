@@ -18,6 +18,7 @@ namespace ModbusForge.Tests.Performance
             public bool IsConnected => true;
             public string BoundEndpoint => "stub";
             public ModbusFrameLogger FrameLogger { get; } = new ModbusFrameLogger(10);
+            public event EventHandler? ConnectionLost { add { } remove { } }
 
             public Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1", CancellationToken cancellationToken = default)
                 => Task.FromResult(true);

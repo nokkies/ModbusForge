@@ -86,6 +86,8 @@ namespace ModbusForge.Services
             throw new NotSupportedException("Serial connections require a ConnectionProfile. Use ConnectAsync(ConnectionProfile).");
         }
 
+        public event EventHandler? ConnectionLost;
+
         public virtual async Task<bool> ConnectAsync(ConnectionProfile profile, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(profile);
@@ -147,9 +149,28 @@ namespace ModbusForge.Services
             }
         }
 
+        private static readonly TimeSpan DisconnectLockTimeout = TimeSpan.FromSeconds(10);
+
         public virtual async Task DisconnectAsync()
         {
-            await _ioLock.WaitAsync().ConfigureAwait(false);
+            // Bound the wait: a request stuck on a dead port must not block the
+            // disconnect forever. If we time out, close the transport anyway so
+            // the in-flight request fails and releases the lock on its own.
+            var acquired = await _ioLock.WaitAsync(DisconnectLockTimeout).ConfigureAwait(false);
+            if (!acquired)
+            {
+                _logger.LogWarning("Timed out waiting for an in-flight request before disconnect; closing the transport anyway.");
+                try
+                {
+                    DisconnectCore();
+                }
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                {
+                    _logger.LogError(ex, "Error closing the transport after a disconnect timeout.");
+                }
+                return;
+            }
+
             try
             {
                 if (IsConnected)
@@ -548,7 +569,13 @@ namespace ModbusForge.Services
         private void HandleConnectionLoss()
         {
             _logger.LogInformation("Serial client is disconnected. Cleaning up connection.");
+            bool wasConnected = _client != null;
             DisconnectCore();
+
+            if (wasConnected)
+            {
+                ConnectionLost?.Invoke(this, EventArgs.Empty);
+            }
         }
 
         private void DisconnectCore()

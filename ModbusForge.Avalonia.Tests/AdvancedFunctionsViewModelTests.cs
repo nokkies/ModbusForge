@@ -116,6 +116,7 @@ namespace ModbusForge.Avalonia.Tests
             public bool IsConnected { get; set; }
             public string BoundEndpoint => string.Empty;
             public ModbusFrameLogger FrameLogger { get; } = new();
+            public event EventHandler? ConnectionLost { add { } remove { } }
             public ushort? MaskWriteResult { get; set; }
             public ushort[]? ReadWriteResult { get; set; }
             public DeviceIdentification? Identification { get; set; }

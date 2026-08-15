@@ -8,6 +8,11 @@ namespace ModbusForge.Services
     /// </summary>
     public interface IDispatcher
     {
+        /// <summary>
+        /// True when the calling thread is the dispatcher's thread.
+        /// </summary>
+        bool CheckAccess { get; }
+
         void Invoke(Action action);
         T Invoke<T>(Func<T> func);
         Task InvokeAsync(Action action);

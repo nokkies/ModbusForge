@@ -45,6 +45,13 @@ namespace ModbusForge.Services
 
         public virtual bool IsConnected => _isRunning;
 
+        // The server side has no peer connection to lose; the event is never raised.
+        public event EventHandler? ConnectionLost
+        {
+            add { }
+            remove { }
+        }
+
         public virtual async Task<bool> ConnectAsync(ConnectionProfile profile, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(profile);

@@ -1469,6 +1469,15 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void ActiveProfile_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
+            // Profile properties can change from a worker thread (e.g. when the
+            // service detects a lost connection). The notifications below feed
+            // UI-bound properties, so re-post to the dispatcher when needed.
+            if (!_dispatcher.CheckAccess)
+            {
+                _ = _dispatcher.InvokeAsync(() => ActiveProfile_PropertyChanged(sender, e));
+                return;
+            }
+
             if (e.PropertyName == nameof(ConnectionProfile.IsConnected))
             {
                 if (ActiveProfile?.IsConnected == true)
@@ -1650,9 +1659,24 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void ConnectionManager_ProfileDisconnected(object? sender, ConnectionProfile e)
         {
+            // May be raised from a worker thread when the service detects a lost
+            // connection; marshal the UI-facing work to the dispatcher (the
+            // dispatcher adapter runs inline when already on the UI thread).
+            _ = _dispatcher.InvokeAsync(() => OnProfileDisconnected(e));
+        }
+
+        private void OnProfileDisconnected(ConnectionProfile e)
+        {
             _logger.LogInformation("Profile disconnected: {Name}", e.Name);
             OnPropertyChanged(nameof(ServerIpAddress));
             OnPropertyChanged(nameof(ActiveProfileDisplayName));
+            OnPropertyChanged(nameof(IsConnected));
+            OnPropertyChanged(nameof(IsDisconnected));
+            OnPropertyChanged(nameof(IsConnectionErrorVisible));
+            OnPropertyChanged(nameof(ConnectionStatusText));
+            OnPropertyChanged(nameof(DebugSummary));
+            OnPropertyChanged(nameof(ToggleConnectionButtonText));
+            ToggleConnectionCommand.NotifyCanExecuteChanged();
             _trendLogger?.Stop();
             StopPolling();
             StopCustomWatchMonitoring();
@@ -2140,6 +2164,12 @@ namespace ModbusForge.Avalonia.ViewModels
                 if (service == null || ActiveProfile == null)
                 {
                     await _dispatcher.InvokeAsync(() => StatusMessage = "No active service.");
+                    return;
+                }
+
+                if (!service.IsConnected)
+                {
+                    await _dispatcher.InvokeAsync(() => StatusMessage = "Not connected to a Modbus device.");
                     return;
                 }
 

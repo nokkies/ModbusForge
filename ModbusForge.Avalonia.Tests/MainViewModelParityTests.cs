@@ -483,6 +483,7 @@ namespace ModbusForge.Avalonia.Tests
             public bool IsConnected => true;
             public string BoundEndpoint => "test";
             public ModbusFrameLogger FrameLogger { get; } = new();
+            public event EventHandler? ConnectionLost { add { } remove { } }
 
             public Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1", CancellationToken cancellationToken = default) => Task.FromResult(true);
             public Task DisconnectAsync() => Task.CompletedTask;

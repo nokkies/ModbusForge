@@ -170,7 +170,7 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<IApiApplicationService>(provider =>
                 new ApiApplicationService(
                     provider.GetRequiredService<IAppStateAccessor>(),
-                    provider.GetRequiredService<IModbusService>(),
+                    provider.GetRequiredService<IConnectionManager>(),
                     provider.GetRequiredService<IScriptRuleService>(),
                     provider.GetRequiredService<IConsoleLoggerService>(),
                     provider.GetRequiredService<ITrendLogger>(),
