@@ -115,14 +115,8 @@ public class SettingsService : ISettingsService
     {
         try
         {
-            var directory = Path.GetDirectoryName(_settingsFilePath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
             var json = JsonSerializer.Serialize(_settings, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_settingsFilePath, json);
+            AtomicFileWriter.WriteAllText(_settingsFilePath, json);
             return true;
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))

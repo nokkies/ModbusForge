@@ -121,6 +121,8 @@ namespace ModbusForge.Avalonia.Views
 
         private async void ViewModel_RequestTagSelection(object? sender, EventArgs e)
         {
+            try
+            {
             if (_viewModel == null || _registerTemplateImportService == null || _registerTemplateStore == null ||
                 _fileDialogService == null || _fileSystem == null || _messageBoxService == null)
             {
@@ -135,8 +137,6 @@ namespace ModbusForge.Avalonia.Views
                 return;
             }
 
-            try
-            {
                 var browserViewModel = new TagBrowserViewModel(
                     _viewModel.TagService,
                     _registerTemplateImportService,

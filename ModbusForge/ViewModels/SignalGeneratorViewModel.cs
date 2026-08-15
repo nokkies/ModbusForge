@@ -15,6 +15,10 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly IDispatcher _dispatcher;
         private CancellationTokenSource? _cts;
         private Task? _runTask;
+        private int _runGeneration;
+
+        /// <summary>Delay before retrying after a write error in the run loop (ms).</summary>
+        private const int ErrorRetryDelayMs = 1000;
 
         public static IReadOnlyList<string> Waveforms { get; } = new[] { "Ramp", "Sine", "Triangle", "Square" };
 
@@ -50,7 +54,7 @@ namespace ModbusForge.Avalonia.ViewModels
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
 
-            StartCommand = new AsyncRelayCommand(StartAsync, () => !IsRunning);
+            StartCommand = new RelayCommand(Start, () => !IsRunning);
             StopCommand = new RelayCommand(Stop, () => IsRunning);
         }
 
@@ -60,7 +64,7 @@ namespace ModbusForge.Avalonia.ViewModels
             ((RelayCommand)StopCommand).NotifyCanExecuteChanged();
         }
 
-        private async Task StartAsync()
+        private void Start()
         {
             var service = _connectionManager.ActiveService;
             if (service == null || !service.IsConnected)
@@ -69,15 +73,20 @@ namespace ModbusForge.Avalonia.ViewModels
                 return;
             }
 
+            // Cancel a still-finishing previous run so its final status write
+            // cannot clobber this run's messages.
+            _cts?.Cancel();
+            _cts?.Dispose();
             _cts = new CancellationTokenSource();
+            var generation = System.Threading.Interlocked.Increment(ref _runGeneration);
+
             IsRunning = true;
             StatusMessage = $"Signal generator running ({Waveform})...";
 
-            _runTask = RunLoopAsync(_cts.Token);
-            await Task.CompletedTask;
+            _runTask = RunLoopAsync(_cts.Token, generation);
         }
 
-        private async Task RunLoopAsync(CancellationToken token)
+        private async Task RunLoopAsync(CancellationToken token, int generation)
         {
             var service = _connectionManager.ActiveService;
             var unitId = (byte)(_connectionManager.ActiveProfile?.UnitId ?? 1);
@@ -115,12 +124,23 @@ namespace ModbusForge.Avalonia.ViewModels
                 {
                     break;
                 }
+                catch (ObjectDisposedException)
+                {
+                    // The CTS was disposed by Dispose()/Start() while the loop was
+                    // unwinding - do not retry.
+                    break;
+                }
                 catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     await _dispatcher.InvokeAsync(() => StatusMessage = $"Signal generator error: {ex.Message}");
-                    await Task.Delay(1000, token);
+                    await Task.Delay(ErrorRetryDelayMs, token);
                 }
             }
+
+            // A newer run may have started while this one was shutting down; only the
+            // most recent run announces the stopped state.
+            if (generation != Volatile.Read(ref _runGeneration))
+                return;
 
             await _dispatcher.InvokeAsync(() =>
             {

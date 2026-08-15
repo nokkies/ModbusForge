@@ -715,11 +715,34 @@ namespace ModbusForge.Services
             var snapshotGroups      = GetAllGroupsFlat().ToList();
             var snapshotWatchEntries = WatchEntries.ToList();
 
+            // Root groups captured BEFORE any mutation: the rollback must not re-derive
+            // rootness from the (already re-parented) current state.
+            var snapshotRootGroups = GetAllGroupsFlat()
+                .Where(g => string.IsNullOrEmpty(g.ParentGroupId))
+                .ToList();
+
             // Per-group Tags-collection snapshots (needed to restore group.Tags on rollback)
             var groupTagsSnapshot = GetAllGroupsFlat()
                 .ToDictionary(g => g.Id, g => g.Tags.ToList());
             var groupSubsSnapshot = GetAllGroupsFlat()
                 .ToDictionary(g => g.Id, g => g.SubGroups.ToList());
+
+            // Move mode mutates tag / sub-group / watch-entry objects IN PLACE. The list
+            // snapshots above hold references to those same objects, so restoring the
+            // lists alone would leave the re-parented field values behind. Capture the
+            // original values so the rollback can undo the mutations too.
+            var tagOriginals = new Dictionary<string, (string? GroupId, string Group)>();
+            var subOriginals = new Dictionary<string, (string? ParentGroupId, string ParentGroup)>();
+            var watchOriginals = new Dictionary<string, string>();
+            if (mode != GroupDeletionMode.CascadeDelete)
+            {
+                foreach (var t in affectedTags)
+                    tagOriginals[t.Id] = (t.GroupId, t.Group);
+                foreach (var s in group.SubGroups)
+                    subOriginals[s.Id] = (s.ParentGroupId, s.ParentGroup);
+                foreach (var w in affectedWatchEntries)
+                    watchOriginals[w.Id] = w.TagGroup;
+            }
 
             // ---- Apply mutation ----
             try
@@ -769,18 +792,9 @@ namespace ModbusForge.Services
                         destinationGroup.SubGroups.Add(sub);
                     }
 
-                    // For tags in deeper descendants: reparent them to the destination group as well
-                    var deepTags = affectedTags
-                        .Where(t => t.GroupId != groupId)
-                        .ToList();
-                    foreach (var tag in deepTags)
-                    {
-                        var oldGroup = FindGroupById(tag.GroupId!);
-                        // These tags stay in their own subgroup (which moved up) – no relocation needed
-                        // unless MoveToDefault flattens all levels.
-                        // Under MoveToParent the descendants also moved up so tags remain correct.
-                        movedTagCount++;
-                    }
+                    // Tags in deeper descendants are NOT relocated: their subgroup moved
+                    // up as a unit, so the tags keep their own group. They are deliberately
+                    // not counted in movedTagCount (only the direct tags above were re-parented).
 
                     // Update watch entries to reflect new group name (TagGroup field is display only)
                     foreach (var we in affectedWatchEntries)
@@ -823,7 +837,8 @@ namespace ModbusForge.Services
                 // ---- Rollback ----
                 _tagLogger.LogError(ex, "DeleteGroupAsync failed for '{GroupId}'; rolling back.", groupId);
                 RollbackDeletion(snapshotTags, snapshotGroups, snapshotWatchEntries,
-                                 groupTagsSnapshot, groupSubsSnapshot);
+                                 groupTagsSnapshot, groupSubsSnapshot, snapshotRootGroups,
+                                 tagOriginals, subOriginals, watchOriginals);
                 return Fail($"Deletion failed and was rolled back: {ex.Message}");
             }
         }
@@ -879,14 +894,19 @@ namespace ModbusForge.Services
         }
 
         /// <summary>
-        /// Restores all in-memory collections to their pre-deletion snapshots.
+        /// Restores all in-memory collections to their pre-deletion snapshots, and undoes
+        /// the in-place field mutations that move mode performed on shared objects.
         /// </summary>
         private void RollbackDeletion(
             List<Tag> snapshotTags,
             List<TagGroup> snapshotGroups,
             List<WatchEntry> snapshotWatchEntries,
             Dictionary<string, List<Tag>> groupTagsSnapshot,
-            Dictionary<string, List<TagGroup>> groupSubsSnapshot)
+            Dictionary<string, List<TagGroup>> groupSubsSnapshot,
+            List<TagGroup> snapshotRootGroups,
+            Dictionary<string, (string? GroupId, string Group)> tagOriginals,
+            Dictionary<string, (string? ParentGroupId, string ParentGroup)> subOriginals,
+            Dictionary<string, string> watchOriginals)
         {
             // Restore flat tags list
             Tags.Clear();
@@ -911,29 +931,38 @@ namespace ModbusForge.Services
                 }
             }
 
-            // Restore root Groups collection (rebuild from snapshot root-level groups)
-            var snapshotRoots = snapshotGroups
-                .Where(g => string.IsNullOrEmpty(g.ParentGroupId))
-                .ToList();
-            Groups.Clear();
-            foreach (var g in snapshotRoots) Groups.Add(g);
-        }
-
-        // ----------------------------------------------------------------
-        //  Preview helper (declared here, shared with GroupDeletionPreview)
-        // ----------------------------------------------------------------
-
-        /// <summary>
-        /// Workaround property accessor for GroupDeletionPreview.Message —
-        /// available only on the preview object, declared here as a private static extension point.
-        /// </summary>
-        private static GroupDeletionPreview ErrorPreview(string groupId, string message) =>
-            new()
+            // Restore in-place field mutations (the list snapshots share object references,
+            // so the re-parented values must be undone explicitly).
+            foreach (var (id, original) in tagOriginals)
             {
-                GroupId     = groupId,
-                IsProtected = true,
-                Message     = message
-            };
+                var tag = snapshotTags.FirstOrDefault(t => t.Id == id);
+                if (tag != null)
+                {
+                    tag.GroupId = original.GroupId;
+                    tag.Group = original.Group;
+                }
+            }
+            foreach (var (id, original) in subOriginals)
+            {
+                var sub = snapshotGroups.FirstOrDefault(g => g.Id == id);
+                if (sub != null)
+                {
+                    sub.ParentGroupId = original.ParentGroupId;
+                    sub.ParentGroup = original.ParentGroup;
+                }
+            }
+            foreach (var (id, originalTagGroup) in watchOriginals)
+            {
+                var watch = snapshotWatchEntries.FirstOrDefault(w => w.Id == id);
+                if (watch != null)
+                    watch.TagGroup = originalTagGroup;
+            }
+
+            // Restore root Groups collection from the pre-mutation snapshot (NOT by
+            // re-filtering the current state, which may already have been re-parented).
+            Groups.Clear();
+            foreach (var g in snapshotRootGroups) Groups.Add(g);
+        }
 
         /// <summary>
         /// Saves the tag database atomically (write to temp file, then replace).

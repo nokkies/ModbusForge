@@ -53,32 +53,17 @@ namespace ModbusForge.Services
         public async Task<T> ExecuteAsync<T>(string circuitName, Func<Task<T>> action, CircuitBreakerConfig? config = null)
         {
             var state = GetOrCreateCircuitState(circuitName, config);
-
-            if (state.State == CircuitState.Open)
-            {
-                if (DateTime.UtcNow >= state.OpenUntil)
-                {
-                    _logger.LogInformation("Circuit {CircuitName} transitioning to Half-Open state", circuitName);
-                    state.State = CircuitState.HalfOpen;
-                    state.ConsecutiveSuccesses = 0;
-                }
-                else
-                {
-                    _logger.LogWarning("Circuit {CircuitName} is OPEN, blocking request until {OpenUntil}", 
-                        circuitName, state.OpenUntil);
-                    throw new CircuitBreakerOpenException($"Circuit '{circuitName}' is open until {state.OpenUntil}");
-                }
-            }
+            AcquireExecutionPermission(state, circuitName);
 
             try
             {
                 var result = await action();
-                RecordSuccess(circuitName, state);
+                RecordSuccess(state, circuitName);
                 return result;
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
-                RecordFailure(circuitName, state, ex);
+                RecordFailure(state, circuitName, ex);
                 throw;
             }
         }
@@ -86,32 +71,52 @@ namespace ModbusForge.Services
         public async Task ExecuteAsync(string circuitName, Func<Task> action, CircuitBreakerConfig? config = null)
         {
             var state = GetOrCreateCircuitState(circuitName, config);
-
-            if (state.State == CircuitState.Open)
-            {
-                if (DateTime.UtcNow >= state.OpenUntil)
-                {
-                    _logger.LogInformation("Circuit {CircuitName} transitioning to Half-Open state", circuitName);
-                    state.State = CircuitState.HalfOpen;
-                    state.ConsecutiveSuccesses = 0;
-                }
-                else
-                {
-                    _logger.LogWarning("Circuit {CircuitName} is OPEN, blocking request until {OpenUntil}", 
-                        circuitName, state.OpenUntil);
-                    throw new CircuitBreakerOpenException($"Circuit '{circuitName}' is open until {state.OpenUntil}");
-                }
-            }
+            AcquireExecutionPermission(state, circuitName);
 
             try
             {
                 await action();
-                RecordSuccess(circuitName, state);
+                RecordSuccess(state, circuitName);
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
-                RecordFailure(circuitName, state, ex);
+                RecordFailure(state, circuitName, ex);
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// Atomically decides whether this call may proceed. When the open period has
+        /// elapsed, exactly one caller becomes the half-open recovery probe; concurrent
+        /// callers are still blocked until that probe decides the circuit's fate
+        /// (the previous code let every concurrent caller transition to HalfOpen at once,
+        /// hammering a recovering dependency with parallel test requests).
+        /// </summary>
+        private void AcquireExecutionPermission(CircuitBreakerState state, string circuitName)
+        {
+            lock (_lock)
+            {
+                if (state.State != CircuitState.Open)
+                    return;
+
+                if (state.OpenUntil is null || DateTime.UtcNow < state.OpenUntil)
+                {
+                    _logger.LogWarning("Circuit {CircuitName} is OPEN, blocking request until {OpenUntil}",
+                        circuitName, state.OpenUntil);
+                    throw new CircuitBreakerOpenException($"Circuit '{circuitName}' is open until {state.OpenUntil}");
+                }
+
+                if (state.HalfOpenProbeInFlight)
+                {
+                    _logger.LogWarning("Circuit {CircuitName} is HALF-OPEN with a recovery probe in flight, blocking request",
+                        circuitName);
+                    throw new CircuitBreakerOpenException($"Circuit '{circuitName}' is half-open; waiting for the recovery probe to complete");
+                }
+
+                _logger.LogInformation("Circuit {CircuitName} transitioning to Half-Open state", circuitName);
+                state.State = CircuitState.HalfOpen;
+                state.HalfOpenProbeInFlight = true;
+                state.ConsecutiveSuccesses = 0;
             }
         }
 
@@ -135,6 +140,7 @@ namespace ModbusForge.Services
                     state.ConsecutiveSuccesses = 0;
                     state.LastFailureTime = null;
                     state.OpenUntil = null;
+                    state.HalfOpenProbeInFlight = false;
                 }
             }
         }
@@ -151,6 +157,7 @@ namespace ModbusForge.Services
                     circuit.ConsecutiveSuccesses = 0;
                     circuit.LastFailureTime = null;
                     circuit.OpenUntil = null;
+                    circuit.HalfOpenProbeInFlight = false;
                 }
             }
         }
@@ -169,16 +176,20 @@ namespace ModbusForge.Services
             }
         }
 
-        private void RecordSuccess(string circuitName, CircuitBreakerState state)
+        private void RecordSuccess(CircuitBreakerState state, string circuitName)
         {
             lock (_lock)
             {
                 state.ConsecutiveSuccesses++;
-                _logger.LogDebug("Circuit {CircuitName} success recorded. Consecutive successes: {Count}", 
+                _logger.LogDebug("Circuit {CircuitName} success recorded. Consecutive successes: {Count}",
                     circuitName, state.ConsecutiveSuccesses);
 
                 if (state.State == CircuitState.HalfOpen)
                 {
+                    // This probe finished; further probes may start if more successes
+                    // are still required to close the circuit.
+                    state.HalfOpenProbeInFlight = false;
+
                     if (state.ConsecutiveSuccesses >= state.Config.SuccessThreshold)
                     {
                         _logger.LogInformation("Circuit {CircuitName} transitioning to CLOSED state", circuitName);
@@ -197,7 +208,7 @@ namespace ModbusForge.Services
             }
         }
 
-        private void RecordFailure(string circuitName, CircuitBreakerState state, Exception exception)
+        private void RecordFailure(CircuitBreakerState state, string circuitName, Exception exception)
         {
             lock (_lock)
             {
@@ -205,12 +216,21 @@ namespace ModbusForge.Services
                 state.LastFailureTime = DateTime.UtcNow;
                 state.ConsecutiveSuccesses = 0;
 
-                _logger.LogWarning(exception, "Circuit {CircuitName} failure recorded. Total failures: {Count}", 
+                _logger.LogWarning(exception, "Circuit {CircuitName} failure recorded. Total failures: {Count}",
                     circuitName, state.FailureCount);
 
-                if (state.FailureCount >= state.Config.FailureThreshold)
+                if (state.State == CircuitState.HalfOpen)
                 {
-                    _logger.LogError("Circuit {CircuitName} opening due to {FailureCount} failures", 
+                    // The recovery probe failed: reopen for a fresh open period.
+                    _logger.LogError("Circuit {CircuitName} recovery probe failed, reopening circuit", circuitName);
+                    state.State = CircuitState.Open;
+                    state.OpenUntil = DateTime.UtcNow.Add(state.Config.OpenTimeout);
+                    state.HalfOpenProbeInFlight = false;
+                    state.FailureCount = 0;
+                }
+                else if (state.FailureCount >= state.Config.FailureThreshold)
+                {
+                    _logger.LogError("Circuit {CircuitName} opening due to {FailureCount} failures",
                         circuitName, state.FailureCount);
                     state.State = CircuitState.Open;
                     state.OpenUntil = DateTime.UtcNow.Add(state.Config.OpenTimeout);
@@ -231,6 +251,9 @@ namespace ModbusForge.Services
             public int ConsecutiveSuccesses { get; set; }
             public DateTime? LastFailureTime { get; set; }
             public DateTime? OpenUntil { get; set; }
+
+            /// <summary>True while the single allowed half-open recovery probe is running.</summary>
+            public bool HalfOpenProbeInFlight { get; set; }
         }
     }
 

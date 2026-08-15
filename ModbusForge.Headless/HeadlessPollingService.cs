@@ -16,6 +16,12 @@ namespace ModbusForge.Headless
     /// </summary>
     public sealed class HeadlessPollingService : BackgroundService
     {
+        /// <summary>Consecutive failed reads before a reconnect is attempted.</summary>
+        private const int MaxConsecutiveFailuresBeforeReconnect = 3;
+
+        /// <summary>Default delay before a reconnect attempt, giving transient network issues time to clear.</summary>
+        private const int DefaultReconnectBackoffMs = 5000;
+
         private readonly IModbusService _modbusService;
         private readonly MqttGatewayService? _mqttService;
         private readonly IHostApplicationLifetime _lifetime;
@@ -26,6 +32,8 @@ namespace ModbusForge.Headless
         private readonly int _intervalMs;
         private readonly PlcArea _area;
         private readonly MqttSettings _mqttSettings;
+        private readonly int _reconnectBackoffMs;
+        private int _consecutiveFailures;
 
         public HeadlessPollingService(
             IModbusService modbusService,
@@ -45,6 +53,7 @@ namespace ModbusForge.Headless
             _count = configuration.GetValue<int?>("Polling:Count") ?? 10;
             _intervalMs = configuration.GetValue<int?>("Polling:IntervalMs") ?? 1000;
             _area = Enum.TryParse<PlcArea>(configuration["Polling:Area"], true, out var a) ? a : PlcArea.HoldingRegister;
+            _reconnectBackoffMs = configuration.GetValue<int?>("Polling:ReconnectBackoffMs") ?? DefaultReconnectBackoffMs;
 
             _mqttSettings = HeadlessProfileFactory.CreateMqttSettings(configuration);
         }
@@ -77,13 +86,34 @@ namespace ModbusForge.Headless
 
             while (!stoppingToken.IsCancellationRequested)
             {
+                bool pollSucceeded;
                 try
                 {
-                    await PollOnceAsync(stoppingToken);
+                    pollSucceeded = await PollOnceAsync(stoppingToken);
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
                 {
                     _logger.LogError(ex, "Poll failed");
+                    pollSucceeded = false;
+                }
+
+                if (pollSucceeded)
+                {
+                    _consecutiveFailures = 0;
+                }
+                else if (!_modbusService.IsConnected || _consecutiveFailures >= MaxConsecutiveFailuresBeforeReconnect)
+                {
+                    _consecutiveFailures++;
+                    await TryReconnectAsync(stoppingToken);
+                    _consecutiveFailures = 0;
+                }
+                else
+                {
+                    _consecutiveFailures++;
                 }
 
                 try
@@ -96,12 +126,66 @@ namespace ModbusForge.Headless
                 }
             }
 
-            await (_mqttService?.DisconnectAsync() ?? Task.CompletedTask);
-            await _modbusService.DisconnectAsync();
+            await StopServicesAsync();
             _lifetime.StopApplication();
         }
 
-        private async Task PollOnceAsync(CancellationToken token)
+        /// <summary>Test seam: runs the service loop directly (visible to ModbusForge.Headless.Tests).</summary>
+        internal Task ExecuteForTest(CancellationToken token) => ExecuteAsync(token);
+
+        private async Task TryReconnectAsync(CancellationToken token)
+        {
+            _logger.LogWarning(
+                "Connection lost or {Failures} consecutive read failure(s) - attempting reconnect in {BackoffMs} ms",
+                _consecutiveFailures, _reconnectBackoffMs);
+
+            try
+            {
+                await _modbusService.DisconnectAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error while disconnecting before reconnect");
+            }
+
+            await Task.Delay(_reconnectBackoffMs, token);
+
+            var connected = await _modbusService.ConnectAsync(_profile, token);
+            if (connected)
+            {
+                _logger.LogInformation("Reconnected to the Modbus device.");
+            }
+            else
+            {
+                _logger.LogError("Reconnect failed - will keep retrying on subsequent poll cycles.");
+            }
+        }
+
+        private async Task StopServicesAsync()
+        {
+            if (_mqttService is not null)
+            {
+                try
+                {
+                    await _mqttService.DisconnectAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error while disconnecting MQTT");
+                }
+            }
+
+            try
+            {
+                await _modbusService.DisconnectAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error while disconnecting Modbus");
+            }
+        }
+
+        private async Task<bool> PollOnceAsync(CancellationToken token)
         {
             if (_area == PlcArea.HoldingRegister || _area == PlcArea.InputRegister)
             {
@@ -112,13 +196,14 @@ namespace ModbusForge.Headless
                 if (values is null)
                 {
                     _logger.LogWarning("No response for {Area} [{StartAddress}..{EndAddress}]", _area, _startAddress, _startAddress + _count - 1);
-                    return;
+                    return false;
                 }
 
                 _logger.LogInformation("{Area} [{StartAddress}..{EndAddress}]: {Values}",
                     _area, _startAddress, _startAddress + values.Length - 1, string.Join(", ", values));
 
                 await PublishAsync(values, null, token);
+                return true;
             }
             else
             {
@@ -129,13 +214,14 @@ namespace ModbusForge.Headless
                 if (states is null)
                 {
                     _logger.LogWarning("No response for {Area} [{StartAddress}..{EndAddress}]", _area, _startAddress, _startAddress + _count - 1);
-                    return;
+                    return false;
                 }
 
                 _logger.LogInformation("{Area} [{StartAddress}..{EndAddress}]: {Values}",
                     _area, _startAddress, _startAddress + states.Length - 1, string.Join(", ", states));
 
                 await PublishAsync(null, states, token);
+                return true;
             }
         }
 

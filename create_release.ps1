@@ -1,10 +1,14 @@
 # GitHub Release Creation Script for ModbusForge
-# Note: This script requires a GitHub Personal Access Token with 'repo' scope
+#
+# The token is read from the GITHUB_TOKEN environment variable so it never
+# appears on a command line (where other processes and ETW would see it):
+#     $env:GITHUB_TOKEN = 'ghp_...' ; .\create_release.ps1
+#
+# Note: for a normal release you only need to push the v* tag - the
+# release.yml workflow builds, signs, packages and publishes. This script is
+# for the manual/emergency path.
 
 param(
-    [Parameter(Mandatory=$true)]
-    [string]$GitHubToken,
-
     [Parameter(Mandatory=$false)]
     [string]$RepoOwner = "nokkies",
 
@@ -15,16 +19,49 @@ param(
     [string]$Version = ""
 )
 
+$ErrorActionPreference = "Stop"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 $repoRoot = $PSScriptRoot
-$csproj = Join-Path $repoRoot "ModbusForge\ModbusForge.csproj"
+if (-not $repoRoot) { $repoRoot = (Get-Location).Path }
+
+# The three policy-tracked csproj files must agree on the version (same rule as
+# the CI release gate).
+$csprojFiles = @(
+    (Join-Path $repoRoot "ModbusForge\ModbusForge.csproj"),
+    (Join-Path $repoRoot "ModbusForge.Core\ModbusForge.Core.csproj"),
+    (Join-Path $repoRoot "ModbusForge.Headless\ModbusForge.Headless.csproj")
+)
+
+function Read-CsprojVersion([string]$path) {
+    $match = Select-String -Path $path -Pattern '<Version>([^<]+)</Version>' | Select-Object -First 1
+    if (-not $match) { throw "No <Version> element found in $path" }
+    return $match.Matches[0].Groups[1].Value
+}
+
+$projectVersions = @{}
+foreach ($csproj in $csprojFiles) {
+    $projectVersions[$csproj] = Read-CsprojVersion $csproj
+}
+
 if (-not $Version) {
-    $Version = ((Get-Content $csproj | Select-String '<Version>(.*)</Version>').Matches[0].Groups[1].Value)
+    $Version = $projectVersions[$csprojFiles[0]]
+}
+
+foreach ($csproj in $csprojFiles) {
+    if ($projectVersions[$csproj] -ne $Version) {
+        throw "Version mismatch: $(Split-Path $csproj -Leaf) is '$($projectVersions[$csproj])' but the release version is '$Version'."
+    }
+}
+
+if (-not $env:GITHUB_TOKEN) {
+    throw "GITHUB_TOKEN environment variable is not set. Export a token with 'repo' scope first."
 }
 
 $ReleaseTag = "v$Version"
 $ReleaseName = "ModbusForge v$Version"
-$CommitSha = (git rev-parse HEAD)
-$ReleaseNotesPath = "RELEASE_NOTES_v$Version.md"
+$CommitSha = (git -C $repoRoot rev-parse HEAD)
+$ReleaseNotesPath = Join-Path $repoRoot "RELEASE_NOTES_v$Version.md"
 
 # Read release notes
 if (Test-Path $ReleaseNotesPath) {
@@ -50,7 +87,7 @@ Write-Host "Commit: $CommitSha"
 
 # Create the release using GitHub API
 $Headers = @{
-    "Authorization" = "token $GitHubToken"
+    "Authorization" = "token $($env:GITHUB_TOKEN)"
     "Accept" = "application/vnd.github.v3+json"
     "Content-Type" = "application/json"
 }
@@ -60,16 +97,20 @@ try {
                                 -Method Post `
                                 -Headers $Headers `
                                 -Body $ReleasePayload
+}
+catch {
+    $statusCode = "n/a"
+    $content = $null
+    if ($_.Exception.Response) {
+        $statusCode = $_.Exception.Response.StatusCode.value__
+        $reader = [System.IO.StreamReader]::new($_.Exception.Response.GetResponseStream())
+        $content = $reader.ReadToEnd()
+    }
 
-    Write-Host "Release created successfully!"
-    Write-Host "Release URL: $($Response.html_url)"
-    Write-Host "Tag: $($Response.tag_name)"
-
-} catch {
     Write-Host "Error creating release:"
     Write-Host $_.Exception.Message
-    Write-Host "Status Code: $($_.Exception.Response.StatusCode.value__)"
-    Write-Host "Content: $($_.Exception.Response.Content)"
+    Write-Host "Status Code: $statusCode"
+    if ($content) { Write-Host "Content: $content" }
 
     Write-Host ""
     Write-Host "To create the release manually:"
@@ -77,8 +118,12 @@ try {
     Write-Host "2. Tag: $ReleaseTag"
     Write-Host "3. Target: $CommitSha"
     Write-Host "4. Title: $ReleaseName"
-    Write-Host "5. Copy release notes from: $ReleaseNotesPath"
+    if (Test-Path $ReleaseNotesPath) { Write-Host "5. Copy release notes from: $ReleaseNotesPath" }
+    exit 1
 }
 
+Write-Host "Release created successfully!"
+Write-Host "Release URL: $($Response.html_url)"
+Write-Host "Tag: $($Response.tag_name)"
 Write-Host ""
 Write-Host "ModbusForge v$Version is ready for release!"

@@ -68,11 +68,22 @@ namespace ModbusForge.Avalonia.Views
 
         private async void Browse_Click(object? sender, global::Avalonia.Interactivity.RoutedEventArgs e)
         {
-            var path = await _fileDialogService.ShowOpenFileDialogAsync(
-                "Select a register map",
-                "Register maps (*.csv;*.tsv;*.txt;*.xlsx;*.l5x;*.json;*.yaml;*.yml)|*.csv;*.tsv;*.txt;*.xlsx;*.l5x;*.json;*.yaml;*.yml|" +
-                "CSV files (*.csv;*.tsv;*.txt)|*.csv;*.tsv;*.txt|Excel files (*.xlsx)|*.xlsx|" +
-                "Rockwell L5X (*.l5x)|*.l5x|JSON (*.json)|*.json|YAML (*.yaml;*.yml)|*.yaml;*.yml|All files (*.*)|*.*");
+            string? path;
+            try
+            {
+                path = await _fileDialogService.ShowOpenFileDialogAsync(
+                    "Select a register map",
+                    "Register maps (*.csv;*.tsv;*.txt;*.xlsx;*.l5x;*.json;*.yaml;*.yml)|*.csv;*.tsv;*.txt;*.xlsx;*.l5x;*.json;*.yaml;*.yml|" +
+                    "CSV files (*.csv;*.tsv;*.txt)|*.csv;*.tsv;*.txt|Excel files (*.xlsx)|*.xlsx|" +
+                    "Rockwell L5X (*.l5x)|*.l5x|JSON (*.json)|*.json|YAML (*.yaml;*.yml)|*.yaml;*.yml|All files (*.*)|*.*");
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or OperationCanceledException))
+            {
+                // async void would otherwise swallow the exception silently.
+                SummaryText.Text = $"File dialog failed: {ex.Message}";
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(path))
                 return;
 

@@ -2,13 +2,15 @@
 ; See https://jrsoftware.org/isinfo.php for documentation
 
 #ifndef AppVersion
-  #define AppVersion "2026.8.24"
+  #define AppVersion "2026.8.27"
 #endif
 
 [Setup]
 AppName=ModbusForge
 AppVersion={#AppVersion}
 AppPublisher=ModbusForge
+; .NET 8 requires Windows 10 or later
+MinVersion=10.0.0.0
 DefaultDirName={autopf}\ModbusForge
 DefaultGroupName=ModbusForge
 UninstallDisplayIcon={app}\ModbusForge.exe

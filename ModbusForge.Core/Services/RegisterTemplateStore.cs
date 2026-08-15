@@ -60,7 +60,7 @@ namespace ModbusForge.Services
 
             var name = string.IsNullOrWhiteSpace(template.Name) ? "template" : template.Name;
             var path = Path.Combine(TemplatesDirectory, $"{Sanitize(name)}.json");
-            File.WriteAllText(path, JsonSerializer.Serialize(template, SerializerOptions));
+            AtomicFileWriter.WriteAllText(path, JsonSerializer.Serialize(template, SerializerOptions));
 
             _logger.LogInformation("Saved register template '{TemplateName}' with {EntryCount} entries to {Path}",
                 template.Name, template.Entries.Count, path);

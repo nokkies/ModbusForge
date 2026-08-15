@@ -16,7 +16,10 @@ namespace ModbusForge.Services
             _serialPort = serialPort ?? throw new ArgumentNullException(nameof(serialPort));
         }
 
-        public int InfiniteTimeout => _serialPort.ReadTimeout;
+        // NModbus uses InfiniteTimeout as a sentinel value to decide whether a timeout
+        // is active at all; it must be the platform constant (255), not the current
+        // ReadTimeout value.
+        public int InfiniteTimeout => SerialPort.InfiniteTimeout;
 
         public int ReadTimeout
         {

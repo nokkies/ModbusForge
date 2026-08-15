@@ -46,10 +46,20 @@ foreach ($rt in $runtimes) {
         Compress-Archive -Path "$publishDir\*" -DestinationPath $zipPath -Force
         Write-Output "Created $zipPath"
 
-        $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+        $iscc = $null
+        $isccCandidates = @(
+            'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+            'C:\Program Files\Inno Setup 6\ISCC.exe'
+        )
+        foreach ($candidate in $isccCandidates) {
+            if (Test-Path $candidate) { $iscc = $candidate; break }
+        }
+        if (-not $iscc) {
+            $iscc = Get-Command iscc.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+        }
         $issPath = Join-Path $repoRoot 'setup\ModbusForge.iss'
 
-        if (Test-Path $iscc) {
+        if ($iscc) {
             Write-Output "Building Windows installer with Inno Setup..."
             & $iscc /dAppVersion=$version $issPath
 
@@ -66,7 +76,7 @@ foreach ($rt in $runtimes) {
             }
         }
         else {
-            Write-Warning "Inno Setup compiler not found at $iscc; skipping installer build"
+            Write-Warning "Inno Setup compiler (iscc.exe) not found; skipping installer build"
         }
     }
     elseif ($rt -eq 'linux-x64') {

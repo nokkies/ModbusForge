@@ -3,7 +3,6 @@
         xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
         x:Class="ModbusForge.Avalonia.Views.TagBrowserWindow"
         x:DataType="vm:TagBrowserViewModel"
-        x:CompileBindings="False"
         Title="Tag Browser - Symbolic Addressing"
         Width="1100"
         Height="720"

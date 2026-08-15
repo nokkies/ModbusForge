@@ -202,6 +202,15 @@ namespace ModbusForge.Avalonia.Views
             {
                 await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
             }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
+            {
+                // async void would otherwise swallow the exception silently.
+                _viewModel?.MessageBoxService.ShowAsync(
+                    $"Tag drag failed: {ex.Message}",
+                    "Drag Failed",
+                    ModbusForge.Services.DialogButton.Ok,
+                    ModbusForge.Services.DialogIcon.Error);
+            }
             finally
             {
                 ResetTreeDrag();

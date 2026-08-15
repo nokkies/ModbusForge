@@ -11,7 +11,7 @@ namespace ModbusForge.Services.Api;
 public interface IApiApplicationService
 {
     /// <summary>Gets a snapshot of the current application status.</summary>
-    ApiStatus GetStatus();
+    Task<ApiStatus> GetStatusAsync(CancellationToken token);
 
     /// <summary>Initiates a connection and waits up to <paramref name="token"/> / the built-in timeout.</summary>
     Task<OperationResult> ConnectAsync(CancellationToken token);

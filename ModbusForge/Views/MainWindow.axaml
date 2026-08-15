@@ -4,7 +4,6 @@
         xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
         x:Class="ModbusForge.Avalonia.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        x:CompileBindings="False"
         Title="ModbusForge"
         Width="1556"
         Height="1073"
@@ -19,6 +18,10 @@
     <KeyBinding Gesture="F1" Command="{Binding OpenHelpCommand}" />
     <KeyBinding Gesture="Ctrl+P" Command="{Binding OpenPreferencesCommand}" />
     <KeyBinding Gesture="Ctrl+Q" Command="{Binding ExitCommand}" />
+    <KeyBinding Gesture="Ctrl+L" Command="{Binding ToggleConnectionCommand}" />
+    <KeyBinding Gesture="Ctrl+W" Command="{Binding OpenWatchWindowCommand}" />
+    <KeyBinding Gesture="Ctrl+N" Command="{Binding AddCustomEntryCommand}" />
+    <KeyBinding Gesture="Ctrl+B" Command="{Binding AddBulkCustomEntryCommand}" />
   </Window.KeyBindings>
 
   <Grid RowDefinitions="Auto,Auto,*,Auto">
@@ -57,7 +60,7 @@
           <MenuItem Header="_Custom Watch" ToggleType="CheckBox" IsChecked="{Binding IsCustomWatchTabVisible}" />
           <MenuItem Header="_Simulation" ToggleType="CheckBox" IsChecked="{Binding IsSimulationTabVisible}" />
           <MenuItem Header="_Decode" ToggleType="CheckBox" IsChecked="{Binding IsDecodeTabVisible}" />
-          <MenuItem Header="_Trend" ToggleType="CheckBox" IsChecked="{Binding IsTrendTabVisible}" />
+          <MenuItem Header="_Trends Tab" ToggleType="CheckBox" IsChecked="{Binding IsTrendTabVisible}" />
           <MenuItem Header="_Console" ToggleType="CheckBox" IsChecked="{Binding IsConsoleTabVisible}" />
           <MenuItem Header="_Debug" ToggleType="CheckBox" IsChecked="{Binding IsDebugTabVisible}" />
           <Separator />
@@ -68,11 +71,10 @@
           <MenuItem Header="_Preferences" Command="{Binding OpenPreferencesCommand}" InputGesture="Ctrl+P" />
           <MenuItem Header="_Connection Manager..." Command="{Binding OpenConnectionManagerCommand}" />
           <MenuItem Header="_Device Scanner..." Click="DeviceScanner_Click" />
-          <MenuItem Header="_Script Editor..." Click="ScriptEditor_Click" InputGesture="Ctrl+E" />
+          <MenuItem Header="_Script Editor..." Command="{Binding OpenScriptEditorCommand}" InputGesture="Ctrl+E" />
           <MenuItem Header="_Advanced Functions..." Click="AdvancedFunctions_Click" />
           <MenuItem Header="_Tag Browser..." Command="{Binding OpenTagBrowserCommand}" />
           <MenuItem Header="_Watch Window..." Command="{Binding OpenWatchWindowCommand}" />
-          <MenuItem Header="_Frame Inspector..." Command="{Binding OpenFrameInspectorCommand}" />
         </MenuItem>
         <MenuItem Header="_Help">
           <MenuItem Header="_Help" Command="{Binding OpenHelpCommand}" InputGesture="F1" />

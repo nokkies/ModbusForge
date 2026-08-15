@@ -27,6 +27,14 @@ namespace ModbusForge.Services
         private Task? _worker;
         private bool _disposed;
 
+        /// <summary>
+        /// How long Stop() waits for the worker after canceling. The worker's worst-case
+        /// in-flight time is one Modbus I/O at the transport timeout (5000 ms, no app-level
+        /// retries), so the margin must exceed that or a cancel arriving mid-read times out
+        /// the wait while the worker is still (briefly) alive.
+        /// </summary>
+        private const int StopWorkerWaitMs = 6000;
+
         public PollingEngine(
             IModbusService clientService,
             IModbusService serverService,
@@ -61,7 +69,15 @@ namespace ModbusForge.Services
         public void Stop()
         {
             _cts.Cancel();
-            _worker?.Wait(TimeSpan.FromSeconds(5));
+            var worker = _worker;
+            if (worker != null && !worker.Wait(TimeSpan.FromMilliseconds(StopWorkerWaitMs)))
+            {
+                // Cannot happen in steady state (the worker is always within one bounded I/O
+                // of checking the token); log loudly if it ever does so the leak is visible.
+                _logger.LogWarning(
+                    "Polling engine worker did not exit within {WaitMs} ms after cancel; it will finish on its own",
+                    StopWorkerWaitMs);
+            }
             _worker = null;
             _logger.LogInformation("Polling engine stopped");
         }
@@ -182,26 +198,37 @@ namespace ModbusForge.Services
                 }
                 else
                 {
+                    // A null result means the device did not respond (disconnected, slave
+                    // exception, or timeout). Surface it as an error instead of reporting a
+                    // "successful" empty read.
                     switch (command.Area)
                     {
                         case PlcArea.HoldingRegister:
-                            result.Values = await service.ReadHoldingRegistersAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false)
-                                ?? Array.Empty<ushort>();
+                            var holdingValues = await service.ReadHoldingRegistersAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false);
+                            if (holdingValues is null)
+                                return FailResult(result, "No response from device");
+                            result.Values = holdingValues;
                             break;
 
                         case PlcArea.InputRegister:
-                            result.Values = await service.ReadInputRegistersAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false)
-                                ?? Array.Empty<ushort>();
+                            var inputValues = await service.ReadInputRegistersAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false);
+                            if (inputValues is null)
+                                return FailResult(result, "No response from device");
+                            result.Values = inputValues;
                             break;
 
                         case PlcArea.Coil:
-                            result.States = await service.ReadCoilsAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false)
-                                ?? Array.Empty<bool>();
+                            var coilStates = await service.ReadCoilsAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false);
+                            if (coilStates is null)
+                                return FailResult(result, "No response from device");
+                            result.States = coilStates;
                             break;
 
                         case PlcArea.DiscreteInput:
-                            result.States = await service.ReadDiscreteInputsAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false)
-                                ?? Array.Empty<bool>();
+                            var discreteStates = await service.ReadDiscreteInputsAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false);
+                            if (discreteStates is null)
+                                return FailResult(result, "No response from device");
+                            result.States = discreteStates;
                             break;
 
                         default:
@@ -218,6 +245,17 @@ namespace ModbusForge.Services
                 result.ErrorMessage = ex.Message;
             }
 
+            return result;
+        }
+
+        private static PollingResult FailResult(PollingResult result, string message)
+        {
+            result.IsError = true;
+            result.ErrorMessage = message;
+            if (result.Area is PlcArea.HoldingRegister or PlcArea.InputRegister)
+                result.Values = Array.Empty<ushort>();
+            else
+                result.States = Array.Empty<bool>();
             return result;
         }
     }

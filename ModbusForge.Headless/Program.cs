@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -83,6 +83,13 @@ namespace ModbusForge.Headless
                 var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
                 var logger = host.Services.GetRequiredService<ILogger<Program>>();
 
+                if (!ValidateRuntimeConfiguration(host.Services.GetRequiredService<IConfiguration>(), out var configError))
+                {
+                    logger.LogError("{Error}", configError);
+                    lifetime.StopApplication();
+                    return;
+                }
+
                 lifetime.ApplicationStarted.Register(() =>
                     logger.LogInformation("ModbusForge.Headless started. Press Ctrl+C to stop."));
                 lifetime.ApplicationStopping.Register(() =>
@@ -114,25 +121,8 @@ namespace ModbusForge.Headless
         {
             var configuration = context.Configuration;
 
-            var defaultLevel = configuration["Logging:LogLevel:Default"] switch
-            {
-                "Debug" => LogEventLevel.Debug,
-                "Information" or null or "" => LogEventLevel.Information,
-                "Warning" => LogEventLevel.Warning,
-                "Error" => LogEventLevel.Error,
-                "Fatal" => LogEventLevel.Fatal,
-                _ => LogEventLevel.Information,
-            };
-
-            var microsoftLevel = configuration["Logging:LogLevel:Microsoft"] switch
-            {
-                "Debug" => LogEventLevel.Debug,
-                "Information" => LogEventLevel.Information,
-                "Warning" or null or "" => LogEventLevel.Warning,
-                "Error" => LogEventLevel.Error,
-                "Fatal" => LogEventLevel.Fatal,
-                _ => LogEventLevel.Warning,
-            };
+            var defaultLevel = ParseLogLevel(configuration["Logging:LogLevel:Default"], LogEventLevel.Information);
+            var microsoftLevel = ParseLogLevel(configuration["Logging:LogLevel:Microsoft"], LogEventLevel.Warning);
 
             config.MinimumLevel.Is(defaultLevel)
                 .MinimumLevel.Override("Microsoft", microsoftLevel)
@@ -153,6 +143,13 @@ namespace ModbusForge.Headless
             var filePath = configuration["Logging:File:Path"];
             if (!string.IsNullOrWhiteSpace(filePath))
             {
+                // Resolve relative paths against the content root (AppContext.BaseDirectory) so the
+                // log file location does not depend on the process working directory (systemd/Docker).
+                if (!Path.IsPathRooted(filePath))
+                {
+                    filePath = Path.Combine(AppContext.BaseDirectory, filePath);
+                }
+
                 var directory = Path.GetDirectoryName(filePath);
                 if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
                 {
@@ -219,17 +216,64 @@ namespace ModbusForge.Headless
             ["--mqtt-publish-period"] = "Mqtt:PublishPeriodMs",
         };
 
-        private static bool TryValidateAndNormalizeArgs(IReadOnlyList<string> args, out List<string> hostArgs, out string? error)
+        internal static LogEventLevel ParseLogLevel(string? value, LogEventLevel fallback)
+        {
+            var normalized = value?.Trim().ToLowerInvariant();
+            if (string.IsNullOrEmpty(normalized))
+            {
+                return fallback;
+            }
+
+            return normalized switch
+            {
+                "trace" or "verbose" => LogEventLevel.Verbose,
+                "debug" => LogEventLevel.Debug,
+                "information" or "info" => LogEventLevel.Information,
+                "warning" or "warn" => LogEventLevel.Warning,
+                "error" => LogEventLevel.Error,
+                "critical" or "fatal" => LogEventLevel.Fatal,
+                _ => fallback
+            };
+        }
+
+        internal static bool TryValidateAndNormalizeArgs(IReadOnlyList<string> args, out List<string> hostArgs, out string? error)
         {
             hostArgs = new List<string>(args);
             error = null;
+
+            // Every recognized option switch, so typos are rejected instead of silently
+            // becoming unknown configuration keys.
+            var recognizedOptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "--environment", "-e",
+                "--port", "--unit-id",
+                "--host", "--transport", "--com-port", "--baud-rate", "--parity",
+                "--data-bits", "--stop-bits", "--rts-enable", "--pre-tx-delay", "--post-tx-delay",
+                "--start", "--count", "--interval", "--area",
+                "--custom", "--custom-tick",
+                "--mqtt-enabled", "--mqtt-broker-host", "--mqtt-broker-port", "--mqtt-client-id",
+                "--mqtt-username", "--mqtt-password", "--mqtt-topic-template",
+                "--mqtt-qos", "--mqtt-retain", "--mqtt-publish-period"
+            };
 
             for (int i = 0; i < hostArgs.Count; i++)
             {
                 var arg = hostArgs[i];
 
-                if (i + 1 < hostArgs.Count)
+                if (arg.StartsWith("-", StringComparison.Ordinal) && arg.Length > 1)
                 {
+                    if (!recognizedOptions.Contains(arg))
+                    {
+                        error = $"Unknown option: {arg}";
+                        return false;
+                    }
+
+                    if (i + 1 >= hostArgs.Count)
+                    {
+                        error = $"Option {arg} requires a value.";
+                        return false;
+                    }
+
                     if (string.Equals(arg, "--port", StringComparison.OrdinalIgnoreCase))
                     {
                         if (!int.TryParse(hostArgs[i + 1], out var port) || port < 1 || port > 65535)
@@ -247,6 +291,47 @@ namespace ModbusForge.Headless
                             return false;
                         }
                     }
+                }
+            }
+
+            return true;
+        }
+
+        internal static bool ValidateRuntimeConfiguration(IConfiguration configuration, out string? error)
+        {
+            error = null;
+
+            if (string.IsNullOrWhiteSpace(configuration["Custom:Path"]))
+            {
+                var count = configuration.GetValue<int?>("Polling:Count") ?? 10;
+                var intervalMs = configuration.GetValue<int?>("Polling:IntervalMs") ?? 1000;
+                var startAddress = configuration.GetValue<int?>("Polling:StartAddress") ?? 0;
+
+                if (count < 1)
+                {
+                    error = "Polling:Count must be at least 1.";
+                    return false;
+                }
+
+                if (intervalMs < 1)
+                {
+                    error = "Polling:IntervalMs must be at least 1.";
+                    return false;
+                }
+
+                if (startAddress < 0)
+                {
+                    error = "Polling:StartAddress must be zero or positive.";
+                    return false;
+                }
+            }
+            else
+            {
+                var tickMs = configuration.GetValue<int?>("Custom:TickMs") ?? 100;
+                if (tickMs < 1)
+                {
+                    error = "Custom:TickMs must be at least 1.";
+                    return false;
                 }
             }
 
@@ -289,7 +374,7 @@ MQTT options:
   --mqtt-enabled <true|false>         Enable MQTT publishing (default: false)
   --mqtt-broker-host <host>           MQTT broker host (default: localhost)
   --mqtt-broker-port <port>           MQTT broker port (default: 1883)
-  --mqtt-client-id <id>               MQTT client id (default: ModbusForge)
+  --mqtt-client-id <id>               MQTT client id (default: ModbusForge-Headless)
   --mqtt-username <user>              MQTT username
   --mqtt-password <pass>              MQTT password
   --mqtt-topic-template <tpl>         Topic template (default: modbusforge/{UnitId}/{Tag})

@@ -49,30 +49,28 @@ namespace ModbusForge.Tests.Services
 
             await stream.WriteAsync(header, 0, header.Length);
 
-            // Give the server time to process
-            await Task.Delay(500);
-
+            // Wait for the server's reaction (response or disconnect) without a fixed sleep:
+            // poll the stream with short read timeouts until a deadline. A vulnerable server
+            // blocks in ReadExactAsync(65534 bytes) and never closes the connection, so the
+            // read keeps timing out and `read` stays -1; a fixed server closes the stream,
+            // which ReadAsync reports as 0 bytes.
             byte[] buffer = new byte[10];
             int read = -1;
-            try
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < deadline)
             {
-                client.ReceiveTimeout = 1000;
-                read = await stream.ReadAsync(buffer, 0, buffer.Length);
+                try
+                {
+                    using var readCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+                    read = await stream.ReadAsync(buffer, 0, buffer.Length, readCts.Token);
+                    break;
+                }
+                catch (OperationCanceledException)
+                {
+                    // No reaction yet; keep polling until the deadline.
+                }
             }
-            catch (Exception)
-            {
-                read = 0;
-            }
 
-            // Before fix, server waits for data. ReadAsync may block (or return after timeout if configured)
-            // But if server is NOT fixed, it's sitting at ReadExactAsync(stream, pdu, 65534, ct)
-            // Since we didn't send 65534 bytes, ReadExactAsync won't return.
-            // stream.ReadAsync(buffer, 0, buffer.Length) on client side will block or wait.
-
-            // If the server IS fixed, it closes the stream. ReadAsync returns 0.
-
-            // Let's adjust expectation for initial run (it should FAIL if vulnerable)
-            // If it's vulnerable, it should NOT return 0 (it should timeout or block)
             Assert.Equal(0, read);
         }
 

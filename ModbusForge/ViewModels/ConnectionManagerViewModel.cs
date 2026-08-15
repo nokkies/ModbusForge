@@ -34,7 +34,7 @@ namespace ModbusForge.Avalonia.ViewModels
         public static IReadOnlyList<StopBits> StopBitsOptions { get; } =
             new[] { StopBits.None, StopBits.One, StopBits.OnePointFive, StopBits.Two };
 
-        public static IReadOnlyList<int> BaudRates => SerialSettingsDetector.CommonBaudRates.OrderBy(b => b).ToList();
+        public static IReadOnlyList<int> BaudRates { get; } = SerialSettingsDetector.CommonBaudRates.OrderBy(b => b).ToList();
 
         public bool IsSerial => SelectedProfile?.Transport is TransportType.Rtu or TransportType.Ascii;
 
@@ -399,6 +399,15 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             if (SelectedProfile == null || IsConnecting) return;
 
+            // Validate the edited fields before touching the network - an invalid IP,
+            // port, or unit list used to fail only deep in the socket code.
+            var validationError = GetProfileValidationError(SelectedProfile);
+            if (!string.IsNullOrEmpty(validationError))
+            {
+                StatusMessage = validationError;
+                return;
+            }
+
             IsConnecting = true;
             StatusMessage = $"Connecting to {SelectedProfile.DisplayName}...";
 
@@ -415,6 +424,26 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 IsConnecting = false;
             }
+        }
+
+        /// <summary>First validation error of the transport-relevant profile fields, or empty.</summary>
+        private static string GetProfileValidationError(ConnectionProfile profile)
+        {
+            var fields = profile.Transport == TransportType.Tcp
+                ? new[] { nameof(ConnectionProfile.IpAddress), nameof(ConnectionProfile.Port) }
+                : new[] { nameof(ConnectionProfile.BaudRate) };
+
+            if (profile.IsServerMode)
+                fields = fields.Append(nameof(ConnectionProfile.ServerUnitIds)).ToArray();
+
+            foreach (var field in fields)
+            {
+                var fieldError = profile[field];
+                if (!string.IsNullOrEmpty(fieldError))
+                    return fieldError;
+            }
+
+            return string.Empty;
         }
 
         private async Task DisconnectAsync()

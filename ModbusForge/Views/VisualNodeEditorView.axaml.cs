@@ -144,7 +144,6 @@ namespace ModbusForge.Avalonia.Views
                 _isPanning = true;
                 _panStartPoint = _canvasScrollViewer != null ? e.GetPosition(_canvasScrollViewer) : e.GetPosition(_nodeCanvas);
                 _panStartOffset = _canvasScrollViewer?.Offset ?? new Vector(0, 0);
-                _panStartPoint = e.GetPosition(_canvasScrollViewer);
                 e.Pointer.Capture(_nodeCanvas);
                 _nodeCanvas.Cursor = new Cursor(StandardCursorType.Hand);
                 e.Handled = true;
@@ -648,6 +647,12 @@ namespace ModbusForge.Avalonia.Views
             {
                 await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
             }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
+            {
+                // async void would otherwise swallow the exception silently.
+                if (ViewModel != null)
+                    ViewModel.StatusText = $"Palette drag failed: {ex.Message}";
+            }
             finally
             {
                 ResetPaletteDrag(e.Pointer);
@@ -1143,6 +1148,12 @@ namespace ModbusForge.Avalonia.Views
             try
             {
                 await DragDrop.DoDragDrop(e, data, DragDropEffects.Move);
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
+            {
+                // async void would otherwise swallow the exception silently.
+                if (ViewModel != null)
+                    ViewModel.StatusText = $"Program tree drag failed: {ex.Message}";
             }
             finally
             {

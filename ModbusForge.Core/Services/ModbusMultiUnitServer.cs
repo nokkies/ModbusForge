@@ -27,13 +27,30 @@ namespace ModbusForge.Services
         private readonly ILogger _logger;
         private readonly IConsoleLoggerService? _consoleLoggerService;
         private bool _disposed;
+        private int _activeClients;
 
-        private const int DefaultDataStoreSize = ModbusAddressValidator.MaxTotalCount;
         private const ushort MbapProtocolId = 0x0000;
         private const byte MeiTypeDeviceIdentification = 0x0E;
         private const byte DeviceIdMoreFollows = 0xFF;
         private const byte DeviceIdNoMoreFollows = 0x00;
-        private const int MaxDeviceIdResponseBytes = 250;
+
+        /// <summary>
+        /// Max bytes of FC43 object data per response: the Modbus TCP PDU is capped at
+        /// 253 bytes (MBAP length 254 includes the unit ID byte), and the FC43 header
+        /// itself is 7 bytes - so 246, not 250 (a 250-byte body would produce an
+        /// oversize PDU that violates the protocol frame limit).
+        /// </summary>
+        private const int MaxDeviceIdResponseBytes = 246;
+
+        /// <summary>Strict FC05 coil values; any other 16-bit value is an illegal data value.</summary>
+        private const ushort CoilValueOn = 0xFF00;
+        private const ushort CoilValueOff = 0x0000;
+
+        /// <summary>Upper bound on simultaneous client connections.</summary>
+        private const int MaxClients = 10;
+
+        /// <summary>Clients that go quiet for this long are disconnected (frees the slot).</summary>
+        private const int ClientIdleTimeoutMs = 10 * 60 * 1000;
 
         /// <summary>
         /// Identity reported by FC43 (Read Device Identification).
@@ -61,11 +78,9 @@ namespace ModbusForge.Services
         {
             return _dataStores.GetOrAdd(unitId, id =>
             {
+                // The store is pre-sized to the full address space by the DataStore
+                // constructor (Add calls are no-ops on the fixed-size collection).
                 var ds = new DataStore();
-                for (int i = 0; i < DefaultDataStoreSize; i++) ds.HoldingRegisters.Add(0);
-                for (int i = 0; i < DefaultDataStoreSize; i++) ds.InputRegisters.Add(0);
-                for (int i = 0; i < DefaultDataStoreSize; i++) ds.CoilDiscretes.Add(false);
-                for (int i = 0; i < DefaultDataStoreSize; i++) ds.InputDiscretes.Add(false);
                 // Seed test data
                 for (ushort i = 1; i <= 16; i++)
                     ds.HoldingRegisters[i] = (ushort)(i * 10);
@@ -113,7 +128,32 @@ namespace ModbusForge.Services
                 try
                 {
                     var client = await _listener!.AcceptTcpClientAsync(ct);
-                    _ = Task.Run(() => HandleClientAsync(client, ct), ct);
+
+                    if (Interlocked.Increment(ref _activeClients) > MaxClients)
+                    {
+                        Interlocked.Decrement(ref _activeClients);
+                        _logger.LogWarning(
+                            "Modbus server max clients ({MaxClients}) reached; rejecting connection from {Remote}",
+                            MaxClients, client.Client.RemoteEndPoint);
+                        try { client.Dispose(); } catch { /* already closed */ }
+                        continue;
+                    }
+
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await HandleClientAsync(client, ct);
+                        }
+                        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                        {
+                            _logger.LogError(ex, "Unhandled error handling Modbus client connection");
+                        }
+                        finally
+                        {
+                            Interlocked.Decrement(ref _activeClients);
+                        }
+                    }, ct);
                 }
                 catch (OperationCanceledException) { break; }
                 catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -138,13 +178,26 @@ namespace ModbusForge.Services
                 {
                     while (!ct.IsCancellationRequested)
                     {
+                        // Per-request idle timeout: a client that goes quiet is dropped after
+                        // ClientIdleTimeoutMs, freeing its slot instead of holding it forever.
+                        using var readCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                        readCts.CancelAfter(ClientIdleTimeoutMs);
+
                         // Read 7-byte MBAP header
-                        if (!await ReadExactAsync(stream, header, 7, ct)) break;
+                        if (!await ReadExactAsync(stream, header, 7, readCts.Token)) break;
 
                         ushort transactionId = (ushort)((header[0] << 8) | header[1]);
-                        // header[2..3] = protocol ID (should be 0x0000)
+                        ushort protocolId = (ushort)((header[2] << 8) | header[3]);
                         ushort length = (ushort)((header[4] << 8) | header[5]);
                         byte unitId = header[6];
+
+                        if (protocolId != MbapProtocolId)
+                        {
+                            _logger.LogWarning(
+                                "Invalid Modbus MBAP protocol ID {ProtocolId:X4} from {Remote}. Closing connection.",
+                                protocolId, remoteEndpoint);
+                            break;
+                        }
 
                         // Max Modbus TCP frame size is 260 bytes (7-byte MBAP + 253-byte PDU)
                         // MBAP length includes UnitID (1 byte) + PDU (up to 253 bytes)
@@ -156,7 +209,7 @@ namespace ModbusForge.Services
 
                         // Read PDU (length - 1 because length includes unit ID byte)
                         var pdu = new byte[length - 1];
-                        if (!await ReadExactAsync(stream, pdu, pdu.Length, ct)) break;
+                        if (!await ReadExactAsync(stream, pdu, pdu.Length, readCts.Token)) break;
 
                         var details = FormatRequestDetails(pdu);
                         _consoleLoggerService?.Log($"Request from {remoteEndpoint} Unit ID {unitId} FC {(pdu.Length > 0 ? pdu[0] : 0)}{details}");
@@ -180,11 +233,12 @@ namespace ModbusForge.Services
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
+                    _logger.LogDebug("Client {Remote} connection ended by server shutdown", remoteEndpoint);
                 }
                 catch (Exception ex) when (ex is not OutOfMemoryException)
                 {
                     if (!ct.IsCancellationRequested)
-                        _logger.LogDebug(ex, "Client connection closed");
+                        _logger.LogDebug(ex, "Client {Remote} connection closed", remoteEndpoint);
                 }
             }
         }
@@ -214,6 +268,17 @@ namespace ModbusForge.Services
         private byte[]? ProcessPdu(byte unitId, byte[] pdu)
         {
             if (pdu.Length == 0) return null;
+
+            // Broadcast address: per the Modbus specification, writes are applied to every
+            // unit and NO response is sent (a response to a broadcast would corrupt the
+            // transaction space for other clients). Previously this created a data store
+            // for Unit ID 0 and answered, which is not spec-compliant.
+            if (unitId == 0)
+            {
+                ApplyBroadcastWrite(pdu);
+                return null;
+            }
+
             var ds = GetOrCreateDataStore(unitId);
             byte fc = pdu[0];
 
@@ -249,8 +314,45 @@ namespace ModbusForge.Services
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
-                _logger.LogDebug(ex, "Error processing FC{FC} for Unit ID {UnitId}", fc, unitId);
+                _logger.LogWarning(ex, "Error processing FC{FC} for Unit ID {UnitId}", fc, unitId);
                 return ExceptionResponse(fc, 4); // Slave device failure
+            }
+        }
+
+        /// <summary>
+        /// Applies a broadcast (Unit ID 0) write PDU to every configured unit's data store.
+        /// Reads addressed to Unit ID 0 are ignored (no response is ever sent for broadcasts).
+        /// </summary>
+        private void ApplyBroadcastWrite(byte[] pdu)
+        {
+            byte fc = pdu[0];
+            if (fc is not (5 or 6 or 15 or 16 or 22 or 23))
+            {
+                _logger.LogDebug("Broadcast (Unit ID 0) read FC{FC} ignored - broadcasts receive no response", fc);
+                return;
+            }
+
+            foreach (var ds in _dataStores.Values)
+            {
+                lock (ds)
+                {
+                    try
+                    {
+                        switch (fc)
+                        {
+                            case 5: WriteSingleCoil(pdu, ds); break;
+                            case 6: WriteSingleRegister(pdu, ds); break;
+                            case 15: WriteMultipleCoils(pdu, ds); break;
+                            case 16: WriteMultipleRegisters(pdu, ds); break;
+                            case 22: MaskWriteRegister(pdu, ds); break;
+                            case 23: ReadWriteMultipleRegisters(pdu, ds); break;
+                        }
+                    }
+                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                    {
+                        _logger.LogWarning(ex, "Broadcast FC{FC} failed for one of the unit data stores", fc);
+                    }
+                }
             }
         }
 
@@ -321,9 +423,15 @@ namespace ModbusForge.Services
         {
             if (pdu.Length < 5) return ExceptionResponse(5, 3);
             int addr = ((pdu[1] << 8) | pdu[2]) + 1; // +1: PDU→DataStore index
-            bool value = pdu[3] == 0xFF;
+            ushort coilValue = (ushort)((pdu[3] << 8) | pdu[4]);
+
+            // The spec only allows 0xFF00 (ON) or 0x0000 (OFF); anything else is an
+            // illegal data value. (Previously any non-0xFF high byte silently read as OFF.)
+            if (coilValue != CoilValueOn && coilValue != CoilValueOff)
+                return ExceptionResponse(5, 3);
+
             if (addr >= ds.CoilDiscretes.Count) return ExceptionResponse(5, 2);
-            ds.CoilDiscretes[addr] = value;
+            ds.CoilDiscretes[addr] = coilValue == CoilValueOn;
             return pdu[..5]; // Echo request
         }
 

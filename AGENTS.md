@@ -91,7 +91,9 @@ Tags should still be prefixed with `v`, e.g. `v2026.7.1`.
 - `ModbusForge.Core/` - Cross-platform view-agnostic class library (`net8.0`)
 - `ModbusForge.Avalonia.Tests/` - Avalonia integration/unit tests (`net8.0`)
 - `ModbusForge.Headless/` - Linux/headless console runtime (`net8.0`)
-- `ModbusForge.Tests/` - Core/headless unit tests (`net8.0-windows`)
+- `ModbusForge.Tests/` - Core/headless unit tests (`net8.0`)
+- `ModbusForge.Headless.Tests/` - Headless runtime tests (`net8.0`)
+- `ModbusForge.UITests/` - FlaUI UI smoke tests (`net8.0-windows`)
 - `setup/ModbusForge.iss` - Inno Setup installer script
 - `installers/` - Built installers (gitignored)
 - `.windsurf/workflows/` - Workflow definitions

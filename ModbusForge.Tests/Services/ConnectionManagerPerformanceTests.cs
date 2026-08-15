@@ -25,7 +25,28 @@ public class ConnectionManagerPerformanceTests
         // Arrange
         var loggerMock = new Mock<ILogger<ConnectionManager>>();
         var loggerFactoryMock = new Mock<ILoggerFactory>();
-        var manager = new ConnectionManager(loggerMock.Object, loggerFactoryMock.Object);
+
+        // Private profile store - this test adds profiles, which triggers persistence.
+        var profileDir = Path.Combine(Path.GetTempPath(), "ModbusForgeTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(profileDir);
+
+        try
+        {
+            await DisconnectAllAsync_PerformanceTestCore(loggerMock.Object, loggerFactoryMock.Object,
+                Path.Combine(profileDir, "connection-profiles.json"));
+        }
+        finally
+        {
+            try { Directory.Delete(profileDir, recursive: true); }
+            catch (IOException) { /* best effort */ }
+        }
+    }
+
+    private async Task DisconnectAllAsync_PerformanceTestCore(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, string profilePath)
+    {
+        var manager = new ConnectionManager(logger, loggerFactory,
+            validationService: null, correlationContext: null, addressValidator: null,
+            profilesFilePath: profilePath);
 
         // Clear default profiles
         manager.Profiles.Clear();

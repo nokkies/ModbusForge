@@ -17,7 +17,11 @@ public class ConnectionManagerTests : IDisposable
     private readonly Mock<ILoggerFactory> _mockLoggerFactory;
     private readonly ConnectionManager _manager;
 
-    private readonly bool _backupExisted;
+    // Per-test private profile store: tests must never touch the developer's real
+    // %APPDATA%\ModbusForge\connection-profiles.json (a crashed run used to strand it
+    // as a .bak file).
+    private readonly string _profileDir;
+    private readonly string _profilePath;
 
     public ConnectionManagerTests()
     {
@@ -29,24 +33,13 @@ public class ConnectionManagerTests : IDisposable
             .Setup(x => x.CreateLogger(It.IsAny<string>()))
             .Returns(new Mock<ILogger>().Object);
 
-        // Reset the default profiles file by moving it out of the way or replacing it if it exists.
-        // It's saved in ApplicationData.
-        var profilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "ModbusForge",
-            "connection-profiles.json");
+        _profileDir = Path.Combine(Path.GetTempPath(), "ModbusForgeTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_profileDir);
+        _profilePath = Path.Combine(_profileDir, "connection-profiles.json");
 
-        if (File.Exists(profilePath))
-        {
-            _backupExisted = true;
-            File.Move(profilePath, profilePath + ".bak", true);
-        }
-        else
-        {
-            _backupExisted = false;
-        }
-
-        _manager = new ConnectionManager(_mockLogger.Object, _mockLoggerFactory.Object);
+        _manager = new ConnectionManager(_mockLogger.Object, _mockLoggerFactory.Object,
+            validationService: null, correlationContext: null, addressValidator: null,
+            profilesFilePath: _profilePath);
         // Start fresh for each test by removing the default profile
         while (_manager.Profiles.Count > 0)
         {
@@ -56,20 +49,14 @@ public class ConnectionManagerTests : IDisposable
 
     public void Dispose()
     {
-        // Restore backup if it exists
-        var profilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "ModbusForge",
-            "connection-profiles.json");
-
-        if (_backupExisted && File.Exists(profilePath + ".bak"))
+        _manager?.Dispose();
+        try
         {
-            File.Move(profilePath + ".bak", profilePath, true);
+            Directory.Delete(_profileDir, recursive: true);
         }
-        else if (!_backupExisted && File.Exists(profilePath))
+        catch (IOException)
         {
-            // If there was no backup, it means the test created a new file. Clean it up.
-            File.Delete(profilePath);
+            // Best effort; the directory is uniquely named and under %TEMP%.
         }
     }
 
@@ -101,7 +88,9 @@ public class ConnectionManagerTests : IDisposable
         // so a new instance will have no loaded profiles.
 
         // Act
-        var newManager = new ConnectionManager(_mockLogger.Object, _mockLoggerFactory.Object);
+        var newManager = new ConnectionManager(_mockLogger.Object, _mockLoggerFactory.Object,
+            validationService: null, correlationContext: null, addressValidator: null,
+            profilesFilePath: _profilePath);
 
         // Assert
         Assert.Single(newManager.Profiles);
@@ -496,14 +485,18 @@ public class ConnectionManagerTests : IDisposable
     {
         // Arrange
         // We'll create one manager, add a non-default profile, and save it.
-        var initialManager = new ConnectionManager(_mockLogger.Object, _mockLoggerFactory.Object);
+        var initialManager = new ConnectionManager(_mockLogger.Object, _mockLoggerFactory.Object,
+            validationService: null, correlationContext: null, addressValidator: null,
+            profilesFilePath: _profilePath);
         initialManager.Profiles.Clear();
         initialManager.AddProfile(new ConnectionProfile("Custom Profile", "192.168.1.100", 5020, 2));
         initialManager.SaveProfiles();
 
         // Act
         // The second manager should load the custom profile and not add the default one.
-        var secondManager = new ConnectionManager(_mockLogger.Object, _mockLoggerFactory.Object);
+        var secondManager = new ConnectionManager(_mockLogger.Object, _mockLoggerFactory.Object,
+            validationService: null, correlationContext: null, addressValidator: null,
+            profilesFilePath: _profilePath);
 
         // Assert
         Assert.Single(secondManager.Profiles);

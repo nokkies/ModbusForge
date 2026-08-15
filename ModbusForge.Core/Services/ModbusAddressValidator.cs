@@ -21,7 +21,15 @@ namespace ModbusForge.Services
         private const int MaxReadCoils = 2000;
         private const int MaxWriteCoils = 1968;
         private const int MaxReadRegisters = 125;
-        private const int MaxWriteRegisters = 123;
+
+        /// <summary>FC16 (Write Multiple Registers) allows at most 123 register values
+        /// per frame - the single-write portion of FC23 is capped lower (see
+        /// <see cref="MaxReadWriteWriteCount"/>).</summary>
+        public const int MaxWriteRegisters = 123;
+
+        /// <summary>FC23 (Read/Write Multiple Registers) caps the WRITE quantity at 121 -
+        /// fewer than FC16's 123, per MBE 8501.</summary>
+        public const int MaxReadWriteWriteCount = 121;
 
         public bool IsValidUnitId(byte unitId) => unitId >= MinUnitId && unitId <= MaxUnitId;
 

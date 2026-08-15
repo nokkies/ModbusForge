@@ -88,7 +88,8 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 StartPoint = points[0],
                 IsClosed = false,
-                IsFilled = false
+                IsFilled = false,
+                Segments = new PathSegments()
             };
 
             if (points.Count == 2)
@@ -112,8 +113,8 @@ namespace ModbusForge.Avalonia.ViewModels
                 figure.Segments.Add(segment);
             }
 
-            var geometry = new PathGeometry();
-            geometry.Figures.Add(figure);
+            var figures = new PathFigures { figure };
+            var geometry = new PathGeometry { Figures = figures };
             PathData = geometry;
         }
 

@@ -24,6 +24,16 @@ namespace ModbusForge.Services
         private readonly IModbusAddressValidator _addressValidator;
         private readonly SemaphoreSlim _ioLock = new(1, 1);
         private const int DisposeLockTimeoutMs = 5000;
+
+        /// <summary>
+        /// Serial I/O timeout. Bounds both the raw SerialPort and the NModbus transport read/write
+        /// so an unresponsive device cannot hang the I/O lock. Matches the TCP transport timeout.
+        /// </summary>
+        private const int IoTimeoutMs = 5000;
+
+        /// <summary>Shorter timeout used by the connection diagnostics probe.</summary>
+        private const int DiagnosticTimeoutMs = 1000;
+
         private const byte DeviceIdMoreFollows = 0xFF;
         private const int MaxDeviceIdTransactions = 16;
 
@@ -109,8 +119,8 @@ namespace ModbusForge.Services
                 _serialPort = new SerialPort(profile.ComPort, profile.BaudRate, profile.Parity, profile.DataBits, profile.StopBits)
                 {
                     RtsEnable = profile.RtsEnable,
-                    ReadTimeout = 5000,
-                    WriteTimeout = 5000
+                    ReadTimeout = IoTimeoutMs,
+                    WriteTimeout = IoTimeoutMs
                 };
 
                 try
@@ -119,13 +129,13 @@ namespace ModbusForge.Services
 
                     var adapter = ModbusStreamAdapterFactory.CreateSerialAdapter(_serialPort);
                     var transport = Transport == TransportType.Rtu
-                        ? (IModbusSerialTransport)_factory.CreateRtuTransport(new LoggingStreamResource(adapter, _frameLogger))
-                        : (IModbusSerialTransport)_factory.CreateAsciiTransport(new LoggingStreamResource(adapter, _frameLogger));
+                        ? (IModbusSerialTransport)_factory.CreateRtuTransport(new LoggingStreamResource(adapter, _frameLogger, Transport))
+                        : (IModbusSerialTransport)_factory.CreateAsciiTransport(new LoggingStreamResource(adapter, _frameLogger, Transport));
 
                     _client = _factory.CreateMaster(transport);
 
-                    _client.Transport.ReadTimeout = 5000;
-                    _client.Transport.WriteTimeout = 5000;
+                    _client.Transport.ReadTimeout = IoTimeoutMs;
+                    _client.Transport.WriteTimeout = IoTimeoutMs;
 
                     var message = $"Connected to Modbus {Transport} on {profile.ComPort} ({profile.BaudRate}/{profile.DataBits}{ParityChar(profile.Parity)}{StopBitsChar(profile.StopBits)})";
                     _logger.LogInformation(message);
@@ -226,7 +236,9 @@ namespace ModbusForge.Services
 
         public virtual async Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
         {
-            ValidateSingleRequest(unitId, startAddress, count, PlcArea.DiscreteInput);
+            // Validate against the whole address space (not the per-request cap) so that
+            // large reads are chunked by ModbusChunkedExecutor.GetReadRanges instead of throwing.
+            ValidateAddressRange(unitId, startAddress, count);
             return await ModbusChunkedExecutor.ReadAsync(
                 () => IsConnected,
                 _ioLock,
@@ -251,7 +263,9 @@ namespace ModbusForge.Services
 
         public virtual async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
         {
-            ValidateSingleRequest(unitId, startAddress, count, PlcArea.Coil);
+            // Validate against the whole address space (not the per-request cap) so that
+            // large reads are chunked by ModbusChunkedExecutor.GetReadRanges instead of throwing.
+            ValidateAddressRange(unitId, startAddress, count);
             return await ModbusChunkedExecutor.ReadAsync(
                 () => IsConnected,
                 _ioLock,
@@ -364,6 +378,12 @@ namespace ModbusForge.Services
             ValidateSingleRequest(unitId, readStartAddress, readCount, PlcArea.HoldingRegister);
             ValidateSingleRequest(unitId, writeStartAddress, writeValues.Length, PlcArea.HoldingRegister, isWrite: true);
 
+            // FC23 caps the write quantity at 121 registers (FC16's 123 would be rejected
+            // by spec-compliant devices).
+            if (writeValues.Length > ModbusAddressValidator.MaxReadWriteWriteCount)
+                throw new ArgumentOutOfRangeException(nameof(writeValues),
+                    $"FC23 (read/write multiple registers) supports at most {ModbusAddressValidator.MaxReadWriteWriteCount} write registers.");
+
             return await ExecuteMasterAsync<ushort[]?>(
                 $"Reading {readCount} registers at {readStartAddress} and writing {writeValues.Length} registers at {writeStartAddress}",
                 "Error in read/write multiple registers",
@@ -428,10 +448,18 @@ namespace ModbusForge.Services
                         if (_client != null)
                             ApplySerialTiming(() => writeAction(_client, protocolAddress));
                     }
+                    catch (NModbus.SlaveException ex)
+                    {
+                        // Report the failure to the caller - a slave exception means the write
+                        // did NOT happen (mirrors ModbusChunkedExecutor.WriteAsync, which rethrows).
+                        _logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
+                        throw;
+                    }
                     catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
                         _logger.LogError(ex, errorLogContext);
                         HandleConnectionLoss();
+                        throw;
                     }
                 }).ConfigureAwait(false);
             }
@@ -553,20 +581,21 @@ namespace ModbusForge.Services
 
         private void DisconnectCore()
         {
-            try { (_client as IDisposable)?.Dispose(); } catch { }
+            try { (_client as IDisposable)?.Dispose(); }
+            catch (Exception ex) { _logger.LogDebug(ex, "Error disposing serial Modbus client during disconnect"); }
             _client = null;
 
             try
             {
                 _serialPort?.Close();
             }
-            catch { }
+            catch (Exception ex) { _logger.LogDebug(ex, "Error closing serial port during disconnect"); }
 
             try
             {
                 _serialPort?.Dispose();
             }
-            catch { }
+            catch (Exception ex) { _logger.LogDebug(ex, "Error disposing serial port during disconnect"); }
 
             _serialPort = null;
             _connectionProfile = null;
@@ -574,41 +603,48 @@ namespace ModbusForge.Services
 
         public virtual Task<ConnectionDiagnosticResult> RunDiagnosticsAsync(string ipAddress, int port, byte unitId)
         {
-            var result = new ConnectionDiagnosticResult { IsSerialConnection = true, RemoteEndpoint = ipAddress };
-
-            // For diagnostics through the legacy IP/port signature, treat ipAddress as the COM port
-            // and port as the baud rate. All other serial settings use defaults.
-            var profile = new ConnectionProfile("Diagnostics", "127.0.0.1", 502, unitId)
+            // The diagnostics open a real COM port and perform blocking Modbus I/O, so they
+            // must run on the thread pool, not the (UI) calling thread.
+            return Task.Run(() =>
             {
-                Transport = Transport,
-                ComPort = ipAddress,
-                BaudRate = port > 0 ? port : 9600
-            };
+                var result = new ConnectionDiagnosticResult { IsSerialConnection = true, RemoteEndpoint = ipAddress };
 
-            var validation = _validationService?.ValidateSerialSettings(profile);
-            if (validation is { IsValid: false })
-            {
-                result.TcpError = validation.ErrorMessage;
-                return Task.FromResult(result);
-            }
+                // For diagnostics through the legacy IP/port signature, treat ipAddress as the COM port
+                // and port as the baud rate. All other serial settings use defaults.
+                var profile = new ConnectionProfile("Diagnostics", "127.0.0.1", 502, unitId)
+                {
+                    Transport = Transport,
+                    ComPort = ipAddress,
+                    BaudRate = port > 0 ? port : 9600
+                };
 
-            var testPort = TryOpenDiagnosticPort(profile, result);
-            if (testPort == null)
-            {
-                return Task.FromResult(result);
-            }
+                var validation = _validationService?.ValidateSerialSettings(profile);
+                if (validation is { IsValid: false })
+                {
+                    result.TcpError = validation.ErrorMessage;
+                    return result;
+                }
 
-            try
-            {
-                RunModbusDiagnostic(testPort, unitId, result);
-            }
-            finally
-            {
-                try { testPort.Close(); } catch { }
-                try { testPort.Dispose(); } catch { }
-            }
+                var testPort = TryOpenDiagnosticPort(profile, result);
+                if (testPort == null)
+                {
+                    return result;
+                }
 
-            return Task.FromResult(result);
+                try
+                {
+                    RunModbusDiagnostic(testPort, unitId, result);
+                }
+                finally
+                {
+                    try { testPort.Close(); }
+                    catch (Exception ex) { _logger.LogDebug(ex, "Error closing diagnostic serial port"); }
+                    try { testPort.Dispose(); }
+                    catch (Exception ex) { _logger.LogDebug(ex, "Error disposing diagnostic serial port"); }
+                }
+
+                return result;
+            });
         }
 
         private SerialPort? TryOpenDiagnosticPort(ConnectionProfile profile, ConnectionDiagnosticResult result)
@@ -620,8 +656,8 @@ namespace ModbusForge.Services
                 _logger.LogInformation("Diagnostics: Opening serial port {ComPort} at {BaudRate}", profile.ComPort, profile.BaudRate);
                 var port = new SerialPort(profile.ComPort, profile.BaudRate, Parity.None, 8, StopBits.One)
                 {
-                    ReadTimeout = 5000,
-                    WriteTimeout = 5000
+                    ReadTimeout = IoTimeoutMs,
+                    WriteTimeout = IoTimeoutMs
                 };
                 port.Open();
 
@@ -647,13 +683,13 @@ namespace ModbusForge.Services
             {
                 var adapter = ModbusStreamAdapterFactory.CreateSerialAdapter(port);
                 var transport = Transport == TransportType.Rtu
-                    ? (IModbusSerialTransport)_factory.CreateRtuTransport(new LoggingStreamResource(adapter, _frameLogger))
-                    : (IModbusSerialTransport)_factory.CreateAsciiTransport(new LoggingStreamResource(adapter, _frameLogger));
+                    ? (IModbusSerialTransport)_factory.CreateRtuTransport(new LoggingStreamResource(adapter, _frameLogger, Transport))
+                    : (IModbusSerialTransport)_factory.CreateAsciiTransport(new LoggingStreamResource(adapter, _frameLogger, Transport));
                 var master = _factory.CreateMaster(transport);
                 try
                 {
-                    master.Transport.ReadTimeout = 1000;
-                    master.Transport.WriteTimeout = 1000;
+                    master.Transport.ReadTimeout = DiagnosticTimeoutMs;
+                    master.Transport.WriteTimeout = DiagnosticTimeoutMs;
 
                     sw.Restart();
                     EvaluateModbusRead(master.ReadHoldingRegisters(unitId, 0, 1), sw, result);
