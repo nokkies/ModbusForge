@@ -62,6 +62,24 @@ namespace ModbusForge.Services
             _logger.LogInformation("Modbus TCP client created");
         }
 
+        /// <summary>
+        /// Test seam: lets tests inject a mocked IModbusMaster and a connected TcpClient
+        /// instead of going through the network (visible to the test assemblies via
+        /// InternalsVisibleTo). Replaces reflection-based field injection in tests.
+        /// </summary>
+        internal ModbusTcpService(
+            ILogger<ModbusTcpService> logger,
+            IConsoleLoggerService? consoleLoggerService,
+            ModbusFrameLogger? frameLogger,
+            IModbusAddressValidator? addressValidator,
+            IModbusMaster? master,
+            TcpClient? tcpClient)
+            : this(logger, consoleLoggerService, frameLogger, addressValidator)
+        {
+            _client = master;
+            _tcpClient = tcpClient;
+        }
+
         public virtual async Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
         {
             ValidateAddressRange(unitId, startAddress, count);

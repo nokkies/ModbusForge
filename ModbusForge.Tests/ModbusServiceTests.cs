@@ -1,79 +1,82 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using NModbus;
 using ModbusForge.Services;
 using Moq;
 using Xunit;
 
 namespace ModbusForge.Tests
 {
+    /// <summary>
+    /// Verifies the TCP service's logging hygiene: write values are sent to the device
+    /// (the mocked NModbus master) but never appear in log messages. Uses the internal
+    /// test-seam constructor instead of reflection, so a renamed field fails the build
+    /// rather than silently no-opping the injection.
+    /// </summary>
     public class ModbusServiceTests : IDisposable
     {
-        private readonly Mock<ILogger<ModbusTcpService>> _loggerMock = null!;
+        private readonly Mock<ILogger<ModbusTcpService>> _loggerMock;
+        private readonly Mock<NModbus.IModbusMaster> _modbusMasterMock;
         private readonly ModbusTcpService _service;
-        private readonly Mock<IModbusMaster> _modbusMasterMock;
         private readonly TcpListener _listener;
         private readonly TcpClient _tcpClient;
 
         public ModbusServiceTests()
         {
             _loggerMock = new Mock<ILogger<ModbusTcpService>>();
-            _service = new ModbusTcpService(_loggerMock.Object);
-            _modbusMasterMock = new Mock<IModbusMaster>();
+            _modbusMasterMock = new Mock<NModbus.IModbusMaster>();
 
-            // Setup local TCP listener to allow connection
+            // Local TCP listener + connected client so IsConnected reports true.
             _listener = new TcpListener(IPAddress.Loopback, 0);
             _listener.Start();
             var port = ((IPEndPoint)_listener.LocalEndpoint).Port;
 
-            // Create and connect TcpClient
             _tcpClient = new TcpClient();
             _tcpClient.Connect(IPAddress.Loopback, port);
 
-            // Inject mocked fields using reflection
-            var clientField = typeof(ModbusTcpService).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance);
-            if (clientField != null)
-            {
-                clientField.SetValue(_service, _modbusMasterMock.Object);
-            }
+            _service = new ModbusTcpService(
+                _loggerMock.Object,
+                consoleLoggerService: null,
+                frameLogger: null,
+                addressValidator: null,
+                master: _modbusMasterMock.Object,
+                tcpClient: _tcpClient);
 
-            // Inject the connected TcpClient
-            var tcpClientField = typeof(ModbusTcpService).GetField("_tcpClient", BindingFlags.NonPublic | BindingFlags.Instance);
-            if (tcpClientField != null)
-            {
-                tcpClientField.SetValue(_service, _tcpClient);
-            }
+            Assert.True(_service.IsConnected, "Seam-injected connection must report connected");
         }
 
         [Fact]
-        public async Task WriteSingleRegisterAsync_DoesNotLogSensitiveValue()
+        public async Task WriteSingleRegisterAsync_SendsValueToMaster_DoesNotLogValue()
         {
             // Arrange
-            byte unitId = 1;
-            int registerAddress = 100;
-            ushort sensitiveValue = 12345;
-            string sensitiveValueStr = sensitiveValue.ToString();
+            const byte unitId = 1;
+            const int uiAddress = 100; // 1-based UI address
+            const ushort sensitiveValue = 12345;
 
             // Act
-            await _service.WriteSingleRegisterAsync(unitId, registerAddress, sensitiveValue);
+            await _service.WriteSingleRegisterAsync(unitId, uiAddress, sensitiveValue);
 
-            // Assert - Check that the sensitive value is NOT logged
-            _loggerMock!.Verify(
+            // The write must reach the device ... (NModbus protocol address is 0-based)
+            _modbusMasterMock.Verify(
+                m => m.WriteSingleRegister(unitId, (ushort)(uiAddress - 1), sensitiveValue),
+                Times.Once,
+                "WriteSingleRegisterAsync must forward the value to the master");
+
+            // ... and the sensitive value must NOT appear in any log message.
+            _loggerMock.Verify(
                 x => x.Log(
                     LogLevel.Debug,
                     It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, t) => v!.ToString()!.Contains(sensitiveValueStr)),
+                    It.Is<It.IsAnyType>((v, t) => v != null && v.ToString()!.Contains(sensitiveValue.ToString())),
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Never,
-                $"Log message should NOT contain sensitive value '{sensitiveValueStr}'");
+                "Log message should NOT contain sensitive value '12345'");
 
-            // Also assert that something WAS logged (to ensure we didn't just remove logging entirely)
-            _loggerMock!.Verify(
+            // And a debug log actually happened (logging was not removed entirely).
+            _loggerMock.Verify(
                 x => x.Log(
                     LogLevel.Debug,
                     It.IsAny<EventId>(),
@@ -84,30 +87,36 @@ namespace ModbusForge.Tests
         }
 
         [Fact]
-        public async Task WriteSingleCoilAsync_DoesNotLogSensitiveValue()
+        public async Task WriteSingleCoilAsync_SendsValueToMaster_DoesNotLogValue()
         {
             // Arrange
-            byte unitId = 1;
-            int coilAddress = 100;
-            bool sensitiveValue = true;
-            string sensitiveValueStr = sensitiveValue.ToString();
+            const byte unitId = 1;
+            const int uiAddress = 100;
+            const bool sensitiveValue = true;
 
             // Act
-            await _service.WriteSingleCoilAsync(unitId, coilAddress, sensitiveValue);
+            await _service.WriteSingleCoilAsync(unitId, uiAddress, sensitiveValue);
 
-            // Assert - Check that the sensitive value is NOT logged
-            _loggerMock!.Verify(
+            // The write must reach the device.
+            _modbusMasterMock.Verify(
+                m => m.WriteSingleCoil(unitId, (ushort)(uiAddress - 1), sensitiveValue),
+                Times.Once,
+                "WriteSingleCoilAsync must forward the value to the master");
+
+            // "True" as a standalone token must not appear in a debug log message.
+            _loggerMock.Verify(
                 x => x.Log(
                     LogLevel.Debug,
                     It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, t) => v!.ToString()!.Contains(sensitiveValueStr)),
+                    It.Is<It.IsAnyType>((v, t) => v != null &&
+                        System.Text.RegularExpressions.Regex.IsMatch(v.ToString()!, @"\bTrue\b")),
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Never,
-                $"Log message should NOT contain sensitive value '{sensitiveValueStr}'");
+                "Log message should NOT contain sensitive value 'True'");
 
-            // Also assert that something WAS logged
-            _loggerMock!.Verify(
+            // And a debug log actually happened.
+            _loggerMock.Verify(
                 x => x.Log(
                     LogLevel.Debug,
                     It.IsAny<EventId>(),
@@ -119,8 +128,8 @@ namespace ModbusForge.Tests
 
         public void Dispose()
         {
-            // ModbusService disposes the TcpClient, but we should clean up the listener
             _service?.Dispose();
+            _tcpClient?.Dispose();
             _listener?.Stop();
         }
     }

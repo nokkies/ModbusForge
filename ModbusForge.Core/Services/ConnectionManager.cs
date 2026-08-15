@@ -14,11 +14,13 @@ namespace ModbusForge.Services;
 
 public class ConnectionManager : IConnectionManager, IDisposable
 {
-    private static readonly string ProfilesFilePath = Path.Combine(
+    /// <summary>Default location of the persisted profiles file.</summary>
+    private static string DefaultProfilesFilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "ModbusForge",
         "connection-profiles.json");
 
+    private readonly string _profilesFilePath;
     private readonly ILogger<ConnectionManager> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IValidationService? _validationService;
@@ -42,13 +44,16 @@ public class ConnectionManager : IConnectionManager, IDisposable
     {
     }
 
-    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService, ICorrelationContext? correlationContext, IModbusAddressValidator? addressValidator)
+    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService, ICorrelationContext? correlationContext, IModbusAddressValidator? addressValidator, string? profilesFilePath = null)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
         _validationService = validationService;
         _correlationContext = correlationContext ?? new CorrelationContext();
         _addressValidator = addressValidator ?? new ModbusAddressValidator();
+        // Injectable path so tests can persist to a temp directory instead of the
+        // developer's real %APPDATA%\ModbusForge\connection-profiles.json.
+        _profilesFilePath = profilesFilePath ?? DefaultProfilesFilePath;
         LoadProfiles();
 
         // Add default profile if none exist
@@ -324,7 +329,7 @@ public class ConnectionManager : IConnectionManager, IDisposable
             };
 
             var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-            AtomicFileWriter.WriteAllText(ProfilesFilePath, json);
+            AtomicFileWriter.WriteAllText(_profilesFilePath, json);
             _logger.LogInformation("Saved {Count} connection profiles", Profiles.Count);
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
@@ -337,12 +342,12 @@ public class ConnectionManager : IConnectionManager, IDisposable
     {
         try
         {
-            if (!File.Exists(ProfilesFilePath))
+            if (!File.Exists(_profilesFilePath))
             {
                 return;
             }
 
-            var json = File.ReadAllText(ProfilesFilePath);
+            var json = File.ReadAllText(_profilesFilePath);
             var data = JsonSerializer.Deserialize<ProfilesData>(json);
 
             if (data?.Profiles != null)

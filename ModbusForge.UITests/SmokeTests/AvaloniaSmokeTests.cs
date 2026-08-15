@@ -4,11 +4,11 @@ using System.Linq;
 using System.Threading;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
-using ModbusForge.Tests.Helpers;
+using ModbusForge.UITests.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace ModbusForge.Tests.SmokeTests;
+namespace ModbusForge.UITests.SmokeTests;
 
 [Collection("Sequential UI Tests")]
 public class AvaloniaSmokeTests : IDisposable

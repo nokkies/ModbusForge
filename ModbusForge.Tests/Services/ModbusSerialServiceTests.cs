@@ -66,19 +66,5 @@ namespace ModbusForge.Tests.Services
             Assert.False(result);
             Assert.False(service.IsConnected);
         }
-
-        [Fact]
-        public void AddressConversion_ReadHoldingRegisters_UsesZeroBasedProtocolAddress()
-        {
-            // This test documents the 1-based UI -> 0-based protocol address conversion
-            // implemented in ModbusSerialService.ExecuteReadAsync.
-            const int uiAddress = 1;
-            ushort protocolAddress = (ushort)(uiAddress > 0 ? uiAddress - 1 : 0);
-            Assert.Equal(0, protocolAddress);
-
-            const int uiAddress2 = 100;
-            ushort protocolAddress2 = (ushort)(uiAddress2 > 0 ? uiAddress2 - 1 : 0);
-            Assert.Equal(99, protocolAddress2);
-        }
     }
 }

@@ -20,10 +20,18 @@ namespace ModbusForge.Avalonia.Tests
                 ?? throw new InvalidOperationException("Server not bound");
 
             var loggerFactory = NullLoggerFactory.Instance;
+
+            // Private profile store - the manager persists on every change.
+            var profileDir = Path.Combine(Path.GetTempPath(), "ModbusForgeTests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(profileDir);
+
             var connectionManager = new ConnectionManager(
                 NullLogger<ConnectionManager>.Instance,
                 loggerFactory,
-                null);
+                validationService: null,
+                correlationContext: null,
+                addressValidator: null,
+                profilesFilePath: Path.Combine(profileDir, "connection-profiles.json"));
 
             var profile = new ConnectionProfile("Test", "127.0.0.1", port, 1) { Mode = "Client" };
             connectionManager.AddProfile(profile);
@@ -35,9 +43,17 @@ namespace ModbusForge.Avalonia.Tests
             vm.StartAddress = 0;
             vm.RegisterCount = 5;
 
-            // Act: connect and wait for one poll cycle.
+            // Act: connect, then wait for the first poll cycle to land (event-style
+            // polling with a deadline instead of a fixed 1.5 s sleep).
             await vm.ConnectCommand.ExecuteAsync(null);
-            await Task.Delay(TimeSpan.FromSeconds(1.5));
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (vm.Registers.Count == 0 ||
+                   string.IsNullOrEmpty(vm.Registers[0].ValueText) ||
+                   vm.Registers.Count < 5)
+            {
+                if (DateTime.UtcNow > deadline) break;
+                await Task.Delay(50);
+            }
 
             // Assert
             Assert.NotNull(vm.ActiveProfile);
@@ -53,6 +69,9 @@ namespace ModbusForge.Avalonia.Tests
             await vm.DisconnectCommand.ExecuteAsync(null);
             vm.Dispose();
             server.Stop();
+
+            try { Directory.Delete(profileDir, recursive: true); }
+            catch (IOException) { /* best effort */ }
         }
 
         private static ModbusMultiUnitServer CreateTestServer()

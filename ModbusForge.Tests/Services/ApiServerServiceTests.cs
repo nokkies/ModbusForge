@@ -35,6 +35,19 @@ namespace ModbusForge.Tests.Services
         // Helpers / Fakes
         // ──────────────────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Asks the OS for a free TCP port (bind port 0, read the assignment, release).
+        /// Tests never hard-code ports, so parallel runs and local services cannot collide.
+        /// </summary>
+        private static int GetFreePort()
+        {
+            using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+            listener.Start();
+            var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+            listener.Stop();
+            return port;
+        }
+
         private static Mock<ISettingsService> MakeSettings(
             bool enableApi = false,
             int port = 15080,
@@ -101,7 +114,8 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public async Task StartAsync_ValidPort_StartsServer()
         {
-            var settings = MakeSettings(enableApi: true, port: 15081);
+            var port = GetFreePort();
+            var settings = MakeSettings(enableApi: true, port: port);
             var svc = MakeService(settings.Object);
             await svc.StartAsync();
             try
@@ -117,7 +131,8 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public async Task StartAsync_AlreadyRunning_IsIdempotent()
         {
-            var settings = MakeSettings(port: 15082);
+            var port = GetFreePort();
+            var settings = MakeSettings(port: port);
             var svc = MakeService(settings.Object);
             await svc.StartAsync();
             Assert.True(svc.IsRunning);
@@ -138,7 +153,8 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public async Task StartStop_CanBeRepeated_WithoutResourceLeak()
         {
-            var settings = MakeSettings(port: 15083);
+            var port = GetFreePort();
+            var settings = MakeSettings(port: port);
             var svc = MakeService(settings.Object);
 
             for (int i = 0; i < 3; i++)
@@ -157,14 +173,15 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public async Task SwaggerUnavailable_ByDefault()
         {
-            var settings = MakeSettings(port: 15084, enableDocs: false);
+            var port = GetFreePort();
+            var settings = MakeSettings(port: port, enableDocs: false);
             var svc = MakeService(settings.Object);
             await svc.StartAsync();
             Assert.True(svc.IsRunning);
             try
             {
                 using var http = new HttpClient();
-                var response = await http.GetAsync("http://localhost:15084/swagger/index.html");
+                var response = await http.GetAsync($"http://localhost:{port}/swagger/index.html");
                 // Swagger should return 404 when not enabled
                 Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
             }
@@ -177,14 +194,15 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public async Task SwaggerAvailable_WhenEnabled()
         {
-            var settings = MakeSettings(port: 15085, enableDocs: true);
+            var port = GetFreePort();
+            var settings = MakeSettings(port: port, enableDocs: true);
             var svc = MakeService(settings.Object);
             await svc.StartAsync();
             Assert.True(svc.IsRunning);
             try
             {
                 using var http = new HttpClient();
-                var response = await http.GetAsync("http://localhost:15085/swagger/index.html");
+                var response = await http.GetAsync($"http://localhost:{port}/swagger/index.html");
                 Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
             }
             finally
@@ -200,21 +218,76 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public async Task Server_BindsOnlyToLoopback()
         {
-            var settings = MakeSettings(port: 15086);
+            var port = GetFreePort();
+            var settings = MakeSettings(port: port);
             var svc = MakeService(settings.Object);
             await svc.StartAsync();
             Assert.True(svc.IsRunning);
             try
             {
-                // Should respond on localhost
+                // Should respond on localhost.
                 using var http = new HttpClient();
-                var response = await http.GetAsync("http://localhost:15086/api/status");
+                var response = await http.GetAsync($"http://localhost:{port}/api/status");
                 Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+
+                // And it must NOT be reachable via a non-loopback interface, when one exists
+                // (the previous version of this test only checked the localhost side and
+                // could never detect a regression to a 0.0.0.0 bind).
+                var externalIp = GetFirstNonLoopbackIPv4();
+                if (externalIp is not null)
+                {
+                    // Probe the external address directly: a 'localhost'-bound Kestrel
+                    // server must refuse the connection (or never answer within the timeout).
+                    bool reachable = false;
+                    using (var probe = new System.Net.Sockets.Socket(
+                               System.Net.Sockets.AddressFamily.InterNetwork,
+                               System.Net.Sockets.SocketType.Stream,
+                               System.Net.Sockets.ProtocolType.Tcp))
+                    {
+                        try
+                        {
+                            await probe.ConnectAsync(
+                                new System.Net.IPEndPoint(System.Net.IPAddress.Parse(externalIp), port),
+                                new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(3)).Token);
+                            reachable = true;
+                        }
+                        catch (System.Net.Sockets.SocketException)
+                        {
+                            reachable = false; // connection refused
+                        }
+                        catch (System.OperationCanceledException)
+                        {
+                            reachable = false; // no answer within the timeout
+                        }
+                    }
+
+                    Assert.False(reachable,
+                        $"Server bound to 'localhost' should not be reachable on {externalIp}:{port}");
+                }
             }
             finally
             {
                 await svc.StopAsync();
             }
+        }
+
+        /// <summary>First IPv4 address of this machine that is not loopback, or null.</summary>
+        private static string? GetFirstNonLoopbackIPv4()
+        {
+            System.Net.IPAddress? address = null;
+            try
+            {
+                address = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName())
+                    .AddressList
+                    .FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork &&
+                                        !System.Net.IPAddress.IsLoopback(a));
+            }
+            catch (System.Net.Sockets.SocketException)
+            {
+                return null;
+            }
+
+            return address?.ToString();
         }
 
         // ──────────────────────────────────────────────────────────────────────
@@ -225,18 +298,19 @@ namespace ModbusForge.Tests.Services
         public async Task GetRegisters_InvalidCount_Returns400_WithoutCallingModbus()
         {
             var appMock = MakeApiApp();
-            var settings = MakeSettings(port: 15087);
+            var port = GetFreePort();
+            var settings = MakeSettings(port: port);
             var svc = MakeService(settings.Object, appMock.Object);
             await svc.StartAsync();
             try
             {
                 using var http = new HttpClient();
                 // count = 0 → invalid
-                var r1 = await http.GetAsync("http://localhost:15087/api/modbus/registers/0?length=0");
+                var r1 = await http.GetAsync($"http://localhost:{port}/api/modbus/registers/0?length=0");
                 Assert.Equal(System.Net.HttpStatusCode.BadRequest, r1.StatusCode);
 
                 // count = 126 → exceeds MaxRegisterCount (125)
-                var r2 = await http.GetAsync("http://localhost:15087/api/modbus/registers/0?length=126");
+                var r2 = await http.GetAsync($"http://localhost:{port}/api/modbus/registers/0?length=126");
                 Assert.Equal(System.Net.HttpStatusCode.BadRequest, r2.StatusCode);
 
                 // Modbus service must NOT have been called
@@ -255,13 +329,14 @@ namespace ModbusForge.Tests.Services
         public async Task GetCoils_InvalidCount_Returns400_WithoutCallingModbus()
         {
             var appMock = MakeApiApp();
-            var settings = MakeSettings(port: 15088);
+            var port = GetFreePort();
+            var settings = MakeSettings(port: port);
             var svc = MakeService(settings.Object, appMock.Object);
             await svc.StartAsync();
             try
             {
                 using var http = new HttpClient();
-                var r = await http.GetAsync("http://localhost:15088/api/modbus/coils/0?length=0");
+                var r = await http.GetAsync($"http://localhost:{port}/api/modbus/coils/0?length=0");
                 Assert.Equal(System.Net.HttpStatusCode.BadRequest, r.StatusCode);
 
                 appMock.Verify(
@@ -278,14 +353,15 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public async Task PostCustomTag_NullBody_Returns400()
         {
-            var settings = MakeSettings(port: 15089);
+            var port = GetFreePort();
+            var settings = MakeSettings(port: port);
             var svc = MakeService(settings.Object);
             await svc.StartAsync();
             try
             {
                 using var http = new HttpClient();
                 var r = await http.PostAsync(
-                    "http://localhost:15089/api/custom-tags",
+                    $"http://localhost:{port}/api/custom-tags",
                     new StringContent("null", System.Text.Encoding.UTF8, "application/json"));
                 Assert.Equal(System.Net.HttpStatusCode.BadRequest, r.StatusCode);
             }
@@ -308,14 +384,16 @@ namespace ModbusForge.Tests.Services
                     It.IsAny<byte>(), It.IsAny<ushort>(), It.IsAny<ushort>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new InvalidOperationException("secret internal detail"));
 
-            var settings = MakeSettings(port: 15090);
+            var port = GetFreePort();
+
+            var settings = MakeSettings(port: port);
             var svc = MakeService(settings.Object, appMock.Object);
             await svc.StartAsync();
             try
             {
                 using var http = new HttpClient();
                 var response = await http.GetAsync(
-                    "http://localhost:15090/api/modbus/registers/0?length=1");
+                    $"http://localhost:{port}/api/modbus/registers/0?length=1");
                 Assert.Equal(System.Net.HttpStatusCode.InternalServerError, response.StatusCode);
 
                 var body = await response.Content.ReadAsStringAsync();
@@ -335,7 +413,8 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public async Task UnauthorizedMutation_Returns401_WhenAuthEnabled()
         {
-            var settings = MakeSettings(port: 15091, enableAuth: true, apiKey: "correct-key");
+            var port = GetFreePort();
+            var settings = MakeSettings(port: port, enableAuth: true, apiKey: "correct-key");
             var svc = MakeService(settings.Object);
             await svc.StartAsync();
             try
@@ -343,7 +422,7 @@ namespace ModbusForge.Tests.Services
                 using var http = new HttpClient();
                 // POST /api/app/connect without a key
                 var r = await http.PostAsync(
-                    "http://localhost:15091/api/app/connect",
+                    $"http://localhost:{port}/api/app/connect",
                     new StringContent(string.Empty));
                 Assert.Equal(System.Net.HttpStatusCode.Unauthorized, r.StatusCode);
             }
@@ -361,13 +440,15 @@ namespace ModbusForge.Tests.Services
             appMock.Setup(a => a.ConnectAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(OperationResult.Ok());
 
-            var settings = MakeSettings(port: 15092, enableAuth: true, apiKey: key);
+            var port = GetFreePort();
+
+            var settings = MakeSettings(port: port, enableAuth: true, apiKey: key);
             var svc = MakeService(settings.Object, appMock.Object);
             await svc.StartAsync();
             try
             {
                 using var http = new HttpClient();
-                var req = new HttpRequestMessage(HttpMethod.Post, "http://localhost:15092/api/app/connect");
+                var req = new HttpRequestMessage(HttpMethod.Post, $"http://localhost:{port}/api/app/connect");
                 req.Headers.Add("X-ModbusForge-Api-Key", key);
                 req.Content = new StringContent(string.Empty);
                 var r = await http.SendAsync(req);
@@ -385,14 +466,16 @@ namespace ModbusForge.Tests.Services
             var appMock = MakeApiApp();
             appMock.Setup(a => a.GetStatusAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new ApiStatus(false, "Client"));
 
-            var settings = MakeSettings(port: 15093, enableAuth: false);
+            var port = GetFreePort();
+
+            var settings = MakeSettings(port: port, enableAuth: false);
             var svc = MakeService(settings.Object, appMock.Object);
             await svc.StartAsync();
             try
             {
                 using var http = new HttpClient();
                 // GET /api/app/status – should succeed without any key
-                var r = await http.GetAsync("http://localhost:15093/api/app/status");
+                var r = await http.GetAsync($"http://localhost:{port}/api/app/status");
                 Assert.Equal(System.Net.HttpStatusCode.OK, r.StatusCode);
             }
             finally
@@ -408,7 +491,8 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public async Task OversizedBody_Returns413OrBadRequest()
         {
-            var settings = MakeSettings(port: 15094);
+            var port = GetFreePort();
+            var settings = MakeSettings(port: port);
             var svc = MakeService(settings.Object);
             await svc.StartAsync();
             try
@@ -417,7 +501,7 @@ namespace ModbusForge.Tests.Services
                 // 2 MB body
                 var oversized = new string('x', 2 * 1024 * 1024);
                 var r = await http.PostAsync(
-                    "http://localhost:15094/api/custom-tags",
+                    $"http://localhost:{port}/api/custom-tags",
                     new StringContent(oversized, System.Text.Encoding.UTF8, "application/json"));
 
                 // Expect 413 (Kestrel body limit) or 400 (framework parse failure)

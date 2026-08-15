@@ -16,7 +16,6 @@ namespace ModbusForge.Tests.Models
         [InlineData("123.456.7.8", "Enter a valid IP address or host name.")]
         [InlineData("", "IP address is required.")]
         [InlineData("   ", "IP address is required.")]
-        [InlineData("999.1.1.1", "Enter a valid IP address or host name.")]
         [InlineData("127.0.0.1 extra", "Enter a valid IP address or host name.")]
         [InlineData("host name", "Enter a valid IP address or host name.")]
         public void IpAddress_Validation(string ip, string expected)

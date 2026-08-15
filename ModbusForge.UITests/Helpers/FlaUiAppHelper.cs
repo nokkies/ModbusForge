@@ -7,7 +7,7 @@ using FlaUI.Core;
 using FlaUI.Core.AutomationElements;
 using FlaUI.UIA3;
 
-namespace ModbusForge.Tests.Helpers;
+namespace ModbusForge.UITests.Helpers;
 
 public class FlaUiAppHelper : IDisposable
 {

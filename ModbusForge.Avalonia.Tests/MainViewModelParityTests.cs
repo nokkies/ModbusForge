@@ -413,9 +413,17 @@ namespace ModbusForge.Avalonia.Tests
                 ServerUnitIds = "1"
             };
 
+            // Private profile store - the manager persists on every change.
+            var profileDir = Path.Combine(Path.GetTempPath(), "ModbusForgeTests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(profileDir);
+
             var connectionManager = new ConnectionManager(
                 NullLogger<ConnectionManager>.Instance,
-                NullLoggerFactory.Instance);
+                NullLoggerFactory.Instance,
+                validationService: null,
+                correlationContext: null,
+                addressValidator: null,
+                profilesFilePath: Path.Combine(profileDir, "connection-profiles.json"));
             connectionManager.Profiles.Add(profile);
             connectionManager.SetActiveProfile(profile);
 
@@ -444,6 +452,9 @@ namespace ModbusForge.Avalonia.Tests
             Assert.Equal("10", vm.HoldingRegisters[1].ValueText);
 
             await vm.ToggleConnectionCommand.ExecuteAsync(null);
+
+            try { Directory.Delete(profileDir, recursive: true); }
+            catch (IOException) { /* best effort */ }
         }
 
         [Fact]
