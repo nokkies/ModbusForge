@@ -244,8 +244,9 @@ namespace ModbusForge.Services
             {
                 return comparison(currentValue, triggerValue);
             }
-            catch
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
+                _logger.LogDebug(ex, "Value comparison failed. Current: '{CurrentValue}', Trigger: '{TriggerValue}'", currentValue, triggerValue);
                 return false;
             }
         }

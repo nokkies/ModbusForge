@@ -27,6 +27,14 @@ namespace ModbusForge.Services
         private Task? _worker;
         private bool _disposed;
 
+        /// <summary>
+        /// How long Stop() waits for the worker after canceling. The worker's worst-case
+        /// in-flight time is one Modbus I/O at the transport timeout (5000 ms, no app-level
+        /// retries), so the margin must exceed that or a cancel arriving mid-read times out
+        /// the wait while the worker is still (briefly) alive.
+        /// </summary>
+        private const int StopWorkerWaitMs = 6000;
+
         public PollingEngine(
             IModbusService clientService,
             IModbusService serverService,
@@ -61,7 +69,15 @@ namespace ModbusForge.Services
         public void Stop()
         {
             _cts.Cancel();
-            _worker?.Wait(TimeSpan.FromSeconds(5));
+            var worker = _worker;
+            if (worker != null && !worker.Wait(TimeSpan.FromMilliseconds(StopWorkerWaitMs)))
+            {
+                // Cannot happen in steady state (the worker is always within one bounded I/O
+                // of checking the token); log loudly if it ever does so the leak is visible.
+                _logger.LogWarning(
+                    "Polling engine worker did not exit within {WaitMs} ms after cancel; it will finish on its own",
+                    StopWorkerWaitMs);
+            }
             _worker = null;
             _logger.LogInformation("Polling engine stopped");
         }

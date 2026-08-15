@@ -964,22 +964,6 @@ namespace ModbusForge.Services
             foreach (var g in snapshotRootGroups) Groups.Add(g);
         }
 
-        // ----------------------------------------------------------------
-        //  Preview helper (declared here, shared with GroupDeletionPreview)
-        // ----------------------------------------------------------------
-
-        /// <summary>
-        /// Workaround property accessor for GroupDeletionPreview.Message —
-        /// available only on the preview object, declared here as a private static extension point.
-        /// </summary>
-        private static GroupDeletionPreview ErrorPreview(string groupId, string message) =>
-            new()
-            {
-                GroupId     = groupId,
-                IsProtected = true,
-                Message     = message
-            };
-
         /// <summary>
         /// Saves the tag database atomically (write to temp file, then replace).
         /// Throws on failure so callers can handle it.

@@ -644,10 +644,10 @@ namespace ModbusForge.Services
                 
                 // Use async connect with timeout
                 var connectTask = testClient.ConnectAsync(ipAddress, port);
-                if (await Task.WhenAny(connectTask, Task.Delay(5000)) != connectTask)
+                if (await Task.WhenAny(connectTask, Task.Delay(IoTimeoutMs)) != connectTask)
                 {
                     result.TcpConnected = false;
-                    result.TcpError = "Connection timeout (5s) - host may be unreachable or port blocked by firewall";
+                    result.TcpError = $"Connection timeout ({IoTimeoutMs}ms) - host may be unreachable or port blocked by firewall";
                     return result;
                 }
 
@@ -682,8 +682,8 @@ namespace ModbusForge.Services
                 var master = _factory.CreateMaster(testClient);
                 try
                 {
-                    master.Transport.ReadTimeout = 5000;
-                    master.Transport.WriteTimeout = 5000;
+                    master.Transport.ReadTimeout = IoTimeoutMs;
+                    master.Transport.WriteTimeout = IoTimeoutMs;
 
                     // Try to read a single holding register - this is the most basic Modbus operation
                 try

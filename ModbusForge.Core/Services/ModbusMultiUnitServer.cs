@@ -29,7 +29,6 @@ namespace ModbusForge.Services
         private bool _disposed;
         private int _activeClients;
 
-        private const int DefaultDataStoreSize = ModbusAddressValidator.MaxTotalCount;
         private const ushort MbapProtocolId = 0x0000;
         private const byte MeiTypeDeviceIdentification = 0x0E;
         private const byte DeviceIdMoreFollows = 0xFF;
@@ -79,11 +78,9 @@ namespace ModbusForge.Services
         {
             return _dataStores.GetOrAdd(unitId, id =>
             {
+                // The store is pre-sized to the full address space by the DataStore
+                // constructor (Add calls are no-ops on the fixed-size collection).
                 var ds = new DataStore();
-                for (int i = 0; i < DefaultDataStoreSize; i++) ds.HoldingRegisters.Add(0);
-                for (int i = 0; i < DefaultDataStoreSize; i++) ds.InputRegisters.Add(0);
-                for (int i = 0; i < DefaultDataStoreSize; i++) ds.CoilDiscretes.Add(false);
-                for (int i = 0; i < DefaultDataStoreSize; i++) ds.InputDiscretes.Add(false);
                 // Seed test data
                 for (ushort i = 1; i <= 16; i++)
                     ds.HoldingRegisters[i] = (ushort)(i * 10);

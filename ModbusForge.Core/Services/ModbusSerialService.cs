@@ -656,8 +656,8 @@ namespace ModbusForge.Services
                 _logger.LogInformation("Diagnostics: Opening serial port {ComPort} at {BaudRate}", profile.ComPort, profile.BaudRate);
                 var port = new SerialPort(profile.ComPort, profile.BaudRate, Parity.None, 8, StopBits.One)
                 {
-                    ReadTimeout = 5000,
-                    WriteTimeout = 5000
+                    ReadTimeout = IoTimeoutMs,
+                    WriteTimeout = IoTimeoutMs
                 };
                 port.Open();
 

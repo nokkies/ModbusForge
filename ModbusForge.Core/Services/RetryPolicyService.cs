@@ -108,25 +108,15 @@ namespace ModbusForge.Services
             }, operationName, maxRetries, initialDelayMs, maxDelayMs);
         }
 
-        private bool IsRetryableException(Exception ex)
+        private static bool IsRetryableException(Exception ex)
         {
-            // Retry on network-related exceptions
-            if (ex is System.IO.IOException || 
-                ex is System.TimeoutException ||
-                ex is System.Net.Sockets.SocketException)
-            {
-                return true;
-            }
-
-            // Retry on connection-related exceptions
-            if (ex.Message.Contains("connection", StringComparison.OrdinalIgnoreCase) ||
-                ex.Message.Contains("network", StringComparison.OrdinalIgnoreCase) ||
-                ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            return false;
+            // Retry only on exception TYPES that indicate a transient network fault.
+            // (The previous version also retried whenever the message text contained
+            // words like "connection" or "timeout" - that re-ran non-transient failures
+            // whose messages merely mentioned those words.)
+            return ex is System.IO.IOException
+                || ex is System.TimeoutException
+                || ex is System.Net.Sockets.SocketException;
         }
 
         private static int CalculateDelay(int attempt, int initialDelayMs, int maxDelayMs)
