@@ -375,6 +375,12 @@ namespace ModbusForge.Services
             ValidateSingleRequest(unitId, readStartAddress, readCount, PlcArea.HoldingRegister);
             ValidateSingleRequest(unitId, writeStartAddress, writeValues.Length, PlcArea.HoldingRegister, isWrite: true);
 
+            // FC23 caps the write quantity at 121 registers (FC16's 123 would be rejected
+            // by spec-compliant devices).
+            if (writeValues.Length > ModbusAddressValidator.MaxReadWriteWriteCount)
+                throw new ArgumentOutOfRangeException(nameof(writeValues),
+                    $"FC23 (read/write multiple registers) supports at most {ModbusAddressValidator.MaxReadWriteWriteCount} write registers.");
+
             return await ExecuteMasterAsync<ushort[]?>(
                 $"Reading {readCount} registers at {readStartAddress} and writing {writeValues.Length} registers at {writeStartAddress}",
                 "Error in read/write multiple registers",

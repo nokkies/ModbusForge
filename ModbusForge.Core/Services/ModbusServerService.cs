@@ -333,6 +333,9 @@ namespace ModbusForge.Services
             {
                 var ds = GetDataStore(unitId);
                 if (ds == null) throw new InvalidOperationException("Data store not initialized");
+                if (writeValues.Length < 1 || writeValues.Length > ModbusAddressValidator.MaxReadWriteWriteCount)
+                    throw new ArgumentOutOfRangeException(nameof(writeValues),
+                        $"FC23 (read/write multiple registers) supports 1..{ModbusAddressValidator.MaxReadWriteWriteCount} write registers.");
                 if (writeStartAddress < 0 || writeStartAddress + writeValues.Length - 1 >= ds.HoldingRegisters.Count)
                     throw new ArgumentOutOfRangeException(nameof(writeStartAddress));
                 if (readStartAddress < 0 || readCount < 1 || readStartAddress + readCount - 1 >= ds.HoldingRegisters.Count)

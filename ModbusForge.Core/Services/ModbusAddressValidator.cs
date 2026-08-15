@@ -23,6 +23,10 @@ namespace ModbusForge.Services
         private const int MaxReadRegisters = 125;
         private const int MaxWriteRegisters = 123;
 
+        /// <summary>FC23 (Read/Write Multiple Registers) caps the WRITE quantity at 121 -
+        /// fewer than FC16's 123, per MBE 8501.</summary>
+        public const int MaxReadWriteWriteCount = 121;
+
         public bool IsValidUnitId(byte unitId) => unitId >= MinUnitId && unitId <= MaxUnitId;
 
         public bool IsValidStartAddress(int startAddress) =>
