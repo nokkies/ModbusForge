@@ -196,6 +196,21 @@ namespace ModbusForge.Avalonia.ViewModels
 
         /// <summary>Set while applying an undo/redo so the resulting writes are not re-recorded.</summary>
         private bool _suppressingNodeEdits;
+
+        /// <summary>
+        /// Node properties holding a <see cref="PlcAddressReference"/> whose edits
+        /// participate in undo. Editors mutate the reference in place, so these are
+        /// observed on the reference objects themselves and snapshotted by clone.
+        /// </summary>
+        private static readonly HashSet<string> UndoableAddressProperties = new(StringComparer.Ordinal)
+        {
+            nameof(VisualNode.Input1Address),
+            nameof(VisualNode.Input2Address),
+            nameof(VisualNode.OutputAddress),
+        };
+
+        /// <summary>Maps every observed address reference to its owning node and property.</summary>
+        private readonly List<(VisualNode Node, string Property, PlcAddressReference Reference)> _addressReferenceOwners = new();
         private bool _isSwitchingProgram;
         private bool _isUpdatingSelection;
         private bool _isDisposed;
@@ -882,6 +897,38 @@ namespace ModbusForge.Avalonia.ViewModels
             }
 
             InitializeNodeEditBaselines(node);
+            AttachAddressReferenceHandlers(node);
+        }
+
+        private void AttachAddressReferenceHandlers(VisualNode node)
+        {
+            var references = new (string Property, PlcAddressReference? Reference)[]
+            {
+                (nameof(VisualNode.Input1Address), node.Input1Address),
+                (nameof(VisualNode.Input2Address), node.Input2Address),
+                (nameof(VisualNode.OutputAddress), node.OutputAddress),
+            };
+
+            foreach (var (property, reference) in references)
+            {
+                if (reference == null) continue;
+                reference.PropertyChanged += OnAddressReferencePropertyChanged;
+                _addressReferenceOwners.Add((node, property, reference));
+            }
+        }
+
+        private void OnAddressReferencePropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (_suppressingNodeEdits || sender is not PlcAddressReference) return;
+
+            foreach (var (node, property, reference) in _addressReferenceOwners)
+            {
+                if (ReferenceEquals(reference, sender))
+                {
+                    RecordNodeEdit(node, property);
+                    break;
+                }
+            }
         }
 
         /// <summary>
@@ -922,6 +969,13 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 _nodeEditLastKnown.Remove(key);
             }
+
+            var owners = _addressReferenceOwners.Where(owner => ReferenceEquals(owner.Node, node)).ToList();
+            foreach (var (_, _, reference) in owners)
+            {
+                reference.PropertyChanged -= OnAddressReferencePropertyChanged;
+            }
+            _addressReferenceOwners.RemoveAll(owner => ReferenceEquals(owner.Node, node));
         }
 
         private void OnNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -984,6 +1038,9 @@ namespace ModbusForge.Avalonia.ViewModels
             nameof(VisualNode.VsdAtSpeedTolerance),
         };
 
+        private static IEnumerable<string> AllUndoableNodeProperties()
+            => UndoableNodeProperties.Union(UndoableAddressProperties);
+
         private static object? ReadUndoableNodeProperty(VisualNode node, string property)
         {
             switch (property)
@@ -992,6 +1049,12 @@ namespace ModbusForge.Avalonia.ViewModels
                     return node.Name;
                 case nameof(VisualNode.IsEnabled):
                     return node.IsEnabled;
+                case nameof(VisualNode.Input1Address):
+                    return node.Input1Address?.Clone();
+                case nameof(VisualNode.Input2Address):
+                    return node.Input2Address?.Clone();
+                case nameof(VisualNode.OutputAddress):
+                    return node.OutputAddress?.Clone();
                 default:
                     return ParameterAccess.TryGet(property)?.Getter(node);
             }
@@ -999,7 +1062,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void InitializeNodeEditBaselines(VisualNode node)
         {
-            foreach (var property in UndoableNodeProperties)
+            foreach (var property in AllUndoableNodeProperties())
             {
                 var value = ReadUndoableNodeProperty(node, property);
                 if (value != null)
@@ -1030,7 +1093,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 // with the new value in place, so the node itself can no longer be read
                 // for the property that started this series.
                 var before = new Dictionary<string, object?>(StringComparer.Ordinal);
-                foreach (var name in UndoableNodeProperties)
+                foreach (var name in AllUndoableNodeProperties())
                 {
                     before[name] = _nodeEditLastKnown.GetValueOrDefault((node, name)) ?? ReadUndoableNodeProperty(node, name);
                 }
@@ -1100,6 +1163,15 @@ namespace ModbusForge.Avalonia.ViewModels
                         case nameof(VisualNode.IsEnabled):
                             node.IsEnabled = value is bool b && b;
                             break;
+                        case nameof(VisualNode.Input1Address) when value is PlcAddressReference stored1:
+                            ApplyAddressReference(node.Input1Address, stored1);
+                            break;
+                        case nameof(VisualNode.Input2Address) when value is PlcAddressReference stored2:
+                            ApplyAddressReference(node.Input2Address, stored2);
+                            break;
+                        case nameof(VisualNode.OutputAddress) when value is PlcAddressReference stored3:
+                            ApplyAddressReference(node.OutputAddress, stored3);
+                            break;
                         default:
                             if (ParameterAccess.TryGet(property) is { } access)
                                 access.Setter(node, value);
@@ -1121,6 +1193,19 @@ namespace ModbusForge.Avalonia.ViewModels
             }
 
             InitializeNodeEditBaselines(node);
+        }
+
+        /// <summary>
+        /// Copies a snapshotted address reference onto the live one in place, so the
+        /// editor controls (bound to the reference object) keep working.
+        /// </summary>
+        private static void ApplyAddressReference(PlcAddressReference target, PlcAddressReference source)
+        {
+            if (target == null) return;
+            target.Area = source.Area;
+            target.Address = source.Address;
+            target.Not = source.Not;
+            target.SymbolicName = source.SymbolicName;
         }
 
         private void OnNodeValueEditedByUser(VisualNode node, double value)

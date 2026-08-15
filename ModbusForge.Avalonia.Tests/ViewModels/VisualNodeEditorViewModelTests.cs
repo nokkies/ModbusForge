@@ -126,6 +126,27 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         }
 
         [Fact]
+        public void AddressEdit_UndoRestoresOriginalBinding()
+        {
+            using var vm = CreateVm();
+            var node = vm.AddNodeAt(PlcElementType.InputBool, 0, 0)!;
+            var originalArea = node.Input1Address.Area;
+            var originalAddress = node.Input1Address.Address;
+
+            node.Input1Address.Address = 17;
+            node.Input1Address.Area = PlcArea.HoldingRegister;
+
+            vm.UndoCommand.Execute(null);
+
+            Assert.Equal(originalAddress, node.Input1Address.Address);
+            Assert.Equal(originalArea, node.Input1Address.Area);
+
+            vm.RedoCommand.Execute(null);
+            Assert.Equal(17, node.Input1Address.Address);
+            Assert.Equal(PlcArea.HoldingRegister, node.Input1Address.Area);
+        }
+
+        [Fact]
         public void MixedEdits_SameNode_CoalesceIntoOneUndoStep()
         {
             using var vm = CreateVm();
