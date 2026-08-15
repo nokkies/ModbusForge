@@ -12,7 +12,7 @@ using ModbusForge.Models;
 
 namespace ModbusForge.Services;
 
-public class ConnectionManager : IConnectionManager
+public class ConnectionManager : IConnectionManager, IDisposable
 {
     private static readonly string ProfilesFilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -71,14 +71,47 @@ public class ConnectionManager : IConnectionManager
 
     public void RemoveProfile(ConnectionProfile profile)
     {
-        if (profile.IsConnected)
+        // Remove from the service map first so no new operation can pick the service up
+        // while it is being torn down.
+        IModbusService? service = null;
+        if (_services.TryRemove(profile.Id, out var removed))
         {
-            _ = DisconnectProfileAsync(profile);
+            service = removed;
         }
 
-        if (_services.TryRemove(profile.Id, out var service))
+        if (profile.IsConnected && service != null)
         {
-            service.Dispose();
+            // Disconnect synchronously and let Dispose follow: a fire-and-forget
+            // DisconnectAsync racing an immediate Dispose could release a disposed
+            // semaphore or touch a disposed socket. Both calls are bounded internally
+            // (5 s lock wait), so the worst-case block is short and only on the
+            // explicit remove-profile path.
+            try
+            {
+                service.DisconnectAsync().GetAwaiter().GetResult();
+                profile.Status = "Disconnected";
+                ProfileDisconnected?.Invoke(this, profile);
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogWarning(ex, "Error disconnecting profile {Name} during removal", profile.Name);
+            }
+            finally
+            {
+                profile.IsConnected = false;
+            }
+        }
+
+        if (service != null)
+        {
+            try
+            {
+                service.Dispose();
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogWarning(ex, "Error disposing service for profile {Name}", profile.Name);
+            }
         }
 
         Profiles.Remove(profile);
@@ -181,6 +214,26 @@ public class ConnectionManager : IConnectionManager
         var connectedProfiles = Profiles.Where(p => p.IsConnected).ToList();
         var tasks = connectedProfiles.Select(DisconnectProfileAsync);
         await Task.WhenAll(tasks);
+    }
+
+    /// <summary>
+    /// Disposes every per-profile service. Surviving profiles (connected or not) would
+    /// otherwise keep their sockets/COM ports open until process exit.
+    /// </summary>
+    public void Dispose()
+    {
+        foreach (var (id, service) in _services)
+        {
+            try
+            {
+                service.Dispose();
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogWarning(ex, "Error disposing service {ServiceId}", id);
+            }
+        }
+        _services.Clear();
     }
 
     public IModbusService? GetServiceForProfile(ConnectionProfile profile)

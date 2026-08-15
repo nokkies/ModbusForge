@@ -48,6 +48,12 @@ namespace ModbusForge.Services
         private const int MbapHeaderLength = 7;
         private const int MaxResponseLength = 260;
 
+        /// <summary>
+        /// Safety cap on FC43 MoreFollows pagination. A device that keeps claiming
+        /// "more follows" (malformed or buggy) must not loop forever.
+        /// </summary>
+        private const int MaxIdentificationTransactions = 16;
+
         private readonly ILogger<DeviceIdentificationReader> _logger;
 
         public DeviceIdentificationReader(ILogger<DeviceIdentificationReader> logger)
@@ -73,25 +79,53 @@ namespace ModbusForge.Services
                 }
 
                 var stream = tcpClient.GetStream();
-                await stream.WriteAsync(BuildRequest(unitId), cancellationToken).ConfigureAwait(false);
 
                 using var responseTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 responseTimeout.CancelAfter(Math.Max(1, responseTimeoutMs));
 
-                var header = await ReadExactlyAsync(stream, MbapHeaderLength, responseTimeout.Token).ConfigureAwait(false);
-                if (header == null)
+                // FC43 responses can span multiple transactions: the first object (vendor
+                // name) may push product code / revision into a follow-up response,
+                // signalled by moreFollows=1 and nextObjectId in each response.
+                var values = new Dictionary<byte, string>();
+                var objectId = ObjectIdVendorName;
+
+                for (var transaction = 0; transaction < MaxIdentificationTransactions; transaction++)
                 {
-                    return null;
+                    await stream.WriteAsync(BuildRequest(unitId, objectId), cancellationToken).ConfigureAwait(false);
+
+                    var header = await ReadExactlyAsync(stream, MbapHeaderLength, responseTimeout.Token).ConfigureAwait(false);
+                    if (header == null)
+                    {
+                        return null;
+                    }
+
+                    var remaining = ((header[4] << 8) | header[5]) - 1;
+                    if (remaining is <= 0 or > MaxResponseLength)
+                    {
+                        return null;
+                    }
+
+                    var pdu = await ReadExactlyAsync(stream, remaining, responseTimeout.Token).ConfigureAwait(false);
+                    if (pdu == null)
+                    {
+                        return null;
+                    }
+
+                    if (!TryParseObjectChunk(pdu, out var moreFollows, out var nextObjectId, out var chunkValues))
+                    {
+                        return null;
+                    }
+
+                    foreach (var (id, value) in chunkValues)
+                        values[id] = value;
+
+                    if (!moreFollows)
+                        break;
+
+                    objectId = nextObjectId;
                 }
 
-                var remaining = ((header[4] << 8) | header[5]) - 1;
-                if (remaining is <= 0 or > MaxResponseLength)
-                {
-                    return null;
-                }
-
-                var pdu = await ReadExactlyAsync(stream, remaining, responseTimeout.Token).ConfigureAwait(false);
-                return pdu == null ? null : Parse(pdu);
+                return BuildIdentification(values);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -104,7 +138,9 @@ namespace ModbusForge.Services
             }
         }
 
-        internal static byte[] BuildRequest(byte unitId)
+        internal static byte[] BuildRequest(byte unitId) => BuildRequest(unitId, ObjectIdVendorName);
+
+        internal static byte[] BuildRequest(byte unitId, byte objectId)
         {
             return new byte[]
             {
@@ -115,28 +151,50 @@ namespace ModbusForge.Services
                 FunctionCode,
                 MeiTypeDeviceIdentification,
                 ReadDeviceIdBasic,
-                ObjectIdVendorName
+                objectId
             };
         }
 
         /// <summary>
-        /// Parses an FC43 response PDU (function code first). Returns null for exception
+        /// Parses a single (first-chunk) FC43 response PDU. Returns null for exception
         /// responses and for frames that are not well-formed device identification data.
         /// </summary>
         internal static ScannedDeviceIdentification? Parse(byte[] pdu)
         {
+            return TryParseObjectChunk(pdu, out _, out _, out var values)
+                ? BuildIdentification(values)
+                : null;
+        }
+
+        /// <summary>
+        /// Parses one FC43 response chunk (function code first), exposing the MoreFollows
+        /// flag and next object id so the caller can paginate. Returns false for exception
+        /// responses and malformed frames.
+        /// </summary>
+        internal static bool TryParseObjectChunk(
+            byte[] pdu,
+            out bool moreFollows,
+            out byte nextObjectId,
+            out Dictionary<byte, string> values)
+        {
+            moreFollows = false;
+            nextObjectId = 0;
+            values = new Dictionary<byte, string>();
+
             ArgumentNullException.ThrowIfNull(pdu);
 
             // functionCode, meiType, readDeviceIdCode, conformityLevel, moreFollows, nextObjectId, objectCount
             const int minimumLength = 7;
             if (pdu.Length < minimumLength || pdu[0] != FunctionCode || pdu[1] != MeiTypeDeviceIdentification)
             {
-                return null;
+                return false;
             }
+
+            moreFollows = pdu[4] == 0x01;
+            nextObjectId = pdu[5];
 
             var objectCount = pdu[6];
             var offset = minimumLength;
-            var values = new Dictionary<byte, string>(objectCount);
 
             for (var i = 0; i < objectCount; i++)
             {
@@ -158,6 +216,11 @@ namespace ModbusForge.Services
                 offset += length;
             }
 
+            return true;
+        }
+
+        private static ScannedDeviceIdentification? BuildIdentification(Dictionary<byte, string> values)
+        {
             if (values.Count == 0)
             {
                 return null;

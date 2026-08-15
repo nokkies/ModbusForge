@@ -53,14 +53,14 @@ public sealed class ApiApplicationService : IApiApplicationService
     // Status
     // ──────────────────────────────────────────────────────────────────────────
 
-    public ApiStatus GetStatus()
+    public Task<ApiStatus> GetStatusAsync(CancellationToken token)
     {
         // Marshal the read through the dispatcher for consistency with the
         // write-side calls, so UI-owned state is never read from the API thread.
-        return _dispatcher
-            .InvokeAsync(() => new ApiStatus(_appState.IsConnected, _appState.Mode))
-            .GetAwaiter()
-            .GetResult();
+        // (Previously this blocked the API thread with .GetAwaiter().GetResult(),
+        // a sync-over-async that could stall the request pipeline under load.)
+        return _dispatcher.InvokeAsync(
+            () => new ApiStatus(_appState.IsConnected, _appState.Mode));
     }
 
     // ──────────────────────────────────────────────────────────────────────────

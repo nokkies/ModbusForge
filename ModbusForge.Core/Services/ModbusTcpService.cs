@@ -27,6 +27,14 @@ namespace ModbusForge.Services
         private int _lastPort;
 
         private const int DisposeLockTimeoutMs = 5000;
+
+        /// <summary>
+        /// Socket and NModbus transport I/O timeout. NModbus defaults to 0 (infinite), so without
+        /// this an unresponsive device would block every Modbus operation on this profile forever.
+        /// Matches the serial transport timeout.
+        /// </summary>
+        private const int IoTimeoutMs = 5000;
+
         private const byte DeviceIdMoreFollows = 0xFF;
         private const int MaxDeviceIdTransactions = 16;
 
@@ -76,7 +84,9 @@ namespace ModbusForge.Services
 
         public virtual async Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
         {
-            ValidateSingleRequest(unitId, startAddress, count, PlcArea.DiscreteInput);
+            // Validate against the whole address space (not the per-request cap) so that
+            // large reads are chunked by ModbusChunkedExecutor.GetReadRanges instead of throwing.
+            ValidateAddressRange(unitId, startAddress, count);
             return await ModbusChunkedExecutor.ReadAsync(
                 () => IsConnected,
                 _ioLock,
@@ -123,13 +133,61 @@ namespace ModbusForge.Services
             {
                 _lastIpAddress = ipAddress;
                 _lastPort = port;
+
+                // Dispose any previous connection first so reconnects do not leak the old
+                // socket and master (mirrors ModbusSerialService, which calls DisconnectCore).
+                var previousClient = _client;
+                var previousTcpClient = _tcpClient;
+                _client = null;
+                _tcpClient = null;
+                if (previousClient is IDisposable disposable)
+                {
+                    try
+                    {
+                        disposable.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error disposing previous Modbus client during reconnect");
+                    }
+                }
+                try
+                {
+                    previousTcpClient?.Close();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error closing previous TCP socket during reconnect");
+                }
+
                 var tcpClient = new TcpClient();
                 try
                 {
+                    // Bound the socket I/O itself as well: NModbus's transport timeout alone does
+                    // not cover a TCP connect to a device that accepts the connection but never
+                    // completes the handshake.
+                    tcpClient.ReceiveTimeout = IoTimeoutMs;
+                    tcpClient.SendTimeout = IoTimeoutMs;
+
                     await tcpClient.ConnectAsync(ipAddress, port, cancellationToken).ConfigureAwait(false);
                     _tcpClient = tcpClient;
                     var streamResource = new LoggingStreamResource(ModbusStreamAdapterFactory.CreateTcpAdapter(tcpClient), _frameLogger);
                     var transport = _factory.CreateIpTransport(streamResource);
+
+                    // NModbus defaults ReadTimeout/WriteTimeout to 0 (infinite). Without these, a
+                    // device that accepts TCP but never answers hangs every operation that follows
+                    // (while holding the I/O lock) until the process is killed.
+                    transport.ReadTimeout = IoTimeoutMs;
+                    transport.WriteTimeout = IoTimeoutMs;
+
+                    // NModbus also retries timed-out requests 3 more times by default
+                    // (ModbusTransport.Retries = 3), so a single dead peer costs ~4 x the I/O
+                    // timeout (~21 s) while holding the shared polling queue. TCP already
+                    // retransmits at the protocol level; if a peer never answers, app-level
+                    // retries are pure latency. Fail after one attempt and let the
+                    // connection-loss handling / reconnect logic do the recovery.
+                    transport.Retries = 0;
+
                     _client = new ModbusIpMaster(transport);
                     var message = $"Connected to Modbus server at {ipAddress}:{port}";
                     _logger.LogInformation(message);
@@ -141,10 +199,7 @@ namespace ModbusForge.Services
                     var message = $"Failed to connect to Modbus server at {ipAddress}:{port}: {ex.Message}";
                     _logger.LogError(ex, message);
                     _consoleLoggerService?.Log(message);
-                    (_client as IDisposable)?.Dispose();
-                    _client = null;
                     tcpClient.Dispose();
-                    _tcpClient = null;
                     return false;
                 }
             }
@@ -238,7 +293,9 @@ namespace ModbusForge.Services
 
         public virtual async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
         {
-            ValidateSingleRequest(unitId, startAddress, count, PlcArea.Coil);
+            // Validate against the whole address space (not the per-request cap) so that
+            // large reads are chunked by ModbusChunkedExecutor.GetReadRanges instead of throwing.
+            ValidateAddressRange(unitId, startAddress, count);
             return await ModbusChunkedExecutor.ReadAsync(
                 () => IsConnected,
                 _ioLock,
@@ -442,10 +499,18 @@ namespace ModbusForge.Services
                         if (_client != null)
                             writeAction(_client, protocolAddress);
                     }
+                    catch (NModbus.SlaveException ex)
+                    {
+                        // Report the failure to the caller - a slave exception means the write
+                        // did NOT happen (mirrors ModbusChunkedExecutor.WriteAsync, which rethrows).
+                        _logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
+                        throw;
+                    }
                     catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
                         _logger.LogError(ex, errorLogContext);
                         HandleConnectionLoss();
+                        throw;
                     }
                 }).ConfigureAwait(false);
             }

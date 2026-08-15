@@ -24,6 +24,13 @@ namespace ModbusForge.Services
         private readonly IModbusAddressValidator _addressValidator;
         private readonly SemaphoreSlim _ioLock = new(1, 1);
         private const int DisposeLockTimeoutMs = 5000;
+
+        /// <summary>
+        /// Serial I/O timeout. Bounds both the raw SerialPort and the NModbus transport read/write
+        /// so an unresponsive device cannot hang the I/O lock. Matches the TCP transport timeout.
+        /// </summary>
+        private const int IoTimeoutMs = 5000;
+
         private const byte DeviceIdMoreFollows = 0xFF;
         private const int MaxDeviceIdTransactions = 16;
 
@@ -109,8 +116,8 @@ namespace ModbusForge.Services
                 _serialPort = new SerialPort(profile.ComPort, profile.BaudRate, profile.Parity, profile.DataBits, profile.StopBits)
                 {
                     RtsEnable = profile.RtsEnable,
-                    ReadTimeout = 5000,
-                    WriteTimeout = 5000
+                    ReadTimeout = IoTimeoutMs,
+                    WriteTimeout = IoTimeoutMs
                 };
 
                 try
@@ -124,8 +131,8 @@ namespace ModbusForge.Services
 
                     _client = _factory.CreateMaster(transport);
 
-                    _client.Transport.ReadTimeout = 5000;
-                    _client.Transport.WriteTimeout = 5000;
+                    _client.Transport.ReadTimeout = IoTimeoutMs;
+                    _client.Transport.WriteTimeout = IoTimeoutMs;
 
                     var message = $"Connected to Modbus {Transport} on {profile.ComPort} ({profile.BaudRate}/{profile.DataBits}{ParityChar(profile.Parity)}{StopBitsChar(profile.StopBits)})";
                     _logger.LogInformation(message);
@@ -226,7 +233,9 @@ namespace ModbusForge.Services
 
         public virtual async Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
         {
-            ValidateSingleRequest(unitId, startAddress, count, PlcArea.DiscreteInput);
+            // Validate against the whole address space (not the per-request cap) so that
+            // large reads are chunked by ModbusChunkedExecutor.GetReadRanges instead of throwing.
+            ValidateAddressRange(unitId, startAddress, count);
             return await ModbusChunkedExecutor.ReadAsync(
                 () => IsConnected,
                 _ioLock,
@@ -251,7 +260,9 @@ namespace ModbusForge.Services
 
         public virtual async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
         {
-            ValidateSingleRequest(unitId, startAddress, count, PlcArea.Coil);
+            // Validate against the whole address space (not the per-request cap) so that
+            // large reads are chunked by ModbusChunkedExecutor.GetReadRanges instead of throwing.
+            ValidateAddressRange(unitId, startAddress, count);
             return await ModbusChunkedExecutor.ReadAsync(
                 () => IsConnected,
                 _ioLock,
@@ -428,10 +439,18 @@ namespace ModbusForge.Services
                         if (_client != null)
                             ApplySerialTiming(() => writeAction(_client, protocolAddress));
                     }
+                    catch (NModbus.SlaveException ex)
+                    {
+                        // Report the failure to the caller - a slave exception means the write
+                        // did NOT happen (mirrors ModbusChunkedExecutor.WriteAsync, which rethrows).
+                        _logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
+                        throw;
+                    }
                     catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
                         _logger.LogError(ex, errorLogContext);
                         HandleConnectionLoss();
+                        throw;
                     }
                 }).ConfigureAwait(false);
             }

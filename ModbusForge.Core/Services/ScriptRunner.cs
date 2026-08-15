@@ -119,27 +119,37 @@ public class ScriptRunner : IScriptRunner
         {
             switch (cmd.CommandType)
             {
+                // A null read means the device did not respond - report it as a failure,
+                // not as a successful "null" read.
                 case ScriptCommandType.ReadHoldingRegisters:
                     var holdingRegs = await modbusService.ReadHoldingRegistersAsync(unitId, cmd.Address, cmd.Count);
-                    var holdingResult = holdingRegs != null ? string.Join(", ", holdingRegs) : "null";
+                    if (holdingRegs is null)
+                        return (false, "No response from device");
+                    var holdingResult = string.Join(", ", holdingRegs);
                     Log($"Read Holding Registers [{cmd.Address}..{cmd.Address + cmd.Count - 1}]: {holdingResult}");
                     return (true, holdingResult);
 
                 case ScriptCommandType.ReadInputRegisters:
                     var inputRegs = await modbusService.ReadInputRegistersAsync(unitId, cmd.Address, cmd.Count);
-                    var inputResult = inputRegs != null ? string.Join(", ", inputRegs) : "null";
+                    if (inputRegs is null)
+                        return (false, "No response from device");
+                    var inputResult = string.Join(", ", inputRegs);
                     Log($"Read Input Registers [{cmd.Address}..{cmd.Address + cmd.Count - 1}]: {inputResult}");
                     return (true, inputResult);
 
                 case ScriptCommandType.ReadCoils:
                     var coils = await modbusService.ReadCoilsAsync(unitId, cmd.Address, cmd.Count);
-                    var coilResult = coils != null ? string.Join(", ", Array.ConvertAll(coils, b => b ? "ON" : "OFF")) : "null";
+                    if (coils is null)
+                        return (false, "No response from device");
+                    var coilResult = string.Join(", ", Array.ConvertAll(coils, b => b ? "ON" : "OFF"));
                     Log($"Read Coils [{cmd.Address}..{cmd.Address + cmd.Count - 1}]: {coilResult}");
                     return (true, coilResult);
 
                 case ScriptCommandType.ReadDiscreteInputs:
                     var discreteInputs = await modbusService.ReadDiscreteInputsAsync(unitId, cmd.Address, cmd.Count);
-                    var discreteResult = discreteInputs != null ? string.Join(", ", Array.ConvertAll(discreteInputs, b => b ? "ON" : "OFF")) : "null";
+                    if (discreteInputs is null)
+                        return (false, "No response from device");
+                    var discreteResult = string.Join(", ", Array.ConvertAll(discreteInputs, b => b ? "ON" : "OFF"));
                     Log($"Read Discrete Inputs [{cmd.Address}..{cmd.Address + cmd.Count - 1}]: {discreteResult}");
                     return (true, discreteResult);
 

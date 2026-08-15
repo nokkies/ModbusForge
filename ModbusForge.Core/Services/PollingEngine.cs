@@ -182,26 +182,37 @@ namespace ModbusForge.Services
                 }
                 else
                 {
+                    // A null result means the device did not respond (disconnected, slave
+                    // exception, or timeout). Surface it as an error instead of reporting a
+                    // "successful" empty read.
                     switch (command.Area)
                     {
                         case PlcArea.HoldingRegister:
-                            result.Values = await service.ReadHoldingRegistersAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false)
-                                ?? Array.Empty<ushort>();
+                            var holdingValues = await service.ReadHoldingRegistersAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false);
+                            if (holdingValues is null)
+                                return FailResult(result, "No response from device");
+                            result.Values = holdingValues;
                             break;
 
                         case PlcArea.InputRegister:
-                            result.Values = await service.ReadInputRegistersAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false)
-                                ?? Array.Empty<ushort>();
+                            var inputValues = await service.ReadInputRegistersAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false);
+                            if (inputValues is null)
+                                return FailResult(result, "No response from device");
+                            result.Values = inputValues;
                             break;
 
                         case PlcArea.Coil:
-                            result.States = await service.ReadCoilsAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false)
-                                ?? Array.Empty<bool>();
+                            var coilStates = await service.ReadCoilsAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false);
+                            if (coilStates is null)
+                                return FailResult(result, "No response from device");
+                            result.States = coilStates;
                             break;
 
                         case PlcArea.DiscreteInput:
-                            result.States = await service.ReadDiscreteInputsAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false)
-                                ?? Array.Empty<bool>();
+                            var discreteStates = await service.ReadDiscreteInputsAsync(command.UnitId, command.StartAddress, command.Count).ConfigureAwait(false);
+                            if (discreteStates is null)
+                                return FailResult(result, "No response from device");
+                            result.States = discreteStates;
                             break;
 
                         default:
@@ -218,6 +229,17 @@ namespace ModbusForge.Services
                 result.ErrorMessage = ex.Message;
             }
 
+            return result;
+        }
+
+        private static PollingResult FailResult(PollingResult result, string message)
+        {
+            result.IsError = true;
+            result.ErrorMessage = message;
+            if (result.Area is PlcArea.HoldingRegister or PlcArea.InputRegister)
+                result.Values = Array.Empty<ushort>();
+            else
+                result.States = Array.Empty<bool>();
             return result;
         }
     }

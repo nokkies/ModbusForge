@@ -8,6 +8,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ModbusForge.Services
@@ -23,6 +24,12 @@ namespace ModbusForge.Services
         private readonly IOptions<ServerSettings> _serverSettings;
         private readonly Timer _evaluationTimer;
 
+        /// <summary>How often the rule evaluation timer fires.</summary>
+        private const int EvaluationIntervalMs = 250;
+
+        private int _evaluationRunning;
+        private volatile bool _disposed;
+
         public ObservableCollection<ScriptRule> Rules { get; } = new();
 
         public ScriptRuleService(
@@ -36,8 +43,8 @@ namespace ModbusForge.Services
             _consoleLoggerService = consoleLoggerService ?? throw new ArgumentNullException(nameof(consoleLoggerService));
             _serverSettings = serverSettings ?? throw new ArgumentNullException(nameof(serverSettings));
             
-            // Initialize evaluation timer (runs every 250ms)
-            _evaluationTimer = new Timer(EvaluateRulesCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(250));
+            // Initialize evaluation timer (runs every EvaluationIntervalMs)
+            _evaluationTimer = new Timer(EvaluateRulesCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(EvaluationIntervalMs));
         }
 
         public void AddRule(ScriptRule rule)
@@ -76,10 +83,11 @@ namespace ModbusForge.Services
 
         public async Task EvaluateRulesAsync()
         {
-            if (!_modbusService.IsConnected) return;
+            if (!_modbusService.IsConnected || _disposed) return;
 
             foreach (var rule in Rules.Where(r => r.Enabled && !r.Triggered))
             {
+                if (_disposed) break;
                 try
                 {
                     bool conditionMet = await EvaluateConditionAsync(rule);
@@ -123,8 +131,14 @@ namespace ModbusForge.Services
 
         private async void EvaluateRulesCallback(object? state)
         {
-            if (!_modbusService.IsConnected) return;
-            
+            if (!_modbusService.IsConnected || _disposed) return;
+
+            // A Modbus read can take up to the transport timeout, so successive timer ticks
+            // would otherwise start overlapping evaluations - and the same rule's action
+            // (a Modbus write) could fire twice. Skip the tick when one is still running.
+            if (Interlocked.CompareExchange(ref _evaluationRunning, 1, 0) == 1)
+                return;
+
             try
             {
                 await EvaluateRulesAsync();
@@ -137,10 +151,15 @@ namespace ModbusForge.Services
             {
                 _logger.LogError(ex, "Error evaluating script rules in timer callback");
             }
+            finally
+            {
+                Interlocked.Exchange(ref _evaluationRunning, 0);
+            }
         }
 
         public void Dispose()
         {
+            _disposed = true;
             _evaluationTimer?.Dispose();
         }
 
@@ -204,11 +223,13 @@ namespace ModbusForge.Services
                 return false;
             }
 
-            // Compare based on operator
+            // Compare based on operator. Equals/NotEquals must compare semantically: the
+            // register value is boxed (ushort/bool) while the parsed trigger is boxed
+            // (double/bool), and boxed a.Equals(b) across different types is always false.
             return rule.TriggerOperator switch
             {
-                "Equals" => CompareValues(currentValue, triggerValueObj ?? new object(), (a, b) => a.Equals(b)),
-                "NotEquals" => CompareValues(currentValue, triggerValueObj ?? new object(), (a, b) => !a.Equals(b)),
+                "Equals" => CompareValues(currentValue, triggerValueObj ?? new object(), (a, b) => ValuesEqual(a, b)),
+                "NotEquals" => CompareValues(currentValue, triggerValueObj ?? new object(), (a, b) => !ValuesEqual(a, b)),
                 "GreaterThan" => CompareNumericValues(currentValue, triggerValueObj ?? new object(), (a, b) => a > b),
                 "LessThan" => CompareNumericValues(currentValue, triggerValueObj ?? new object(), (a, b) => a < b),
                 "GreaterThanOrEqual" => CompareNumericValues(currentValue, triggerValueObj ?? new object(), (a, b) => a >= b),
@@ -225,6 +246,32 @@ namespace ModbusForge.Services
             }
             catch
             {
+                return false;
+            }
+        }
+
+        internal static bool ValuesEqual(object a, object b)
+        {
+            if (a is bool boolA && b is bool boolB)
+                return boolA == boolB;
+
+            // Numeric comparison for register values (ushort vs parsed double).
+            if (TryConvertToDouble(a, out var numA) && TryConvertToDouble(b, out var numB))
+                return numA == numB;
+
+            return a.Equals(b);
+        }
+
+        private static bool TryConvertToDouble(object value, out double result)
+        {
+            try
+            {
+                result = Convert.ToDouble(value, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch (Exception)
+            {
+                result = 0;
                 return false;
             }
         }

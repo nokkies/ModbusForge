@@ -190,8 +190,8 @@ public class ApiServerService : IApiServerService
         // ── Application state ─────────────────────────────────────────────────
         var appGroup = apiGroup.MapGroup("/app").WithTags("Application");
 
-        appGroup.MapGet("/status", (IApiApplicationService svc) =>
-            Results.Ok(svc.GetStatus()));
+        appGroup.MapGet("/status", async (IApiApplicationService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetStatusAsync(ct)));
 
         appGroup.MapPost("/connect", async (
             IApiApplicationService svc,
@@ -268,7 +268,7 @@ public class ApiServerService : IApiServerService
                 return Results.BadRequest(ApiError.BadRequest(
                     "address + length exceeds maximum address 65535."));
 
-            var status = svc.GetStatus();
+            var status = await svc.GetStatusAsync(ct);
             if (!status.IsConnected)
                 return Results.BadRequest(ApiError.BadRequest("Not connected."));
 
@@ -312,7 +312,7 @@ public class ApiServerService : IApiServerService
                 return Results.BadRequest(ApiError.BadRequest(
                     "address + length exceeds maximum address 65535."));
 
-            var status = svc.GetStatus();
+            var status = await svc.GetStatusAsync(ct);
             if (!status.IsConnected)
                 return Results.BadRequest(ApiError.BadRequest("Not connected."));
 

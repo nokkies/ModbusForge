@@ -27,8 +27,15 @@ namespace ModbusForge.Services
         private Task? _reconnectTask;
         private Task? _publishTask;
 
+        /// <summary>True while DisconnectAsync is running; blocks late reconnects from creating a client that would never be disposed.</summary>
+        private volatile bool _disconnecting;
+
+        /// <summary>True after Dispose(); the service must not create any more clients.</summary>
+        private volatile bool _disposed;
+
         private const int MinReconnectDelayMs = 1000;
         private const int MaxReconnectDelayMs = 30000;
+        private const int DisposeWaitMs = 5000;
 
         public bool IsConnected => _client?.IsConnected == true;
 
@@ -73,13 +80,26 @@ namespace ModbusForge.Services
         {
             try
             {
+                if (_disposed || _disconnecting)
+                    return;
+
                 if (_client is not null && _client.IsConnected)
                     return;
 
-                _client?.Dispose();
+                IMqttClient client;
+                lock (_gate)
+                {
+                    if (_disposed || _disconnecting)
+                        return;
 
-                var factory = new MqttFactory();
-                _client = factory.CreateMqttClient();
+                    _client?.Dispose();
+                    _client = null;
+
+                    var factory = new MqttFactory();
+                    client = factory.CreateMqttClient();
+                    client.DisconnectedAsync += OnDisconnectedAsync;
+                    _client = client;
+                }
 
                 var options = new MqttClientOptionsBuilder()
                     .WithTcpServer(_settings.BrokerHost, _settings.BrokerPort)
@@ -92,9 +112,7 @@ namespace ModbusForge.Services
                     options.WithCredentials(_settings.Username, _settings.Password ?? string.Empty);
                 }
 
-                _client.DisconnectedAsync += OnDisconnectedAsync;
-
-                var result = await _client.ConnectAsync(options.Build(), cancellationToken).ConfigureAwait(false);
+                var result = await client.ConnectAsync(options.Build(), cancellationToken).ConfigureAwait(false);
                 if (result.ResultCode == MqttClientConnectResultCode.Success)
                 {
                     _logger.LogInformation("Connected to MQTT broker {Host}:{Port}", _settings.BrokerHost, _settings.BrokerPort);
@@ -127,7 +145,7 @@ namespace ModbusForge.Services
                     if (_client?.IsConnected == true)
                     {
                         delay = MinReconnectDelayMs;
-                        await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
+                        await Task.Delay(MinReconnectDelayMs, cancellationToken).ConfigureAwait(false);
                         continue;
                     }
 
@@ -205,44 +223,65 @@ namespace ModbusForge.Services
         {
             lock (_gate)
             {
+                // Block any in-flight reconnect loop from creating a new client after this
+                // point (the previous code let a reconnect win the race and leak a client).
+                _disconnecting = true;
                 _reconnectCts?.Cancel();
                 _publishCts?.Cancel();
             }
 
             if (_publishTask is not null)
             {
-                try { await _publishTask.ConfigureAwait(false); } catch { /* ignored */ }
+                try { await _publishTask.ConfigureAwait(false); }
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                {
+                    _logger.LogWarning(ex, "Error stopping MQTT publish loop");
+                }
             }
 
             if (_reconnectTask is not null)
             {
-                try { await _reconnectTask.ConfigureAwait(false); } catch { /* ignored */ }
+                try { await _reconnectTask.ConfigureAwait(false); }
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                {
+                    _logger.LogWarning(ex, "Error stopping MQTT reconnect loop");
+                }
             }
 
-            if (_client is not null)
+            IMqttClient? client;
+            lock (_gate)
             {
-                _client.DisconnectedAsync -= OnDisconnectedAsync;
+                client = _client;
+                _client = null;
+            }
+
+            if (client is not null)
+            {
+                client.DisconnectedAsync -= OnDisconnectedAsync;
 
                 try
                 {
-                    if (_client.IsConnected)
-                        await _client.DisconnectAsync().ConfigureAwait(false);
+                    if (client.IsConnected)
+                        await client.DisconnectAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is not OutOfMemoryException)
                 {
                     _logger.LogWarning(ex, "Error disconnecting from MQTT broker");
                 }
 
-                _client.Dispose();
-                _client = null;
+                client.Dispose();
             }
 
-            _reconnectCts?.Dispose();
-            _reconnectCts = null;
-            _publishCts?.Dispose();
-            _publishCts = null;
-            _reconnectTask = null;
-            _publishTask = null;
+            lock (_gate)
+            {
+                _reconnectCts?.Dispose();
+                _reconnectCts = null;
+                _publishCts?.Dispose();
+                _publishCts = null;
+                _reconnectTask = null;
+                _publishTask = null;
+                _disconnecting = false;
+            }
         }
 
         public async Task PublishAsync(IEnumerable<MqttTagUpdate> updates, CancellationToken cancellationToken = default)
@@ -284,7 +323,39 @@ namespace ModbusForge.Services
 
         public void Dispose()
         {
-            _ = DisconnectAsync();
+            lock (_gate)
+            {
+                _disposed = true;
+            }
+
+            Task? disconnectTask;
+            try
+            {
+                disconnectTask = DisconnectAsync();
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogError(ex, "Error starting MQTT disconnect during disposal");
+                GC.SuppressFinalize(this);
+                return;
+            }
+
+            // Bounded wait: the app must not hang on shutdown if the broker is unresponsive,
+            // but we wait long enough that the client is normally disposed before exit
+            // (the previous fire-and-forget Dispose let the process exit first, leaking the
+            // socket).
+            try
+            {
+                if (!disconnectTask.Wait(TimeSpan.FromMilliseconds(DisposeWaitMs)))
+                {
+                    _logger.LogWarning("MQTT disconnect did not complete within {TimeoutMs} ms during disposal", DisposeWaitMs);
+                }
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                _logger.LogWarning(ex, "Error during MQTT disposal");
+            }
+
             GC.SuppressFinalize(this);
         }
 

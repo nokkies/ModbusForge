@@ -27,7 +27,6 @@ namespace ModbusForge.Services
     public class RetryPolicyService : IRetryPolicyService
     {
         private readonly ILogger<RetryPolicyService> _logger;
-        private readonly Random _random = new Random();
 
         public RetryPolicyService(ILogger<RetryPolicyService> logger)
         {
@@ -130,13 +129,19 @@ namespace ModbusForge.Services
             return false;
         }
 
-        private int CalculateDelay(int attempt, int initialDelayMs, int maxDelayMs)
+        private static int CalculateDelay(int attempt, int initialDelayMs, int maxDelayMs)
         {
-            // Exponential backoff with jitter
-            var exponentialDelay = initialDelayMs * (int)Math.Pow(2, attempt - 1);
-            var jitter = _random.Next(0, (int)(exponentialDelay * 0.1)); // 10% jitter
-            var delay = Math.Min(exponentialDelay + jitter, maxDelayMs);
-            return delay;
+            // Exponential backoff with 10% jitter. The doubling is done in long and capped
+            // early so a large attempt count can never overflow the int multiply, and the
+            // jitter range is clamped so Random.Shared.Next(0, 0) can never throw.
+            long exponentialDelay = Math.Max(0, initialDelayMs);
+            for (int i = 1; i < attempt && exponentialDelay < maxDelayMs; i++)
+                exponentialDelay = Math.Min(maxDelayMs, exponentialDelay * 2);
+
+            var jitterRange = (int)Math.Max(1, exponentialDelay / 10);
+            var jitter = Random.Shared.Next(0, jitterRange);
+
+            return (int)Math.Min(maxDelayMs, exponentialDelay + jitter);
         }
     }
 }

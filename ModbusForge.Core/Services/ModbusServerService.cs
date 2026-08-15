@@ -269,8 +269,11 @@ namespace ModbusForge.Services
             if (!_isRunning) throw new InvalidOperationException("Modbus server is not running");
             return await Task.Run(() =>
             {
-                var ds = GetDataStore(unitId) ?? GetDataStore(_primaryUnitId);
-                if (ds == null) throw new InvalidOperationException("Data store not initialized");
+                // Do NOT fall back to the primary unit's store: silently returning another
+                // unit's data for an unconfigured unit ID is worse than a visible error
+                // (and the write path already rejects unknown units).
+                var ds = GetDataStore(unitId);
+                if (ds == null) throw new InvalidOperationException($"Data store not initialized for unit {unitId}");
                 var collection = collectionSelector(ds);
                 if (startAddress < 0 || count < 0 || startAddress + count > collection.Count)
                     throw new ArgumentOutOfRangeException(nameof(startAddress), $"{resourceName} range out of bounds");
