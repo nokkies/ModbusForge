@@ -319,7 +319,9 @@ namespace ModbusForge.Avalonia.Services
             var viewModel = new WatchViewModel(
                 _tagService,
                 _messageBoxService,
-                logger: null);
+                logger: null,
+                _connectionManager,
+                _dispatcher);
 
             var window = new WatchWindow(
                 viewModel,

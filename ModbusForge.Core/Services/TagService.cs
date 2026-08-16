@@ -207,7 +207,7 @@ namespace ModbusForge.Services
         }
 
         /// <summary>
-        /// Update tag value (called by Modbus service when reading)
+        /// Update tag value (called by the view models when reading)
         /// </summary>
         public void UpdateTagValue(PlcArea area, int address, object value)
         {

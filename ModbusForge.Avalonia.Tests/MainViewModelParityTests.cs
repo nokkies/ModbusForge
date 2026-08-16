@@ -148,8 +148,13 @@ namespace ModbusForge.Avalonia.Tests
             Assert.False(vm.HoldingMonitorEnabled);
             Assert.Equal(1, vm.HoldingMonitorFailureCount);
             Assert.True(vm.IsConnected);
-            Assert.Equal(1, messageBox.CallCount);
-            Assert.Contains("paused", messageBox.LastMessage, StringComparison.OrdinalIgnoreCase);
+
+            // A failed *monitoring* read is reported in the status bar, not with a modal
+            // dialog: several armed areas failing at once (e.g. a dropped connection)
+            // would otherwise stack one dialog per area.
+            Assert.Equal(0, messageBox.CallCount);
+            Assert.Contains("Failed to read", vm.StatusMessage, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("paused", vm.StatusMessage, StringComparison.OrdinalIgnoreCase);
 
             vm.Dispose();
         }

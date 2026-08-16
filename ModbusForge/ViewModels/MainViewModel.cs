@@ -39,6 +39,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly IApplicationLifetime? _applicationLifetime;
         private readonly IDockingHost? _dockingHost;
         private readonly ITrendLogger? _trendLogger;
+        private readonly TagService? _tagService;
         private CancellationTokenSource? _pollCts;
         private readonly object _pollLifecycleLock = new();
         private readonly object _pendingPollLock = new();
@@ -422,7 +423,8 @@ namespace ModbusForge.Avalonia.ViewModels
             DecodeViewModel? decodeViewModel = null,
             IUnitConfigurationStore? unitConfigurationStore = null,
             IFileSystem? fileSystem = null,
-            IDockingHost? dockingHost = null)
+            IDockingHost? dockingHost = null,
+            TagService? tagService = null)
         {
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -441,6 +443,7 @@ namespace ModbusForge.Avalonia.ViewModels
             _applicationLifetime = applicationLifetime;
             _dockingHost = dockingHost;
             _trendLogger = trendLogger;
+            _tagService = tagService;
             TrendViewModel = trendViewModel;
             FrameInspectorViewModel = frameInspectorViewModel;
             MqttViewModel = mqttViewModel;
@@ -2205,6 +2208,7 @@ namespace ModbusForge.Avalonia.ViewModels
                         var holdingPartial = holding.Length < count;
                         await _dispatcher.InvokeAsync(() =>
                         {
+                            SyncTags(PlcArea.HoldingRegister, start, holding);
                             if (IsRegisterGridEditing) return;
                             HoldingRegisters = ApplyRegisterValues(
                                 HoldingRegisters,
@@ -2227,6 +2231,7 @@ namespace ModbusForge.Avalonia.ViewModels
                         var inputPartial = input.Length < count;
                         await _dispatcher.InvokeAsync(() =>
                         {
+                            SyncTags(PlcArea.InputRegister, start, input);
                             if (IsRegisterGridEditing) return;
                             InputRegisters = ApplyRegisterValues(
                                 InputRegisters,
@@ -2249,6 +2254,7 @@ namespace ModbusForge.Avalonia.ViewModels
                         var coilsPartial = coils.Length < count;
                         await _dispatcher.InvokeAsync(() =>
                         {
+                            SyncTags(PlcArea.Coil, start, coils);
                             if (IsRegisterGridEditing) return;
                             Coils = ApplyCoilValues(Coils, start, coils, coilsPartial);
                             StatusMessage = coilsPartial
@@ -2263,6 +2269,7 @@ namespace ModbusForge.Avalonia.ViewModels
                         var discretePartial = discrete.Length < count;
                         await _dispatcher.InvokeAsync(() =>
                         {
+                            SyncTags(PlcArea.DiscreteInput, start, discrete);
                             if (IsRegisterGridEditing) return;
                             DiscreteInputs = ApplyCoilValues(DiscreteInputs, start, discrete, discretePartial);
                             StatusMessage = discretePartial
@@ -2286,6 +2293,30 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 _modbusIoGate.Release();
             }
+        }
+
+        /// <summary>
+        /// Feeds freshly read values into the tag database so symbolic tags, the
+        /// Tag Browser and the Watch Window see live data (values, freshness and
+        /// alarms). Runs on the UI thread inside the read's dispatcher callback.
+        /// No-op when no tags exist — the common case.
+        /// </summary>
+        private void SyncTags(PlcArea area, int start, ushort[] values)
+        {
+            var tagService = _tagService;
+            if (tagService == null || tagService.Tags.Count == 0) return;
+
+            for (var i = 0; i < values.Length; i++)
+                tagService.UpdateTagValue(area, start + i, values[i]);
+        }
+
+        private void SyncTags(PlcArea area, int start, bool[] values)
+        {
+            var tagService = _tagService;
+            if (tagService == null || tagService.Tags.Count == 0) return;
+
+            for (var i = 0; i < values.Length; i++)
+                tagService.UpdateTagValue(area, start + i, values[i]);
         }
 
         private bool IsAreaMonitorEnabled(PlcArea area) => area switch
@@ -2321,7 +2352,11 @@ namespace ModbusForge.Avalonia.ViewModels
 
             await _dispatcher.InvokeAsync(() => StatusMessage = message);
 
-            if (_messageBoxService != null)
+            // A modal is only warranted for an explicit read the user just clicked:
+            // every monitoring tick that fails while several areas are armed would
+            // otherwise stack one dialog per area (and the connection-loss chain
+            // already tells the user when the link itself drops).
+            if (!isMonitoring && _messageBoxService != null)
             {
                 Task<DialogResult>? dialogTask = null;
                 await _dispatcher.InvokeAsync(() =>
@@ -2788,6 +2823,7 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 var entries = await _dispatcher.InvokeAsync(() => CustomEntries.ToList());
                 var readCount = 0;
+                var failureCount = 0;
                 foreach (var entry in entries)
                 {
                     try
@@ -2803,11 +2839,15 @@ namespace ModbusForge.Avalonia.ViewModels
                     }
                     catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
-                        await ReportCustomOperationFailureAsync("read", entry, ex, false);
+                        // No per-entry dialog in batch mode; the summary below reports how many failed.
+                        await ReportCustomOperationFailureAsync("read", entry, ex, false, showDialog: false);
+                        failureCount++;
                     }
                 }
 
-                await _dispatcher.InvokeAsync(() => StatusMessage = $"Read {readCount} of {entries.Count} custom entries.");
+                await _dispatcher.InvokeAsync(() => StatusMessage = failureCount > 0
+                    ? $"Read {readCount} of {entries.Count} custom entries; {failureCount} failed."
+                    : $"Read {readCount} of {entries.Count} custom entries.");
             }
             finally
             {
@@ -2841,13 +2881,20 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
-        private async Task ReportCustomOperationFailureAsync(string operation, CustomEntry entry, Exception exception, bool monitoring)
+        /// <summary>
+        /// Reports a failed custom-entry operation. A modal dialog is only shown for
+        /// explicit single operations (the user asked for this exact entry and must
+        /// hear about the failure); batch reads and the monitor loop report to the
+        /// status bar instead, because a dialog per failed entry would stack up
+        /// dozens of modals the instant a connection drops.
+        /// </summary>
+        private async Task ReportCustomOperationFailureAsync(string operation, CustomEntry entry, Exception exception, bool monitoring, bool showDialog = true)
         {
             _logger.LogError(exception, "Error {Operation} custom entry {Name}", operation, entry.Name);
             var suffix = monitoring ? " Continuous monitoring has been paused." : string.Empty;
             var message = $"Failed to {operation} custom entry '{entry.Name}': {exception.Message}.{suffix}";
             await _dispatcher.InvokeAsync(() => StatusMessage = message);
-            if (_messageBoxService != null)
+            if (showDialog && _messageBoxService != null)
             {
                 Task<DialogResult>? dialogTask = null;
                 await _dispatcher.InvokeAsync(() =>
@@ -3081,7 +3128,7 @@ namespace ModbusForge.Avalonia.ViewModels
                             catch (Exception ex) when (ex is not OutOfMemoryException)
                             {
                                 await _dispatcher.InvokeAsync(() => entry.Monitor = false);
-                                await ReportCustomOperationFailureAsync("read", entry, ex, true);
+                                await ReportCustomOperationFailureAsync("read", entry, ex, true, showDialog: false);
                             }
                         }
 
@@ -3106,7 +3153,7 @@ namespace ModbusForge.Avalonia.ViewModels
                             catch (Exception ex) when (ex is not OutOfMemoryException)
                             {
                                 await _dispatcher.InvokeAsync(() => entry.Continuous = false);
-                                await ReportCustomOperationFailureAsync("write", entry, ex, true);
+                                await ReportCustomOperationFailureAsync("write", entry, ex, true, showDialog: false);
                             }
                         }
                     }
