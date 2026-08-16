@@ -9,11 +9,18 @@ namespace ModbusForge.Services
     /// <summary>
     /// In-memory ring buffer that captures Modbus request/response frames for the inspector.
     /// </summary>
+    /// <remarks>
+    /// Frames are captured on worker threads (the socket read/write loops), but the inspector's
+    /// grid binds to <see cref="Frames"/> on the UI thread. An optional
+    /// <see cref="IDispatcher"/> is used to marshal collection mutations onto the UI thread so
+    /// the grid reliably updates; without a dispatcher (headless, tests) mutations happen inline.
+    /// </remarks>
     public class ModbusFrameLogger
     {
         private readonly object _sync = new();
         private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
         private long _lastTimestampTicks;
+        private readonly IDispatcher? _uiDispatcher;
 
         public const int DefaultCapacity = 1000;
 
@@ -21,13 +28,20 @@ namespace ModbusForge.Services
 
         public int Capacity { get; }
 
-        public ModbusFrameLogger() : this(DefaultCapacity)
+        public ModbusFrameLogger()
+            : this(DefaultCapacity, null)
         {
         }
 
         public ModbusFrameLogger(int capacity)
+            : this(capacity, null)
+        {
+        }
+
+        public ModbusFrameLogger(int capacity, IDispatcher? uiDispatcher)
         {
             Capacity = Math.Max(1, capacity);
+            _uiDispatcher = uiDispatcher;
         }
 
         public void Log(FrameDirection direction, byte[] rawBytes, bool? isValidCrc = null, byte unitId = 0, byte functionCode = 0)
@@ -59,13 +73,7 @@ namespace ModbusForge.Services
                 FunctionCode = functionCode,
             };
 
-            lock (_sync)
-            {
-                Frames.Add(log);
-
-                while (Frames.Count > Capacity)
-                    Frames.RemoveAt(0);
-            }
+            Append(log);
         }
 
         public void Log(ModbusFrameLog log)
@@ -73,6 +81,24 @@ namespace ModbusForge.Services
             if (log is null)
                 return;
 
+            Append(log);
+        }
+
+        private void Append(ModbusFrameLog log)
+        {
+            if (_uiDispatcher is null)
+            {
+                AppendInline(log);
+                return;
+            }
+
+            // Mutate the observable collection on the UI thread so bound views update;
+            // posting (not invoking) keeps the capturing socket loop non-blocking.
+            _uiDispatcher.Post(() => AppendInline(log));
+        }
+
+        private void AppendInline(ModbusFrameLog log)
+        {
             lock (_sync)
             {
                 Frames.Add(log);

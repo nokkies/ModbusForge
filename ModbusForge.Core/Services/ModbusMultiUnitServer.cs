@@ -26,6 +26,7 @@ namespace ModbusForge.Services
         private readonly ConcurrentDictionary<byte, DataStore> _dataStores = new();
         private readonly ILogger _logger;
         private readonly IConsoleLoggerService? _consoleLoggerService;
+        private readonly ModbusFrameLogger? _frameLogger;
         private bool _disposed;
 
         private const int DefaultDataStoreSize = ModbusAddressValidator.MaxTotalCount;
@@ -48,9 +49,15 @@ namespace ModbusForge.Services
         }
 
         public ModbusMultiUnitServer(ILogger logger, IConsoleLoggerService? consoleLoggerService)
+            : this(logger, consoleLoggerService, null)
+        {
+        }
+
+        public ModbusMultiUnitServer(ILogger logger, IConsoleLoggerService? consoleLoggerService, ModbusFrameLogger? frameLogger)
         {
             _logger = logger;
             _consoleLoggerService = consoleLoggerService;
+            _frameLogger = frameLogger;
         }
 
         public bool IsRunning => _cts != null && !_cts.IsCancellationRequested;
@@ -161,6 +168,17 @@ namespace ModbusForge.Services
                         var details = FormatRequestDetails(pdu);
                         _consoleLoggerService?.Log($"Request from {remoteEndpoint} Unit ID {unitId} FC {(pdu.Length > 0 ? pdu[0] : 0)}{details}");
 
+                        // Capture the incoming frame (MBAP + PDU) for the Frame Inspector.
+                        var requestFrame = new byte[7 + pdu.Length];
+                        Buffer.BlockCopy(header, 0, requestFrame, 0, 7);
+                        Buffer.BlockCopy(pdu, 0, requestFrame, 7, pdu.Length);
+                        _frameLogger?.Log(
+                            FrameDirection.Rx,
+                            requestFrame,
+                            isValidCrc: null, // Modbus TCP has no per-frame checksum
+                            unitId: unitId,
+                            functionCode: pdu.Length > 0 ? pdu[0] : (byte)0);
+
                         var responseData = ProcessPdu(unitId, pdu);
                         if (responseData == null) continue;
 
@@ -176,6 +194,13 @@ namespace ModbusForge.Services
                         Buffer.BlockCopy(responseData, 0, response, 7, responseData.Length);
 
                         await stream.WriteAsync(response, ct);
+
+                        _frameLogger?.Log(
+                            FrameDirection.Tx,
+                            response,
+                            isValidCrc: null,
+                            unitId: unitId,
+                            functionCode: responseData.Length > 0 ? responseData[0] : (byte)0);
                     }
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)

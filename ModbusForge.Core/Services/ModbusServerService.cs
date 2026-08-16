@@ -31,9 +31,15 @@ namespace ModbusForge.Services
         }
 
         public ModbusServerService(ILogger<ModbusServerService> logger, IConsoleLoggerService? consoleLoggerService)
+            : this(logger, consoleLoggerService, null)
+        {
+        }
+
+        public ModbusServerService(ILogger<ModbusServerService> logger, IConsoleLoggerService? consoleLoggerService, ModbusFrameLogger? frameLogger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _consoleLoggerService = consoleLoggerService;
+            _frameLogger = frameLogger ?? _frameLogger;
             _logger.LogInformation("Modbus TCP server created");
         }
 
@@ -86,7 +92,7 @@ namespace ModbusForge.Services
                         if (ids.Count == 0) ids.Add(DefaultSlaveId);
                         _primaryUnitId = ids[0];
 
-                        _multiServer = new ModbusMultiUnitServer(_logger, _consoleLoggerService);
+                        _multiServer = new ModbusMultiUnitServer(_logger, _consoleLoggerService, _frameLogger);
                         _multiServer.Start(endpoint, ids);
 
                         _isRunning = true;

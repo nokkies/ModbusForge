@@ -122,9 +122,17 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<ICustomBulkAddDialogService, AvaloniaCustomBulkAddDialogService>();
             services.AddSingleton<IMessageBoxService, AvaloniaMessageBoxService>();
 
-            // Connection management
+            // Connection management. The frame logs created for each profile receive the
+            // UI dispatcher so frames captured on socket worker threads marshal their
+            // collection updates to the UI thread (Frame Inspector grid).
             services.AddSingleton<IValidationService, ValidationService>();
-            services.AddSingleton<IConnectionManager, ConnectionManager>();
+            services.AddSingleton<IConnectionManager>(sp => new ConnectionManager(
+                sp.GetRequiredService<ILogger<ConnectionManager>>(),
+                sp.GetRequiredService<ILoggerFactory>(),
+                sp.GetRequiredService<IValidationService>(),
+                null,
+                null,
+                sp.GetRequiredService<IDispatcher>()));
 
             // Last-resort exception reporting
             services.AddSingleton<UnhandledExceptionReporter>();

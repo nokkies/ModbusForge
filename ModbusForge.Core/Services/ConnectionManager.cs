@@ -27,6 +27,7 @@ public class ConnectionManager : IConnectionManager
     private readonly IModbusAddressValidator _addressValidator;
     private readonly ConcurrentDictionary<string, IModbusService> _services = new();
     private ConnectionProfile? _activeProfile;
+    private readonly IDispatcher? _uiDispatcher;
 
     public ObservableCollection<ConnectionProfile> Profiles { get; } = new();
 
@@ -39,17 +40,26 @@ public class ConnectionManager : IConnectionManager
     public event EventHandler<ConnectionProfile>? ProfileDisconnected;
 
     public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService = null)
-        : this(logger, loggerFactory, validationService, null, null)
+        : this(logger, loggerFactory, validationService, null, null, null)
     {
     }
 
     public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService, ICorrelationContext? correlationContext, IModbusAddressValidator? addressValidator)
+        : this(logger, loggerFactory, validationService, correlationContext, addressValidator, null)
+    {
+    }
+
+    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService, ICorrelationContext? correlationContext, IModbusAddressValidator? addressValidator, IDispatcher? uiDispatcher)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
         _validationService = validationService;
         _correlationContext = correlationContext ?? new CorrelationContext();
         _addressValidator = addressValidator ?? new ModbusAddressValidator();
+        // Frames are captured on socket worker threads; when a UI dispatcher is available,
+        // each profile's frame log marshals its collection mutations onto the UI thread
+        // so the Frame Inspector grid updates reliably.
+        _uiDispatcher = uiDispatcher;
         LoadProfiles();
 
         // Add default profile if none exist
@@ -208,11 +218,16 @@ public class ConnectionManager : IConnectionManager
 
         IModbusService service;
 
+        // Every profile gets its own frame log (so the inspector keeps history per profile);
+        // all logs share the UI dispatcher so grid updates are marshalled correctly.
+        var frameLogger = new ModbusFrameLogger(ModbusFrameLogger.DefaultCapacity, _uiDispatcher);
+
         if (profile.IsServerMode && transport == TransportType.Tcp)
         {
             service = new ModbusServerService(
                 _loggerFactory.CreateLogger<ModbusServerService>(),
-                null);
+                null,
+                frameLogger);
         }
         else
         {
@@ -222,10 +237,10 @@ public class ConnectionManager : IConnectionManager
                     _loggerFactory.CreateLogger<ModbusSerialService>(),
                     null,
                     _validationService,
-                    null,
+                    frameLogger,
                     _addressValidator,
                     transport),
-                _ => new ModbusTcpService(_loggerFactory.CreateLogger<ModbusTcpService>(), null, null, _addressValidator)
+                _ => new ModbusTcpService(_loggerFactory.CreateLogger<ModbusTcpService>(), null, frameLogger, _addressValidator)
             };
         }
 
