@@ -9,10 +9,23 @@
     <converters:LockToZoomModeConverter x:Key="LockToZoomModeConverter" />
   </UserControl.Resources>
 
-  <Grid RowDefinitions="Auto,Auto,*">
+  <UserControl.Styles>
+    <Style Selector="Button.trendTool">
+      <Setter Property="Padding" Value="10,3" />
+    </Style>
+    <Style Selector="TextBlock.trendGroup">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Opacity" Value="0.65" />
+      <Setter Property="Margin" Value="0,0,4,0" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,Auto,*">
+    <!-- Series + view controls -->
     <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-      <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-        <TextBlock VerticalAlignment="Center" Text="Series:" />
+      <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,6">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <TextBlock Classes="trendGroup" VerticalAlignment="Center" Text="Series" />
         <ComboBox ItemsSource="{Binding SeriesItems}" SelectedItem="{Binding SelectedSeriesItem}" Width="220">
           <ComboBox.ItemTemplate>
             <DataTemplate>
@@ -20,33 +33,49 @@
             </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
-        <Button Content="Delete" Command="{Binding DeleteSelectedCommand}" />
-        <Button Content="Color" Command="{Binding ChangeColorCommand}" />
-        <Button Content="Reset" Command="{Binding ResetViewCommand}" />
-        <Button Content="Play" Command="{Binding PlayCommand}" />
-        <Button Content="Pause" Command="{Binding PauseCommand}" />
-        <CheckBox VerticalAlignment="Center" Content="Lock X" IsChecked="{Binding LockX}" />
-        <CheckBox VerticalAlignment="Center" Content="Lock Y" IsChecked="{Binding LockY}" />
-        <TextBlock VerticalAlignment="Center" Text="Retention (min):" />
-        <NumericUpDown Value="{Binding RetentionMinutes}" Minimum="1" Maximum="60" Width="80" />
-        <Button Content="Apply" Command="{Binding ApplyRetentionCommand}" />
-        <TextBlock VerticalAlignment="Center" Text="Sample (ms):" />
-        <NumericUpDown Value="{Binding SampleRateMs}" Minimum="50" Maximum="60000" Width="100" />
-        <Button Content="Start" Command="{Binding StartCommand}" />
-        <Button Content="Stop" Command="{Binding StopCommand}" />
-        <Button Content="Clear" Command="{Binding ClearCommand}" />
-        <Button Content="Export CSV" Command="{Binding ExportCsvCommand}" />
-        <Button Content="Import CSV" Command="{Binding ImportCsvCommand}" />
-        <Button Content="Export PNG" Click="ExportPng_Click" />
+        <Button Classes="trendTool" Content="Delete" ToolTip.Tip="Remove the selected series from the chart" Command="{Binding DeleteSelectedCommand}" />
+        <Button Classes="trendTool" Content="Color" ToolTip.Tip="Cycle the color of the selected series" Command="{Binding ChangeColorCommand}" />
+      </StackPanel>
+      <Separator VerticalAlignment="Center" Margin="4,2" />
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <TextBlock Classes="trendGroup" VerticalAlignment="Center" Text="View" />
+        <Button Classes="trendTool" Content="{Binding FollowingButtonText}" ToolTip.Tip="Follow the newest data" Command="{Binding ToggleFollowingCommand}" />
+        <Button Classes="trendTool" Content="Reset" ToolTip.Tip="Reset zoom and pan to the full data range" Command="{Binding ResetViewCommand}" />
+        <CheckBox VerticalAlignment="Center" Content="Lock X" ToolTip.Tip="Allow zooming along the time axis only" IsChecked="{Binding LockX}" />
+        <CheckBox VerticalAlignment="Center" Content="Lock Y" ToolTip.Tip="Allow zooming along the value axis only" IsChecked="{Binding LockY}" />
+      </StackPanel>
       </StackPanel>
     </ScrollViewer>
 
-    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+    <!-- Sampling + data controls -->
+    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+      <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,8">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <TextBlock Classes="trendGroup" VerticalAlignment="Center" Text="Sampling" />
+        <TextBlock VerticalAlignment="Center" Text="Retention (min):" ToolTip.Tip="How long trend data is kept" />
+        <NumericUpDown Value="{Binding RetentionMinutes}" Minimum="1" Maximum="60" Width="80" />
+        <Button Classes="trendTool" Content="Apply" ToolTip.Tip="Apply the retention and sample rate, trimming old data" Command="{Binding ApplyRetentionCommand}" />
+        <TextBlock VerticalAlignment="Center" Text="Sample (ms):" ToolTip.Tip="Sampling interval in milliseconds" />
+        <NumericUpDown Value="{Binding SampleRateMs}" Minimum="50" Maximum="60000" Width="100" />
+        <Button Classes="trendTool" Content="{Binding LoggingButtonText}" ToolTip.Tip="Start or stop trend logging" Command="{Binding ToggleLoggingCommand}" />
+      </StackPanel>
+      <Separator VerticalAlignment="Center" Margin="4,2" />
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <TextBlock Classes="trendGroup" VerticalAlignment="Center" Text="Data" />
+        <Button Classes="trendTool" Content="Clear" ToolTip.Tip="Delete all series data" Command="{Binding ClearCommand}" />
+        <Button Classes="trendTool" Content="Export CSV" ToolTip.Tip="Export the selected series, or all series if none is selected" Command="{Binding ExportCsvCommand}" />
+        <Button Classes="trendTool" Content="Import CSV" ToolTip.Tip="Import a previously exported CSV file" Command="{Binding ImportCsvCommand}" />
+        <Button Classes="trendTool" Content="Export PNG" ToolTip.Tip="Save the current chart as a PNG image" Click="ExportPng_Click" />
+      </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
       <TextBlock VerticalAlignment="Center" Text="Running" IsVisible="{Binding IsRunning}" FontWeight="Bold" />
       <TextBlock VerticalAlignment="Center" Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" />
     </StackPanel>
 
-    <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,8">
+    <Border Grid.Row="3" BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,8">
       <lvc:CartesianChart x:Name="TrendChart"
                           Series="{Binding Series}"
                           XAxes="{Binding XAxes}"

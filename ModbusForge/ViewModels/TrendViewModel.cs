@@ -47,7 +47,6 @@ namespace ModbusForge.Avalonia.ViewModels
             new SKColor(153, 153, 153)
         };
         private int _paletteCursor;
-        private bool _followLive;
         private int _playWindowPoints;
 
         public ObservableCollection<ISeries> Series { get; } = new();
@@ -74,7 +73,22 @@ namespace ModbusForge.Avalonia.ViewModels
         };
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(LoggingButtonText))]
         private bool _isRunning;
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(FollowingButtonText))]
+        private bool _isFollowing;
+
+        /// <summary>
+        /// Label for the single logging start/stop toggle.
+        /// </summary>
+        public string LoggingButtonText => IsRunning ? "Stop" : "Start";
+
+        /// <summary>
+        /// Label for the single live-follow play/pause toggle.
+        /// </summary>
+        public string FollowingButtonText => IsFollowing ? "Pause" : "Play";
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(RemoveSelectedCommand))]
@@ -138,6 +152,8 @@ namespace ModbusForge.Avalonia.ViewModels
             ResetViewCommand = new RelayCommand(ResetView);
             PlayCommand = new RelayCommand(StartFollowing);
             PauseCommand = new RelayCommand(StopFollowing);
+            ToggleFollowingCommand = new RelayCommand(ToggleFollowing);
+            ToggleLoggingCommand = new RelayCommand(ToggleLogging);
             ApplyRetentionCommand = new RelayCommand(ApplyRetention);
             ExportCsvCommand = new AsyncRelayCommand(ExportCsv);
             ImportCsvCommand = new AsyncRelayCommand(ImportCsv);
@@ -152,6 +168,8 @@ namespace ModbusForge.Avalonia.ViewModels
         public IRelayCommand ResetViewCommand { get; }
         public IRelayCommand PlayCommand { get; }
         public IRelayCommand PauseCommand { get; }
+        public IRelayCommand ToggleFollowingCommand { get; }
+        public IRelayCommand ToggleLoggingCommand { get; }
         public IRelayCommand ApplyRetentionCommand { get; }
         public IAsyncRelayCommand ExportCsvCommand { get; }
         public IAsyncRelayCommand ImportCsvCommand { get; }
@@ -457,7 +475,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     samples.RemoveAt(0);
                 }
 
-                if (_followLive)
+                if (IsFollowing)
                 {
                     AlignLiveWindow();
                 }
@@ -477,13 +495,37 @@ namespace ModbusForge.Avalonia.ViewModels
         private void StartFollowing()
         {
             _playWindowPoints = CalculatePlayWindowPoints();
-            _followLive = true;
+            IsFollowing = true;
             AlignLiveWindow();
         }
 
         private void StopFollowing()
         {
-            _followLive = false;
+            IsFollowing = false;
+        }
+
+        private void ToggleFollowing()
+        {
+            if (IsFollowing)
+            {
+                StopFollowing();
+            }
+            else
+            {
+                StartFollowing();
+            }
+        }
+
+        private void ToggleLogging()
+        {
+            if (IsRunning)
+            {
+                Stop();
+            }
+            else
+            {
+                Start();
+            }
         }
 
         private void TrimSeriesToRetention(string key)
@@ -516,7 +558,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 TrimSeriesToRetention(key);
             }
 
-            if (_followLive)
+            if (IsFollowing)
             {
                 _playWindowPoints = CalculatePlayWindowPoints();
                 AlignLiveWindow();
