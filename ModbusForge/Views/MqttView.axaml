@@ -4,7 +4,7 @@
              x:Class="ModbusForge.Avalonia.Views.MqttView"
              x:DataType="vm:MqttViewModel">
 
-  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
     <TextBlock Text="Enabled:" Grid.Row="0" VerticalAlignment="Center" Margin="0,0,12,8" />
     <CheckBox Grid.Row="0" Grid.Column="1" IsChecked="{Binding Settings.Enabled}" Content="Publish tag values to MQTT" Margin="0,0,0,8" />
 
@@ -15,7 +15,7 @@
     <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding Settings.BrokerPort}" Minimum="1" Maximum="65535" Width="120" HorizontalAlignment="Left" Margin="0,0,0,8" />
 
     <TextBlock Text="Client ID:" Grid.Row="3" VerticalAlignment="Center" Margin="0,0,12,8" />
-    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Settings.ClientId, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Settings.ClientId, UpdateSourceTrigger=PropertyChanged}" ToolTip.Tip="Unique identifier for this MQTT client" Margin="0,0,0,8" />
 
     <TextBlock Text="Username:" Grid.Row="4" VerticalAlignment="Center" Margin="0,0,12,8" />
     <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding Settings.Username, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
@@ -24,23 +24,23 @@
     <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding Settings.Password, UpdateSourceTrigger=PropertyChanged}" PasswordChar="*" Margin="0,0,0,8" />
 
     <TextBlock Text="Topic Template:" Grid.Row="6" VerticalAlignment="Center" Margin="0,0,12,8" />
-    <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding Settings.TopicTemplate, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+    <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding Settings.TopicTemplate, UpdateSourceTrigger=PropertyChanged}" ToolTip.Tip="Topic for published messages. Placeholders: {UnitId}, {Tag}, {Area}, {Address}" Margin="0,0,0,8" />
 
     <TextBlock Text="QoS:" Grid.Row="7" VerticalAlignment="Center" Margin="0,0,12,8" />
-    <NumericUpDown Grid.Row="7" Grid.Column="1" Value="{Binding Settings.QualityOfService}" Minimum="0" Maximum="2" Width="80" HorizontalAlignment="Left" Margin="0,0,0,8" />
+    <NumericUpDown Grid.Row="7" Grid.Column="1" Value="{Binding Settings.QualityOfService}" Minimum="0" Maximum="2" Width="80" HorizontalAlignment="Left" ToolTip.Tip="0 = at most once, 1 = at least once, 2 = exactly once" Margin="0,0,0,8" />
 
     <TextBlock Text="Retain:" Grid.Row="8" VerticalAlignment="Center" Margin="0,0,12,8" />
-    <CheckBox Grid.Row="8" Grid.Column="1" IsChecked="{Binding Settings.RetainMessages}" Margin="0,0,0,8" />
+    <CheckBox Grid.Row="8" Grid.Column="1" IsChecked="{Binding Settings.RetainMessages}" ToolTip.Tip="Keep the last published value on the topic for new subscribers" Margin="0,0,0,8" />
 
     <TextBlock Text="Publish Period (ms):" Grid.Row="9" VerticalAlignment="Center" Margin="0,0,12,8" />
-    <NumericUpDown Grid.Row="9" Grid.Column="1" Value="{Binding Settings.PublishPeriodMs}" Minimum="0" Maximum="60000" Width="120" HorizontalAlignment="Left" Margin="0,0,0,8" />
+    <NumericUpDown Grid.Row="9" Grid.Column="1" Value="{Binding Settings.PublishPeriodMs}" Minimum="0" Maximum="60000" Width="120" HorizontalAlignment="Left" ToolTip.Tip="How often the tag snapshot is published; 0 disables periodic publishing" Margin="0,0,0,8" />
 
-    <StackPanel Grid.Row="10" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" Margin="0,8,0,8">
-      <Button Content="Apply &amp; Connect" Command="{Binding ApplyAndConnectCommand}" />
-      <Button Content="Disconnect" Command="{Binding DisconnectCommand}" />
+    <StackPanel Grid.Row="10" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+      <Button Content="Apply &amp; Connect" ToolTip.Tip="Save the settings and connect to the broker" Command="{Binding ApplyAndConnectCommand}" />
+      <Button Content="Disconnect" ToolTip.Tip="Disconnect from the broker" Command="{Binding DisconnectCommand}" />
       <TextBlock VerticalAlignment="Center" Text="Connected" IsVisible="{Binding IsConnected}" FontWeight="Bold" Foreground="Green" />
     </StackPanel>
 
-    <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Text="{Binding StatusMessage}" TextWrapping="Wrap" Margin="0,0,0,8" />
+    <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Text="{Binding StatusMessage}" TextWrapping="Wrap" Margin="0,8,0,0" />
   </Grid>
 </UserControl>

@@ -8,11 +8,11 @@
     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
       <TextBlock Text="Name:" VerticalAlignment="Center" />
       <TextBox Text="{Binding Script.Name, UpdateSourceTrigger=PropertyChanged}" Width="200" />
-      <TextBlock Text="Repeat:" VerticalAlignment="Center" Margin="16,0,0,0" />
+      <TextBlock Text="Repeat:" VerticalAlignment="Center" Margin="16,0,0,0" ToolTip.Tip="How many times the whole command list is looped" />
       <NumericUpDown Value="{Binding Script.RepeatCount}" Minimum="1" Maximum="10000" Width="80" />
-      <TextBlock Text="Delay (ms):" VerticalAlignment="Center" Margin="16,0,0,0" />
+      <TextBlock Text="Delay (ms):" VerticalAlignment="Center" Margin="16,0,0,0" ToolTip.Tip="Delay inserted between consecutive commands" />
       <NumericUpDown Value="{Binding Script.DelayBetweenCommandsMs}" Minimum="0" Maximum="60000" Width="100" />
-      <CheckBox Content="Stop on Error" IsChecked="{Binding Script.StopOnError}" Margin="16,0,0,0" />
+      <CheckBox Content="Stop on Error" IsChecked="{Binding Script.StopOnError}" Margin="16,0,0,0" ToolTip.Tip="Abort the script as soon as a command fails" />
     </StackPanel>
 
     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
@@ -29,21 +29,73 @@
                 AutoGenerateColumns="False"
                 GridLinesVisibility="All">
         <DataGrid.Columns>
-          <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding IsEnabled}" Width="70" />
+          <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding IsEnabled}" Width="70">
+            <DataGridCheckBoxColumn.Header>
+              <TextBlock Text="Enabled" ToolTip.Tip="Include this command when the script runs" />
+            </DataGridCheckBoxColumn.Header>
+          </DataGridCheckBoxColumn>
           <DataGridTextColumn Header="Type" Binding="{Binding CommandType}" Width="180" />
-          <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
-          <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="70" />
-          <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="80" />
-          <DataGridCheckBoxColumn Header="Bool" Binding="{Binding BoolValue}" Width="60" />
-          <DataGridTextColumn Header="AND" Binding="{Binding AndMask}" Width="70" />
-          <DataGridTextColumn Header="OR" Binding="{Binding OrMask}" Width="70" />
-          <DataGridTextColumn Header="Wr Addr" Binding="{Binding WriteStartAddress}" Width="80" />
-          <DataGridTextColumn Header="Wr Values" Binding="{Binding WriteValuesText}" Width="120" />
-          <DataGridTextColumn Header="Object Id" Binding="{Binding ObjectId}" Width="80" />
-          <DataGridTextColumn Header="Delay ms" Binding="{Binding DelayMs}" Width="80" />
-          <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="120" />
+          <DataGridTextColumn Binding="{Binding Address}" Width="80">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Address" ToolTip.Tip="Target register or coil address" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding Count}" Width="70">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Count" ToolTip.Tip="Number of points to read" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding Value}" Width="80">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Value" ToolTip.Tip="Value for single-write and masked-write commands" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridCheckBoxColumn Binding="{Binding BoolValue}" Width="60">
+            <DataGridCheckBoxColumn.Header>
+              <TextBlock Text="Bool" ToolTip.Tip="Value for coil and discrete-input commands" />
+            </DataGridCheckBoxColumn.Header>
+          </DataGridCheckBoxColumn>
+          <DataGridTextColumn Binding="{Binding AndMask}" Width="70">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="AND" ToolTip.Tip="Masked write — bits set in this mask are kept, bits set to 0 are cleared" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding OrMask}" Width="70">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="OR" ToolTip.Tip="OR mask for masked writes; bits set here are forced on" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding WriteStartAddress}" Width="80">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Wr Addr" ToolTip.Tip="Start address for bulk writes" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding WriteValuesText}" Width="120">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Wr Values" ToolTip.Tip="Comma-separated values for bulk writes" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding ObjectId}" Width="80">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Object Id" ToolTip.Tip="Target object ID for object commands" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding DelayMs}" Width="80">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Delay ms" ToolTip.Tip="Extra delay after this command, in milliseconds" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding Message}" Width="120">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Message" ToolTip.Tip="Text for log and message commands" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
           <DataGridTextColumn Header="Description" Binding="{Binding DisplayText}" Width="*" MinWidth="200" IsReadOnly="True" />
-          <DataGridTextColumn Header="Last Result" Binding="{Binding LastResult}" Width="120" IsReadOnly="True" />
+          <DataGridTextColumn Binding="{Binding LastResult}" Width="120" IsReadOnly="True">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Last Result" ToolTip.Tip="Outcome of the most recent run of this command" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
         </DataGrid.Columns>
       </DataGrid>
     </Border>

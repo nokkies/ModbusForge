@@ -6,9 +6,9 @@
 
   <Grid RowDefinitions="Auto,Auto,*">
     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-      <Button Content="Clear" Command="{Binding ClearCommand}" />
-      <Button Content="Import Pcap" Command="{Binding ImportPcapCommand}" />
-      <CheckBox Content="Auto Scroll" IsChecked="{Binding IsAutoScroll}" />
+      <Button Content="Clear" ToolTip.Tip="Remove all captured frames" Command="{Binding ClearCommand}" />
+      <Button Content="Import Pcap" ToolTip.Tip="Import Modbus frames from a pcap capture file" Command="{Binding ImportPcapCommand}" />
+      <CheckBox Content="Auto Scroll" IsChecked="{Binding IsAutoScroll}" ToolTip.Tip="Keep the newest frames in view" />
       <TextBlock VerticalAlignment="Center" Text="{Binding FrameLogger.Frames.Count, StringFormat='Frames: {0}'}" />
     </StackPanel>
 
@@ -23,12 +23,28 @@
                 CanUserResizeColumns="True">
         <DataGrid.Columns>
           <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss.fff}'}" Width="110" />
-          <DataGridTextColumn Header="Delta (ms)" Binding="{Binding DeltaMs, StringFormat='{}{0:F2}'}" Width="90" />
-          <DataGridTextColumn Header="Dir" Binding="{Binding Direction}" Width="50" />
+          <DataGridTextColumn Binding="{Binding DeltaMs, StringFormat='{}{0:F2}'}" Width="90">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Delta (ms)" ToolTip.Tip="Time since the previous captured frame" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding Direction}" Width="50">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Dir" ToolTip.Tip="Tx = sent to the device, Rx = received from the device" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
           <DataGridTextColumn Header="Unit" Binding="{Binding UnitId}" Width="60" />
-          <DataGridTextColumn Header="FC" Binding="{Binding FunctionCode}" Width="50" />
+          <DataGridTextColumn Binding="{Binding FunctionCode}" Width="50">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="FC" ToolTip.Tip="Modbus function code" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
           <DataGridTextColumn Header="Hex" Binding="{Binding HexString}" Width="*" MinWidth="200" />
-          <DataGridTextColumn Header="CRC" Binding="{Binding IsValidCrc, FallbackValue='-'}" Width="60" />
+          <DataGridTextColumn Binding="{Binding IsValidCrc, FallbackValue='-'}" Width="60">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="CRC" ToolTip.Tip="CRC16 check result; empty when the transport has no checksum" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
         </DataGrid.Columns>
       </DataGrid>
     </Border>
