@@ -289,6 +289,17 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public ObservableCollection<ConnectionProfile> ConnectionProfiles => _connectionManager.Profiles;
 
+        /// <summary>
+        /// True when at least one connection profile exists (drives the
+        /// dashboard profile list and its empty-state placeholder).
+        /// </summary>
+        public bool HasConnectionProfiles => ConnectionProfiles.Count > 0;
+
+        /// <summary>
+        /// True when the dashboard should show the no-profiles placeholder.
+        /// </summary>
+        public bool ShowNoProfilesPlaceholder => !HasConnectionProfiles;
+
         public ConnectionProfile? DashboardSelectedProfile
         {
             get => ActiveProfile;
@@ -515,6 +526,7 @@ namespace ModbusForge.Avalonia.ViewModels
             _connectionManager.ActiveProfileChanged += ConnectionManager_ActiveProfileChanged;
             _connectionManager.ProfileConnected += ConnectionManager_ProfileConnected;
             _connectionManager.ProfileDisconnected += ConnectionManager_ProfileDisconnected;
+            ConnectionProfiles.CollectionChanged += OnConnectionProfilesCollectionChanged;
             _unitConfigurationStore.SelectedUnitIdChanged += UnitConfigurationStore_SelectedUnitIdChanged;
             _unitConfigurationStore.AvailableUnitIdsChanged += UnitConfigurationStore_AvailableUnitIdsChanged;
 
@@ -1663,6 +1675,12 @@ namespace ModbusForge.Avalonia.ViewModels
             // connection; marshal the UI-facing work to the dispatcher (the
             // dispatcher adapter runs inline when already on the UI thread).
             _ = _dispatcher.InvokeAsync(() => OnProfileDisconnected(e));
+        }
+
+        private void OnConnectionProfilesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            OnPropertyChanged(nameof(HasConnectionProfiles));
+            OnPropertyChanged(nameof(ShowNoProfilesPlaceholder));
         }
 
         private void OnProfileDisconnected(ConnectionProfile e)
@@ -4014,6 +4032,7 @@ namespace ModbusForge.Avalonia.ViewModels
             _connectionManager.ActiveProfileChanged -= ConnectionManager_ActiveProfileChanged;
             _connectionManager.ProfileConnected -= ConnectionManager_ProfileConnected;
             _connectionManager.ProfileDisconnected -= ConnectionManager_ProfileDisconnected;
+            ConnectionProfiles.CollectionChanged -= OnConnectionProfilesCollectionChanged;
             _unitConfigurationStore.SelectedUnitIdChanged -= UnitConfigurationStore_SelectedUnitIdChanged;
             _unitConfigurationStore.AvailableUnitIdsChanged -= UnitConfigurationStore_AvailableUnitIdsChanged;
             if (_themeService != null)

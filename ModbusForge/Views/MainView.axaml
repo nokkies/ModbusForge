@@ -102,7 +102,7 @@
         </TabControl.Styles>
       <TabItem x:Name="DashboardTab" Header="Dashboard">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-          <Grid Margin="8" RowDefinitions="Auto,Auto,Auto,*">
+          <Grid Margin="8" RowDefinitions="Auto,Auto,Auto,Auto">
             <TextBlock Grid.Row="0" Text="Dashboard" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,16" />
 
             <Border Grid.Row="1" Background="#12000000" CornerRadius="6" Padding="16" Margin="0,0,0,16">
@@ -132,15 +132,45 @@
             </Border>
 
             <Border Grid.Row="3" Background="#12000000" CornerRadius="6" Padding="16">
-              <Grid RowDefinitions="Auto,*">
-                <TextBlock Grid.Row="0" Text="Recent connection profiles" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8" />
-                <ListBox Grid.Row="1" ItemsSource="{Binding ConnectionProfiles}" SelectedItem="{Binding DashboardSelectedProfile, Mode=TwoWay}" BorderBrush="#40000000" BorderThickness="1">
+              <Grid RowDefinitions="Auto,Auto">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                  <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <TextBlock Text="Connection profiles" FontSize="18" FontWeight="SemiBold" />
+                    <TextBlock Text="Select a profile to make it active" Opacity="0.55" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <Button Grid.Column="1" Content="Manage…" VerticalAlignment="Center"
+                          ToolTip.Tip="Open the Connection Manager to edit, add or remove profiles"
+                          Command="{Binding OpenConnectionManagerCommand}" />
+                </Grid>
+                <ListBox Grid.Row="1"
+                         ItemsSource="{Binding ConnectionProfiles}"
+                         SelectedItem="{Binding DashboardSelectedProfile, Mode=TwoWay}"
+                         IsVisible="{Binding HasConnectionProfiles}"
+                         MaxHeight="280"
+                         BorderBrush="#40000000" BorderThickness="1">
                   <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="models:ConnectionProfile">
-                      <TextBlock Text="{Binding DisplayName}" Margin="8,4" />
+                      <StackPanel Orientation="Horizontal" Spacing="10" Margin="8,6">
+                        <TextBlock Text="●" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="#2E8B57" IsVisible="{Binding IsConnected}"
+                                   ToolTip.Tip="Connected" />
+                        <TextBlock Text="●" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="#C62828" IsVisible="{Binding HasConnectionLost}"
+                                   ToolTip.Tip="Connection lost" />
+                        <TextBlock Text="○" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="#777777" IsVisible="{Binding IsIdle}"
+                                   ToolTip.Tip="Not connected" />
+                        <StackPanel Spacing="1">
+                          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding EndpointDescription}" Opacity="0.6" FontSize="12" />
+                        </StackPanel>
+                      </StackPanel>
                     </DataTemplate>
                   </ListBox.ItemTemplate>
                 </ListBox>
+                <TextBlock Grid.Row="1" Text="No connection profiles yet. Use Manage to create one."
+                           Opacity="0.6" Margin="4"
+                           IsVisible="{Binding ShowNoProfilesPlaceholder}" />
               </Grid>
             </Border>
           </Grid>

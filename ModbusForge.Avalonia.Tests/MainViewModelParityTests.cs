@@ -468,6 +468,48 @@ namespace ModbusForge.Avalonia.Tests
             vm.Dispose();
         }
 
+        [Fact]
+        public void Dashboard_profile_list_flags_follow_the_profile_collection()
+        {
+            var manager = new FakeConnectionManager();
+            using var vm = new MainViewModel(
+                manager,
+                NullLogger<MainViewModel>.Instance,
+                new SyncDispatcher());
+
+            // No profiles yet: the empty-state placeholder is visible.
+            Assert.False(vm.HasConnectionProfiles);
+            Assert.True(vm.ShowNoProfilesPlaceholder);
+
+            var profile = new ConnectionProfile("PLC", "127.0.0.1", 502, 1);
+            manager.AddProfile(profile);
+
+            Assert.True(vm.HasConnectionProfiles);
+            Assert.False(vm.ShowNoProfilesPlaceholder);
+
+            manager.RemoveProfile(profile);
+
+            Assert.False(vm.HasConnectionProfiles);
+            Assert.True(vm.ShowNoProfilesPlaceholder);
+        }
+
+        [Fact]
+        public void Selecting_a_dashboard_profile_makes_it_active()
+        {
+            var first = new ConnectionProfile("First", "127.0.0.1", 502, 1);
+            var second = new ConnectionProfile("Second", "127.0.0.1", 503, 2);
+            var manager = new FakeConnectionManager(profile: first);
+            using var vm = new MainViewModel(
+                manager,
+                NullLogger<MainViewModel>.Instance,
+                new SyncDispatcher());
+
+            vm.DashboardSelectedProfile = second;
+
+            Assert.Same(second, manager.ActiveProfile);
+            Assert.Same(second, vm.ActiveProfile);
+        }
+
         private static int GetFreePort()
         {
             using var listener = new TcpListener(IPAddress.Loopback, 0);
