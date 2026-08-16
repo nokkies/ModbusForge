@@ -11,6 +11,7 @@
   <UserControl.Resources>
     <converters:NavigationIndexConverter x:Key="NavigationIndexConverter" />
     <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" />
+    <converters:CountToBoolConverter x:Key="CountToBoolConverter" />
     <x:Int32 x:Key="CountFallback">1</x:Int32>
   </UserControl.Resources>
 
@@ -218,7 +219,8 @@
             <NumericUpDown Value="{Binding HoldingMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
-          <DataGrid x:Name="HoldingRegistersGrid" Grid.Row="1"
+          <Grid Grid.Row="1">
+          <DataGrid x:Name="HoldingRegistersGrid"
                     ItemsSource="{Binding HoldingRegisters}"
                     AutomationProperties.Name="Holding Registers Grid"
                     AutoGenerateColumns="False"
@@ -271,6 +273,12 @@
               <DataGridCheckBoxColumn Header="Swap Words" Binding="{Binding SwapWords}" Width="115" IsReadOnly="True" />
             </DataGrid.Columns>
           </DataGrid>
+          <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                     Opacity="0.55" FontSize="14" IsHitTestVisible="False"
+                     IsVisible="{Binding HoldingRegisters.Count, Converter={StaticResource CountToBoolConverter}, ConverterParameter=zero}">
+            No holding registers loaded. Set Start/Count and press Read.
+          </TextBlock>
+          </Grid>
         </Grid>
       </TabItem>
 
@@ -287,7 +295,8 @@
             <NumericUpDown Value="{Binding CoilsMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
-          <DataGrid x:Name="CoilsGrid" Grid.Row="1"
+          <Grid Grid.Row="1">
+          <DataGrid x:Name="CoilsGrid"
                     ItemsSource="{Binding Coils}"
                     AutomationProperties.Name="Coils Grid"
                     AutoGenerateColumns="False"
@@ -312,6 +321,12 @@
               <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="80" />
             </DataGrid.Columns>
           </DataGrid>
+          <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                     Opacity="0.55" FontSize="14" IsHitTestVisible="False"
+                     IsVisible="{Binding Coils.Count, Converter={StaticResource CountToBoolConverter}, ConverterParameter=zero}">
+            No coils loaded. Set Start/Count and press Read.
+          </TextBlock>
+          </Grid>
         </Grid>
       </TabItem>
 
@@ -332,7 +347,8 @@
             <NumericUpDown Value="{Binding InputRegistersMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
-          <DataGrid x:Name="InputRegistersGrid" Grid.Row="1"
+          <Grid Grid.Row="1">
+          <DataGrid x:Name="InputRegistersGrid"
                     ItemsSource="{Binding InputRegisters}"
                     AutomationProperties.Name="Input Registers Grid"
                     AutoGenerateColumns="False"
@@ -376,6 +392,12 @@
               <DataGridCheckBoxColumn Header="Swap Words" Binding="{Binding SwapWords}" Width="115" IsReadOnly="True" />
             </DataGrid.Columns>
           </DataGrid>
+          <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                     Opacity="0.55" FontSize="14" IsHitTestVisible="False"
+                     IsVisible="{Binding InputRegisters.Count, Converter={StaticResource CountToBoolConverter}, ConverterParameter=zero}">
+            No input registers loaded. Set Start/Count and press Read.
+          </TextBlock>
+          </Grid>
         </Grid>
       </TabItem>
 
@@ -392,7 +414,8 @@
             <NumericUpDown Value="{Binding DiscreteInputsMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
-          <DataGrid x:Name="DiscreteInputsGrid" Grid.Row="1"
+          <Grid Grid.Row="1">
+          <DataGrid x:Name="DiscreteInputsGrid"
                     ItemsSource="{Binding DiscreteInputs}"
                     AutomationProperties.Name="Discrete Inputs Grid"
                     AutoGenerateColumns="False"
@@ -414,6 +437,12 @@
               <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="80" IsReadOnly="True" />
             </DataGrid.Columns>
           </DataGrid>
+          <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                     Opacity="0.55" FontSize="14" IsHitTestVisible="False"
+                     IsVisible="{Binding DiscreteInputs.Count, Converter={StaticResource CountToBoolConverter}, ConverterParameter=zero}">
+            No discrete inputs loaded. Set Start/Count and press Read.
+          </TextBlock>
+          </Grid>
         </Grid>
       </TabItem>
 
@@ -431,7 +460,8 @@
             <CheckBox Content="Monitor" IsChecked="{Binding IsCustomWatchMonitoring}" VerticalAlignment="Center" />
           </StackPanel>
 
-          <DataGrid Grid.Row="1" ItemsSource="{Binding CustomEntries}"
+          <Grid Grid.Row="1">
+          <DataGrid ItemsSource="{Binding CustomEntries}"
                     SelectedItem="{Binding SelectedCustomEntry}"
                     AutoGenerateColumns="False"
                     IsReadOnly="False"
@@ -497,6 +527,12 @@
               </DataGridTemplateColumn>
             </DataGrid.Columns>
           </DataGrid>
+          <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                     Opacity="0.55" FontSize="14" IsHitTestVisible="False"
+                     IsVisible="{Binding CustomEntries.Count, Converter={StaticResource CountToBoolConverter}, ConverterParameter=zero}">
+            No watch entries yet. Use Add or Add Bulk to build a watch list for this unit.
+          </TextBlock>
+          </Grid>
         </Grid>
       </TabItem>
 
