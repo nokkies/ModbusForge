@@ -1,0 +1,26 @@
+Keep the built-in server's data store alive across stop/start cycles
+
+The in-app Modbus server lost every register, coil and input value on
+each stop/start: ConnectionManager's transport match did not recognize
+a ModbusServerService as fitting its server-mode profile, so every
+reconnect disposed the running server and created a fresh one, and
+ModbusServerService.DisconnectAsync disposed the dispatcher even when
+the service was only being stopped.
+
+- ConnectionManager: match the service kind against the profile (server
+  mode + TCP -> ModbusServerService), so reconnects reuse the instance
+- ModbusServerService: DisconnectAsync now only stops the dispatcher;
+  ConnectAsync reuses it (it owns the per-unit DataStores); only the
+  service's Dispose destroys it (DisposeAsyncCore still disposes via
+  the new cleanup path)
+- ConnectionManager: RemoveProfile takes the service out of the table
+  first and tears it down in order (disconnect -> dispose -> event)
+  instead of racing a fire-and-forget disconnect against an immediate
+  Dispose; a stale saved ActiveProfileId now falls back to the first
+  loaded profile
+- ModbusTcpService: a reconnect disposes the previous master/socket
+  under the I/O lock instead of leaking them
+
+Adds regression tests: server reconnect keeps the service instance and
+the written register value; stale ActiveProfileId fallback; removing a
+connected server completes the teardown and actually frees the port.

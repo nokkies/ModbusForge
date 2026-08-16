@@ -127,6 +127,12 @@ namespace ModbusForge.Services
             {
                 _lastIpAddress = ipAddress;
                 _lastPort = port;
+
+                // A reconnect replaces the previous transport. Dispose it first
+                // (we hold the I/O lock, so nothing can be using it) — otherwise
+                // a double-connect leaks the old socket and master.
+                DisposeTransport();
+
                 var tcpClient = new TcpClient();
                 try
                 {
@@ -479,6 +485,33 @@ namespace ModbusForge.Services
             {
                 _ioLock.Release();
             }
+        }
+
+        /// <summary>
+        /// Disposes the current master/transport without touching the I/O lock
+        /// (callers must hold it). Null-safe and exception-safe.
+        /// </summary>
+        private void DisposeTransport()
+        {
+            try
+            {
+                (_client as IDisposable)?.Dispose();
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogError(ex, "Error disposing the previous transport during reconnect.");
+            }
+            _client = null;
+
+            try
+            {
+                _tcpClient?.Close();
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogError(ex, "Error closing the previous socket during reconnect.");
+            }
+            _tcpClient = null;
         }
 
         private void HandleConnectionLoss()

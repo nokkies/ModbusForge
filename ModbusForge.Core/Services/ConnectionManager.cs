@@ -82,22 +82,69 @@ public class ConnectionManager : IConnectionManager
 
     public void RemoveProfile(ConnectionProfile profile)
     {
-        if (profile.IsConnected)
+        // Take the service out of the table before tearing it down: nothing
+        // else can resolve it anymore, and the async teardown below can run
+        // on it without a concurrent Dispose racing the Disconnect.
+        IModbusService? service = null;
+        if (_services.TryRemove(profile.Id, out var removed))
         {
-            _ = DisconnectProfileAsync(profile);
-        }
-
-        if (_services.TryRemove(profile.Id, out var service))
-        {
-            service.Dispose();
+            service = removed;
         }
 
         Profiles.Remove(profile);
         _logger.LogInformation("Removed connection profile: {Name}", profile.Name);
 
+        if (service != null)
+        {
+            if (profile.IsConnected)
+            {
+                service.ConnectionLost -= OnServiceConnectionLost;
+                _ = TearDownServiceAsync(service, profile);
+            }
+            else
+            {
+                service.Dispose();
+            }
+        }
+
         if (_activeProfile == profile)
         {
             SetActiveProfile(Profiles.Count > 0 ? Profiles[0] : null!);
+        }
+    }
+
+    /// <summary>
+    /// Completes the teardown of a removed profile's service: disconnect, then
+    /// dispose, then report the profile as disconnected. Runs asynchronously
+    /// because <see cref="IModbusService.DisconnectAsync"/> can wait on an
+    /// in-flight request; the caller has already detached the service from all
+    /// lookups, so it is safe to let this finish in the background.
+    /// </summary>
+    private async Task TearDownServiceAsync(IModbusService service, ConnectionProfile profile)
+    {
+        try
+        {
+            await service.DisconnectAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+        {
+            _logger.LogError(ex, "Error disconnecting profile during removal: {Name}", profile.Name);
+        }
+        finally
+        {
+            try
+            {
+                service.Dispose();
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogError(ex, "Error disposing service during removal: {Name}", profile.Name);
+            }
+
+            profile.IsConnected = false;
+            profile.Status = "Disconnected";
+            _logger.LogInformation("Disconnected profile: {Name}", profile.Name);
+            ProfileDisconnected?.Invoke(this, profile);
         }
     }
 
@@ -207,7 +254,7 @@ public class ConnectionManager : IConnectionManager
 
         if (_services.TryGetValue(profile.Id, out var existing))
         {
-            if (MatchesTransport(existing, transport))
+            if (MatchesService(existing, profile))
             {
                 return existing;
             }
@@ -254,12 +301,23 @@ public class ConnectionManager : IConnectionManager
         })!;
     }
 
-    private static bool MatchesTransport(IModbusService service, TransportType transport)
+    /// <summary>
+    /// Whether an existing service instance still fits the profile, i.e. is the
+    /// same kind of service this profile would create. Must stay in lockstep
+    /// with the creation branches below: a server-mode TCP profile runs a
+    /// <see cref="ModbusServerService"/> (which owns the register data store),
+    /// so treating it as a mismatch would dispose the live server and wipe the
+    /// store on every reconnect.
+    /// </summary>
+    private static bool MatchesService(IModbusService service, ConnectionProfile profile)
     {
-        if (transport == TransportType.Tcp)
+        if (profile.IsServerMode && profile.Transport == TransportType.Tcp)
+            return service is ModbusServerService;
+
+        if (profile.Transport == TransportType.Tcp)
             return service is ModbusTcpService;
 
-        return service is ModbusSerialService serial && serial.Transport == transport;
+        return service is ModbusSerialService serial && serial.Transport == profile.Transport;
     }
 
     private void AttachConnectionLostHandler(IModbusService service, ConnectionProfile profile)
@@ -389,6 +447,17 @@ public class ConnectionManager : IConnectionManager
                         SetActiveProfile(profile);
                     }
                 }
+
+                // The saved active profile may be gone (profile removed and the
+                // file left consistent-but-stale, or hand-edited). Without a
+                // fallback the app would start with profiles present but no
+                // active one — every read/write target would be empty.
+                if (_activeProfile == null && Profiles.Count > 0)
+                {
+                    SetActiveProfile(Profiles[0]);
+                    _logger.LogInformation("Saved active profile not found; falling back to {Name}", Profiles[0].Name);
+                }
+
                 _logger.LogInformation("Loaded {Count} connection profiles", Profiles.Count);
             }
         }
