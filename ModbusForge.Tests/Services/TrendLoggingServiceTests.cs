@@ -272,5 +272,20 @@ namespace ModbusForge.Tests.Services
             // Assert
             Assert.Equal(0, callCount);
         }
+
+        [Fact]
+        public void StateChanged_FiresOnlyOnActualChanges()
+        {
+            var service = new TrendLoggingService(_mockOptions.Object);
+            var transitions = new List<bool>();
+            service.StateChanged += running => transitions.Add(running);
+
+            service.Start();
+            service.Start(); // no change -> no event
+            service.Stop();
+            service.Stop(); // no change -> no event
+
+            Assert.Equal(new List<bool> { true, false }, transitions);
+        }
     }
 }

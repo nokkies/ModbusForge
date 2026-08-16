@@ -25,6 +25,13 @@ namespace ModbusForge.Services
         event Action<string>? Removed;                // key
         event Action<string, double, DateTime>? Sampled; // key, value, timestampUtc
 
+        /// <summary>
+        /// Raised on the calling thread whenever the running state changes.
+        /// Both controllers of the running flag (connection lifecycle and the
+        /// Trend view's Start/Stop) stay in sync through this event.
+        /// </summary>
+        event Action<bool>? StateChanged;
+
         System.Collections.Generic.IReadOnlyDictionary<string, string> ActiveKeys { get; }
     }
 }

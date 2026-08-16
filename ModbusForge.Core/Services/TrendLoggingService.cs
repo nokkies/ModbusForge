@@ -11,7 +11,7 @@ namespace ModbusForge.Services
         private int _retentionMinutes;
         private int _sampleRateMs;
         private string _exportFolder;
-        private volatile bool _isRunning;
+        private bool _isRunning;
         private readonly Dictionary<string, string> _keys = new(); // key -> displayName
 
         public TrendLoggingService(IOptions<LoggingSettings> options)
@@ -44,24 +44,31 @@ namespace ModbusForge.Services
 
         public void Start()
         {
+            bool changed;
             lock (_sync)
             {
+                changed = !_isRunning;
                 _isRunning = true;
             }
             // Sampling is driven externally via Publish; no internal timer here.
+            if (changed) StateChanged?.Invoke(true);
         }
 
         public void Stop()
         {
+            bool changed;
             lock (_sync)
             {
+                changed = _isRunning;
                 _isRunning = false;
             }
+            if (changed) StateChanged?.Invoke(false);
         }
 
         public event Action<string, string>? Added;
         public event Action<string>? Removed;
         public event Action<string, double, DateTime>? Sampled;
+        public event Action<bool>? StateChanged;
 
         public void Add(string key, string displayName)
         {

@@ -133,6 +133,7 @@ namespace ModbusForge.Avalonia.ViewModels
             _trendLogger.Added += OnAdded;
             _trendLogger.Removed += OnRemoved;
             _trendLogger.Sampled += OnSampled;
+            _trendLogger.StateChanged += OnStateChanged;
 
             if (_trendLogger.ActiveKeys != null)
             {
@@ -333,19 +334,39 @@ namespace ModbusForge.Avalonia.ViewModels
             var key = $"Imported:{Path.GetFileNameWithoutExtension(path)}";
             await _dispatcher.InvokeAsync(() => _trendLogger.Add(key, key));
 
-            const int batchSize = 500;
-            for (var start = 0; start < rows.Count; start += batchSize)
+            // Publish drops samples while logging is stopped, and import is an
+            // explicit data injection that must not be discarded - enable
+            // logging for the duration of the import, then restore the
+            // previous state (the StateChanged events keep IsRunning in sync).
+            var wasRunning = _trendLogger.IsRunning;
+            if (!wasRunning)
             {
-                var offset = start;
-                var count = Math.Min(batchSize, rows.Count - offset);
-                await _dispatcher.InvokeAsync(() =>
+                _trendLogger.Start();
+            }
+
+            try
+            {
+                const int batchSize = 500;
+                for (var start = 0; start < rows.Count; start += batchSize)
                 {
-                    for (var index = 0; index < count; index++)
+                    var offset = start;
+                    var count = Math.Min(batchSize, rows.Count - offset);
+                    await _dispatcher.InvokeAsync(() =>
                     {
-                        var sample = rows[offset + index];
-                        _trendLogger.Publish(key, sample.v, sample.ts);
-                    }
-                });
+                        for (var index = 0; index < count; index++)
+                        {
+                            var sample = rows[offset + index];
+                            _trendLogger.Publish(key, sample.v, sample.ts);
+                        }
+                    });
+                }
+            }
+            finally
+            {
+                if (!wasRunning)
+                {
+                    _trendLogger.Stop();
+                }
             }
         }
 
@@ -400,6 +421,17 @@ namespace ModbusForge.Avalonia.ViewModels
             _dispatcher.Invoke(() => AddSeries(key, displayName));
         }
 
+        // The connection lifecycle also starts/stops the logger without going
+        // through this view; without this sync the Start/Stop button would go
+        // stale. Post (not Invoke) so a worker-thread Start/Stop never blocks.
+        private void OnStateChanged(bool isRunning)
+        {
+            _dispatcher.Post(() =>
+            {
+                IsRunning = isRunning;
+            });
+        }
+
         private void AddSeries(string key, string displayName)
         {
             if (_valuesByKey.ContainsKey(key)) return;
@@ -451,7 +483,12 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void OnSampled(string key, double value, DateTime timestampUtc)
         {
-            _dispatcher.Invoke(() =>
+            // Post (not Invoke): this runs on the polling thread for every
+            // sample of every trended register. A synchronous Invoke would
+            // stall polling whenever the UI thread is busy redrawing the chart.
+            // The dispatcher queue preserves per-thread FIFO order, so sample
+            // sequence stays intact.
+            _dispatcher.Post(() =>
             {
                 if (!_valuesByKey.ContainsKey(key))
                 {
@@ -644,6 +681,7 @@ namespace ModbusForge.Avalonia.ViewModels
             _trendLogger.Added -= OnAdded;
             _trendLogger.Removed -= OnRemoved;
             _trendLogger.Sampled -= OnSampled;
+            _trendLogger.StateChanged -= OnStateChanged;
         }
     }
 }
