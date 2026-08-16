@@ -217,6 +217,7 @@ Go to **Options → Script Editor**
 ### Control Commands
 - **Delay**: Wait for specified milliseconds
 - **Log**: Add a message to the output log
+- **Loop**: Repeat the rest of the script (every command after the Loop row) the number of times in the **Loops** column. The Loop consumes the rest of the script, so those commands only run inside the loop. Nested loops are not supported.
 
 ## Script Settings
 

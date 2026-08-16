@@ -60,7 +60,8 @@ public class ScriptRunner : IScriptRunner
                     Log($"--- Repeat {repeat + 1} of {repeats} ---");
                 }
 
-                for (int i = 0; i < script.Commands.Count; i++)
+                int i = 0;
+                while (i < script.Commands.Count)
                 {
                     if (token.IsCancellationRequested) break;
 
@@ -68,6 +69,35 @@ public class ScriptRunner : IScriptRunner
                     if (!cmd.IsEnabled)
                     {
                         Log($"Skipping disabled command: {cmd.DisplayText}");
+                        i++;
+                        continue;
+                    }
+
+                    if (cmd.CommandType == ScriptCommandType.Loop)
+                    {
+                        // A Loop command repeats the rest of the script (everything
+                        // after this command) N times and then consumes it, so the
+                        // main pass never runs the looped region a second time.
+                        var (loopSuccess, loopResult) = await ExecuteLoopAsync(
+                            cmd, i, script, modbusService, unitId, token, repeat + 1, repeats);
+
+                        cmd.LastSuccess = loopSuccess;
+                        cmd.LastResult = loopResult;
+
+                        CommandExecuted?.Invoke(this, new ScriptExecutionEventArgs(
+                            cmd, i, script.Commands.Count, loopSuccess, loopResult, repeat + 1, repeats));
+
+                        if (!loopSuccess)
+                        {
+                            allSuccess = false;
+                            if (script.StopOnError)
+                            {
+                                Log($"Script stopped due to error: {loopResult}");
+                                break;
+                            }
+                        }
+
+                        i = script.Commands.Count;
                         continue;
                     }
 
@@ -93,6 +123,8 @@ public class ScriptRunner : IScriptRunner
                     {
                         await Task.Delay(script.DelayBetweenCommandsMs, token);
                     }
+
+                    i++;
                 }
 
                 if (!allSuccess && script.StopOnError) break;
@@ -127,6 +159,88 @@ public class ScriptRunner : IScriptRunner
                 ScriptCompleted?.Invoke(this, allSuccess);
             }
         }
+    }
+
+    /// <summary>
+    /// Executes a Loop command: the rest of the script (all commands after the
+    /// Loop) is run <c>LoopCount</c> times in total. The region is then consumed
+    /// by the caller, so those commands are not run again on the main pass.
+    /// </summary>
+    private async Task<(bool success, string result)> ExecuteLoopAsync(
+        ScriptCommand loopCmd, int loopIndex, Script script, IModbusService modbusService,
+        byte unitId, CancellationToken token, int currentRepeat, int totalRepeats)
+    {
+        // Clamp like the script-level RepeatCount: a 0 in a saved file must not
+        // silently run zero iterations.
+        var loopCount = Math.Max(1, loopCmd.LoopCount);
+
+        int regionStart = loopIndex + 1;
+        int regionEnd = script.Commands.Count;
+        var regionCount = regionEnd - regionStart;
+
+        // A Loop inside the looped region would recurse without bound; fail
+        // clearly instead of spinning.
+        for (int k = regionStart; k < regionEnd; k++)
+        {
+            if (script.Commands[k].CommandType == ScriptCommandType.Loop)
+            {
+                Log("Nested loops are not supported");
+                return (false, "Nested loops are not supported");
+            }
+        }
+
+        Log($"Loop {loopCount}x: {regionCount} command(s)");
+
+        bool allOk = true;
+        for (int iteration = 1; iteration <= loopCount; iteration++)
+        {
+            if (loopCount > 1)
+            {
+                Log($"  Loop iteration {iteration} of {loopCount}");
+            }
+
+            for (int k = regionStart; k < regionEnd; k++)
+            {
+                var c = script.Commands[k];
+                if (!c.IsEnabled)
+                {
+                    Log($"Skipping disabled command: {c.DisplayText}");
+                    continue;
+                }
+
+                var (ok, res) = await ExecuteCommandAsync(c, modbusService, unitId, token);
+
+                c.LastSuccess = ok;
+                c.LastResult = res;
+
+                CommandExecuted?.Invoke(this, new ScriptExecutionEventArgs(
+                    c, k, script.Commands.Count, ok, res, currentRepeat, totalRepeats));
+
+                if (!ok)
+                {
+                    allOk = false;
+                    if (script.StopOnError)
+                    {
+                        // The caller reports the stop; just return the failure.
+                        return (false, res);
+                    }
+                }
+
+                // Apply the inter-command delay at iteration boundaries as well
+                // so the spacing between executed commands stays uniform.
+                bool moreInIteration = k < regionEnd - 1;
+                bool moreIterations = iteration < loopCount;
+                if (script.DelayBetweenCommandsMs > 0 && (moreInIteration || moreIterations))
+                {
+                    await Task.Delay(script.DelayBetweenCommandsMs, token);
+                }
+            }
+        }
+
+        var result = allOk
+            ? $"Looped {loopCount}x: {regionCount} command(s)"
+            : $"Looped {loopCount}x: {regionCount} command(s); some commands failed";
+        return (allOk, result);
     }
 
     private async Task<(bool success, string result)> ExecuteCommandAsync(

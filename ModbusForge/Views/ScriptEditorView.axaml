@@ -50,6 +50,11 @@
               <TextBlock Text="Count" ToolTip.Tip="Number of points to read" />
             </DataGridTextColumn.Header>
           </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding LoopCount}" Width="60">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Loops" ToolTip.Tip="For a Loop command: how many times the rest of the script repeats" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
           <DataGridTextColumn Binding="{Binding Value}" Width="80">
             <DataGridTextColumn.Header>
               <TextBlock Text="Value" ToolTip.Tip="Value for single-write and masked-write commands" />
