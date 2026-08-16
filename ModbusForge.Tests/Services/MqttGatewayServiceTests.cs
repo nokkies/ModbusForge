@@ -1,5 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModbusForge.Models;
 using ModbusForge.Services;
@@ -87,6 +92,55 @@ namespace ModbusForge.Tests.Services
 
             await service.DisconnectAsync();
             Assert.True(raised >= 1, "disconnecting a stopped gateway still notifies listeners of the (dis)connected state");
+        }
+
+        [Fact]
+        public async Task UnreachableBroker_LogsOneCalmLineInsteadOfStackTraces()
+        {
+            // A down broker is an expected, self-healing condition: the log must
+            // stay quiet (no warnings, no stack traces) with at most a single-line
+            // heartbeat per attempt - this is what a headless deployment sees when
+            // the broker is simply not up yet.
+            var logger = new CapturingLogger();
+            using var service = new MqttGatewayService(logger);
+            service.ApplySettings(new MqttSettings { Enabled = true, BrokerHost = "127.0.0.1", BrokerPort = 1, PublishPeriodMs = 0 });
+
+            await service.ConnectAsync();
+            try
+            {
+                // Wait for at least one failed reconnect attempt's heartbeat.
+                var stopwatch = Stopwatch.StartNew();
+                while (logger.Entries.All(e => !e.Message.Contains("retrying", StringComparison.OrdinalIgnoreCase))
+                       && stopwatch.Elapsed < TimeSpan.FromSeconds(5))
+                {
+                    await Task.Delay(50);
+                }
+
+                Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information
+                    && e.Message.Contains("unreachable; retrying", StringComparison.OrdinalIgnoreCase));
+                Assert.DoesNotContain(logger.Entries, e => e.Level >= LogLevel.Warning);
+            }
+            finally
+            {
+                await service.DisconnectAsync();
+            }
+        }
+
+        private sealed class CapturingLogger : ILogger, ILogger<MqttGatewayService>
+        {
+            public List<(LogLevel Level, string Message)> Entries { get; } = new();
+
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            {
+                lock (Entries)
+                {
+                    Entries.Add((logLevel, formatter(state, exception)));
+                }
+            }
         }
     }
 }

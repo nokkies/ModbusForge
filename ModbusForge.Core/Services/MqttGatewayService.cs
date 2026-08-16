@@ -73,6 +73,9 @@ namespace ModbusForge.Services
                 _publishCts = new CancellationTokenSource();
             }
 
+            _logger.LogInformation("MQTT gateway starting (broker {Host}:{Port}, publish period {Period} ms)",
+                _settings.BrokerHost, _settings.BrokerPort, _settings.PublishPeriodMs);
+
             await TryConnectAsync(cancellationToken).ConfigureAwait(false);
 
             _reconnectTask = RunReconnectLoopAsync(_reconnectCts.Token);
@@ -119,13 +122,16 @@ namespace ModbusForge.Services
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogWarning(ex, "Failed to connect to MQTT broker {Host}:{Port}", _settings.BrokerHost, _settings.BrokerPort);
+                // The reconnect loop reports the outage once per attempt; keep the
+                // full exception (and its stack trace) at debug level, otherwise a
+                // down broker spams a stack trace into the log every few seconds.
+                _logger.LogDebug(ex, "Failed to connect to MQTT broker {Host}:{Port}", _settings.BrokerHost, _settings.BrokerPort);
             }
         }
 
         private Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs arg)
         {
-            _logger.LogWarning("MQTT client disconnected: {Reason}", arg.Reason);
+            _logger.LogDebug("MQTT client disconnected: {Reason}", arg.Reason);
             RaiseConnectionStateChanged();
             return Task.CompletedTask;
         }
@@ -155,6 +161,12 @@ namespace ModbusForge.Services
                     }
                     else
                     {
+                        // One calm heartbeat per attempt instead of the raw
+                        // exception: a down broker is an expected, self-healing
+                        // condition, and the UI shows "Retrying connection...".
+                        _logger.LogInformation("MQTT broker {Host}:{Port} unreachable; retrying in {Delay}s",
+                            _settings.BrokerHost, _settings.BrokerPort, delay / 1000);
+
                         await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                         delay = Math.Min(MaxReconnectDelayMs, delay * 2);
                     }
