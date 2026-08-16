@@ -91,7 +91,6 @@ namespace ModbusForge.Avalonia.ViewModels
         public string FollowingButtonText => IsFollowing ? "Pause" : "Play";
 
         [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(RemoveSelectedCommand))]
         [NotifyCanExecuteChangedFor(nameof(DeleteSelectedCommand))]
         [NotifyCanExecuteChangedFor(nameof(ChangeColorCommand))]
         private TrendSeriesItem? _selectedSeriesItem;
@@ -145,7 +144,6 @@ namespace ModbusForge.Avalonia.ViewModels
 
             StartCommand = new RelayCommand(Start);
             StopCommand = new RelayCommand(Stop);
-            RemoveSelectedCommand = new RelayCommand(RemoveSelected, CanDeleteSelected);
             DeleteSelectedCommand = new RelayCommand(RemoveSelected, CanDeleteSelected);
             ClearCommand = new RelayCommand(Clear);
             ChangeColorCommand = new RelayCommand(ChangeColor, CanDeleteSelected);
@@ -161,7 +159,6 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public IRelayCommand StartCommand { get; }
         public IRelayCommand StopCommand { get; }
-        public IRelayCommand RemoveSelectedCommand { get; }
         public IRelayCommand DeleteSelectedCommand { get; }
         public IRelayCommand ClearCommand { get; }
         public IRelayCommand ChangeColorCommand { get; }
