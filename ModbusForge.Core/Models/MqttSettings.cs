@@ -31,7 +31,7 @@ namespace ModbusForge.Models
         public bool RetainMessages { get; set; } = false;
 
         /// <summary>
-        /// Publish period in milliseconds. Set to 0 to publish on every value change (when a change-source is wired).
+        /// Publish period in milliseconds. Set to 0 to disable periodic publishing.
         /// </summary>
         public int PublishPeriodMs { get; set; } = 1000;
     }

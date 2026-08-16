@@ -39,6 +39,7 @@
       <Button Content="Apply &amp; Connect" ToolTip.Tip="Save the settings and connect to the broker" Command="{Binding ApplyAndConnectCommand}" />
       <Button Content="Disconnect" ToolTip.Tip="Disconnect from the broker" Command="{Binding DisconnectCommand}" />
       <TextBlock VerticalAlignment="Center" Text="Connected" IsVisible="{Binding IsConnected}" FontWeight="Bold" Foreground="Green" />
+      <TextBlock VerticalAlignment="Center" Text="Retrying connection..." IsVisible="{Binding IsRetrying}" FontWeight="SemiBold" Foreground="Orange" ToolTip.Tip="The gateway is running but the broker is unreachable; it keeps reconnecting automatically." />
     </StackPanel>
 
     <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Text="{Binding StatusMessage}" TextWrapping="Wrap" Margin="0,8,0,0" />

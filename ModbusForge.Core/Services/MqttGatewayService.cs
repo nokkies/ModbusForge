@@ -30,7 +30,19 @@ namespace ModbusForge.Services
         private const int MinReconnectDelayMs = 1000;
         private const int MaxReconnectDelayMs = 30000;
 
-        public bool IsConnected => _client?.IsConnected == true;
+        public virtual bool IsConnected => _client?.IsConnected == true;
+
+        /// <summary>
+        /// True while the gateway is active (a connect attempt has started and it
+        /// has not been fully disconnected), including the reconnect-wait period.
+        /// </summary>
+        public virtual bool IsRunning => _reconnectCts != null;
+
+        /// <summary>
+        /// Raised whenever the broker connection state changes (connect, drop, or
+        /// full disconnect). Raised from a worker thread.
+        /// </summary>
+        public event EventHandler? ConnectionStateChanged;
 
         /// <summary>
         /// Delegate that returns the current set of tag values to publish.
@@ -47,7 +59,7 @@ namespace ModbusForge.Services
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         }
 
-        public async Task ConnectAsync(CancellationToken cancellationToken = default)
+        public virtual async Task ConnectAsync(CancellationToken cancellationToken = default)
         {
             if (!_settings.Enabled)
                 return;
@@ -98,6 +110,7 @@ namespace ModbusForge.Services
                 if (result.ResultCode == MqttClientConnectResultCode.Success)
                 {
                     _logger.LogInformation("Connected to MQTT broker {Host}:{Port}", _settings.BrokerHost, _settings.BrokerPort);
+                    RaiseConnectionStateChanged();
                 }
                 else
                 {
@@ -113,8 +126,11 @@ namespace ModbusForge.Services
         private Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs arg)
         {
             _logger.LogWarning("MQTT client disconnected: {Reason}", arg.Reason);
+            RaiseConnectionStateChanged();
             return Task.CompletedTask;
         }
+
+        internal void RaiseConnectionStateChanged() => ConnectionStateChanged?.Invoke(this, EventArgs.Empty);
 
         private async Task RunReconnectLoopAsync(CancellationToken cancellationToken)
         {
@@ -201,7 +217,7 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task DisconnectAsync()
+        public virtual async Task DisconnectAsync()
         {
             lock (_gate)
             {
@@ -243,6 +259,8 @@ namespace ModbusForge.Services
             _publishCts = null;
             _reconnectTask = null;
             _publishTask = null;
+
+            RaiseConnectionStateChanged();
         }
 
         public async Task PublishAsync(IEnumerable<MqttTagUpdate> updates, CancellationToken cancellationToken = default)

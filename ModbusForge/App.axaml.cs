@@ -64,6 +64,16 @@ namespace ModbusForge.Avalonia
                     }
                 }
 
+                // Resume the MQTT gateway if it was enabled in a previous session:
+                // without this the user would have to re-apply the MQTT settings
+                // after every restart for publishing to continue.
+                var mqttGateway = Services.GetRequiredService<MqttGatewayService>();
+                mqttGateway.ApplySettings(settingsService.MqttSettings);
+                if (settingsService.MqttSettings.Enabled)
+                {
+                    _ = mqttGateway.ConnectAsync();
+                }
+
                 desktop.ShutdownRequested += async (_, _) =>
                 {
                     if (_apiServerService?.IsRunning == true)
