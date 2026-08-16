@@ -80,6 +80,7 @@
               <ListBoxItem Content="Frame Inspector" />
               <ListBoxItem Content="MQTT" />
               <ListBoxItem Content="Script Editor" />
+              <ListBoxItem Content="Rules" />
               <ListBoxItem Content="Signal Generator" />
               <ListBoxItem Content="Simulation" />
               <ListBoxItem Content="Registers" Margin="0,16,0,0" />
@@ -192,6 +193,10 @@
 
       <TabItem x:Name="ScriptEditorTab" Header="Script Editor">
         <views:ScriptEditorView DataContext="{Binding ScriptEditorViewModel}" />
+      </TabItem>
+
+      <TabItem x:Name="RulesTab" Header="Rules">
+        <views:ScriptRulesView DataContext="{Binding RulesViewModel}" />
       </TabItem>
 
       <TabItem x:Name="SignalGeneratorTab" Header="Signal Generator">

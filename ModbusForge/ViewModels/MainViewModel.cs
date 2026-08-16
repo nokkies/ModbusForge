@@ -394,6 +394,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public SignalGeneratorViewModel? SignalGeneratorViewModel { get; }
 
+        public ScriptRulesViewModel? RulesViewModel { get; }
+
         public VisualNodeEditorViewModel? VisualNodeEditorViewModel { get; }
 
         public DecodeViewModel? DecodeViewModel { get; }
@@ -418,6 +420,7 @@ namespace ModbusForge.Avalonia.ViewModels
             MqttViewModel? mqttViewModel = null,
             MqttGatewayService? mqttGateway = null,
             ScriptEditorViewModel? scriptEditorViewModel = null,
+            ScriptRulesViewModel? rulesViewModel = null,
             SignalGeneratorViewModel? signalGeneratorViewModel = null,
             VisualNodeEditorViewModel? visualNodeEditorViewModel = null,
             DecodeViewModel? decodeViewModel = null,
@@ -448,6 +451,7 @@ namespace ModbusForge.Avalonia.ViewModels
             FrameInspectorViewModel = frameInspectorViewModel;
             MqttViewModel = mqttViewModel;
             ScriptEditorViewModel = scriptEditorViewModel;
+            RulesViewModel = rulesViewModel;
             SignalGeneratorViewModel = signalGeneratorViewModel;
             VisualNodeEditorViewModel = visualNodeEditorViewModel;
             if (VisualNodeEditorViewModel != null)
@@ -883,24 +887,28 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             if (IsTabIndexVisible(SelectedTabIndex)) return;
 
-            SelectedTabIndex = Enumerable.Range(0, 15).FirstOrDefault(IsTabIndexVisible);
+            SelectedTabIndex = Enumerable.Range(0, 16).FirstOrDefault(IsTabIndexVisible);
         }
 
         private bool IsTabIndexVisible(int index)
         {
+            // Tab order: Dashboard(0), Trends(1), Frame Inspector(2), MQTT(3),
+            // Script Editor(4), Rules(5), Signal Generator(6), Simulation(7),
+            // Holding(8), Coils(9), Input(10), Discrete(11), Custom Watch(12),
+            // Decode(13), Console(14), Debug(15).
             return index switch
             {
                 0 => true,
                 1 => IsTrendTabVisible,
-                6 => IsSimulationTabVisible,
-                7 => IsRegistersTabVisible,
-                8 => IsCoilsTabVisible,
-                9 => IsInputRegistersTabVisible,
-                10 => IsDiscreteInputsTabVisible,
-                11 => IsCustomWatchTabVisible,
-                12 => IsDecodeTabVisible,
-                13 => IsConsoleTabVisible,
-                14 => IsDebugTabVisible,
+                7 => IsSimulationTabVisible,
+                8 => IsRegistersTabVisible,
+                9 => IsCoilsTabVisible,
+                10 => IsInputRegistersTabVisible,
+                11 => IsDiscreteInputsTabVisible,
+                12 => IsCustomWatchTabVisible,
+                13 => IsDecodeTabVisible,
+                14 => IsConsoleTabVisible,
+                15 => IsDebugTabVisible,
                 _ => true
             };
         }

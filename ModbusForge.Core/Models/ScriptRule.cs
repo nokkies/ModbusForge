@@ -53,7 +53,16 @@ namespace ModbusForge.Models
         private bool _triggered = false;
 
         /// <summary>
-        /// Creates a copy of this rule
+        /// Local time of the last time this rule's condition was met and its
+        /// action was executed. Null until the rule has triggered at least
+        /// once. Set by the rule service; observable so views can refresh.
+        /// </summary>
+        [ObservableProperty]
+        private DateTime? _lastTriggeredAt;
+
+        /// <summary>
+        /// Creates a copy of this rule. Runtime state (<see cref="Triggered"/>
+        /// and <see cref="LastTriggeredAt"/>) is intentionally not copied.
         /// </summary>
         public ScriptRule Clone()
         {
@@ -72,17 +81,36 @@ namespace ModbusForge.Models
                 ActionValue = ActionValue,
                 DelayMs = DelayMs,
                 LogMessage = LogMessage,
-                OneTime = OneTime,
-                Triggered = Triggered
+                OneTime = OneTime
             };
         }
 
         /// <summary>
-        /// Returns a human-readable description of the rule
+        /// Human-readable description of the rule, recomputed from the fields
+        /// below. Observable: every field that contributes to it re-raises
+        /// <see cref="PropertyChanged"/> for this property, so grids and panels
+        /// refresh as the user edits the rule.
         /// </summary>
-        public string GetDescription()
+        public string Description =>
+            $"IF {TriggerArea}[{TriggerAddress}] {TriggerOperator} {TriggerValue} THEN {ActionType} {ActionArea}[{ActionAddress}] = {ActionValue}";
+
+        /// <summary>
+        /// Returns a human-readable description of the rule.
+        /// </summary>
+        public string GetDescription() => Description;
+
+        partial void OnTriggerAreaChanged(string value) => OnDescriptionChanged();
+        partial void OnTriggerAddressChanged(int value) => OnDescriptionChanged();
+        partial void OnTriggerOperatorChanged(string value) => OnDescriptionChanged();
+        partial void OnTriggerValueChanged(string value) => OnDescriptionChanged();
+        partial void OnActionTypeChanged(string value) => OnDescriptionChanged();
+        partial void OnActionAreaChanged(string value) => OnDescriptionChanged();
+        partial void OnActionAddressChanged(int value) => OnDescriptionChanged();
+        partial void OnActionValueChanged(string value) => OnDescriptionChanged();
+
+        private void OnDescriptionChanged()
         {
-            return $"IF {TriggerArea}[{TriggerAddress}] {TriggerOperator} {TriggerValue} THEN {ActionType} {ActionArea}[{ActionAddress}] = {ActionValue}";
+            OnPropertyChanged(nameof(Description));
         }
     }
 }

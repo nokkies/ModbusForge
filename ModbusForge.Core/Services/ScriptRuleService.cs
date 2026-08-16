@@ -99,6 +99,9 @@ namespace ModbusForge.Services
                         bool conditionMet = await EvaluateConditionAsync(service, unitId, rule);
                         if (conditionMet)
                         {
+                            // Record when the rule fired (before the action's
+                            // delay/write completes) so views can show it.
+                            rule.LastTriggeredAt = DateTime.Now;
                             await ExecuteActionAsync(service, unitId, rule);
 
                             if (rule.OneTime)

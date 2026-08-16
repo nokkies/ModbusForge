@@ -1,0 +1,157 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+             xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core"
+             xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters"
+             x:Class="ModbusForge.Avalonia.Views.ScriptRulesView"
+             x:DataType="vm:ScriptRulesViewModel"
+             x:CompileBindings="False">
+  <UserControl.Resources>
+    <converters:StringEqualityToBoolConverter x:Key="StringEqualityToBoolConverter" />
+    <converters:BoolNegateConverter x:Key="BoolNegateConverter" />
+    <converters:CountToBoolConverter x:Key="CountToBoolConverter" />
+  </UserControl.Resources>
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.rulesGroup">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Opacity" Value="0.65" />
+      <Setter Property="Margin" Value="0,8,0,2" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,*,Auto">
+    <!-- Toolbar -->
+    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+      <Button Content="Add" ToolTip.Tip="Add a new rule" Command="{Binding AddRuleCommand}" />
+      <Button Content="Remove" ToolTip.Tip="Remove the selected rule" Command="{Binding RemoveSelectedCommand}" />
+      <Button Content="Re-arm one-time" ToolTip.Tip="Allow triggered one-time rules to fire again" Command="{Binding ResetOneTimeCommand}" />
+      <Separator VerticalAlignment="Center" Margin="4,2" />
+      <Button Content="Save JSON" ToolTip.Tip="Save all rules to a JSON file" Command="{Binding SaveRulesCommand}" />
+      <Button Content="Load JSON" ToolTip.Tip="Replace all rules with the contents of a JSON file" Command="{Binding LoadRulesCommand}" />
+      <Button Content="Clear all" ToolTip.Tip="Remove every rule" Command="{Binding ClearAllCommand}" />
+    </StackPanel>
+
+    <Grid Grid.Row="1" ColumnDefinitions="*,360">
+      <!-- Rule list -->
+      <Grid Grid.Column="0" Margin="0,0,8,0">
+        <DataGrid x:Name="RulesGrid"
+                  ItemsSource="{Binding Rules}"
+                  SelectedItem="{Binding SelectedRule, Mode=TwoWay}"
+                  AutoGenerateColumns="False"
+                  GridLinesVisibility="All"
+                  VerticalAlignment="Stretch">
+          <DataGrid.Columns>
+            <DataGridCheckBoxColumn Header="On" Binding="{Binding Enabled}" Width="44" />
+            <DataGridTextColumn Header="Name" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="140" />
+            <DataGridCheckBoxColumn Header="One-time" Binding="{Binding OneTime}" Width="80" />
+            <DataGridTemplateColumn Header="Fired" Width="52">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate x:DataType="models:ScriptRule">
+                  <StackPanel Orientation="Horizontal" Spacing="0">
+                    <TextBlock Text="&#x2713;" Foreground="#2E8B57" VerticalAlignment="Center" IsVisible="{Binding Triggered}" />
+                    <TextBlock Text="&#x2013;" Opacity="0.4" VerticalAlignment="Center"
+                               IsVisible="{Binding Triggered, Converter={StaticResource BoolNegateConverter}}" />
+                  </StackPanel>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTemplateColumn Header="Last fired" Width="140">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate x:DataType="models:ScriptRule">
+                  <TextBlock VerticalAlignment="Center" Margin="4,0"
+                             Text="{Binding LastTriggeredAt, StringFormat={}{0:HH:mm:ss}, FallbackValue='-'}" />
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTemplateColumn Header="Rule" Width="*">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate x:DataType="models:ScriptRule">
+                  <TextBlock Text="{Binding Description}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="4,0" />
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+          </DataGrid.Columns>
+        </DataGrid>
+        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                   Opacity="0.55" FontSize="14" IsHitTestVisible="False"
+                   IsVisible="{Binding Rules.Count, Converter={StaticResource CountToBoolConverter}, ConverterParameter=zero}">
+          No rules yet. Click Add to create one; rules fire automatically while a connection is active.
+        </TextBlock>
+      </Grid>
+
+      <!-- Rule editor -->
+      <Border Grid.Column="1" BorderBrush="#30000000" BorderThickness="1" CornerRadius="6" Padding="10">
+        <Grid>
+          <ScrollViewer VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasSelectedRule}">
+            <StackPanel>
+              <TextBlock Text="Rule" Classes="rulesGroup" />
+              <TextBox Text="{Binding SelectedRule.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                       Watermark="Rule name" Margin="0,0,0,4" />
+              <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,0">
+                <CheckBox Content="Enabled" IsChecked="{Binding SelectedRule.Enabled, Mode=TwoWay}" />
+                <CheckBox Content="One-time" IsChecked="{Binding SelectedRule.OneTime, Mode=TwoWay}"
+                          ToolTip.Tip="Fire once and stay armed until re-armed" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                <TextBlock VerticalAlignment="Center" Text="Delay (ms):" />
+                <NumericUpDown Value="{Binding SelectedRule.DelayMs, Mode=TwoWay}" Minimum="0" Maximum="60000" Width="90" />
+              </StackPanel>
+
+              <TextBlock Text="Condition" Classes="rulesGroup" />
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock VerticalAlignment="Center" Text="Read" />
+                <ComboBox ItemsSource="{Binding TriggerAreas}" SelectedItem="{Binding SelectedRule.TriggerArea, Mode=TwoWay}" Width="130" />
+                <TextBlock VerticalAlignment="Center" Text="[Address]" />
+                <NumericUpDown Value="{Binding SelectedRule.TriggerAddress, Mode=TwoWay}" Minimum="0" Maximum="65535" Width="80" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                <ComboBox ItemsSource="{Binding TriggerOperators}" SelectedItem="{Binding SelectedRule.TriggerOperator, Mode=TwoWay}" Width="130" />
+                <TextBlock VerticalAlignment="Center" Text="value" />
+                <TextBox Text="{Binding SelectedRule.TriggerValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="90" />
+              </StackPanel>
+
+              <TextBlock Text="Action" Classes="rulesGroup" />
+              <ComboBox ItemsSource="{Binding ActionTypes}" SelectedItem="{Binding SelectedRule.ActionType, Mode=TwoWay}" Width="150" />
+              <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0"
+                          IsVisible="{Binding SelectedRule.ActionType, Converter={StaticResource StringEqualityToBoolConverter}, ConverterParameter=LogMessage}">
+                <TextBlock VerticalAlignment="Center" Text="Log" />
+                <TextBox Text="{Binding SelectedRule.LogMessage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+              </StackPanel>
+              <StackPanel Margin="0,4,0,0"
+                          IsVisible="{Binding SelectedRule.ActionType, Converter={StaticResource StringEqualityToBoolConverter}, ConverterParameter=SetRegister}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock VerticalAlignment="Center" Text="Write" />
+                  <ComboBox ItemsSource="{Binding ActionAreas}" SelectedItem="{Binding SelectedRule.ActionArea, Mode=TwoWay}" Width="130" />
+                  <TextBlock VerticalAlignment="Center" Text="[Address]" />
+                  <NumericUpDown Value="{Binding SelectedRule.ActionAddress, Mode=TwoWay}" Minimum="0" Maximum="65535" Width="80" />
+                  <TextBlock VerticalAlignment="Center" Text="=" />
+                  <TextBox Text="{Binding SelectedRule.ActionValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="70" />
+                </StackPanel>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0"
+                          IsVisible="{Binding SelectedRule.ActionType, Converter={StaticResource StringEqualityToBoolConverter}, ConverterParameter=SetCoil}">
+                <TextBlock VerticalAlignment="Center" Text="Set coil" />
+                <TextBlock VerticalAlignment="Center" Text="[Address]" />
+                <NumericUpDown Value="{Binding SelectedRule.ActionAddress, Mode=TwoWay}" Minimum="0" Maximum="65535" Width="80" />
+                <TextBlock VerticalAlignment="Center" Text="=" />
+                <TextBox Text="{Binding SelectedRule.ActionValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="70"
+                         ToolTip.Tip="true/false or 1/0" />
+              </StackPanel>
+
+              <TextBlock Text="Description" Classes="rulesGroup" />
+              <TextBlock Text="{Binding DescriptionText}" TextWrapping="Wrap" Opacity="0.8" FontSize="11" />
+            </StackPanel>
+          </ScrollViewer>
+          <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                     Opacity="0.55" IsHitTestVisible="False"
+                     IsVisible="{Binding HasSelectedRule, Converter={StaticResource BoolNegateConverter}}">
+            Select a rule to edit it. Edits apply immediately to the next evaluation pass.
+          </TextBlock>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <TextBlock Grid.Row="2" Text="{Binding StatusText}" Margin="0,6,0,0" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+  </Grid>
+</UserControl>

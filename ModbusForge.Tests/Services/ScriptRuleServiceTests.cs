@@ -102,6 +102,32 @@ public class ScriptRuleServiceTests
     }
 
     [Fact]
+    public async Task Evaluate_ConditionMet_RecordsLastTriggeredAt()
+    {
+        _mockService.Setup(s => s.ReadHoldingRegistersAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<int>()))
+            .ReturnsAsync(new ushort[] { 42 });
+        using var service = CreateService();
+        var rule = MakeRule();
+        service.AddRule(rule);
+
+        Assert.Null(rule.LastTriggeredAt);
+
+        var before = DateTime.Now;
+        await service.EvaluateRulesAsync();
+        var after = DateTime.Now;
+
+        Assert.NotNull(rule.LastTriggeredAt);
+        Assert.InRange(rule.LastTriggeredAt!.Value, before, after);
+
+        // A missed condition does not erase the stamp.
+        _mockService.Setup(s => s.ReadHoldingRegistersAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<int>()))
+            .ReturnsAsync(new ushort[] { 0 });
+        var previous = rule.LastTriggeredAt;
+        await service.EvaluateRulesAsync();
+        Assert.Equal(previous, rule.LastTriggeredAt);
+    }
+
+    [Fact]
     public async Task Evaluate_UsesActiveProfileUnitId()
     {
         // Regression: rules used to read/write the static server default unit

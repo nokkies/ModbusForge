@@ -185,6 +185,7 @@ namespace ModbusForge.Avalonia
             // Scripting & signal generator
             services.AddSingleton<IScriptRunner, ScriptRunner>();
             services.AddSingleton<ScriptEditorViewModel>();
+            services.AddSingleton<ScriptRulesViewModel>();
             services.AddSingleton<SignalGeneratorViewModel>();
 
             // Visual simulation
