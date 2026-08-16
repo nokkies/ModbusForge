@@ -321,7 +321,11 @@ namespace ModbusForge.Services
         private static readonly JsonSerializerOptions MqttJsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            // Enum names instead of ordinals: a payload consumer must not need the
+            // C# enum definition to interpret "area", and names stay stable if the
+            // enum is ever reordered.
+            Converters = { new JsonStringEnumConverter() },
         };
     }
 }
