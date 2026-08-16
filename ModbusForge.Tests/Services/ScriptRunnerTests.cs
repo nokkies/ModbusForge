@@ -350,7 +350,7 @@ public class ScriptRunnerTests
     }
 
     [Fact]
-    public async Task Stop_MidRun_CancelsExecution()
+    public async Task Stop_MidRun_RaisesCancelled_NotFailed()
     {
         // Arrange
         var cmd1 = new ScriptCommand
@@ -369,8 +369,10 @@ public class ScriptRunnerTests
             DelayBetweenCommandsMs = 0
         };
 
-        bool? scriptSuccess = null;
-        _runner.ScriptCompleted += (s, success) => scriptSuccess = success;
+        bool? completedWith = null;
+        bool cancelledRaised = false;
+        _runner.ScriptCompleted += (s, success) => completedWith = success;
+        _runner.ScriptCancelled += (s, _) => cancelledRaised = true;
 
         // Act
         var runTask = _runner.RunScriptAsync(script, _mockModbusService.Object, _unitId);
@@ -380,9 +382,113 @@ public class ScriptRunnerTests
 
         await runTask;
 
-        // Assert
+        // Assert: a user stop is reported as a cancellation, NOT as a failed
+        // completion - the two must be distinguishable in the UI.
+        _mockModbusService.Verify(m => m.WriteSingleRegisterAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<ushort>()), Times.Never);
+        Assert.True(cancelledRaised);
+        Assert.True(completedWith == null, "a cancelled script must not also raise ScriptCompleted");
+        Assert.False(_runner.IsRunning);
+    }
+
+    [Fact]
+    public async Task RunScriptAsync_NullReadResult_IsAFailedCommand()
+    {
+        // Arrange: the device answers nothing - the service reports that as null.
+        var read = new ScriptCommand
+        {
+            CommandType = ScriptCommandType.ReadHoldingRegisters,
+            Address = 1,
+            Count = 2
+        };
+        var write = new ScriptCommand
+        {
+            CommandType = ScriptCommandType.WriteSingleRegister,
+            Address = 2,
+            Value = 5
+        };
+        var script = new Script("Test")
+        {
+            Commands = { read, write },
+            StopOnError = true,
+            DelayBetweenCommandsMs = 0
+        };
+
+        _mockModbusService
+            .Setup(m => m.ReadHoldingRegistersAsync(_unitId, 1, 2))
+            .ReturnsAsync((ushort[]?)null);
+
+        bool? scriptSuccess = null;
+        _runner.ScriptCompleted += (s, success) => scriptSuccess = success;
+
+        // Act
+        await _runner.RunScriptAsync(script, _mockModbusService.Object, _unitId);
+
+        // Assert: the no-response read failed, and StopOnError halted the script
+        // before the write.
+        Assert.False(read.LastSuccess);
+        Assert.Equal("no response", read.LastResult);
         _mockModbusService.Verify(m => m.WriteSingleRegisterAsync(It.IsAny<byte>(), It.IsAny<int>(), It.IsAny<ushort>()), Times.Never);
         Assert.False(scriptSuccess);
+    }
+
+    [Fact]
+    public async Task RunScriptAsync_WhenBusy_SecondStartIsIgnored()
+    {
+        // Arrange: the first script is long-running.
+        var first = new Script("First")
+        {
+            Commands = { new ScriptCommand { CommandType = ScriptCommandType.Delay, DelayMs = 500 } },
+            DelayBetweenCommandsMs = 0
+        };
+        var second = new Script("Second")
+        {
+            Commands = { new ScriptCommand
+                {
+                    CommandType = ScriptCommandType.WriteSingleRegister,
+                    Address = 9,
+                    Value = 1
+                } },
+            DelayBetweenCommandsMs = 0
+        };
+
+        // Act
+        var runTask = _runner.RunScriptAsync(first, _mockModbusService.Object, _unitId);
+        await Task.Delay(50);
+        Assert.True(_runner.IsRunning);
+
+        var secondTask = _runner.RunScriptAsync(second, _mockModbusService.Object, _unitId);
+        await secondTask; // returns immediately - it was ignored
+
+        await runTask;
+
+        // Assert: the ignored start must not have executed any of its commands.
+        _mockModbusService.Verify(
+            m => m.WriteSingleRegisterAsync(_unitId, 9, 1),
+            Times.Never,
+            "the rejected second run must not execute its commands");
         Assert.False(_runner.IsRunning);
+    }
+
+    [Fact]
+    public async Task RunScriptAsync_RepeatCountZero_RunsOnce()
+    {
+        // Arrange: a file-loaded script could carry RepeatCount 0.
+        var cmd = new ScriptCommand
+        {
+            CommandType = ScriptCommandType.Log,
+            Message = "ran"
+        };
+        var script = new Script("Test")
+        {
+            Commands = { cmd },
+            RepeatCount = 0,
+            DelayBetweenCommandsMs = 0
+        };
+
+        // Act
+        await _runner.RunScriptAsync(script, _mockModbusService.Object, _unitId);
+
+        // Assert
+        Assert.True(cmd.LastSuccess, "RepeatCount 0 must clamp to a single pass, not silently skip the script");
     }
 }

@@ -11,14 +11,15 @@ public class ScriptRunner : IScriptRunner
 {
     private readonly ILogger<ScriptRunner> _logger;
     private CancellationTokenSource? _cts;
-    private bool _isRunning;
+    private int _running; // 0 = idle, 1 = running (Interlocked)
 
-    public bool IsRunning => _isRunning;
+    public bool IsRunning => Volatile.Read(ref _running) == 1;
 
     public event EventHandler<ScriptExecutionEventArgs>? CommandExecuted;
     public event EventHandler<string>? LogMessage;
     public event EventHandler? ScriptStarted;
     public event EventHandler<bool>? ScriptCompleted;
+    public event EventHandler? ScriptCancelled;
 
     public ScriptRunner(ILogger<ScriptRunner> logger)
     {
@@ -27,30 +28,36 @@ public class ScriptRunner : IScriptRunner
 
     public async Task RunScriptAsync(Script script, IModbusService modbusService, byte unitId, CancellationToken cancellationToken = default)
     {
-        if (_isRunning)
+        // The runner is a singleton and can be reached from the UI and the REST
+        // API at the same time: claim it atomically instead of check-then-act.
+        if (Interlocked.Exchange(ref _running, 1) == 1)
         {
-            Log("Script is already running");
+            Log("Script is already running; request ignored");
             return;
         }
 
-        _isRunning = true;
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var token = _cts.Token;
+
+        // A file-loaded script could carry RepeatCount 0; 0 would silently run
+        // nothing, so clamp to a single pass.
+        var repeats = Math.Max(1, script.RepeatCount);
 
         ScriptStarted?.Invoke(this, EventArgs.Empty);
         Log($"Starting script: {script.Name}");
 
         bool allSuccess = true;
+        bool cancelled = false;
 
         try
         {
-            for (int repeat = 0; repeat < script.RepeatCount; repeat++)
+            for (int repeat = 0; repeat < repeats; repeat++)
             {
                 if (token.IsCancellationRequested) break;
 
-                if (script.RepeatCount > 1)
+                if (repeats > 1)
                 {
-                    Log($"--- Repeat {repeat + 1} of {script.RepeatCount} ---");
+                    Log($"--- Repeat {repeat + 1} of {repeats} ---");
                 }
 
                 for (int i = 0; i < script.Commands.Count; i++)
@@ -70,7 +77,7 @@ public class ScriptRunner : IScriptRunner
                     cmd.LastResult = result;
 
                     CommandExecuted?.Invoke(this, new ScriptExecutionEventArgs(
-                        cmd, i, script.Commands.Count, success, result, repeat + 1, script.RepeatCount));
+                        cmd, i, script.Commands.Count, success, result, repeat + 1, repeats));
 
                     if (!success)
                     {
@@ -93,8 +100,7 @@ public class ScriptRunner : IScriptRunner
         }
         catch (OperationCanceledException)
         {
-            Log("Script cancelled");
-            allSuccess = false;
+            cancelled = true;
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
@@ -104,11 +110,22 @@ public class ScriptRunner : IScriptRunner
         }
         finally
         {
-            _isRunning = false;
+            Interlocked.Exchange(ref _running, 0);
             _cts?.Dispose();
             _cts = null;
-            Log($"Script completed: {(allSuccess ? "SUCCESS" : "FAILED")}");
-            ScriptCompleted?.Invoke(this, allSuccess);
+
+            if (cancelled)
+            {
+                // A user stop is not a failure - the UI must say "stopped", not
+                // "FAILED", or the user cannot tell the two apart.
+                Log("Script stopped by user");
+                ScriptCancelled?.Invoke(this, EventArgs.Empty);
+            }
+            else
+            {
+                Log($"Script completed: {(allSuccess ? "SUCCESS" : "FAILED")}");
+                ScriptCompleted?.Invoke(this, allSuccess);
+            }
         }
     }
 
@@ -120,28 +137,30 @@ public class ScriptRunner : IScriptRunner
             switch (cmd.CommandType)
             {
                 case ScriptCommandType.ReadHoldingRegisters:
+                    // A null result means the device sent no response - that is a
+                    // FAILED read (and must trip StopOnError), not a successful one.
                     var holdingRegs = await modbusService.ReadHoldingRegistersAsync(unitId, cmd.Address, cmd.Count);
-                    var holdingResult = holdingRegs != null ? string.Join(", ", holdingRegs) : "null";
+                    var holdingResult = holdingRegs != null ? string.Join(", ", holdingRegs) : "no response";
                     Log($"Read Holding Registers [{cmd.Address}..{cmd.Address + cmd.Count - 1}]: {holdingResult}");
-                    return (true, holdingResult);
+                    return (holdingRegs != null, holdingResult);
 
                 case ScriptCommandType.ReadInputRegisters:
                     var inputRegs = await modbusService.ReadInputRegistersAsync(unitId, cmd.Address, cmd.Count);
-                    var inputResult = inputRegs != null ? string.Join(", ", inputRegs) : "null";
+                    var inputResult = inputRegs != null ? string.Join(", ", inputRegs) : "no response";
                     Log($"Read Input Registers [{cmd.Address}..{cmd.Address + cmd.Count - 1}]: {inputResult}");
-                    return (true, inputResult);
+                    return (inputRegs != null, inputResult);
 
                 case ScriptCommandType.ReadCoils:
                     var coils = await modbusService.ReadCoilsAsync(unitId, cmd.Address, cmd.Count);
-                    var coilResult = coils != null ? string.Join(", ", Array.ConvertAll(coils, b => b ? "ON" : "OFF")) : "null";
+                    var coilResult = coils != null ? string.Join(", ", Array.ConvertAll(coils, b => b ? "ON" : "OFF")) : "no response";
                     Log($"Read Coils [{cmd.Address}..{cmd.Address + cmd.Count - 1}]: {coilResult}");
-                    return (true, coilResult);
+                    return (coils != null, coilResult);
 
                 case ScriptCommandType.ReadDiscreteInputs:
                     var discreteInputs = await modbusService.ReadDiscreteInputsAsync(unitId, cmd.Address, cmd.Count);
-                    var discreteResult = discreteInputs != null ? string.Join(", ", Array.ConvertAll(discreteInputs, b => b ? "ON" : "OFF")) : "null";
+                    var discreteResult = discreteInputs != null ? string.Join(", ", Array.ConvertAll(discreteInputs, b => b ? "ON" : "OFF")) : "no response";
                     Log($"Read Discrete Inputs [{cmd.Address}..{cmd.Address + cmd.Count - 1}]: {discreteResult}");
-                    return (true, discreteResult);
+                    return (discreteInputs != null, discreteResult);
 
                 case ScriptCommandType.WriteSingleRegister:
                     await modbusService.WriteSingleRegisterAsync(unitId, cmd.Address, cmd.Value);
@@ -212,10 +231,10 @@ public class ScriptRunner : IScriptRunner
 
     public void Stop()
     {
-        if (_isRunning && _cts != null)
+        if (IsRunning)
         {
             Log("Stopping script...");
-            _cts.Cancel();
+            _cts?.Cancel();
         }
     }
 

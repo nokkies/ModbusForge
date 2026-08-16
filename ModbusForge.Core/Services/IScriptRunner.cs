@@ -35,6 +35,12 @@ public interface IScriptRunner
     event EventHandler<string>? LogMessage;
     event EventHandler? ScriptStarted;
     event EventHandler<bool>? ScriptCompleted;
+
+    /// <summary>
+    /// Raised when a running script is stopped by the user (as opposed to
+    /// completing, successfully or with errors).
+    /// </summary>
+    event EventHandler? ScriptCancelled;
     
     Task RunScriptAsync(Script script, IModbusService modbusService, byte unitId, CancellationToken cancellationToken = default);
     void Stop();

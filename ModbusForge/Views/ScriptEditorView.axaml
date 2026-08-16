@@ -15,12 +15,17 @@
       <CheckBox Content="Stop on Error" IsChecked="{Binding Script.StopOnError}" Margin="16,0,0,0" ToolTip.Tip="Abort the script as soon as a command fails" />
     </StackPanel>
 
+    <!-- Button enabled-state is driven by each command's CanExecute (the view model
+         raises CanExecuteChanged), not by extra IsEnabled bindings: the Can* flags
+         are computed properties that never raise PropertyChanged, so binding to
+         them left the buttons permanently disabled after the first collection
+         change. -->
     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
       <Button Content="Add" Command="{Binding AddCommand}" />
-      <Button Content="Remove" Command="{Binding RemoveCommand}" IsEnabled="{Binding CanRemoveSelected}" />
-      <Button Content="Move Up" Command="{Binding MoveUpCommand}" IsEnabled="{Binding CanMoveUp}" />
-      <Button Content="Move Down" Command="{Binding MoveDownCommand}" IsEnabled="{Binding CanMoveDown}" />
-      <Button Content="Clone" Command="{Binding CloneCommand}" IsEnabled="{Binding CanCloneSelected}" />
+      <Button Content="Remove" Command="{Binding RemoveCommand}" />
+      <Button Content="Move Up" Command="{Binding MoveUpCommand}" />
+      <Button Content="Move Down" Command="{Binding MoveDownCommand}" />
+      <Button Content="Clone" Command="{Binding CloneCommand}" />
     </StackPanel>
 
     <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,8">
@@ -101,8 +106,8 @@
     </Border>
 
     <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-      <Button Content="Run Script" Command="{Binding RunScriptCommand}" IsEnabled="{Binding CanRun}" />
-      <Button Content="Stop" Command="{Binding StopScriptCommand}" IsEnabled="{Binding IsRunning}" />
+      <Button Content="Run Script" Command="{Binding RunScriptCommand}" />
+      <Button Content="Stop" Command="{Binding StopScriptCommand}" />
       <Button Content="Save" Command="{Binding SaveScriptCommand}" />
       <Button Content="Load" Command="{Binding LoadScriptCommand}" />
       <Button Content="Clear Log" Command="{Binding ClearLogCommand}" />
