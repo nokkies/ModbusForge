@@ -45,6 +45,14 @@ namespace ModbusForge.Avalonia.Services
             }
         }
 
+        public void Post(Action action)
+        {
+            // Post always enqueues (even when already on the UI thread), which is
+            // the fire-and-forget contract: the action runs as a message, and a
+            // fault in it reaches the dispatcher's unhandled-exception pipeline.
+            global::Avalonia.Threading.Dispatcher.UIThread.Post(action, global::Avalonia.Threading.DispatcherPriority.Normal);
+        }
+
         public async Task<T> InvokeAsync<T>(Func<T> func)
         {
             if (global::Avalonia.Threading.Dispatcher.UIThread.CheckAccess())

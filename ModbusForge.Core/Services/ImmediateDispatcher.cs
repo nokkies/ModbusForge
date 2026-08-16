@@ -21,6 +21,8 @@ namespace ModbusForge.Services
             return Task.CompletedTask;
         }
 
+        public void Post(Action action) => action();
+
         public Task<T> InvokeAsync<T>(Func<T> func) => Task.FromResult(func());
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -65,6 +65,7 @@ namespace ModbusForge.Headless
                     services.AddSingleton<IValidationService, ValidationService>();
                     services.AddSingleton<MqttGatewayService>();
                     services.AddSingleton<IModbusService>(sp => CreateModbusService(sp));
+                    services.AddSingleton<UnhandledExceptionReporter>();
 
                     if (!string.IsNullOrWhiteSpace(context.Configuration["Custom:Path"]))
                     {
@@ -82,6 +83,10 @@ namespace ModbusForge.Headless
             {
                 var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
                 var logger = host.Services.GetRequiredService<ILogger<Program>>();
+
+                // Unattended hosts have no UI: faults are logged (Serilog) and
+                // appended to the crash log file next to the configuration.
+                host.Services.GetRequiredService<UnhandledExceptionReporter>().Attach();
 
                 lifetime.ApplicationStarted.Register(() =>
                     logger.LogInformation("ModbusForge.Headless started. Press Ctrl+C to stop."));

@@ -25,5 +25,7 @@ namespace ModbusForge.Avalonia.Tests
         {
             return Task.FromResult(func());
         }
+
+        public void Post(Action action) => action();
     }
 }

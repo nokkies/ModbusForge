@@ -36,6 +36,18 @@ namespace ModbusForge.Avalonia
                     DataContext = Services.GetRequiredService<MainViewModel>()
                 };
 
+                // Last-resort exception handling: report, log, and keep the user's
+                // session when the fault is recoverable (see UnhandledExceptionReporter).
+                var exceptionReporter = Services.GetRequiredService<UnhandledExceptionReporter>();
+                exceptionReporter.Attach();
+                global::Avalonia.Threading.Dispatcher.UIThread.UnhandledException += (_, e) =>
+                {
+                    if (exceptionReporter.OnDispatcherException(e.Exception))
+                    {
+                        e.Handled = true;
+                    }
+                };
+
                 var settingsService = Services.GetRequiredService<ISettingsService>();
                 _apiServerService = Services.GetRequiredService<IApiServerService>();
 
@@ -113,6 +125,9 @@ namespace ModbusForge.Avalonia
             // Connection management
             services.AddSingleton<IValidationService, ValidationService>();
             services.AddSingleton<IConnectionManager, ConnectionManager>();
+
+            // Last-resort exception reporting
+            services.AddSingleton<UnhandledExceptionReporter>();
 
             // File system, file dialogs, and per-Unit ID workspace state
             services.AddSingleton<IFileSystem, FileSystem>();
