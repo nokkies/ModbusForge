@@ -8,15 +8,22 @@
   </UserControl.KeyBindings>
 
   <Grid RowDefinitions="Auto,*,Auto">
-    <Grid Grid.Row="0" ColumnDefinitions="Auto,150,Auto,100,Auto,*" Margin="0,0,0,8">
+    <Grid Grid.Row="0" ColumnDefinitions="Auto,150,Auto,100,Auto,70,Auto,*" Margin="0,0,0,8">
       <TextBlock Grid.Column="0" Text="Area:" VerticalAlignment="Center" />
       <ComboBox Grid.Column="1"
+                AutomationProperties.Name="Decode area"
                 ItemsSource="{Binding AreaOptions}"
                 SelectedItem="{Binding Area, Mode=TwoWay}" />
       <TextBlock Grid.Column="2" Text="Address:" VerticalAlignment="Center" />
       <TextBox Grid.Column="3"
+               AutomationProperties.Name="Register or coil address"
                Text="{Binding AddressInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-      <Button Grid.Column="4" Content="{Binding ReadButtonText}" Command="{Binding ReadNowCommand}" MinWidth="90" />
+      <TextBlock Grid.Column="4" Text="Count:" VerticalAlignment="Center" />
+      <ComboBox Grid.Column="5"
+                AutomationProperties.Name="Number of registers or coils to read"
+                ItemsSource="{Binding ReadCountOptions}"
+                SelectedItem="{Binding ReadCount, Mode=TwoWay}" />
+      <Button Grid.Column="6" Content="{Binding ReadButtonText}" Command="{Binding ReadNowCommand}" MinWidth="90" />
     </Grid>
 
     <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">

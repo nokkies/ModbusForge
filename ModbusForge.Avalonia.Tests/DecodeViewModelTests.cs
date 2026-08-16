@@ -19,7 +19,8 @@ namespace ModbusForge.Avalonia.Tests
             Assert.Equal("HoldingRegister", vm.Area);
             Assert.Equal(1, vm.Address);
             Assert.Equal("1", vm.AddressInput);
-            Assert.True(vm.UseTwoRegisters);
+            Assert.Equal(2, vm.ReadCount);
+            Assert.Equal(new[] { 1, 2 }, vm.ReadCountOptions);
             Assert.NotNull(vm.ReadNowCommand);
         }
 
@@ -91,6 +92,52 @@ namespace ModbusForge.Avalonia.Tests
             var (vm, _) = CreateViewModel(connected: false);
 
             Assert.False(vm.ReadNowCommand.CanExecute(null));
+        }
+
+        [Fact]
+        public async Task ReadAsync_CountOne_ReadsSingleRegisterAndZeroPadsTheSecondWord()
+        {
+            var (vm, service) = CreateViewModel();
+            vm.ReadCount = 1;
+            service.HoldingRegistersResult = new ushort[] { 0x4149 };
+
+            await vm.ReadNowCommand.ExecuteAsync(null);
+
+            Assert.Equal(1, service.LastCount);
+            Assert.Equal("0x4149", vm.Raw16HexNone);
+            Assert.Equal("0x41490000", vm.Raw32HexNone);
+            Assert.Equal("Read 1 HR from 1", vm.Status);
+        }
+
+        [Fact]
+        public async Task ReadAsync_DecomposesFloat32InAllVariants()
+        {
+            // 12.5f == 0x41480000. Only the None variant matches that layout.
+            var (vm, service) = CreateViewModel();
+            service.HoldingRegistersResult = new ushort[] { 0x4148, 0x0000 };
+
+            await vm.ReadNowCommand.ExecuteAsync(null);
+
+            Assert.Equal("12.5", vm.Float32TextNone);
+            Assert.NotEqual("12.5", vm.Float32TextSwapB);
+            Assert.NotEqual("12.5", vm.Float32TextSwapW);
+            Assert.NotEqual("12.5", vm.Float32TextSwapBW);
+        }
+
+        [Fact]
+        public async Task ReadAsync_SwapVariantsProduceTheFourWordOrders()
+        {
+            // Registers 0x4142 0x4344 -> wire bytes A B C D. The four variants must
+            // yield the four classic 32-bit orders: ABCD, BADC, CDAB, DCBA.
+            var (vm, service) = CreateViewModel();
+            service.HoldingRegistersResult = new ushort[] { 0x4142, 0x4344 };
+
+            await vm.ReadNowCommand.ExecuteAsync(null);
+
+            Assert.Equal("0x41424344", vm.Raw32HexNone);
+            Assert.Equal("0x42414443", vm.Raw32HexSwapB);
+            Assert.Equal("0x43444142", vm.Raw32HexSwapW);
+            Assert.Equal("0x44434241", vm.Raw32HexSwapBW);
         }
 
         [Fact]
