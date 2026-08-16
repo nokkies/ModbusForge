@@ -22,6 +22,8 @@ internal sealed class MainViewModelAppStateAccessor : IAppStateAccessor
 
     public bool IsConnected => _vm.IsConnected;
     public string Mode => _vm.Mode;
+    public bool HasConnectionError => _vm.HasConnectionError;
+    public string StatusMessage => _vm.StatusMessage;
 
     public ICommand ConnectCommand => _vm.ConnectCommand;
     public ICommand DisconnectCommand => _vm.DisconnectCommand;

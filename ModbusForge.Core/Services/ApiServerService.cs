@@ -152,6 +152,20 @@ public class ApiServerService : IApiServerService
         catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
             _logger.LogError(ex, "Failed to start API Server.");
+            // A build can succeed while StartAsync fails (the common case is a
+            // port that is already in use); the half-built host must still be
+            // disposed or every failed start leaks a hosted service container.
+            if (_app is { } built)
+            {
+                try
+                {
+                    await built.DisposeAsync();
+                }
+                catch (Exception disposeEx) when (disposeEx is not (OutOfMemoryException or OperationCanceledException))
+                {
+                    _logger.LogError(disposeEx, "Error disposing API Server after a failed start.");
+                }
+            }
             _app = null;
         }
     }
@@ -190,8 +204,10 @@ public class ApiServerService : IApiServerService
         // ── Application state ─────────────────────────────────────────────────
         var appGroup = apiGroup.MapGroup("/app").WithTags("Application");
 
-        appGroup.MapGet("/status", (IApiApplicationService svc) =>
-            Results.Ok(svc.GetStatus()));
+        appGroup.MapGet("/status", async (
+            IApiApplicationService svc,
+            CancellationToken ct) =>
+            Results.Ok(await svc.GetStatusAsync(ct)));
 
         appGroup.MapPost("/connect", async (
             IApiApplicationService svc,

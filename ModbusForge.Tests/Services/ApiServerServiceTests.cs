@@ -51,7 +51,14 @@ namespace ModbusForge.Tests.Services
             return mock;
         }
 
-        private static Mock<IApiApplicationService> MakeApiApp() => new();
+        private static Mock<IApiApplicationService> MakeApiApp()
+        {
+            var mock = new Mock<IApiApplicationService>();
+            mock.Setup(a => a.GetStatus()).Returns(new ApiStatus(false, "Client"));
+            mock.Setup(a => a.GetStatusAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ApiStatus(false, "Client"));
+            return mock;
+        }
 
         private static ApiServerService MakeService(
             ISettingsService? settings = null,
@@ -503,6 +510,134 @@ namespace ModbusForge.Tests.Services
             Assert.Equal(0, fakeAccessor.PropertyChangedSubscriberCount);
         }
 
+        [Fact]
+        public async Task ConnectAsync_FailedAttempt_ReturnsActualError_WithoutWaitingForTimeout()
+        {
+            // Regression: a failed connect used to wait out the full 30-second
+            // connection-state timeout and report "Connection attempt timed
+            // out" even though the attempt had already failed. The facade must
+            // resolve on the failure and surface the real reason.
+            var fakeAccessor = new FakeAppStateAccessor
+            {
+                IsConnected = false,
+                ShouldExecuteConnect = true,
+            };
+            fakeAccessor.OnConnect = () =>
+            {
+                fakeAccessor.RaiseConnectionError("Failed to connect (connection refused).");
+                return Task.CompletedTask;
+            };
+            var svc = MakeFacade(fakeAccessor);
+
+            // A 2-second cancellation window is far below the 30 s timeout:
+            // if the facade still ignored failures, it would time out here.
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var result = await svc.ConnectAsync(cts.Token);
+            sw.Stop();
+
+            Assert.False(result.Success);
+            Assert.Contains("connection refused", result.Error);
+            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(10),
+                $"Failed connect took {sw.Elapsed}; it should resolve on the error, not the timeout.");
+            Assert.Equal(0, fakeAccessor.PropertyChangedSubscriberCount);
+        }
+
+        [Fact]
+        public async Task ConnectAsync_SuccessfulAttempt_ReturnsOk()
+        {
+            var fakeAccessor = new FakeAppStateAccessor
+            {
+                IsConnected = false,
+                ShouldExecuteConnect = true,
+            };
+            fakeAccessor.OnConnect = () =>
+            {
+                fakeAccessor.RaiseConnected();
+                return Task.CompletedTask;
+            };
+            var svc = MakeFacade(fakeAccessor);
+
+            var result = await svc.ConnectAsync(CancellationToken.None);
+
+            Assert.True(result.Success);
+            Assert.True(fakeAccessor.IsConnected);
+            Assert.Equal(0, fakeAccessor.PropertyChangedSubscriberCount);
+        }
+
+        [Fact]
+        public async Task ConnectAsync_FailureArrivingAfterSubscription_ReturnsError()
+        {
+            // The error fires AFTER the facade has subscribed (the slow-failure
+            // path, i.e. the PropertyChanged handler — not the immediate
+            // re-check).
+            var fakeAccessor = new FakeAppStateAccessor
+            {
+                IsConnected = false,
+                ShouldExecuteConnect = true,
+            };
+            fakeAccessor.OnConnect = async () =>
+            {
+                await Task.Delay(100);
+                fakeAccessor.RaiseConnectionError("late failure (host unreachable).");
+            };
+            var svc = MakeFacade(fakeAccessor);
+
+            var result = await svc.ConnectAsync(CancellationToken.None);
+
+            Assert.False(result.Success);
+            Assert.Contains("host unreachable", result.Error);
+            Assert.Equal(0, fakeAccessor.PropertyChangedSubscriberCount);
+        }
+
+        [Fact]
+        public async Task StartAsync_PortInUse_FailsCleanly_AndCanStartOnAnotherPort()
+        {
+            // Regression: when the port is taken, the half-built WebApplication
+            // must be disposed and the service must remain startable afterwards.
+            var blocker = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 15095);
+            blocker.Start();
+
+            try
+            {
+                var svc = MakeService(MakeSettings(port: 15095).Object);
+
+                // Act: start on the occupied port.
+                await svc.StartAsync();
+
+                // Assert: a clean failure, no exception, not running...
+                Assert.False(svc.IsRunning);
+
+                // ...and a subsequent start on a free port still succeeds.
+                var otherPortSvc = MakeService(MakeSettings(port: 15096).Object);
+                await otherPortSvc.StartAsync();
+                try
+                {
+                    Assert.True(otherPortSvc.IsRunning);
+                }
+                finally
+                {
+                    await otherPortSvc.StopAsync();
+                }
+            }
+            finally
+            {
+                blocker.Stop();
+            }
+        }
+
+        private static ApiApplicationService MakeFacade(IAppStateAccessor accessor)
+        {
+            return new ApiApplicationService(
+                accessor,
+                new Mock<IConnectionManager>().Object,
+                new Mock<IScriptRuleService>().Object,
+                new Mock<IConsoleLoggerService>().Object,
+                new Mock<ITrendLogger>().Object,
+                new ImmediateDispatcher(),
+                NullLogger<ApiApplicationService>.Instance);
+        }
+
         // ──────────────────────────────────────────────────────────────────────
         // Legacy pattern tests (retained from prior version)
         // ──────────────────────────────────────────────────────────────────────
@@ -587,6 +722,7 @@ namespace ModbusForge.Tests.Services
         }
 
         public ApiStatus GetStatus() => new(false, "Client");
+        public Task<ApiStatus> GetStatusAsync(CancellationToken token) => Task.FromResult(new ApiStatus(false, "Client"));
         public Task<OperationResult> DisconnectAsync(CancellationToken token) => Task.FromResult(OperationResult.Ok());
         public Task<ushort[]?> ReadHoldingRegistersAsync(byte u, ushort a, ushort c, CancellationToken t) => Task.FromResult<ushort[]?>(null);
         public Task<bool[]?> ReadCoilsAsync(byte u, ushort a, ushort c, CancellationToken t) => Task.FromResult<bool[]?>(null);
@@ -608,10 +744,15 @@ namespace ModbusForge.Tests.Services
     {
         public bool IsConnected { get; set; }
         public string Mode => "Client";
+        public bool HasConnectionError { get; set; }
+        public string StatusMessage { get; set; } = string.Empty;
 
         public bool ShouldExecuteConnect { get; set; } = false;
         public bool ShouldExecuteDisconnect { get; set; } = false;
         public bool DisconnectChangesState { get; set; } = true;
+
+        /// <summary>Invoked when ConnectCommand.Execute runs (simulates the VM's attempt).</summary>
+        public Func<Task>? OnConnect;
 
         private int _subscriberCount;
         public int PropertyChangedSubscriberCount => _subscriberCount;
@@ -625,8 +766,28 @@ namespace ModbusForge.Tests.Services
         }
 
         public ICommand ConnectCommand => new RelayCommand(
-            () => { /* Does NOT flip IsConnected – let test control that */ },
+            () =>
+            {
+                if (OnConnect is { } attempt)
+                    _ = attempt();
+            },
             () => ShouldExecuteConnect);
+
+        /// <summary>Simulates a completed, successful connection attempt.</summary>
+        public void RaiseConnected()
+        {
+            IsConnected = true;
+            _propertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsConnected)));
+        }
+
+        /// <summary>Simulates a failed connection attempt (as MainViewModel does).</summary>
+        public void RaiseConnectionError(string message)
+        {
+            StatusMessage = message;
+            HasConnectionError = true;
+            _propertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(StatusMessage)));
+            _propertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasConnectionError)));
+        }
 
         public ICommand DisconnectCommand => new RelayCommand(
             () =>

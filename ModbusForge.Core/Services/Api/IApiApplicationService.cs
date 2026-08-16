@@ -13,6 +13,12 @@ public interface IApiApplicationService
     /// <summary>Gets a snapshot of the current application status.</summary>
     ApiStatus GetStatus();
 
+    /// <summary>
+    /// Async variant of <see cref="GetStatus"/> for use from request handlers;
+    /// never blocks a request thread on the UI dispatcher.
+    /// </summary>
+    Task<ApiStatus> GetStatusAsync(CancellationToken token);
+
     /// <summary>Initiates a connection and waits up to <paramref name="token"/> / the built-in timeout.</summary>
     Task<OperationResult> ConnectAsync(CancellationToken token);
 

@@ -1769,6 +1769,11 @@ namespace ModbusForge.Avalonia.ViewModels
             if (ActiveProfile == null) return;
 
             IsBusy = true;
+            // A new attempt supersedes the previous failure; otherwise the
+            // error state (and any watcher of it, e.g. the REST API connect
+            // endpoint) would react to a stale failure while the fresh attempt
+            // is still in flight.
+            HasConnectionError = false;
             try
             {
                 await _connectionManager.ConnectProfileAsync(ActiveProfile);

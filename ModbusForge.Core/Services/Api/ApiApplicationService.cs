@@ -70,6 +70,10 @@ public sealed class ApiApplicationService : IApiApplicationService
             .GetResult();
     }
 
+    public Task<ApiStatus> GetStatusAsync(CancellationToken token)
+        => _dispatcher.InvokeAsync(
+            () => new ApiStatus(_appState.IsConnected, _appState.Mode));
+
     // ──────────────────────────────────────────────────────────────────────────
     // Connect / Disconnect
     // ──────────────────────────────────────────────────────────────────────────
@@ -93,25 +97,56 @@ public sealed class ApiApplicationService : IApiApplicationService
             if (!initiated)
                 return OperationResult.Fail("Already connected or cannot connect.");
 
-            if (_appState.IsConnected)
-                return OperationResult.Ok();
-
-            // Event-driven wait instead of polling.
+            // Event-driven wait instead of polling. The wait resolves on the
+            // OUTCOME of the attempt — success OR a recorded connection error —
+            // so a failed connect is reported with its real reason instead of
+            // hanging for the full timeout.
             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            string? failureMessage = null;
             PropertyChangedEventHandler? handler = null;
             handler = (_, e) =>
             {
                 if (e.PropertyName == nameof(IAppStateAccessor.IsConnected) && _appState.IsConnected)
                     tcs.TrySetResult(true);
+                else if (e.PropertyName == nameof(IAppStateAccessor.HasConnectionError) && _appState.HasConnectionError)
+                {
+                    failureMessage = _appState.StatusMessage;
+                    tcs.TrySetResult(false);
+                }
             };
             _appState.PropertyChanged += handler;
+
+            // Re-check the state on the dispatcher: a fast failure can fire
+            // between Execute and the subscription. null means still pending.
+            var immediate = await _dispatcher.InvokeAsync<bool?>(() =>
+            {
+                if (_appState.IsConnected) return true;
+                if (_appState.HasConnectionError)
+                {
+                    failureMessage = _appState.StatusMessage;
+                    return false;
+                }
+                return null;
+            });
+
+            if (immediate is not null)
+            {
+                // The attempt already finished (fast success or fast failure);
+                // the subscription is no longer needed.
+                _appState.PropertyChanged -= handler;
+                return immediate.Value
+                    ? OperationResult.Ok()
+                    : OperationResult.Fail(failureMessage ?? "Connection failed.");
+            }
 
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(token);
             timeoutCts.CancelAfter(ConnectionStateTimeoutMs);
             try
             {
-                await tcs.Task.WaitAsync(timeoutCts.Token);
-                return OperationResult.Ok();
+                bool connected = await tcs.Task.WaitAsync(timeoutCts.Token);
+                return connected
+                    ? OperationResult.Ok()
+                    : OperationResult.Fail(failureMessage ?? "Connection failed.");
             }
             catch (OperationCanceledException)
             {
@@ -150,7 +185,10 @@ public sealed class ApiApplicationService : IApiApplicationService
             if (!initiated)
                 return OperationResult.Fail("Already disconnected or cannot disconnect.");
 
-            if (!_appState.IsConnected)
+            // Read the outcome state on the dispatcher (never from the API
+            // thread): a fast disconnect may have completed before we could
+            // subscribe to the notification.
+            if (!await _dispatcher.InvokeAsync(() => _appState.IsConnected))
                 return OperationResult.Ok();
 
             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
