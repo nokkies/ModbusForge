@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
               xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
               xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+              xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core"
               xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters"
               x:Class="ModbusForge.Avalonia.Views.FrameInspectorView"
               x:DataType="vm:FrameInspectorViewModel">
@@ -46,11 +47,23 @@
               </DataGridTextColumn.Header>
             </DataGridTextColumn>
             <DataGridTextColumn Header="Hex" Binding="{Binding HexString}" Width="*" MinWidth="200" />
-            <DataGridTextColumn Binding="{Binding IsValidCrc, FallbackValue='-'}" Width="60">
-              <DataGridTextColumn.Header>
-                <TextBlock Text="CRC" ToolTip.Tip="CRC16 check result; empty when the transport has no checksum" />
-              </DataGridTextColumn.Header>
-            </DataGridTextColumn>
+            <DataGridTemplateColumn Width="60">
+              <DataGridTemplateColumn.Header>
+                <TextBlock Text="CRC" ToolTip.Tip="CRC16 check result: check = valid, cross = mismatch, dash = the transport has no checksum" />
+              </DataGridTemplateColumn.Header>
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate x:DataType="models:ModbusFrameLog">
+                  <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                    <TextBlock Text="&#x2713;" Foreground="#2E8B57" FontWeight="Bold"
+                               IsVisible="{Binding IsCrcValid}" ToolTip.Tip="CRC valid" />
+                    <TextBlock Text="&#x2717;" Foreground="#C62828" FontWeight="Bold"
+                               IsVisible="{Binding IsCrcInvalid}" ToolTip.Tip="CRC mismatch" />
+                    <TextBlock Text="&#x2014;" Opacity="0.5"
+                               IsVisible="{Binding IsCrcNotApplicable}" ToolTip.Tip="No checksum in this transport" />
+                  </StackPanel>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
           </DataGrid.Columns>
         </DataGrid>
       </Border>

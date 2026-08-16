@@ -39,6 +39,21 @@ namespace ModbusForge.Models
         /// </summary>
         public bool? IsValidCrc { get; set; }
 
+        /// <summary>
+        /// True when a checksum was present and valid (UI: green check).
+        /// </summary>
+        public bool IsCrcValid => IsValidCrc == true;
+
+        /// <summary>
+        /// True when a checksum was present and did not match (UI: red cross).
+        /// </summary>
+        public bool IsCrcInvalid => IsValidCrc == false;
+
+        /// <summary>
+        /// True when the transport carries no checksum to verify (UI: dash).
+        /// </summary>
+        public bool IsCrcNotApplicable => IsValidCrc == null;
+
         public byte UnitId { get; set; }
 
         public byte FunctionCode { get; set; }
