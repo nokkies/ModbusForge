@@ -9,7 +9,6 @@ namespace ModbusForge.Services
     {
         private readonly object _sync = new();
         private int _retentionMinutes;
-        private int _sampleRateMs;
         private string _exportFolder;
         private bool _isRunning;
         private readonly Dictionary<string, string> _keys = new(); // key -> displayName
@@ -19,25 +18,20 @@ namespace ModbusForge.Services
             var s = options?.Value ?? new LoggingSettings();
             s.Clamp();
             _retentionMinutes = s.RetentionMinutes;
-            _sampleRateMs = s.SampleRateMs;
             _exportFolder = string.IsNullOrWhiteSpace(s.ExportFolder) ? "Exports" : s.ExportFolder;
         }
 
         public int RetentionMinutes { get { lock (_sync) return _retentionMinutes; } }
-        public int SampleRateMs { get { lock (_sync) return _sampleRateMs; } }
         public string ExportFolder { get { lock (_sync) return _exportFolder; } }
         public bool IsRunning { get { lock (_sync) return _isRunning; } }
 
-        public void UpdateSettings(int retentionMinutes, int sampleRateMs, string? exportFolder = null)
+        public void UpdateSettings(int retentionMinutes, string? exportFolder = null)
         {
             lock (_sync)
             {
                 if (retentionMinutes < 1) retentionMinutes = 1;
                 if (retentionMinutes > 60) retentionMinutes = 60;
-                if (sampleRateMs < 50) sampleRateMs = 50;
-                if (sampleRateMs > 60000) sampleRateMs = 60000;
                 _retentionMinutes = retentionMinutes;
-                _sampleRateMs = sampleRateMs;
                 if (!string.IsNullOrWhiteSpace(exportFolder)) _exportFolder = exportFolder!;
             }
         }

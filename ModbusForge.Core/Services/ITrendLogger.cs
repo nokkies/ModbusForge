@@ -5,11 +5,12 @@ namespace ModbusForge.Services
     public interface ITrendLogger
     {
         int RetentionMinutes { get; }
-        int SampleRateMs { get; }
         string ExportFolder { get; }
         bool IsRunning { get; }
 
-        void UpdateSettings(int retentionMinutes, int sampleRateMs, string? exportFolder = null);
+        // Sampling is driven externally (each monitored entry is published at
+        // its own read period), so there is no sample rate to configure here.
+        void UpdateSettings(int retentionMinutes, string? exportFolder = null);
         void Start();
         void Stop();
 

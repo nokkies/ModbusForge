@@ -47,7 +47,6 @@ namespace ModbusForge.Avalonia.ViewModels
             new SKColor(153, 153, 153)
         };
         private int _paletteCursor;
-        private int _playWindowPoints;
 
         public ObservableCollection<ISeries> Series { get; } = new();
         public ObservableCollection<TrendSeriesItem> SeriesItems { get; } = new();
@@ -105,9 +104,6 @@ namespace ModbusForge.Avalonia.ViewModels
         private int _retentionMinutes;
 
         [ObservableProperty]
-        private int _sampleRateMs;
-
-        [ObservableProperty]
         private string _statusMessage = string.Empty;
 
         public TrendViewModel(
@@ -126,9 +122,7 @@ namespace ModbusForge.Avalonia.ViewModels
             settings.Clamp();
 
             RetentionMinutes = settings.RetentionMinutes;
-            SampleRateMs = settings.SampleRateMs;
             IsRunning = _trendLogger.IsRunning;
-            _playWindowPoints = CalculatePlayWindowPoints();
 
             _trendLogger.Added += OnAdded;
             _trendLogger.Removed += OnRemoved;
@@ -180,9 +174,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void Start()
         {
-            _trendLogger.UpdateSettings(RetentionMinutes, SampleRateMs);
+            _trendLogger.UpdateSettings(RetentionMinutes);
             RetentionMinutes = _trendLogger.RetentionMinutes;
-            SampleRateMs = _trendLogger.SampleRateMs;
             _trendLogger.Start();
             IsRunning = _trendLogger.IsRunning;
             StatusMessage = "Trend logging started.";
@@ -528,7 +521,6 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void StartFollowing()
         {
-            _playWindowPoints = CalculatePlayWindowPoints();
             IsFollowing = true;
             AlignLiveWindow();
         }
@@ -583,9 +575,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void ApplyRetention()
         {
-            _trendLogger.UpdateSettings(RetentionMinutes, SampleRateMs);
+            _trendLogger.UpdateSettings(RetentionMinutes);
             RetentionMinutes = _trendLogger.RetentionMinutes;
-            SampleRateMs = _trendLogger.SampleRateMs;
 
             foreach (var key in _valuesByKey.Keys.ToList())
             {
@@ -594,14 +585,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
             if (IsFollowing)
             {
-                _playWindowPoints = CalculatePlayWindowPoints();
                 AlignLiveWindow();
             }
-        }
-
-        private int CalculatePlayWindowPoints()
-        {
-            return Math.Max(1, (int)Math.Round((double)LiveWindowMilliseconds / Math.Max(1, _trendLogger.SampleRateMs)));
         }
 
         private void AlignLiveWindow()
@@ -614,8 +599,11 @@ namespace ModbusForge.Avalonia.ViewModels
 
             if (latest == default) return;
 
-            var window = TimeSpan.FromMilliseconds((double)_playWindowPoints * Math.Max(1, _trendLogger.SampleRateMs));
-            XAxes[0].MinLimit = latest.Subtract(window).ToOADate();
+            // Samples arrive at whatever rate the monitored entries are read,
+            // so the follow window is a fixed span of real time (60s) rather
+            // than a count of points - a point-based window made the visible
+            // span depend on settings that do not control the arrival rate.
+            XAxes[0].MinLimit = latest.AddMilliseconds(-LiveWindowMilliseconds).ToOADate();
             XAxes[0].MaxLimit = latest.ToOADate();
         }
 

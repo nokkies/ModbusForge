@@ -55,9 +55,7 @@
         <TextBlock Classes="trendGroup" VerticalAlignment="Center" Text="Sampling" />
         <TextBlock VerticalAlignment="Center" Text="Retention (min):" ToolTip.Tip="How long trend data is kept" />
         <NumericUpDown Value="{Binding RetentionMinutes}" Minimum="1" Maximum="60" Width="80" />
-        <Button Classes="trendTool" Content="Apply" ToolTip.Tip="Apply the retention and sample rate, trimming old data" Command="{Binding ApplyRetentionCommand}" />
-        <TextBlock VerticalAlignment="Center" Text="Sample (ms):" ToolTip.Tip="Sampling interval in milliseconds" />
-        <NumericUpDown Value="{Binding SampleRateMs}" Minimum="50" Maximum="60000" Width="100" />
+        <Button Classes="trendTool" Content="Apply" ToolTip.Tip="Apply the retention, trimming old data" Command="{Binding ApplyRetentionCommand}" />
         <Button Classes="trendTool" Content="{Binding LoggingButtonText}" ToolTip.Tip="Start or stop trend logging" Command="{Binding ToggleLoggingCommand}" />
       </StackPanel>
       <Separator VerticalAlignment="Center" Margin="4,2" />

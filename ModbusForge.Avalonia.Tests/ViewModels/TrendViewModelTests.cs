@@ -54,6 +54,30 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         }
 
         [Fact]
+        public void Follow_LiveWindowSpansExactlyOneMinute()
+        {
+            // Regression: the follow window was computed as a *count* of points
+            // derived from a sample-rate setting that no real sampler honors,
+            // so the visible span wobbled (e.g. 80s at a 40s rate). It must be
+            // a fixed span of real time.
+            var vm = CreateViewModel(out var logger);
+            logger.Start();
+
+            var latest = DateTime.UtcNow;
+            for (var i = 9; i >= 0; i--)
+            {
+                logger.Publish("k1", 9 - i, latest.AddSeconds(-i * 6));
+            }
+
+            vm.PlayCommand.Execute(null);
+
+            var min = DateTime.FromOADate(vm.XAxes[0].MinLimit!.Value);
+            var max = DateTime.FromOADate(vm.XAxes[0].MaxLimit!.Value);
+            Assert.InRange(max - latest, TimeSpan.FromMilliseconds(-500), TimeSpan.FromMilliseconds(500));
+            Assert.InRange((max - min) - TimeSpan.FromMinutes(1), TimeSpan.FromMilliseconds(-500), TimeSpan.FromMilliseconds(500));
+        }
+
+        [Fact]
         public void PlayAndPauseCommands_StillDriveFollowingState()
         {
             var vm = CreateViewModel(out _);
@@ -177,14 +201,12 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         private sealed class FakeTrendLogger : ITrendLogger
         {
             public int RetentionMinutes { get; private set; } = 5;
-            public int SampleRateMs { get; private set; } = 500;
             public string ExportFolder => "Exports";
             public bool IsRunning { get; private set; }
 
-            public void UpdateSettings(int retentionMinutes, int sampleRateMs, string? exportFolder = null)
+            public void UpdateSettings(int retentionMinutes, string? exportFolder = null)
             {
                 RetentionMinutes = retentionMinutes;
-                SampleRateMs = sampleRateMs;
             }
 
             public void Start()

@@ -25,7 +25,6 @@ namespace ModbusForge.Tests.Services
         {
             // Arrange
             _settings.RetentionMinutes = 10;
-            _settings.SampleRateMs = 500;
             _settings.ExportFolder = "Exports";
 
             // Act
@@ -33,7 +32,6 @@ namespace ModbusForge.Tests.Services
 
             // Assert
             Assert.Equal(10, service.RetentionMinutes);
-            Assert.Equal(500, service.SampleRateMs);
             Assert.Equal("Exports", service.ExportFolder);
             Assert.False(service.IsRunning);
         }
@@ -43,14 +41,12 @@ namespace ModbusForge.Tests.Services
         {
             // Arrange
             _settings.RetentionMinutes = 100; // Should be clamped to 60
-            _settings.SampleRateMs = 10;      // Should be clamped to 50
 
             // Act
             var service = new TrendLoggingService(_mockOptions.Object);
 
             // Assert
             Assert.Equal(60, service.RetentionMinutes);
-            Assert.Equal(50, service.SampleRateMs);
         }
 
         [Fact]
@@ -60,11 +56,10 @@ namespace ModbusForge.Tests.Services
             var service = new TrendLoggingService(_mockOptions.Object);
 
             // Act
-            service.UpdateSettings(100, 10, "NewFolder");
+            service.UpdateSettings(100, "NewFolder");
 
             // Assert
             Assert.Equal(60, service.RetentionMinutes); // Clamped
-            Assert.Equal(50, service.SampleRateMs);     // Clamped
             Assert.Equal("NewFolder", service.ExportFolder);
         }
 
@@ -76,13 +71,13 @@ namespace ModbusForge.Tests.Services
             var service = new TrendLoggingService(_mockOptions.Object);
 
             // Act
-            service.UpdateSettings(10, 500, null);
+            service.UpdateSettings(10, null);
 
             // Assert
             Assert.Equal("InitialFolder", service.ExportFolder);
 
              // Act
-            service.UpdateSettings(10, 500, "");
+            service.UpdateSettings(10, "");
 
             // Assert
             Assert.Equal("InitialFolder", service.ExportFolder);
