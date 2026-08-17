@@ -78,6 +78,37 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         }
 
         [Fact]
+        public void MaxPointsCap_RemovesOldestWhenSeriesExceedsTheLimit()
+        {
+            // Retention is set so short that it cannot trim anything; the
+            // 10k-point cap must be what bounds the series.
+            var vm = CreateViewModel(out var logger);
+            logger.UpdateSettings(1);
+            vm.ApplyRetentionCommand.Execute(null);
+            logger.Start();
+
+            var baseTime = DateTime.UtcNow;
+            const int sampleCount = 10_100;
+            for (var i = 0; i < sampleCount; i++)
+            {
+                logger.Publish("k1", i, baseTime.AddSeconds(i / 1000.0));
+            }
+
+            var values = vm.Series[0].Values as System.Collections.IEnumerable;
+            Assert.NotNull(values);
+            var count = 0;
+            foreach (var _ in values) count++;
+            Assert.Equal(TrendViewModel.MaxPointsForTest, count);
+
+            var samples = vm.SamplesForTest("k1");
+            Assert.Equal(TrendViewModel.MaxPointsForTest, samples.Count);
+            // The oldest samples are the ones dropped.
+            Assert.Equal(baseTime.AddSeconds((sampleCount - TrendViewModel.MaxPointsForTest) / 1000.0),
+                samples[0].ts,
+                TimeSpan.FromSeconds(1));
+        }
+
+        [Fact]
         public void PlayAndPauseCommands_StillDriveFollowingState()
         {
             var vm = CreateViewModel(out _);

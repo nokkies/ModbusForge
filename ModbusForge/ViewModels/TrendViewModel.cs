@@ -25,11 +25,18 @@ namespace ModbusForge.Avalonia.ViewModels
         private const int MaxPoints = 10000;
         private const int LiveWindowMilliseconds = 60000;
 
+        /// <summary>Test-only: the hard per-series point cap.</summary>
+        public static int MaxPointsForTest => MaxPoints;
+
+        /// <summary>Test-only: the raw sample list backing a series.</summary>
+        public IReadOnlyList<(DateTime ts, double v)> SamplesForTest(string key)
+            => _samplesByKey.TryGetValue(key, out var samples) ? samples : Array.Empty<(DateTime ts, double v)>();
+
         private readonly ITrendLogger _trendLogger;
         private readonly IFileDialogService? _fileDialogService;
         private readonly ILogger<TrendViewModel> _logger;
         private readonly IDispatcher _dispatcher;
-        private readonly Dictionary<string, ObservableCollection<DateTimePoint>> _valuesByKey = new();
+        private readonly Dictionary<string, TrendPoints> _valuesByKey = new();
         private readonly Dictionary<string, List<(DateTime ts, double v)>> _samplesByKey = new();
         private readonly Dictionary<string, SKColor> _colorByKey = new();
         private readonly HashSet<SKColor> _usedColors = new();
@@ -431,7 +438,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
             var name = string.IsNullOrWhiteSpace(displayName) ? key : displayName;
             var color = AcquireColor(key);
-            var values = new ObservableCollection<DateTimePoint>();
+            var values = new TrendPoints();
             _valuesByKey[key] = values;
             _samplesByKey[key] = new List<(DateTime ts, double v)>();
 
@@ -495,12 +502,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 values.Add(new DateTimePoint(timestamp, value));
                 samples.Add((timestamp, value));
                 TrimSeriesToRetention(key);
-
-                while (values.Count > MaxPoints && samples.Count > 0)
-                {
-                    values.RemoveAt(0);
-                    samples.RemoveAt(0);
-                }
+                TrimSeriesToMaxPoints(key);
 
                 if (IsFollowing)
                 {
@@ -565,11 +567,62 @@ namespace ModbusForge.Avalonia.ViewModels
                 removeCount++;
             }
 
-            removeCount = Math.Min(removeCount, Math.Min(values.Count, samples.Count));
-            for (var index = 0; index < removeCount; index++)
+            if (removeCount > 0)
             {
-                values.RemoveAt(0);
-                samples.RemoveAt(0);
+                RemoveOldest(values, samples, removeCount);
+            }
+        }
+
+        /// <summary>
+        /// Hard point cap (memory bound). Called after the retention trim.
+        /// </summary>
+        private void TrimSeriesToMaxPoints(string key)
+        {
+            if (!_valuesByKey.TryGetValue(key, out var values) || !_samplesByKey.TryGetValue(key, out var samples)) return;
+
+            var removeCount = values.Count - MaxPoints;
+            if (removeCount <= 0) return;
+
+            RemoveOldest(values, samples, Math.Min(removeCount, samples.Count));
+        }
+
+        /// <summary>
+        /// Drops the oldest <paramref name="count"/> points. Shifting the
+        /// points over and removing the tail in one call is O(n) instead of
+        /// the O(count x n) a per-index RemoveAt(0) loop would cost at 10k
+        /// points.
+        /// </summary>
+        private static void RemoveOldest(TrendPoints values, List<(DateTime ts, double v)> samples, int count)
+        {
+            if (count <= 0) return;
+
+            values.RemoveOldest(count);
+            samples.RemoveRange(0, count);
+        }
+
+        /// <summary>
+        /// Chart point collection with a bulk oldest-first removal
+        /// (<see cref="ObservableCollection{T}.RemoveRange"/> is protected).
+        /// </summary>
+        private sealed class TrendPoints : ObservableCollection<DateTimePoint>
+        {
+            public void RemoveOldest(int count)
+            {
+                if (count <= 0) return;
+
+                var remaining = Count - count;
+                for (var i = 0; i < remaining; i++)
+                {
+                    this[i] = this[i + count];
+                }
+
+                // The last `count` slots still hold the shifted-over values;
+                // drop them from the end - removing from the tail costs O(1)
+                // per item, so the whole trim stays O(n) data movement.
+                for (var i = Count - 1; i >= remaining; i--)
+                {
+                    RemoveAt(i);
+                }
             }
         }
 
