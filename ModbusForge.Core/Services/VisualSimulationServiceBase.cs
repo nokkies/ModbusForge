@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModbusForge.Data;
@@ -64,6 +65,19 @@ namespace ModbusForge.Services
         private readonly ConcurrentDictionary<string, bool> _nodeValueCache = new();
         private readonly ConcurrentDictionary<string, DateTime> _lastNodeUpdate = new();
         private readonly object _sync = new();
+
+        /// <summary>
+        /// Ensures at most one simulation tick executes at a time. The host timer
+        /// (System.Timers.Timer, AutoReset) can raise the next tick while a slow
+        /// previous tick is still running, and the effective data store can change
+        /// between ticks (connect/disconnect), so the per-store lock alone cannot
+        /// keep two ticks from running the shared engine concurrently.
+        /// </summary>
+        private readonly SemaphoreSlim _tickLock = new(1, 1);
+        private int _tickLockDisposed;
+
+        /// <summary>How long Stop waits for a running tick before resetting anyway.</summary>
+        private static readonly TimeSpan StopTickWaitTimeout = TimeSpan.FromSeconds(10);
 
         public bool IsRunning { get; protected set; }
 
@@ -183,28 +197,41 @@ namespace ModbusForge.Services
 
             OnStopTimer();
 
-            if (_config?.Nodes != null)
+            // Wait for a running tick so the reset below cannot be clobbered by a
+            // half-finished node update. If the wait times out (a tick stuck on a
+            // contended store lock), reset anyway - IsRunning is already false, so
+            // no further ticks will start.
+            var acquired = _tickLock.Wait(StopTickWaitTimeout);
+            try
             {
-                VisualNode[] nodes;
-                try
+                if (_config?.Nodes != null)
                 {
-                    nodes = _config.Nodes.ToArray();
-                }
-                catch (InvalidOperationException)
-                {
-                    nodes = Array.Empty<VisualNode>();
+                    VisualNode[] nodes;
+                    try
+                    {
+                        nodes = _config.Nodes.ToArray();
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        nodes = Array.Empty<VisualNode>();
+                    }
+
+                    foreach (var node in nodes)
+                    {
+                        node.CurrentValue = false;
+                        node.ShowLiveValues = false;
+                        node.SetSecondaryOutputs(Array.Empty<KeyValuePair<string, string>>());
+                    }
                 }
 
-                foreach (var node in nodes)
-                {
-                    node.CurrentValue = false;
-                    node.ShowLiveValues = false;
-                    node.SetSecondaryOutputs(Array.Empty<KeyValuePair<string, string>>());
-                }
+                _nodeValueCache.Clear();
+                _lastNodeUpdate.Clear();
             }
-
-            _nodeValueCache.Clear();
-            _lastNodeUpdate.Clear();
+            finally
+            {
+                if (acquired)
+                    _tickLock.Release();
+            }
 
             lock (_sync)
             {
@@ -260,6 +287,22 @@ namespace ModbusForge.Services
         }
 
         public void UpdateNodeValues()
+        {
+            // At most one tick at a time; drop overlapping ticks (see _tickLock).
+            if (!_tickLock.Wait(0))
+                return;
+
+            try
+            {
+                UpdateNodeValuesCore();
+            }
+            finally
+            {
+                _tickLock.Release();
+            }
+        }
+
+        private void UpdateNodeValuesCore()
         {
             VisualNodeEditorConfig? currentConfig;
             lock (_sync)
@@ -458,7 +501,16 @@ namespace ModbusForge.Services
             int currentHash;
             lock (_sync)
             {
-                currentHash = ComputeGraphHash(config);
+                try
+                {
+                    currentHash = ComputeGraphHash(config);
+                }
+                catch (InvalidOperationException)
+                {
+                    // The UI thread is mutating the node collection right now;
+                    // skip this tick instead of throwing.
+                    return;
+                }
 
                 if (_lastGraphHash == currentHash)
                 {
@@ -709,6 +761,16 @@ namespace ModbusForge.Services
                 sourcePort,
                 connection.TargetNodeId,
                 targetPort);
+        }
+
+        /// <summary>
+        /// Disposes the tick lock exactly once. Derived types must call this from
+        /// their Dispose implementation, after <see cref="Stop"/>.
+        /// </summary>
+        protected void DisposeTickLock()
+        {
+            if (Interlocked.Exchange(ref _tickLockDisposed, 1) == 0)
+                _tickLock.Dispose();
         }
 
         public abstract void Dispose();

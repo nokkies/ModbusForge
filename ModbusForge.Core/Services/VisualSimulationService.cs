@@ -10,7 +10,7 @@ namespace ModbusForge.Services
     /// Avalonia/headless visual simulation service. Runs the shared simulation engine
     /// on a <see cref="System.Timers.Timer"/> and updates the configured nodes.
     /// </summary>
-    public sealed class AvaloniaVisualSimulationService : VisualSimulationServiceBase<AvaloniaVisualSimulationService>
+    public class AvaloniaVisualSimulationService : VisualSimulationServiceBase<AvaloniaVisualSimulationService>
     {
         private readonly Timer _timer;
 
@@ -56,6 +56,7 @@ namespace ModbusForge.Services
         {
             Stop();
             _timer.Dispose();
+            DisposeTickLock();
         }
     }
 }

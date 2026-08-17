@@ -1,7 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
+using ModbusForge.Core.Simulation.Engine;
 using ModbusForge.Data;
 using ModbusForge.Models;
 using ModbusForge.Services;
@@ -169,12 +173,109 @@ namespace ModbusForge.Avalonia.Tests.Services
             service.Stop();
         }
 
+        /// <summary>
+        /// Exposes the protected IsRunning setter so tests can run ticks
+        /// without starting the background timer.
+        /// </summary>
+        private sealed class TestableVisualSimulationService : AvaloniaVisualSimulationService
+        {
+            public bool IsRunningForTest
+            {
+                get => IsRunning;
+                set => IsRunning = value;
+            }
+        }
+
         private static DataStore? GetDataStore(AvaloniaVisualSimulationService service)
         {
             var baseType = typeof(AvaloniaVisualSimulationService).BaseType;
             var field = baseType?.GetField("_dataStore", BindingFlags.NonPublic | BindingFlags.Instance);
 
             return field?.GetValue(service) as DataStore;
+        }
+
+        private static void SetConfig(VisualSimulationServiceBase<AvaloniaVisualSimulationService> service, VisualNodeEditorConfig config)
+        {
+            var baseType = typeof(AvaloniaVisualSimulationService).BaseType;
+            var field = baseType!.GetField("_config", BindingFlags.NonPublic | BindingFlags.Instance);
+            field!.SetValue(service, config);
+        }
+
+        private static int GetEngineCycleCount(VisualSimulationServiceBase<AvaloniaVisualSimulationService> service)
+        {
+            var baseType = typeof(AvaloniaVisualSimulationService).BaseType;
+            var field = baseType!.GetField("_engine", BindingFlags.NonPublic | BindingFlags.Instance);
+            return ((ExecutionEngine)field!.GetValue(service)!).CycleCount;
+        }
+
+        [Fact]
+        public async Task UpdateNodeValues_ConcurrentTicks_RunEngineExactlyOnce()
+        {
+            // The host timer can raise a tick while the previous one is still
+            // running (System.Timers.Timer, AutoReset). The shared engine and
+            // node state must therefore tolerate overlapping ticks: at most one
+            // executes, the rest are dropped.
+            var service = new TestableVisualSimulationService();
+            var config = new VisualNodeEditorConfig
+            {
+                Nodes = new ObservableCollection<VisualNode>
+                {
+                    new() { Id = "n1", Name = "N1", ElementType = PlcElementType.InputBool }
+                }
+            };
+            SetConfig(service, config);
+            service.IsRunningForTest = true;
+
+            var dataStore = GetDataStore(service)!;
+
+            // Holding the store lock makes the first tick (the one that wins the
+            // re-entrancy guard) block inside it, while every tick started in the
+            // same window must be dropped instead of queueing a second engine run.
+            var tasks = new List<Task>();
+            lock (dataStore)
+            {
+                for (int i = 0; i < 4; i++)
+                    tasks.Add(Task.Run(() => service.UpdateNodeValues()));
+                Thread.Sleep(2000);
+            }
+            await Task.WhenAll(tasks);
+
+            Assert.Equal(1, GetEngineCycleCount(service));
+        }
+
+        [Fact]
+        public void Stop_ClearsLiveNodeValues()
+        {
+            var service = new TestableVisualSimulationService();
+            var config = new VisualNodeEditorConfig
+            {
+                Nodes = new ObservableCollection<VisualNode>
+                {
+                    new()
+                    {
+                        Id = "in1",
+                        Name = "IN",
+                        ElementType = PlcElementType.InputBool,
+                        Input1Address = new PlcAddressReference
+                        {
+                            Area = PlcArea.Coil,
+                            Address = 1
+                        }
+                    }
+                }
+            };
+            SetConfig(service, config);
+
+            var dataStore = GetDataStore(service)!;
+            dataStore.CoilDiscretes[1] = true;
+
+            service.IsRunningForTest = true;
+            service.UpdateNodeValues();
+            Assert.True(service.GetNodeValue("in1"));
+
+            service.Stop();
+
+            Assert.False(service.GetNodeValue("in1"));
         }
     }
 }
