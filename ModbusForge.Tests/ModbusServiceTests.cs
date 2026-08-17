@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -115,6 +116,32 @@ namespace ModbusForge.Tests
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.AtLeastOnce);
+        }
+
+        [Fact]
+        public async Task WriteSingleRegisterAsync_SlaveException_KeepsConnection()
+        {
+            // A slave exception response (e.g. the device rejected the address) is a
+            // valid Modbus answer - it must not tear the connection down.
+            _modbusMasterMock
+                .Setup(m => m.WriteSingleRegister(It.IsAny<byte>(), It.IsAny<ushort>(), It.IsAny<ushort>()))
+                .Throws(new SlaveException("Slave returned exception code 2 (ILLEGAL DATA ADDRESS)"));
+
+            await _service.WriteSingleRegisterAsync(1, 100, 42);
+
+            Assert.True(_service.IsConnected, "Slave exception must not disconnect the TCP session");
+        }
+
+        [Fact]
+        public async Task WriteSingleRegisterAsync_TransportError_Disconnects()
+        {
+            _modbusMasterMock
+                .Setup(m => m.WriteSingleRegister(It.IsAny<byte>(), It.IsAny<ushort>(), It.IsAny<ushort>()))
+                .Throws(new IOException("socket closed"));
+
+            await _service.WriteSingleRegisterAsync(1, 100, 42);
+
+            Assert.False(_service.IsConnected, "A transport failure must disconnect the TCP session");
         }
 
         public void Dispose()

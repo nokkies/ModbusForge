@@ -474,6 +474,13 @@ namespace ModbusForge.Services
                         if (_client != null)
                             writeAction(_client, protocolAddress);
                     }
+                    catch (NModbus.SlaveException ex)
+                    {
+                        // A slave exception response is a valid Modbus answer (e.g. the
+                        // device rejected the address), not a dead line - keep the
+                        // connection, as ExecuteMasterAsync and the chunked executor do.
+                        _logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
+                    }
                     catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
                         _logger.LogError(ex, errorLogContext);
