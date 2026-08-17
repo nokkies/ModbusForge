@@ -38,6 +38,14 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public ObservableCollection<string> OutputLog { get; } = new();
 
+        /// <summary>
+        /// Every <see cref="ScriptCommandType"/>, for the grid's Type combo box.
+        /// Free-text enum editing let users type plausible-but-invalid names
+        /// (e.g. "WriteHoldingRegisters") that only failed at commit time; the
+        /// combo makes the valid set visible and eliminates that class of error.
+        /// </summary>
+        public Array CommandTypes { get; } = Enum.GetValues(typeof(ScriptCommandType));
+
         public bool CanRun => !IsRunning && Script.Commands.Count > 0;
         public bool CanRemoveSelected => SelectedCommand != null;
         public bool CanCloneSelected => SelectedCommand != null;

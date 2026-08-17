@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+              xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core"
              x:Class="ModbusForge.Avalonia.Views.ScriptEditorView"
              x:DataType="vm:ScriptEditorViewModel">
 
@@ -29,8 +30,13 @@
     </StackPanel>
 
     <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,8">
-      <DataGrid ItemsSource="{Binding Script.Commands}"
+      <!-- Tag carries the command-type list to the Type column's in-cell
+           ComboBoxes: cell templates live in their own name scope, so the
+           binding reaches it via the visual tree ($parent[DataGrid].Tag). -->
+      <DataGrid x:Name="CommandsGrid"
+                ItemsSource="{Binding Script.Commands}"
                 SelectedItem="{Binding SelectedCommand}"
+                Tag="{Binding CommandTypes}"
                 AutoGenerateColumns="False"
                 GridLinesVisibility="All">
         <DataGrid.Columns>
@@ -39,7 +45,20 @@
               <TextBlock Text="Enabled" ToolTip.Tip="Include this command when the script runs" />
             </DataGridCheckBoxColumn.Header>
           </DataGridCheckBoxColumn>
-          <DataGridTextColumn Header="Type" Binding="{Binding CommandType}" Width="180" />
+          <!-- Combo instead of free text: the command type is a closed enum,
+               and typing invalid names (e.g. "WriteHoldingRegisters") used to
+               fail only at commit with a validation marker. Avalonia has no
+               DataGridComboBoxColumn, so this is a template column whose cell
+               is an interactive ComboBox bound to the row. -->
+          <DataGridTemplateColumn Header="Type" Width="180">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="models:ScriptCommand">
+                <ComboBox HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                          ItemsSource="{Binding $parent[DataGrid].Tag}"
+                          SelectedItem="{Binding CommandType}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
           <DataGridTextColumn Binding="{Binding Address}" Width="80">
             <DataGridTextColumn.Header>
               <TextBlock Text="Address" ToolTip.Tip="Target register or coil address" />

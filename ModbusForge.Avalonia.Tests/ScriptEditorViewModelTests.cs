@@ -41,6 +41,25 @@ namespace ModbusForge.Avalonia.Tests
         }
 
         [Fact]
+        public void CommandTypes_ContainsEveryCommandType_ExactlyOnce()
+        {
+            // The grid's Type combo binds to this list; it must present the
+            // complete closed set so no valid command is unselectable.
+            var types = (Array)_vm.CommandTypes;
+
+            Assert.Equal(typeof(ScriptCommandType), types.GetType().GetElementType());
+            Assert.Equal(Enum.GetValues<ScriptCommandType>().Length, types.Length);
+            Assert.Equal(
+                new[] { ScriptCommandType.ReadHoldingRegisters, ScriptCommandType.ReadInputRegisters,
+                        ScriptCommandType.ReadCoils, ScriptCommandType.ReadDiscreteInputs,
+                        ScriptCommandType.WriteSingleRegister, ScriptCommandType.WriteSingleCoil,
+                        ScriptCommandType.WriteMultipleRegisters, ScriptCommandType.MaskWriteRegister,
+                        ScriptCommandType.ReadWriteMultipleRegisters, ScriptCommandType.ReadDeviceIdentification,
+                        ScriptCommandType.Delay, ScriptCommandType.Log, ScriptCommandType.Loop },
+                types.Cast<ScriptCommandType>());
+        }
+
+        [Fact]
         public void AddCommand_CanBeReused_ToBuildACommandList()
         {
             _vm.AddCommand.Execute(null);
