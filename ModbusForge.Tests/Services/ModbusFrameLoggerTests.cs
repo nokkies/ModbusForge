@@ -89,12 +89,16 @@ namespace ModbusForge.Tests.Services
         public void WithDispatcher_MutationRunsOnTheDispatcherThread()
         {
             // A stand-in UI dispatcher: Post enqueues onto a queue drained by a
-            // dedicated background thread.
+            // dedicated background thread. The drain loop parks on a gate until
+            // the test releases it, so the "not applied yet" assertion below is
+            // deterministic instead of racing the dispatcher thread.
             var queue = new BlockingCollection<Action>();
+            var drainGate = new ManualResetEventSlim(false);
             var dispatcherThread = new Thread(() =>
             {
                 foreach (var action in queue.GetConsumingEnumerable())
                 {
+                    drainGate.Wait();
                     action();
                 }
             })
@@ -110,10 +114,12 @@ namespace ModbusForge.Tests.Services
 
             logger.Log(FrameDirection.Rx, new byte[] { 1 });
 
-            // Not applied synchronously on the capturing thread...
+            // Not applied synchronously on the capturing thread (the dispatcher
+            // thread is parked on the gate, so nothing can have run yet)...
             Assert.Empty(logger.Frames);
 
-            // ...but applied by the dispatcher thread.
+            // ...and applied by the dispatcher thread once released.
+            drainGate.Set();
             var deadline = DateTime.UtcNow.AddSeconds(5);
             while (logger.Frames.Count == 0 && DateTime.UtcNow < deadline)
             {

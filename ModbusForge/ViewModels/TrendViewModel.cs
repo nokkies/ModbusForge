@@ -60,18 +60,34 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public Axis[] XAxes { get; } =
         {
-            new Axis
+            CreateTimeAxis()
+        };
+
+        /// <summary>
+        /// Builds the shared time axis. <c>DateTimePoint</c> exposes
+        /// <see cref="DateTime.Ticks"/> as the X coordinate, so the axis is
+        /// expressed in second units: with <c>UnitWidth</c> one second the
+        /// chart's step algorithm counts clean second steps (1/2/5 x 10^n),
+        /// and <c>MinStep</c> one second keeps zoomed-in labels from
+        /// repeating the same HH:mm:ss. Labelers must be total: LiveCharts
+        /// can pass NaN/±infinity (degenerate axis domain, e.g. a
+        /// single-sample series) or out-of-range coordinates, and the
+        /// DateTime ticks constructor throws for those. The labeler reads
+        /// the axis' visible span to decide between time-only and dated
+        /// labels.
+        /// </summary>
+        private static Axis CreateTimeAxis()
+        {
+            var axis = new Axis
             {
                 Name = "Time",
                 LabelsRotation = 15,
-                MinStep = 1,
-                // Labelers must be total: LiveCharts can pass NaN/±infinity
-                // (degenerate axis domain, e.g. a single-sample series) or
-                // out-of-range coordinates, and DateTime.FromOADate throws
-                // for those.
-                Labeler = ChartAxisTimeLabels.Time
-            }
-        };
+                UnitWidth = TimeSpan.TicksPerSecond,
+                MinStep = TimeSpan.TicksPerSecond
+            };
+            axis.Labeler = value => ChartAxisTimeLabels.Time(value, axis);
+            return axis;
+        }
 
         public Axis[] YAxes { get; } =
         {
@@ -559,8 +575,22 @@ namespace ModbusForge.Avalonia.ViewModels
         private void TrimSeriesToRetention(string key)
         {
             if (!_valuesByKey.TryGetValue(key, out var values) || !_samplesByKey.TryGetValue(key, out var samples)) return;
+            if (samples.Count == 0) return;
 
-            var cutoff = DateTime.UtcNow.AddMinutes(-Math.Max(1, RetentionMinutes));
+            // Retention is relative to the newest sample in this series, not
+            // to wall-clock time. The main use of Import CSV is to re-import
+            // previously exported (historical) captures; a wall-clock cutoff
+            // would trim every imported sample immediately and the user would
+            // see an empty chart with no explanation. For live series the
+            // newest sample is effectively "now", so live behaviour is
+            // unchanged.
+            var newest = samples[0].ts;
+            for (var i = 1; i < samples.Count; i++)
+            {
+                if (samples[i].ts > newest) newest = samples[i].ts;
+            }
+
+            var cutoff = newest.AddMinutes(-Math.Max(1, RetentionMinutes));
             var removeCount = 0;
             while (removeCount < samples.Count && samples[removeCount].ts < cutoff)
             {
@@ -656,8 +686,11 @@ namespace ModbusForge.Avalonia.ViewModels
             // so the follow window is a fixed span of real time (60s) rather
             // than a count of points - a point-based window made the visible
             // span depend on settings that do not control the arrival rate.
-            XAxes[0].MinLimit = latest.AddMilliseconds(-LiveWindowMilliseconds).ToOADate();
-            XAxes[0].MaxLimit = latest.ToOADate();
+            // The limits must be in the series' X coordinate space (DateTime
+            // ticks, via DateTimePoint); OADate limits here used to clamp the
+            // view to a window billions of coordinates away from the data.
+            XAxes[0].MinLimit = latest.AddMilliseconds(-LiveWindowMilliseconds).Ticks;
+            XAxes[0].MaxLimit = latest.Ticks;
         }
 
         private SKColor AcquireColor(string key)

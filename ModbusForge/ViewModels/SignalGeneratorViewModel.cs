@@ -79,14 +79,28 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public Axis[] XAxes { get; } =
         {
-            new Axis
+            CreateTimeAxis()
+        };
+
+        /// <summary>
+        /// Builds the time axis. The series uses <c>DateTimePoint</c>, whose
+        /// X coordinate is <see cref="DateTime.Ticks"/>, so the axis is
+        /// expressed in second units (see the trend view's axis for the
+        /// full rationale).
+        /// </summary>
+        private static Axis CreateTimeAxis()
+        {
+            var axis = new Axis
             {
                 LabelsRotation = 15,
-                // Total: see ChartAxisTimeLabels (LiveCharts can pass NaN or
-                // out-of-range coordinates for degenerate axis domains).
-                Labeler = ChartAxisTimeLabels.Time
-            }
-        };
+                UnitWidth = TimeSpan.TicksPerSecond,
+                MinStep = TimeSpan.TicksPerSecond
+            };
+            // Total: LiveCharts can pass NaN or out-of-range coordinates for
+            // degenerate axis domains - see ChartAxisTimeLabels.
+            axis.Labeler = value => ChartAxisTimeLabels.Time(value, axis);
+            return axis;
+        }
 
         public Axis[] YAxes { get; } =
         {

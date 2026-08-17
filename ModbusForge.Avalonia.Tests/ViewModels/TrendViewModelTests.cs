@@ -71,8 +71,10 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
 
             vm.PlayCommand.Execute(null);
 
-            var min = DateTime.FromOADate(vm.XAxes[0].MinLimit!.Value);
-            var max = DateTime.FromOADate(vm.XAxes[0].MaxLimit!.Value);
+            // Limits are in the series' X coordinate space: DateTime ticks
+            // (DateTimePoint exposes DateTime.Ticks), not OADate.
+            var min = new DateTime((long)vm.XAxes[0].MinLimit!.Value);
+            var max = new DateTime((long)vm.XAxes[0].MaxLimit!.Value);
             Assert.InRange(max - latest, TimeSpan.FromMilliseconds(-500), TimeSpan.FromMilliseconds(500));
             Assert.InRange((max - min) - TimeSpan.FromMinutes(1), TimeSpan.FromMilliseconds(-500), TimeSpan.FromMilliseconds(500));
         }
@@ -230,13 +232,85 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         }
 
         [Fact]
+        public async Task ImportCsv_HistoricalData_SurvivesRetentionTrim()
+        {
+            // Regression: retention was measured against wall-clock time, so
+            // re-importing a previously exported (historical) CSV - the main
+            // use of Import CSV - trimmed every sample immediately and the
+            // chart stayed empty with no explanation. Retention must be
+            // relative to the newest sample in the series.
+            var path = Path.Combine(Path.GetTempPath(), $"trend-import-history-{Guid.NewGuid():N}.csv");
+            var t0 = DateTime.UtcNow.AddDays(-2);
+            try
+            {
+                // Both samples sit within the 5-minute window behind the
+                // import's tail (FakeTrendLogger's default retention).
+                await File.WriteAllTextAsync(path,
+                    "series,timestamp_utc,value" + Environment.NewLine +
+                    $"history,{t0:O},10" + Environment.NewLine +
+                    $"history,{t0.AddSeconds(30):O},20" + Environment.NewLine);
+
+                var vm = CreateViewModel(out var logger);
+                logger.Start();
+
+                await vm.ImportCsvAsync(path);
+
+                var samples = vm.SamplesForTest("Imported:" + Path.GetFileNameWithoutExtension(path));
+                Assert.Equal(2, samples.Count);
+                Assert.Equal(10, samples[0].v);
+                Assert.Equal(20, samples[1].v);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public async Task ImportCsv_DataOlderThanRetentionWindow_IsStillTrimmed()
+        {
+            // The trim still applies to historical data - but relative to the
+            // newest imported sample, so only the portion older than the
+            // retention window behind the import's tail is dropped.
+            var path = Path.Combine(Path.GetTempPath(), $"trend-import-stale-{Guid.NewGuid():N}.csv");
+            var t0 = DateTime.UtcNow.AddDays(-2);
+            try
+            {
+                // FakeTrendLogger defaults to a 5-minute retention window.
+                await File.WriteAllTextAsync(path,
+                    "series,timestamp_utc,value" + Environment.NewLine +
+                    $"stale,{t0:O},1" + Environment.NewLine +
+                    $"stale,{t0.AddMinutes(3):O},2" + Environment.NewLine +
+                    $"stale,{t0.AddMinutes(10):O},3" + Environment.NewLine +
+                    $"stale,{t0.AddMinutes(15):O},4" + Environment.NewLine);
+
+                var vm = CreateViewModel(out var logger);
+                logger.Start();
+
+                await vm.ImportCsvAsync(path);
+
+                var samples = vm.SamplesForTest("Imported:" + Path.GetFileNameWithoutExtension(path));
+                // Newest sample is t0+15m; the 5-minute window keeps
+                // t0+10m and t0+15m and drops t0 and t0+3m.
+                Assert.Equal(2, samples.Count);
+                Assert.Equal(3, samples[0].v);
+                Assert.Equal(4, samples[1].v);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
         public void XAxisLabeler_NeverThrows_ForDegenerateChartCoordinates()
         {
             // Regression: with a degenerate axis domain (for example a series
             // whose samples all share one timestamp, or an empty hover
             // projection) LiveCharts hands NaN/±infinity/out-of-range
-            // coordinates to the axis labeler. DateTime.FromOADate throws for
-            // those, which crashed the UI dispatcher with a full crash dialog.
+            // coordinates to the axis labeler. The DateTime ticks
+            // constructor throws for those, which used to crash the UI
+            // dispatcher with a full crash dialog.
             var vm = CreateViewModel(out _);
             var labeler = vm.XAxes[0].Labeler;
             Assert.NotNull(labeler);
@@ -246,11 +320,47 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             Assert.Equal(string.Empty, labeler(double.NegativeInfinity));
             Assert.Equal(string.Empty, labeler(double.MaxValue));
             Assert.Equal(string.Empty, labeler(double.MinValue));
-            Assert.Equal(string.Empty, labeler(-657434.0001));  // before 100-01-01
-            Assert.Equal(string.Empty, labeler(2958465.0001));  // after 9999-12-31
+            Assert.Equal(string.Empty, labeler(-1.0));          // before 0001-01-01
+            Assert.Equal(string.Empty, labeler(1.0e19));        // after 9999-12-31
 
+            // Axis coordinates are DateTime ticks (DateTimePoint's X), so a
+            // 1970-epoch import formats as its real clock time, not as an
+            // OADate day count.
             var known = DateTime.Parse("2026-08-17T12:34:56");
-            Assert.Equal("12:34:56", labeler(known.ToOADate()));
+            Assert.Equal("12:34:56", labeler(known.Ticks));
+            Assert.Equal("10:00:00", labeler(new DateTime(1970, 1, 1, 10, 0, 0, DateTimeKind.Utc).Ticks));
+        }
+
+        [Fact]
+        public void TimeLabeler_FormatsByVisibleSpan()
+        {
+            // Under a day the label is time-only; a visible span of a day or
+            // more repeats clock times, so the month/day is added.
+            var ticks = DateTime.Parse("2026-08-17T12:34:56").Ticks;
+
+            Assert.Equal("12:34:56", ChartAxisTimeLabels.Time(ticks, 0.5));
+            Assert.Equal("12:34:56", ChartAxisTimeLabels.Time(ticks, (double?)null));
+            Assert.Equal("12:34:56", ChartAxisTimeLabels.Time(ticks));
+            Assert.Equal("08-17 12:34", ChartAxisTimeLabels.Time(ticks, 1.0));
+            Assert.Equal("08-17 12:34", ChartAxisTimeLabels.Time(ticks, 3.5));
+
+            // The guards stay total regardless of the span.
+            Assert.Equal(string.Empty, ChartAxisTimeLabels.Time(double.NaN, 3.5));
+            Assert.Equal(string.Empty, ChartAxisTimeLabels.Time(-1.0, 0.5));
+        }
+
+        [Fact]
+        public void TimeAxis_UsesSecondUnitsForSteps()
+        {
+            // Regression: the axis once ran on raw DateTime ticks with
+            // MinStep = 1 OADate-day, and the follow-window limits were set
+            // in OADate while the data was in ticks - the X axis rendered
+            // without labels and follow clamped the view away from the data.
+            // The axis must be expressed in second units so the chart's
+            // clean-step algorithm counts seconds.
+            var vm = CreateViewModel(out _);
+            Assert.Equal(TimeSpan.TicksPerSecond, vm.XAxes[0].UnitWidth);
+            Assert.Equal(TimeSpan.TicksPerSecond, vm.XAxes[0].MinStep);
         }
 
         private sealed class FakeTrendLogger : ITrendLogger
