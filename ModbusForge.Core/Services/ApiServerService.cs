@@ -19,7 +19,6 @@ namespace ModbusForge.Services;
 public class ApiServerService : IApiServerService
 {
     // ─── Constants ────────────────────────────────────────────────────────────
-    private const int ConnectionStateTimeoutMs = 30_000;
     private const int MaxRequestBodyBytes = 1 * 1024 * 1024; // 1 MB
 
     // Modbus protocol limits
@@ -284,7 +283,7 @@ public class ApiServerService : IApiServerService
                 return Results.BadRequest(ApiError.BadRequest(
                     "address + length exceeds maximum address 65535."));
 
-            var status = svc.GetStatus();
+            var status = await svc.GetStatusAsync(ct);
             if (!status.IsConnected)
                 return Results.BadRequest(ApiError.BadRequest("Not connected."));
 
@@ -328,7 +327,7 @@ public class ApiServerService : IApiServerService
                 return Results.BadRequest(ApiError.BadRequest(
                     "address + length exceeds maximum address 65535."));
 
-            var status = svc.GetStatus();
+            var status = await svc.GetStatusAsync(ct);
             if (!status.IsConnected)
                 return Results.BadRequest(ApiError.BadRequest("Not connected."));
 

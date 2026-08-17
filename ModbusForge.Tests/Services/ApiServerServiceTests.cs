@@ -54,7 +54,6 @@ namespace ModbusForge.Tests.Services
         private static Mock<IApiApplicationService> MakeApiApp()
         {
             var mock = new Mock<IApiApplicationService>();
-            mock.Setup(a => a.GetStatus()).Returns(new ApiStatus(false, "Client"));
             mock.Setup(a => a.GetStatusAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new ApiStatus(false, "Client"));
             return mock;
@@ -310,7 +309,8 @@ namespace ModbusForge.Tests.Services
         public async Task ModbusRead_Exception_Returns500_NotRawMessage()
         {
             var appMock = MakeApiApp();
-            appMock.Setup(a => a.GetStatus()).Returns(new ApiStatus(true, "Client"));
+            appMock.Setup(a => a.GetStatusAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ApiStatus(true, "Client"));
             appMock.Setup(a => a.ReadHoldingRegistersAsync(
                     It.IsAny<byte>(), It.IsAny<ushort>(), It.IsAny<ushort>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new InvalidOperationException("secret internal detail"));
@@ -390,7 +390,6 @@ namespace ModbusForge.Tests.Services
         public async Task ReadEndpoints_DoNotRequireApiKey_WhenAuthDisabled()
         {
             var appMock = MakeApiApp();
-            appMock.Setup(a => a.GetStatus()).Returns(new ApiStatus(false, "Client"));
 
             var settings = MakeSettings(port: 15093, enableAuth: false);
             var svc = MakeService(settings.Object, appMock.Object);
@@ -721,7 +720,6 @@ namespace ModbusForge.Tests.Services
             }
         }
 
-        public ApiStatus GetStatus() => new(false, "Client");
         public Task<ApiStatus> GetStatusAsync(CancellationToken token) => Task.FromResult(new ApiStatus(false, "Client"));
         public Task<OperationResult> DisconnectAsync(CancellationToken token) => Task.FromResult(OperationResult.Ok());
         public Task<ushort[]?> ReadHoldingRegistersAsync(byte u, ushort a, ushort c, CancellationToken t) => Task.FromResult<ushort[]?>(null);
