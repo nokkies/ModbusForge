@@ -22,6 +22,7 @@ namespace ModbusForge.Services
         private readonly CancellationTokenSource _cts = new();
         private readonly object _gate = new();
         private readonly List<ReceivedPublish> _published = new();
+        private readonly TimeSpan _connAckDelay;
         private TcpClient? _client;
         private bool _disposed;
 
@@ -36,8 +37,13 @@ namespace ModbusForge.Services
         /// <summary>How many clients have connected so far.</summary>
         public int ConnectionCount { get; private set; }
 
-        public FakeMqttBroker()
+        /// <param name="connAckDelay">
+        /// Optional delay before the CONNACK reply, to simulate a slow broker
+        /// and make connect-in-flight shutdowns deterministic in tests.
+        /// </param>
+        public FakeMqttBroker(TimeSpan? connAckDelay = null)
         {
+            _connAckDelay = connAckDelay ?? TimeSpan.Zero;
             _listener = new TcpListener(IPAddress.Loopback, 0); // port 0: pick a free ephemeral port
             _listener.Start();
             Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
@@ -111,6 +117,8 @@ namespace ModbusForge.Services
                     case 0x10: // CONNECT
                         {
                             await DrainAsync(stream, remaining, token).ConfigureAwait(false);
+                            if (_connAckDelay > TimeSpan.Zero)
+                                await Task.Delay(_connAckDelay, token).ConfigureAwait(false);
                             // CONNACK: session not present, connection accepted
                             await stream.WriteAsync(new byte[] { 0x20, 0x02, 0x00, 0x00 }, token).ConfigureAwait(false);
                             break;

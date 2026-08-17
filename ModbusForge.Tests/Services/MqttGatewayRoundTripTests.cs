@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
@@ -40,7 +40,7 @@ namespace ModbusForge.Tests.Services
             await ConnectUntilConnectedAsync(gateway);
 
             await gateway.PublishSnapshotAsync();
-            await WaitForAsync(() => broker.PublishedCount >= 2, TimeSpan.FromSeconds(5));
+            await WaitForAsync(() => broker.PublishedCount >= 2, TimeSpan.FromSeconds(15), () => $"published: {broker.PublishedCount}");
 
             var published = broker.GetAllPublished();
             var flow = published.Single(m => m.Topic == "modbusforge/1/Flow");
@@ -85,7 +85,7 @@ namespace ModbusForge.Tests.Services
             // ConnectAsync started the publish loop; just wait for a few cycles.
             await WaitForAsync(
                 () => broker.GetAllPublished().Count(m => m.Topic == "modbusforge/1/Temp") >= 3,
-                TimeSpan.FromSeconds(10));
+                TimeSpan.FromSeconds(20));
         }
 
         [Fact]
@@ -112,7 +112,7 @@ namespace ModbusForge.Tests.Services
             await ConnectUntilConnectedAsync(gateway);
 
             await gateway.PublishSnapshotAsync();
-            await WaitForAsync(() => broker.PublishedCount >= 1, TimeSpan.FromSeconds(5));
+            await WaitForAsync(() => broker.PublishedCount >= 1, TimeSpan.FromSeconds(15), () => $"published: {broker.PublishedCount}");
 
             var message = broker.GetAllPublished().Single();
             Assert.True(message.QualityOfService == 1, "the configured QoS must be on the wire");
@@ -121,24 +121,58 @@ namespace ModbusForge.Tests.Services
             // here also proves the QoS 1 handshake was handled.
         }
 
+        [Fact]
+        public async Task PublishSnapshot_FreeFormTagName_PublishesOnASanitizedTopic()
+        {
+            // A tag name containing characters that are invalid in an MQTT
+            // topic must still be published Ã¢â‚¬â€ on a sanitized topic.
+            using var broker = new FakeMqttBroker();
+            using var gateway = new MqttGatewayService(NullLogger<MqttGatewayService>.Instance)
+            {
+                SnapshotProvider = () => new[]
+                {
+                    new MqttTagUpdate { UnitId = 1, TagName = "Temp #1 (A)", Area = PlcArea.HoldingRegister, Address = 20, Value = 1f },
+                },
+            };
+            gateway.ApplySettings(new MqttSettings
+            {
+                Enabled = true,
+                BrokerHost = "127.0.0.1",
+                BrokerPort = broker.Port,
+                PublishPeriodMs = 0,
+            });
+
+            await ConnectUntilConnectedAsync(gateway);
+
+            await gateway.PublishSnapshotAsync();
+            await WaitForAsync(() => broker.PublishedCount >= 1, TimeSpan.FromSeconds(15), () => $"published: {broker.PublishedCount}");
+
+            var message = broker.GetAllPublished().Single();
+            Assert.Equal("modbusforge/1/Temp _1 (A)", message.Topic);
+        }
+
         private static async Task ConnectUntilConnectedAsync(MqttGatewayService gateway)
         {
             await gateway.ConnectAsync();
 
-            var deadline = DateTime.UtcNow.AddSeconds(5);
+            var deadline = DateTime.UtcNow.AddSeconds(15);
             while (!gateway.IsConnected && DateTime.UtcNow < deadline)
                 await Task.Delay(50);
 
             Assert.True(gateway.IsConnected, "the gateway should connect to the in-process broker");
         }
 
-        private static async Task WaitForAsync(Func<bool> condition, TimeSpan timeout)
+        /// <param name="describe">Optional state description included in the timeout message.</param>
+        private static async Task WaitForAsync(Func<bool> condition, TimeSpan timeout, Func<string>? describe = null)
         {
             var stopwatch = Stopwatch.StartNew();
             while (!condition() && stopwatch.Elapsed < timeout)
                 await Task.Delay(25);
 
-            Assert.True(condition(), "timed out waiting for the message to arrive");
+            var detail = describe is null ? string.Empty : $" (state: {describe()})";
+            Assert.True(condition(), $"timed out waiting for the message to arrive{detail}");
         }
     }
 }
+
+

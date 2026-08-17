@@ -88,6 +88,23 @@ namespace ModbusForge.Avalonia
                             logger?.LogError(ex, "Failed to stop API server");
                         }
                     }
+
+                    // Stop the MQTT gateway so the broker receives a clean
+                    // DISCONNECT instead of waiting out the 60-second keepalive
+                    // for the process to die.
+                    var gateway = Services?.GetService<MqttGatewayService>();
+                    if (gateway?.IsRunning == true)
+                    {
+                        try
+                        {
+                            await gateway.DisconnectAsync();
+                        }
+                        catch (Exception ex) when (ex is not OutOfMemoryException)
+                        {
+                            Services?.GetService<ILogger<App>>()
+                                ?.LogError(ex, "Failed to stop MQTT gateway on shutdown");
+                        }
+                    }
                 };
             }
 
