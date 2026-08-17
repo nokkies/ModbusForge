@@ -69,6 +69,13 @@ namespace ModbusForge.Models
         [ObservableProperty]
         private int _address = 1;
 
+        /// <summary>
+        /// Bit within the register, for tags that occupy a single bit of a packed
+        /// status word. Null when the whole register belongs to the tag.
+        /// </summary>
+        [ObservableProperty]
+        private int? _bit;
+
         [ObservableProperty]
         private TagDataType _dataType = TagDataType.UInt16;
 
