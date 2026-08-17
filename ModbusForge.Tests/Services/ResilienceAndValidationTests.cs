@@ -272,12 +272,41 @@ namespace ModbusForge.Tests.Services
             var logger = new Mock<ILogger<ValidationService>>().Object;
             var service = new ValidationService(logger);
 
-            Assert.True(service.ValidateSerialPort("COM1").IsValid);
-            Assert.True(service.ValidateSerialPort("COM10").IsValid);
-
             Assert.False(service.ValidateSerialPort("").IsValid);
-            Assert.False(service.ValidateSerialPort("PORT1").IsValid);
+            Assert.False(service.ValidateSerialPort("   ").IsValid);
             Assert.False(service.ValidateSerialPort("COM").IsValid);
+            Assert.False(service.ValidateSerialPort("PORT1").IsValid);
+
+            if (OperatingSystem.IsWindows())
+            {
+                Assert.True(service.ValidateSerialPort("COM1").IsValid);
+                Assert.True(service.ValidateSerialPort("COM10").IsValid);
+                Assert.True(service.ValidateSerialPort(@"\\.\COM10").IsValid);
+                Assert.True(service.ValidateSerialPort("com3").IsValid);
+                Assert.False(service.ValidateSerialPort("/dev/ttyUSB0").IsValid);
+            }
+            else
+            {
+                Assert.True(service.ValidateSerialPort("/dev/ttyUSB0").IsValid);
+                Assert.True(service.ValidateSerialPort("/dev/serial/by-id/usb-FTDI_FT232R").IsValid);
+                Assert.False(service.ValidateSerialPort("COM1").IsValid);
+                Assert.False(service.ValidateSerialPort("dev/ttyUSB0").IsValid);
+            }
+        }
+
+        [Fact]
+        public void ValidationService_ValidateConnectionString_SupportsBracketedIpv6()
+        {
+            var logger = new Mock<ILogger<ValidationService>>().Object;
+            var service = new ValidationService(logger);
+
+            Assert.True(service.ValidateConnectionString("[::1]:502").IsValid);
+            Assert.True(service.ValidateConnectionString("[2001:db8::1]:502:3").IsValid);
+
+            Assert.False(service.ValidateConnectionString("[::1]").IsValid); // missing port
+            Assert.False(service.ValidateConnectionString("::1:502:3").IsValid); // unbracketed IPv6 with unit id
+            Assert.False(service.ValidateConnectionString("[::1]:invalid").IsValid);
+            Assert.False(service.ValidateConnectionString("[::1]:502:248").IsValid); // reserved unit id
         }
 
         [Fact]

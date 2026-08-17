@@ -192,17 +192,47 @@ namespace ModbusForge.Services
                 return ValidationResult.Failure("Connection string cannot be empty");
             }
 
-            // Expected format: "ip:port" or "ip:port:unitId"
-            var parts = connectionString.Split(':');
+            // Expected format: "ip:port" or "ip:port:unitId". IPv6 hosts contain
+            // colons themselves and must be bracketed: "[::1]:502".
+            const string formatError = "Invalid connection string format. Expected: 'ip:port' or 'ip:port:unitId' (IPv6 hosts need brackets, e.g. '[::1]:502')";
 
-            if (parts.Length < 2 || parts.Length > 3)
+            string hostPart;
+            string tail;
+            if (connectionString.StartsWith('['))
             {
-                return ValidationResult.Failure(
-                    "Invalid connection string format. Expected: 'ip:port' or 'ip:port:unitId'",
-                    $"Provided: {connectionString}");
+                var close = connectionString.IndexOf(']');
+                if (close < 1)
+                {
+                    return ValidationResult.Failure(formatError, $"Provided: {connectionString}");
+                }
+
+                hostPart = connectionString.Substring(1, close - 1);
+                if (close + 1 >= connectionString.Length || connectionString[close + 1] != ':')
+                {
+                    return ValidationResult.Failure(formatError, $"Provided {connectionString}");
+                }
+
+                tail = connectionString.Substring(close + 2);
+            }
+            else
+            {
+                var firstColon = connectionString.IndexOf(':');
+                if (firstColon < 0)
+                {
+                    return ValidationResult.Failure(formatError, $"Provided: {connectionString}");
+                }
+
+                hostPart = connectionString.Substring(0, firstColon);
+                tail = connectionString.Substring(firstColon + 1);
             }
 
-            var ipResult = ValidateIpAddress(parts[0]);
+            var tailParts = tail.Split(':');
+            if (tailParts.Length < 1 || tailParts.Length > 2)
+            {
+                return ValidationResult.Failure(formatError, $"Provided: {connectionString}");
+            }
+
+            var ipResult = ValidateIpAddress(hostPart);
             if (!ipResult.IsValid)
             {
                 return ValidationResult.Failure(
@@ -210,10 +240,10 @@ namespace ModbusForge.Services
                     connectionString);
             }
 
-            if (!int.TryParse(parts[1], out var port))
+            if (!int.TryParse(tailParts[0], out var port))
             {
                 return ValidationResult.Failure(
-                    $"Invalid port number in connection string: {parts[1]}",
+                    $"Invalid port number in connection string: {tailParts[0]}",
                     connectionString);
             }
 
@@ -225,12 +255,12 @@ namespace ModbusForge.Services
                     connectionString);
             }
 
-            if (parts.Length == 3)
+            if (tailParts.Length == 2)
             {
-                if (!byte.TryParse(parts[2], out var unitId))
+                if (!byte.TryParse(tailParts[1], out var unitId))
                 {
                     return ValidationResult.Failure(
-                        $"Invalid unit ID in connection string: {parts[2]}",
+                        $"Invalid unit ID in connection string: {tailParts[1]}",
                         connectionString);
                 }
 
@@ -271,11 +301,31 @@ namespace ModbusForge.Services
                 return ValidationResult.Failure("COM port name cannot be empty");
             }
 
-            if (!Regex.IsMatch(portName, @"^COM\d+$", RegexOptions.IgnoreCase))
+            if (OperatingSystem.IsWindows())
             {
-                return ValidationResult.Failure(
-                    $"Invalid COM port name: {portName}",
-                    "Expected format: COM1, COM2, ...");
+                // Windows port names are "COM1", "COM10", ... - optionally
+                // qualified as "\\\\.\\COM10".
+                var normalized = portName.StartsWith(@"\\.\", StringComparison.Ordinal)
+                    ? portName[4..]
+                    : portName;
+
+                if (!Regex.IsMatch(normalized, @"^COM\d+$", RegexOptions.IgnoreCase))
+                {
+                    return ValidationResult.Failure(
+                        $"Invalid COM port name: {portName}",
+                        "Expected format: COM1, COM2, ...");
+                }
+            }
+            else
+            {
+                // On Linux and macOS serial ports are device paths
+                // (/dev/ttyUSB0, /dev/serial/by-id/..., /dev/cu.usbserial-...).
+                if (!portName.StartsWith("/dev/", StringComparison.Ordinal))
+                {
+                    return ValidationResult.Failure(
+                        $"Invalid serial port name: {portName}",
+                        "Expected a device path such as /dev/ttyUSB0");
+                }
             }
 
             return ValidationResult.Success;
