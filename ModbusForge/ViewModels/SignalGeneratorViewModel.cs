@@ -82,11 +82,9 @@ namespace ModbusForge.Avalonia.ViewModels
             new Axis
             {
                 LabelsRotation = 15,
-                Labeler = value =>
-                {
-                    var date = DateTime.FromOADate(value);
-                    return date.ToString("HH:mm:ss");
-                }
+                // Total: see ChartAxisTimeLabels (LiveCharts can pass NaN or
+                // out-of-range coordinates for degenerate axis domains).
+                Labeler = ChartAxisTimeLabels.Time
             }
         };
 

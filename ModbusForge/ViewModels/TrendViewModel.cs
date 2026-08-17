@@ -65,11 +65,11 @@ namespace ModbusForge.Avalonia.ViewModels
                 Name = "Time",
                 LabelsRotation = 15,
                 MinStep = 1,
-                Labeler = value =>
-                {
-                    var date = DateTime.FromOADate(value);
-                    return date.ToString("HH:mm:ss");
-                }
+                // Labelers must be total: LiveCharts can pass NaN/±infinity
+                // (degenerate axis domain, e.g. a single-sample series) or
+                // out-of-range coordinates, and DateTime.FromOADate throws
+                // for those.
+                Labeler = ChartAxisTimeLabels.Time
             }
         };
 

@@ -229,6 +229,30 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             }
         }
 
+        [Fact]
+        public void XAxisLabeler_NeverThrows_ForDegenerateChartCoordinates()
+        {
+            // Regression: with a degenerate axis domain (for example a series
+            // whose samples all share one timestamp, or an empty hover
+            // projection) LiveCharts hands NaN/±infinity/out-of-range
+            // coordinates to the axis labeler. DateTime.FromOADate throws for
+            // those, which crashed the UI dispatcher with a full crash dialog.
+            var vm = CreateViewModel(out _);
+            var labeler = vm.XAxes[0].Labeler;
+            Assert.NotNull(labeler);
+
+            Assert.Equal(string.Empty, labeler(double.NaN));
+            Assert.Equal(string.Empty, labeler(double.PositiveInfinity));
+            Assert.Equal(string.Empty, labeler(double.NegativeInfinity));
+            Assert.Equal(string.Empty, labeler(double.MaxValue));
+            Assert.Equal(string.Empty, labeler(double.MinValue));
+            Assert.Equal(string.Empty, labeler(-657434.0001));  // before 100-01-01
+            Assert.Equal(string.Empty, labeler(2958465.0001));  // after 9999-12-31
+
+            var known = DateTime.Parse("2026-08-17T12:34:56");
+            Assert.Equal("12:34:56", labeler(known.ToOADate()));
+        }
+
         private sealed class FakeTrendLogger : ITrendLogger
         {
             public int RetentionMinutes { get; private set; } = 5;
