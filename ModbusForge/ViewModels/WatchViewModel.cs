@@ -302,12 +302,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 return inputs is { Length: > 0 } ? inputs[0] : null;
             }
 
-            var registerCount = tag.DataType switch
-            {
-                TagDataType.Int32 or TagDataType.UInt32 or TagDataType.Float or TagDataType.String => 2,
-                TagDataType.Double => 4,
-                _ => 1
-            };
+            var registerCount = DataTypeConverter.GetRegisterCount(tag.DataType);
 
             var registers = tag.Area == PlcArea.InputRegister
                 ? await service.ReadInputRegistersAsync(unitId, tag.Address, registerCount)
@@ -316,54 +311,7 @@ namespace ModbusForge.Avalonia.ViewModels
             if (registers == null || registers.Length == 0)
                 return null;
 
-            return ConvertRegistersByDataType(tag.DataType, registers);
-        }
-
-        private static object ConvertRegistersByDataType(TagDataType dataType, ushort[] registers)
-        {
-            switch (dataType)
-            {
-                case TagDataType.Int16:
-                    return unchecked((short)registers[0]);
-                case TagDataType.UInt16:
-                    return registers[0];
-                case TagDataType.Bool:
-                    return registers[0] != 0;
-                case TagDataType.Int32:
-                    return DataTypeConverter.ToInt32(RegistersToBytes(registers), EndiannessFormat.ABCD_BigEndian);
-                case TagDataType.UInt32:
-                    return DataTypeConverter.ToUInt32(RegistersToBytes(registers), EndiannessFormat.ABCD_BigEndian);
-                case TagDataType.Float:
-                    return DataTypeConverter.ToFloat32(RegistersToBytes(registers), EndiannessFormat.ABCD_BigEndian);
-                case TagDataType.Double:
-                    return DataTypeConverter.ToFloat64(RegistersToBytes(registers), EndiannessFormat.ABCD_BigEndian);
-                case TagDataType.String:
-                    {
-                        var bytes = RegistersToBytes(registers);
-                        var end = Array.IndexOf(bytes, (byte)0);
-                        if (end >= 0)
-                            Array.Resize(ref bytes, end);
-                        return Encoding.ASCII.GetString(bytes);
-                    }
-                default:
-                    return registers[0];
-            }
-        }
-
-        /// <summary>
-        /// Register payload to big-endian byte order (the Modbus wire layout),
-        /// matching what <see cref="DataTypeConverter"/> expects.
-        /// </summary>
-        private static byte[] RegistersToBytes(ushort[] registers)
-        {
-            var bytes = new byte[registers.Length * 2];
-            for (var i = 0; i < registers.Length; i++)
-            {
-                bytes[i * 2] = (byte)(registers[i] >> 8);
-                bytes[i * 2 + 1] = (byte)(registers[i] & 0xFF);
-            }
-
-            return bytes;
+            return DataTypeConverter.ConvertRegisters(tag.DataType, registers);
         }
 
         private void UpdateTimer_Tick(object? sender, EventArgs e)

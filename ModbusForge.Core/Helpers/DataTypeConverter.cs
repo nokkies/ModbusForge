@@ -8,6 +8,75 @@ namespace ModbusForge.Helpers
     public static class DataTypeConverter
     {
         /// <summary>
+        /// Number of 16-bit registers a tag data type occupies.
+        /// </summary>
+        public static int GetRegisterCount(TagDataType dataType)
+        {
+            return dataType switch
+            {
+                TagDataType.Int32 or TagDataType.UInt32 or TagDataType.Float or TagDataType.String => 2,
+                TagDataType.Double => 4,
+                _ => 1
+            };
+        }
+
+        /// <summary>
+        /// Converts a freshly read register payload to the tag's data type.
+        /// Registers are in Modbus wire order (big-endian words); callers must
+        /// pass exactly <see cref="GetRegisterCount"/> registers.
+        /// This is the single place where register payloads become typed values,
+        /// shared by the watch window and the tag store.
+        /// </summary>
+        public static object ConvertRegisters(TagDataType dataType, ushort[] registers)
+        {
+            if (registers is null) throw new ArgumentNullException(nameof(registers));
+
+            switch (dataType)
+            {
+                case TagDataType.Int16:
+                    return unchecked((short)registers[0]);
+                case TagDataType.UInt16:
+                    return registers[0];
+                case TagDataType.Bool:
+                    return registers[0] != 0;
+                case TagDataType.Int32:
+                    return ToInt32(RegistersToBytes(registers), EndiannessFormat.ABCD_BigEndian);
+                case TagDataType.UInt32:
+                    return ToUInt32(RegistersToBytes(registers), EndiannessFormat.ABCD_BigEndian);
+                case TagDataType.Float:
+                    return ToFloat32(RegistersToBytes(registers), EndiannessFormat.ABCD_BigEndian);
+                case TagDataType.Double:
+                    return ToFloat64(RegistersToBytes(registers), EndiannessFormat.ABCD_BigEndian);
+                case TagDataType.String:
+                    {
+                        var bytes = RegistersToBytes(registers);
+                        var end = Array.IndexOf(bytes, (byte)0);
+                        if (end >= 0)
+                            Array.Resize(ref bytes, end);
+                        return Encoding.ASCII.GetString(bytes);
+                    }
+                default:
+                    return registers[0];
+            }
+        }
+
+        /// <summary>
+        /// Register payload to big-endian byte order (the Modbus wire layout),
+        /// matching what <see cref="DataTypeConverter"/> expects.
+        /// </summary>
+        public static byte[] RegistersToBytes(ushort[] registers)
+        {
+            var bytes = new byte[registers.Length * 2];
+            for (var i = 0; i < registers.Length; i++)
+            {
+                bytes[i * 2] = (byte)(registers[i] >> 8);
+                bytes[i * 2 + 1] = (byte)(registers[i] & 0xFF);
+            }
+
+            return bytes;
+        }
+
+        /// <summary>
         /// Maps the legacy pair of boolean swap flags to an <see cref="EndiannessFormat"/>.
         /// </summary>
         public static EndiannessFormat GetEndianness(bool swapBytes, bool swapWords) => (swapBytes, swapWords) switch

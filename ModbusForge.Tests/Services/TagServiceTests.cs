@@ -834,6 +834,84 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
+        public async Task UpdateRegisterValues_FloatTag_CombinesBothWords()
+        {
+            var service = CreateService(out _, out _);
+            var tag = await service.CreateTag("Level", "Default", PlcArea.HoldingRegister, 5, TagDataType.Float);
+
+            // 12.5f == 0x41480000 -> high word 0x4148, low word 0x0000.
+            service.UpdateRegisterValues(PlcArea.HoldingRegister, 5, new ushort[] { 0x4148, 0x0000 });
+
+            Assert.Equal(12.5f, tag.CurrentValue);
+        }
+
+        [Fact]
+        public async Task UpdateRegisterValues_DoubleTag_CombinesAllFourWords()
+        {
+            var service = CreateService(out _, out _);
+            var tag = await service.CreateTag("Total", "Default", PlcArea.HoldingRegister, 10, TagDataType.Double);
+
+            // 1.0 == 0x3FF0000000000000.
+            service.UpdateRegisterValues(PlcArea.HoldingRegister, 10, new ushort[] { 0x3FF0, 0, 0, 0 });
+
+            Assert.Equal(1.0, tag.CurrentValue);
+        }
+
+        [Fact]
+        public async Task UpdateRegisterValues_Int32Tag_CombinesTwoWords()
+        {
+            var service = CreateService(out _, out _);
+            var tag = await service.CreateTag("Counter", "Default", PlcArea.HoldingRegister, 7, TagDataType.Int32);
+
+            // 0xFFFFFFFF == -1.
+            service.UpdateRegisterValues(PlcArea.HoldingRegister, 7, new ushort[] { 0xFFFF, 0xFFFF });
+
+            Assert.Equal(-1, tag.CurrentValue);
+        }
+
+        [Fact]
+        public async Task UpdateRegisterValues_MultiWordTagAtBatchEnd_LeavesTagUnchanged()
+        {
+            var service = CreateService(out _, out _);
+            var tag = await service.CreateTag("Level", "Default", PlcArea.HoldingRegister, 8, TagDataType.Float);
+
+            // The tag needs words at 8 and 9, but the batch only covers 7 and 8.
+            service.UpdateRegisterValues(PlcArea.HoldingRegister, 7, new ushort[] { 0x0001, 0x0002 });
+
+            // A half-width payload must not be converted into a bogus float.
+            Assert.Null(tag.CurrentValue);
+            Assert.Equal(DateTime.MinValue, tag.LastUpdated);
+        }
+
+        [Fact]
+        public async Task UpdateRegisterValues_SingleWordAndBitTags_UpdatedPointByPoint()
+        {
+            var service = CreateService(out _, out _);
+            var word = await service.CreateTag("Word", "Default", PlcArea.HoldingRegister, 120, TagDataType.UInt16);
+            var bit = await service.CreateTag("Status_Bit0", "Default", PlcArea.HoldingRegister, 120, TagDataType.Bool);
+            bit.Bit = 0;
+
+            service.UpdateRegisterValues(PlcArea.HoldingRegister, 120, new ushort[] { 0b0001 });
+
+            Assert.Equal((ushort)1, word.CurrentValue);
+            Assert.Equal(true, bit.CurrentValue);
+        }
+
+        [Fact]
+        public async Task UpdateRegisterValues_MultiWordTagWithWatchEntry_UpdatesEntry()
+        {
+            var service = CreateService(out _, out _);
+            var tag = await service.CreateTag("Level", "Default", PlcArea.HoldingRegister, 5, TagDataType.Float);
+            service.AddToWatch(tag.Id);
+
+            service.UpdateRegisterValues(PlcArea.HoldingRegister, 5, new ushort[] { 0x4148, 0x0000 });
+
+            var entry = Assert.Single(service.WatchEntries);
+            Assert.Equal(12.5f, entry.CurrentValue);
+            Assert.False(entry.IsStale);
+        }
+
+        [Fact]
         public void ToTag_CarriesTheBitIndexThrough()
         {
             var entry = new RegisterTemplateEntry

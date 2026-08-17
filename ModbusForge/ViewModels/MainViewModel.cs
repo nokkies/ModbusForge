@@ -2319,8 +2319,9 @@ namespace ModbusForge.Avalonia.ViewModels
             var tagService = _tagService;
             if (tagService == null || tagService.Tags.Count == 0) return;
 
-            for (var i = 0; i < values.Length; i++)
-                tagService.UpdateTagValue(area, start + i, values[i]);
+            // Batch update: multi-word tags (Float, Double, ...) are converted
+            // from all of their words at once instead of being fed one word.
+            tagService.UpdateRegisterValues(area, start, values);
         }
 
         private void SyncTags(PlcArea area, int start, bool[] values)

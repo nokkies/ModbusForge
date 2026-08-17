@@ -218,45 +218,88 @@ namespace ModbusForge.Services
             if (tags.Count == 0)
                 return;
 
-            var now = DateTime.Now;
+            foreach (var tag in tags)
+                UpdateTag(tag, value);
+        }
+
+        /// <summary>
+        /// Feeds a contiguous batch of register values read starting at
+        /// <paramref name="startAddress"/> (the polling loop and manual register
+        /// reads). Multi-word tags (Int32, UInt32, Float, String, Double) are
+        /// converted from all of their words at once; single-word and bit tags
+        /// are updated point by point. A multi-word tag whose words extend past
+        /// the end of the batch is left unchanged rather than being fed a
+        /// half-width payload.
+        /// </summary>
+        public void UpdateRegisterValues(PlcArea area, int startAddress, ushort[] values)
+        {
+            if (values is null)
+                return;
+
+            var tags = Tags.Where(t => t.Area == area).ToList();
+            if (tags.Count == 0)
+                return;
+
             foreach (var tag in tags)
             {
-                var tagValue = tag.Bit is int bitIndex && TryConvertToUInt16(value, out var raw)
-                    ? (((raw >> bitIndex) & 1) == 1)
-                    : value;
-
-                tag.CurrentValue = tagValue;
-                tag.LastUpdated = now;
-
-                // Update watch entry if exists
-                var watchEntry = WatchEntries.FirstOrDefault(w => w.TagId == tag.Id);
-                if (watchEntry == null)
+                var index = tag.Address - startAddress;
+                if (index < 0 || index >= values.Length)
                     continue;
 
-                watchEntry.CurrentValue = tagValue;
-                watchEntry.FormattedValue = tag.FormattedValue;
-                watchEntry.LastUpdated = now;
-                watchEntry.IsStale = false;
+                var wordCount = Helpers.DataTypeConverter.GetRegisterCount(tag.DataType);
+                if (wordCount > 1 && index + wordCount > values.Length)
+                    continue; // not all of this tag's words are in the batch
 
-                // Check alarms
-                if (tag.IsAlarmEnabled && tag.ScaledValue.HasValue)
+                var value = wordCount > 1
+                    ? Helpers.DataTypeConverter.ConvertRegisters(tag.DataType, values[index..(index + wordCount)])
+                    : (object)values[index];
+
+                UpdateTag(tag, value);
+            }
+        }
+
+        /// <summary>
+        /// Applies a freshly read value to a single tag: bit extraction, current
+        /// value, freshness, the tag's watch entry and its alarm state.
+        /// </summary>
+        private void UpdateTag(Tag tag, object value)
+        {
+            var tagValue = tag.Bit is int bitIndex && TryConvertToUInt16(value, out var raw)
+                ? (((raw >> bitIndex) & 1) == 1)
+                : value;
+
+            var now = DateTime.Now;
+            tag.CurrentValue = tagValue;
+            tag.LastUpdated = now;
+
+            // Update watch entry if exists
+            var watchEntry = WatchEntries.FirstOrDefault(w => w.TagId == tag.Id);
+            if (watchEntry == null)
+                return;
+
+            watchEntry.CurrentValue = tagValue;
+            watchEntry.FormattedValue = tag.FormattedValue;
+            watchEntry.LastUpdated = now;
+            watchEntry.IsStale = false;
+
+            // Check alarms
+            if (tag.IsAlarmEnabled && tag.ScaledValue.HasValue)
+            {
+                var scaled = tag.ScaledValue.Value;
+                if (tag.AlarmHigh.HasValue && scaled > tag.AlarmHigh.Value)
                 {
-                    var scaled = tag.ScaledValue.Value;
-                    if (tag.AlarmHigh.HasValue && scaled > tag.AlarmHigh.Value)
-                    {
-                        watchEntry.HasAlarm = true;
-                        watchEntry.AlarmMessage = $"HIGH ALARM: {scaled:F2} > {tag.AlarmHigh.Value:F2}";
-                    }
-                    else if (tag.AlarmLow.HasValue && scaled < tag.AlarmLow.Value)
-                    {
-                        watchEntry.HasAlarm = true;
-                        watchEntry.AlarmMessage = $"LOW ALARM: {scaled:F2} < {tag.AlarmLow.Value:F2}";
-                    }
-                    else
-                    {
-                        watchEntry.HasAlarm = false;
-                        watchEntry.AlarmMessage = "";
-                    }
+                    watchEntry.HasAlarm = true;
+                    watchEntry.AlarmMessage = $"HIGH ALARM: {scaled:F2} > {tag.AlarmHigh.Value:F2}";
+                }
+                else if (tag.AlarmLow.HasValue && scaled < tag.AlarmLow.Value)
+                {
+                    watchEntry.HasAlarm = true;
+                    watchEntry.AlarmMessage = $"LOW ALARM: {scaled:F2} < {tag.AlarmLow.Value:F2}";
+                }
+                else
+                {
+                    watchEntry.HasAlarm = false;
+                    watchEntry.AlarmMessage = "";
                 }
             }
         }
