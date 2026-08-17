@@ -42,10 +42,13 @@
                   GridLinesVisibility="All"
                   VerticalAlignment="Stretch">
           <DataGrid.Columns>
-            <DataGridCheckBoxColumn Header="On" Binding="{Binding Enabled}" Width="44" />
+            <!-- Column widths sized so the header text (including the checkbox
+                 glyph on checkbox columns) always fits; clipped headers were
+                 reported in E2E ("One-ti…", "F…"). -->
+            <DataGridCheckBoxColumn Header="On" Binding="{Binding Enabled}" Width="56" MinWidth="56" />
             <DataGridTextColumn Header="Name" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="140" />
-            <DataGridCheckBoxColumn Header="One-time" Binding="{Binding OneTime}" Width="80" />
-            <DataGridTemplateColumn Header="Fired" Width="52">
+            <DataGridCheckBoxColumn Header="One-time" Binding="{Binding OneTime}" Width="96" MinWidth="96" />
+            <DataGridTemplateColumn Header="Fired" Width="64" MinWidth="64">
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate x:DataType="models:ScriptRule">
                   <StackPanel Orientation="Horizontal" Spacing="0">
