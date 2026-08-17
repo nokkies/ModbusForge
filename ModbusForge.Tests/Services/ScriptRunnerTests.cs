@@ -432,6 +432,80 @@ public class ScriptRunnerTests
     }
 
     [Fact]
+    public async Task RunScriptAsync_WithDisposedCallerToken_Throws_AndLeavesTheRunnerUsable()
+    {
+        // Regression: a caller token whose source was already disposed (an HTTP
+        // request's lifetime ended) made CreateLinkedTokenSource throw between
+        // the atomic claim and the try/finally, leaving the runner claimed
+        // forever - every later script run would be silently ignored.
+        var cts = new CancellationTokenSource();
+        cts.Dispose();
+
+        var script = new Script("Test") { Commands = { } };
+
+        await Assert.ThrowsAnyAsync<ObjectDisposedException>(
+            () => _runner.RunScriptAsync(script, _mockModbusService.Object, _unitId, cts.Token));
+
+        // The failed start must not wedge the runner.
+        Assert.False(_runner.IsRunning);
+
+        var script2 = new Script("Test 2") { Commands = { } };
+        bool completed = false;
+        _runner.ScriptCompleted += (s, success) => completed = success;
+        await _runner.RunScriptAsync(script2, _mockModbusService.Object, _unitId);
+        Assert.True(completed);
+        Assert.False(_runner.IsRunning);
+    }
+
+    [Fact]
+    public void Stop_WhenIdle_DoesNotThrowOrLogStopping()
+    {
+        var logs = new System.Collections.Generic.List<string>();
+        _runner.LogMessage += (s, m) => logs.Add(m);
+
+        // Must be a no-op: no cancellation of a stale token source, no log.
+        var ex = Record.Exception(() => _runner.Stop());
+
+        Assert.Null(ex);
+        Assert.DoesNotContain(logs, l => l.Contains("Stopping", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Stop_RacingScriptCompletion_NeverThrows_AndRaisesExactlyOneTerminalEvent()
+    {
+        // Stop and the script's own completion race over the token source's
+        // Dispose; neither side may surface an ObjectDisposedException, and the
+        // terminal events must stay consistent (exactly one of completed/cancelled).
+        var cmd = new ScriptCommand
+        {
+            CommandType = ScriptCommandType.Delay,
+            DelayMs = 400
+        };
+        var script = new Script("Test") { Commands = { cmd }, DelayBetweenCommandsMs = 0 };
+
+        int completedCount = 0;
+        int cancelledCount = 0;
+        _runner.ScriptCompleted += (s, _) => Interlocked.Increment(ref completedCount);
+        _runner.ScriptCancelled += (s, _) => Interlocked.Increment(ref cancelledCount);
+
+        var runTask = _runner.RunScriptAsync(script, _mockModbusService.Object, _unitId);
+
+        // Hammer Stop until the run has settled.
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        Exception? stopError = null;
+        while (runTask.IsCompleted == false && DateTime.UtcNow < deadline)
+        {
+            stopError = stopError ?? Record.Exception(() => _runner.Stop());
+            await Task.Delay(5);
+        }
+
+        await runTask;
+        Assert.Null(stopError); // Stop must never throw, even while racing completion
+        Assert.Equal(1, completedCount + cancelledCount); // exactly one terminal event
+        Assert.False(_runner.IsRunning);
+    }
+
+    [Fact]
     public async Task RunScriptAsync_WhenBusy_SecondStartIsIgnored()
     {
         // Arrange: the first script is long-running.

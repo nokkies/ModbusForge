@@ -10,6 +10,7 @@ namespace ModbusForge.Services;
 public class ScriptRunner : IScriptRunner
 {
     private readonly ILogger<ScriptRunner> _logger;
+    private readonly object _ctsGate = new();
     private CancellationTokenSource? _cts;
     private int _running; // 0 = idle, 1 = running (Interlocked)
 
@@ -36,8 +37,26 @@ public class ScriptRunner : IScriptRunner
             return;
         }
 
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var token = _cts.Token;
+        CancellationTokenSource linked;
+        try
+        {
+            linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        }
+        catch
+        {
+            // The caller's token may belong to a disposed source (e.g. an
+            // HTTP request whose lifetime has ended). Whatever the reason,
+            // the runner must not stay claimed: without the release, every
+            // later RunScriptAsync would be ignored for the process lifetime.
+            Interlocked.Exchange(ref _running, 0);
+            throw;
+        }
+
+        lock (_ctsGate)
+        {
+            _cts = linked;
+        }
+        var token = linked.Token;
 
         // A file-loaded script could carry RepeatCount 0; 0 would silently run
         // nothing, so clamp to a single pass.
@@ -143,8 +162,13 @@ public class ScriptRunner : IScriptRunner
         finally
         {
             Interlocked.Exchange(ref _running, 0);
-            _cts?.Dispose();
-            _cts = null;
+            CancellationTokenSource? toDispose;
+            lock (_ctsGate)
+            {
+                toDispose = _cts;
+                _cts = null;
+            }
+            toDispose?.Dispose();
 
             if (cancelled)
             {
@@ -345,10 +369,28 @@ public class ScriptRunner : IScriptRunner
 
     public void Stop()
     {
-        if (IsRunning)
+        // Take the current token source under the same gate the runner uses,
+        // then cancel it outside: the script's finally may dispose the source
+        // at any moment, and a Cancel racing a Dispose would otherwise throw
+        // ObjectDisposedException at the caller.
+        CancellationTokenSource? cts;
+        lock (_ctsGate)
         {
-            Log("Stopping script...");
-            _cts?.Cancel();
+            cts = IsRunning ? _cts : null;
+        }
+
+        if (cts is null)
+            return;
+
+        Log("Stopping script...");
+        try
+        {
+            cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The script finished between the snapshot and the cancel; the
+            // stop was effectively a no-op.
         }
     }
 
