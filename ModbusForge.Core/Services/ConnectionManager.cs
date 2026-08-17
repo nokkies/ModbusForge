@@ -334,6 +334,23 @@ public class ConnectionManager : IConnectionManager
             return;
         }
 
+        // The profile list and profile state are owned by the UI thread:
+        // enumerating Profiles off-thread races with add/remove on the UI
+        // thread, and setting an observable property (IsConnected, Status)
+        // off-thread raises PropertyChanged on the wrong thread for the
+        // bindings. Run the lookup and state update on the dispatcher
+        // thread; without a dispatcher (headless, tests) run inline.
+        if (_uiDispatcher is { } dispatcher && !dispatcher.CheckAccess)
+        {
+            dispatcher.Post(() => HandleServiceConnectionLost(lostService));
+            return;
+        }
+
+        HandleServiceConnectionLost(lostService);
+    }
+
+    private void HandleServiceConnectionLost(IModbusService lostService)
+    {
         ConnectionProfile? profile = null;
         foreach (var candidate in Profiles)
         {
@@ -388,13 +405,25 @@ public class ConnectionManager : IConnectionManager
             };
 
             var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(ProfilesFilePath, json);
+            WriteAllTextAtomic(ProfilesFilePath, json);
             _logger.LogInformation("Saved {Count} connection profiles", Profiles.Count);
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
             _logger.LogError(ex, "Failed to save connection profiles");
         }
+    }
+
+    /// <summary>
+    /// Writes the text to a temp file in the same directory and renames it over
+    /// the destination, so a crash mid-write leaves the previous profiles file
+    /// intact instead of a truncated one that would lose every saved connection.
+    /// </summary>
+    private static void WriteAllTextAtomic(string path, string contents)
+    {
+        var tmpPath = path + ".tmp";
+        File.WriteAllText(tmpPath, contents);
+        File.Move(tmpPath, path, overwrite: true);
     }
 
     private static readonly JsonSerializerOptions _profileJsonOptions = new()

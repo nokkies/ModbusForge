@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.IO.Ports;
 using System.Linq;
@@ -560,6 +560,127 @@ public class ConnectionManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task ConnectionLost_UpdatesProfileStateAndFiresEvent()
+    {
+        // Arrange: a loopback server that accepts the connection and then
+        // resets it, so the next I/O through the service detects the dead socket.
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+        try
+        {
+            _ = Task.Run(async () =>
+            {
+                var client = await listener.AcceptTcpClientAsync();
+                // Linger 0 -> close() sends an RST instead of a FIN, so the
+                // client's next read fails immediately with a reset.
+                client.LingerState = new System.Net.Sockets.LingerOption(true, 0);
+                client.Close();
+            });
+
+            var profile = new ConnectionProfile("Test", "127.0.0.1", port, 1);
+            _manager.AddProfile(profile);
+            Assert.True(await _manager.ConnectProfileAsync(profile));
+
+            ConnectionProfile? disconnectedProfile = null;
+            _manager.ProfileDisconnected += (s, p) => disconnectedProfile = p;
+
+            // Act: the next read hits the dead socket. The service swallows the
+            // I/O error into a default return and raises ConnectionLost.
+            var service = _manager.GetServiceForProfile(profile);
+            Assert.NotNull(service);
+            await service!.ReadHoldingRegistersAsync(1, 0, 1);
+
+            // Assert
+            Assert.False(profile.IsConnected);
+            Assert.Equal("Connection lost", profile.Status);
+            Assert.Equal(profile, disconnectedProfile);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task ConnectionLost_FromWorkerThread_MarshalsStateUpdateToDispatcher()
+    {
+        // Arrange: a manager whose dispatcher queues work instead of running it.
+        // If the connection-loss handling is marshalled (as it must be - the
+        // profile list and observable profile state are UI-thread-owned), the
+        // profile is still "connected" when the failing read returns, and only
+        // becomes disconnected once the queued work runs.
+        var dispatcher = new QueuedDispatcher();
+        var manager = new ConnectionManager(
+            _mockLogger.Object, _mockLoggerFactory.Object, null, null, null, dispatcher);
+
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+        try
+        {
+            _ = Task.Run(async () =>
+            {
+                var client = await listener.AcceptTcpClientAsync();
+                client.LingerState = new System.Net.Sockets.LingerOption(true, 0);
+                client.Close();
+            });
+
+            var profile = new ConnectionProfile("Test", "127.0.0.1", port, 1);
+            manager.AddProfile(profile);
+            Assert.True(await manager.ConnectProfileAsync(profile));
+
+            ConnectionProfile? disconnectedProfile = null;
+            manager.ProfileDisconnected += (s, p) => disconnectedProfile = p;
+
+            // Act: the next read hits the dead socket and queues the
+            // connection-loss handling on the dispatcher.
+            var service = manager.GetServiceForProfile(profile);
+            Assert.NotNull(service);
+            await service!.ReadHoldingRegistersAsync(1, 0, 1);
+
+            // The handling must not have run inline on the socket worker.
+            Assert.True(profile.IsConnected, "profile was updated before the dispatcher ran its queued work");
+
+            // Assert: once the dispatcher runs the queued work, the profile is
+            // updated and the event fires.
+            await dispatcher.WaitUntilPostedAsync();
+            dispatcher.Drain();
+
+            Assert.False(profile.IsConnected);
+            Assert.Equal("Connection lost", profile.Status);
+            Assert.Equal(profile, disconnectedProfile);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    [Fact]
+    public void SaveProfiles_WritesProfilesAndLeavesNoTempFile()
+    {
+        // Arrange
+        _manager.AddProfile(new ConnectionProfile("Custom Profile", "192.168.1.100", 5020, 2));
+
+        // Act
+        _manager.SaveProfiles();
+
+        // Assert
+        var profilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "ModbusForge",
+            "connection-profiles.json");
+
+        Assert.True(File.Exists(profilePath));
+        var json = File.ReadAllText(profilePath);
+        Assert.Contains("Custom Profile", json);
+        Assert.False(File.Exists(profilePath + ".tmp"));
+    }
+
+    [Fact]
     public async Task GetServiceForProfile_ReturnsService_IfProfileHasBeenUsed()
     {
         // Arrange
@@ -827,6 +948,45 @@ public class ConnectionManagerTests : IDisposable
         // Cleanup
         await _manager.DisconnectProfileAsync(clientProfile);
         await _manager.DisconnectProfileAsync(serverProfile);
+    }
+
+    /// <summary>
+    /// A dispatcher that claims the caller is always off its thread and queues
+    /// posted work instead of running it, so tests can observe whether the
+    /// manager marshalled the work rather than running it inline.
+    /// </summary>
+    private sealed class QueuedDispatcher : IDispatcher
+    {
+        private readonly Queue<Action> _queue = new();
+        private readonly TaskCompletionSource _firstPost = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool CheckAccess => false;
+
+        public void Invoke(Action action) => action();
+
+        public T Invoke<T>(Func<T> func) => func();
+
+        public Task InvokeAsync(Action action)
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        public Task<T> InvokeAsync<T>(Func<T> func) => Task.FromResult(func());
+
+        public void Post(Action action)
+        {
+            _queue.Enqueue(action);
+            _firstPost.TrySetResult();
+        }
+
+        public Task WaitUntilPostedAsync() => _firstPost.Task;
+
+        public void Drain()
+        {
+            while (_queue.Count > 0)
+                _queue.Dequeue()();
+        }
     }
 }
 
