@@ -67,7 +67,14 @@ namespace ModbusForge.Headless
                     services.AddSingleton<IModbusService>(sp => CreateModbusService(sp));
                     services.AddSingleton<UnhandledExceptionReporter>();
 
-                    if (!string.IsNullOrWhiteSpace(context.Configuration["Custom:Path"]))
+                    // A simulation run is the job: it executes against its own offline
+                    // data store and needs no connection, so it replaces the
+                    // polling/custom-watch service instead of running beside it.
+                    if (!string.IsNullOrWhiteSpace(context.Configuration["Simulation:Path"]))
+                    {
+                        services.AddHostedService<HeadlessSimulationService>();
+                    }
+                    else if (!string.IsNullOrWhiteSpace(context.Configuration["Custom:Path"]))
                     {
                         services.AddHostedService<HeadlessCustomService>();
                     }
@@ -222,6 +229,9 @@ namespace ModbusForge.Headless
             ["--mqtt-qos"] = "Mqtt:QualityOfService",
             ["--mqtt-retain"] = "Mqtt:RetainMessages",
             ["--mqtt-publish-period"] = "Mqtt:PublishPeriodMs",
+            ["--simulate"] = "Simulation:Path",
+            ["--simulate-interval"] = "Simulation:IntervalMs",
+            ["--simulate-steps"] = "Simulation:Steps",
         };
 
         private static bool TryValidateAndNormalizeArgs(IReadOnlyList<string> args, out List<string> hostArgs, out string? error)
@@ -249,6 +259,24 @@ namespace ModbusForge.Headless
                         if (!byte.TryParse(hostArgs[i + 1], out var unitId) || unitId == 0)
                         {
                             error = "Invalid unit id. Must be between 1 and 255.";
+                            return false;
+                        }
+                    }
+
+                    if (string.Equals(arg, "--simulate-interval", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!int.TryParse(hostArgs[i + 1], out var interval) || interval <= 0)
+                        {
+                            error = "Invalid simulate interval. Must be a positive number of milliseconds.";
+                            return false;
+                        }
+                    }
+
+                    if (string.Equals(arg, "--simulate-steps", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!int.TryParse(hostArgs[i + 1], out var steps) || steps < 0)
+                        {
+                            error = "Invalid simulate steps. Must be zero or a positive whole number (0 = run until stopped).";
                             return false;
                         }
                     }
@@ -301,6 +329,15 @@ MQTT options:
   --mqtt-qos <0|1|2>                  MQTT QoS (default: 0)
   --mqtt-retain <true|false>          Retain MQTT messages (default: false)
   --mqtt-publish-period <ms>          MQTT publish period (default: 1000)
+
+Simulation options:
+  --simulate <path>     Path to a simulation file (.mfsim/.json) saved from the visual node editor
+  --simulate-interval <ms>  Override the simulation scan period in ms
+  --simulate-steps <n>    Stop automatically after n ticks and dump the final state (default: run until Ctrl+C)
+
+--simulate replaces the normal polling/custom-watch service; the simulation runs
+until stopped (Ctrl+C) or the step count elapses. On shutdown the final node values
+and every non-default register/bit are dumped to the log.
 
 Other options:
   --environment <env>   Hosting environment: Development/Production (default: Production)

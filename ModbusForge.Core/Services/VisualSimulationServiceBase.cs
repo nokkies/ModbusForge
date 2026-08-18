@@ -480,6 +480,15 @@ namespace ModbusForge.Services
         }
 
         /// <summary>
+        /// The data store the simulation is currently reading and writing to
+        /// (the connected device's store when bound, otherwise the private
+        /// offline store). Exposed read-only so non-visual hosts such as the
+        /// headless runtime can inspect simulation results after a run;
+        /// callers must treat the returned store as read-only.
+        /// </summary>
+        public DataStore CurrentDataStore => GetEffectiveDataStore();
+
+        /// <summary>
         /// Returns the active Modbus server's data store when available, otherwise the
         /// fallback local data store used for offline simulation.
         /// </summary>

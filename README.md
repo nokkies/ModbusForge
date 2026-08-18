@@ -683,6 +683,28 @@ Example `appsettings.json`:
 
 Set `Logging:Console:UseJson` to `true` for JSON output to the console and to the log file.
 
+### Running a Simulation
+
+A simulation graph saved from the visual node editor (`.mfsim` or `.json`) can be executed headlessly, which is useful for CI checks of simulation logic without the GUI:
+
+```
+ModbusForge.Headless --simulate path/to/program.mfsim
+```
+
+The graph runs on its saved scan period against the private offline data store (no device connection required). Add `--simulate-steps <n>` to stop automatically after `n` ticks, and `--simulate-interval <ms>` to override the scan period from the file. On shutdown the headless runtime dumps the final node values and every non-default register/bit to the log:
+
+```
+[12:00:03 INF] === Simulation final state ===
+[12:00:03 INF]   IN (in1): true, 42
+[12:00:03 INF]   Scale (scale1): true, 420
+[12:00:03 INF]   HR* non-default:
+HR[1] = 42
+HR[2] = 420
+[12:00:03 INF]   IR*: all default
+```
+
+`--simulate` replaces the normal polling/custom-watch service: the host runs the simulation instead of polling, on its own offline data store.
+
 Run `ModbusForge.Headless --help` for a complete list of command-line switches.
 
 ### Linux systemd service
