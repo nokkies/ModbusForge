@@ -290,7 +290,7 @@ namespace ModbusForge.Services
             return Task.Run(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null || coilAddress < 1 || coilAddress >= ds.CoilDiscretes.Count)
+                if (ds == null || coilAddress < 0 || coilAddress >= ds.CoilDiscretes.Count)
                     throw new ArgumentOutOfRangeException(nameof(coilAddress));
                 lock (ds)
                 {

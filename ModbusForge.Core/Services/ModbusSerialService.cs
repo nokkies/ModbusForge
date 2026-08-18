@@ -195,7 +195,7 @@ namespace ModbusForge.Services
                 {
                     ushort[]? result = null;
                     ApplySerialTiming(() => { result = client.ReadHoldingRegisters(unitId, protocolAddress, chunkCount); });
-                    return result ?? Array.Empty<ushort>();
+                    return result;
                 });
         }
 
@@ -220,7 +220,7 @@ namespace ModbusForge.Services
                 {
                     ushort[]? result = null;
                     ApplySerialTiming(() => { result = client.ReadInputRegisters(unitId, protocolAddress, chunkCount); });
-                    return result ?? Array.Empty<ushort>();
+                    return result;
                 });
         }
 
@@ -245,7 +245,7 @@ namespace ModbusForge.Services
                 {
                     bool[]? result = null;
                     ApplySerialTiming(() => { result = client.ReadInputs(unitId, protocolAddress, chunkCount); });
-                    return result ?? Array.Empty<bool>();
+                    return result;
                 });
         }
 
@@ -270,7 +270,7 @@ namespace ModbusForge.Services
                 {
                     bool[]? result = null;
                     ApplySerialTiming(() => { result = client.ReadCoils(unitId, protocolAddress, chunkCount); });
-                    return result ?? Array.Empty<bool>();
+                    return result;
                 });
         }
 

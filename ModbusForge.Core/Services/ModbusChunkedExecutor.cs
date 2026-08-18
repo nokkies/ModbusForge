@@ -31,7 +31,7 @@ namespace ModbusForge.Services
             PlcArea area,
             string debugLogMessage,
             string errorLogContext,
-            Func<IModbusMaster, ushort, ushort, T[]> readFunc)
+            Func<IModbusMaster, ushort, ushort, T[]?> readFunc)
         {
             if (!isConnected())
                 return null;
@@ -48,7 +48,7 @@ namespace ModbusForge.Services
                         logger.LogDebug("{DebugMessage} (Unit ID: {UnitId})", debugLogMessage, unitId);
 
                         if (client == null)
-                            return Array.Empty<T>();
+                            return null;
 
                         var chunks = addressValidator.GetReadRanges(startAddress, count, area).ToList();
 

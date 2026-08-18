@@ -900,7 +900,6 @@ namespace ModbusForge.Avalonia.ViewModels
             IsRegisterGridEditing = false;
             SelectedAreaIndex = (int)value;
             OnPropertyChanged(nameof(IsRegisterArea));
-            OnPropertyChanged(nameof(CanWrite));
             WriteCommand.NotifyCanExecuteChanged();
 
             // Keep legacy global properties in sync with the newly selected area
@@ -1140,8 +1139,6 @@ namespace ModbusForge.Avalonia.ViewModels
             OnPropertyChanged(nameof(EffectiveUnitId));
             OnPropertyChanged(nameof(CanConnect));
             OnPropertyChanged(nameof(CanDisconnect));
-            OnPropertyChanged(nameof(CanRead));
-            OnPropertyChanged(nameof(CanWrite));
             OnPropertyChanged(nameof(CanReadCustomEntry));
             OnPropertyChanged(nameof(CanWriteCustomEntry));
         }
@@ -1486,8 +1483,6 @@ namespace ModbusForge.Avalonia.ViewModels
                 OnPropertyChanged(nameof(CanConnect));
                 OnPropertyChanged(nameof(CanDisconnect));
                 OnPropertyChanged(nameof(ToggleConnectionButtonText));
-                OnPropertyChanged(nameof(CanRead));
-                OnPropertyChanged(nameof(CanWrite));
                 OnPropertyChanged(nameof(CanReadCustomEntry));
                 OnPropertyChanged(nameof(CanWriteCustomEntry));
                 ConnectCommand.NotifyCanExecuteChanged();

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -39,22 +40,24 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void LoadHelpTopics()
         {
-            HelpTopics = new ObservableCollection<HelpTopic>
-            {
-                new HelpTopic { TopicId = "getting-started", Title = "Getting Started" },
-                new HelpTopic { TopicId = "connection-manager", Title = "Connection Manager" },
-                new HelpTopic { TopicId = "device-scanner", Title = "Device Scanner" },
-                new HelpTopic { TopicId = "script-editor", Title = "Script Editor" },
-                new HelpTopic { TopicId = "custom-data", Title = "Custom Data Tab" },
-                new HelpTopic { TopicId = "trends", Title = "Trend & Logging" },
-                new HelpTopic { TopicId = "visual-editor", Title = "Visual Node Editor" },
-                new HelpTopic { TopicId = "preferences", Title = "Preferences" },
-                new HelpTopic { TopicId = "mcp-server", Title = "API & MCP Server" },
-                new HelpTopic { TopicId = "keyboard-shortcuts", Title = "Keyboard Shortcuts" },
-                new HelpTopic { TopicId = "partial-reads", Title = "Partial or Chunked Reads" },
-                new HelpTopic { TopicId = "troubleshooting", Title = "Troubleshooting" }
-            };
+            HelpTopics = new ObservableCollection<HelpTopic>(GetAllTopics());
         }
+
+        private static List<HelpTopic> GetAllTopics() => new()
+        {
+            new HelpTopic { TopicId = "getting-started", Title = "Getting Started" },
+            new HelpTopic { TopicId = "connection-manager", Title = "Connection Manager" },
+            new HelpTopic { TopicId = "device-scanner", Title = "Device Scanner" },
+            new HelpTopic { TopicId = "script-editor", Title = "Script Editor" },
+            new HelpTopic { TopicId = "custom-data", Title = "Custom Data Tab" },
+            new HelpTopic { TopicId = "trends", Title = "Trend & Logging" },
+            new HelpTopic { TopicId = "visual-editor", Title = "Visual Node Editor" },
+            new HelpTopic { TopicId = "preferences", Title = "Preferences" },
+            new HelpTopic { TopicId = "mcp-server", Title = "API & MCP Server" },
+            new HelpTopic { TopicId = "keyboard-shortcuts", Title = "Keyboard Shortcuts" },
+            new HelpTopic { TopicId = "partial-reads", Title = "Partial or Chunked Reads" },
+            new HelpTopic { TopicId = "troubleshooting", Title = "Troubleshooting" }
+        };
 
         private void LoadDefaultTopic()
         {
@@ -106,20 +109,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     return;
                 }
 
-                var allTopics = new System.Collections.Generic.List<HelpTopic>
-                {
-                    new HelpTopic { TopicId = "getting-started", Title = "Getting Started" },
-                    new HelpTopic { TopicId = "connection-manager", Title = "Connection Manager" },
-                    new HelpTopic { TopicId = "device-scanner", Title = "Device Scanner" },
-                    new HelpTopic { TopicId = "script-editor", Title = "Script Editor" },
-                    new HelpTopic { TopicId = "custom-data", Title = "Custom Data Tab" },
-                    new HelpTopic { TopicId = "trends", Title = "Trend & Logging" },
-                    new HelpTopic { TopicId = "visual-editor", Title = "Visual Node Editor" },
-                    new HelpTopic { TopicId = "preferences", Title = "Preferences" },
-                    new HelpTopic { TopicId = "keyboard-shortcuts", Title = "Keyboard Shortcuts" },
-                    new HelpTopic { TopicId = "partial-reads", Title = "Partial or Chunked Reads" },
-                    new HelpTopic { TopicId = "troubleshooting", Title = "Troubleshooting" }
-                };
+                var allTopics = GetAllTopics();
 
                 var filtered = allTopics.Where(t =>
                     t.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
