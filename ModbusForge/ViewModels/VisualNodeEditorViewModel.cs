@@ -166,11 +166,32 @@ namespace ModbusForge.Avalonia.ViewModels
         private const double LayoutHorizontalGap = 80.0;
         private const double LayoutVerticalGap = 40.0;
 
+        /// <summary>
+        /// The error text stamped on blocks the engine has locked out of the execution
+        /// order because they sit in a cycle. Compared (not assumed) when unmarking so a
+        /// genuine per-tick failure on the same node is never clobbered.
+        /// </summary>
+        public const string CycleLockErrorText = "Locked in a loop — this block is not evaluated.";
+
         private readonly IVisualSimulationService _visualSimulation;
         private readonly IFileDialogService? _fileDialogService;
         private readonly IMessageBoxService? _messageBoxService;
         private readonly ITagWindowService? _tagWindowService;
         private readonly ILogger<VisualNodeEditorViewModel> _logger;
+
+        /// <summary>
+        /// Node ids currently marked with <see cref="CycleLockErrorText"/>; cleared
+        /// (and the marks removed) when a graph edit dissolves the loop or the
+        /// simulation stops.
+        /// </summary>
+        private readonly HashSet<string> _cycleMarkedNodeIds = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The loop warning raised by the most recent graph rebuild, kept so
+        /// <see cref="StartSimulation"/> does not overwrite it with the generic
+        /// "running" status.
+        /// </summary>
+        private string? _lastCycleWarning;
 
         private ObservableCollection<VisualNode>? _observedNodes;
         private ObservableCollection<NodeConnection>? _observedConnections;
@@ -550,12 +571,44 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void OnSimulationCyclesChanged(IReadOnlyList<string> cycleNodeIds)
         {
-            if (cycleNodeIds.Count == 0) return;
+            var currentIds = new HashSet<string>(cycleNodeIds, StringComparer.Ordinal);
 
+            // Unmark nodes that are no longer locked. Only remove our own marker: a
+            // block that left the loop may carry a genuine per-tick error, which the
+            // simulation service owns.
+            foreach (var id in _cycleMarkedNodeIds.Where(id => !currentIds.Contains(id)).ToList())
+            {
+                var node = Config.Nodes.FirstOrDefault(n => n.Id == id);
+                if (node is not null && string.Equals(node.ErrorText, CycleLockErrorText, StringComparison.Ordinal))
+                {
+                    node.SetErrorText(null);
+                }
+                _cycleMarkedNodeIds.Remove(id);
+            }
+
+            // Mark newly locked nodes.
+            foreach (var id in currentIds)
+            {
+                if (!_cycleMarkedNodeIds.Add(id)) continue;
+                Config.Nodes.FirstOrDefault(n => n.Id == id)?.SetErrorText(CycleLockErrorText);
+            }
+
+            _lastCycleWarning = currentIds.Count > 0
+                ? BuildCycleWarning(cycleNodeIds)
+                : null;
+
+            if (_lastCycleWarning is not null)
+            {
+                StatusText = _lastCycleWarning;
+            }
+        }
+
+        private string BuildCycleWarning(IReadOnlyList<string> cycleNodeIds)
+        {
             var names = cycleNodeIds
                 .Select(id => Config.Nodes.FirstOrDefault(n => n.Id == id)?.Name ?? id)
                 .ToList();
-            StatusText = $"Warning: {names.Count} node(s) form a loop and will not run: {string.Join(", ", names)}";
+            return $"Warning: {names.Count} node(s) form a loop and will not run: {string.Join(", ", names)}";
         }
 
         private void StartSimulation()
@@ -571,7 +624,10 @@ namespace ModbusForge.Avalonia.ViewModels
             SimulationStoreMode = _visualSimulation.StoreMode == "local"
                 ? "local store (offline)"
                 : "device store";
-            StatusText = $"Simulation running — {SimulationStoreMode}";
+            // A loop warning raised during Start (the graph rebuild fires
+            // CyclesChanged synchronously) must survive the status update, or
+            // the only visible sign that blocks are locked out vanishes.
+            StatusText = _lastCycleWarning ?? $"Simulation running — {SimulationStoreMode}";
         }
 
         private void StopSimulation()
@@ -584,6 +640,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
             IsRunning = false;
             SimulationStoreMode = string.Empty;
+            _cycleMarkedNodeIds.Clear();
+            _lastCycleWarning = null;
             StatusText = "Simulation stopped";
         }
 

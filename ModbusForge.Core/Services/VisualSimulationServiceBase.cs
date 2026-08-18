@@ -221,6 +221,7 @@ namespace ModbusForge.Services
                         node.CurrentValue = false;
                         node.ShowLiveValues = false;
                         node.SetSecondaryOutputs(Array.Empty<KeyValuePair<string, string>>());
+                        node.SetErrorText(null);
                     }
                 }
 
@@ -362,6 +363,11 @@ namespace ModbusForge.Services
                         simulationNode.OutputValues.TryGetValue(p.Name, out var v) ? FormatValue(v) : "n/a"))
                     .ToList();
                 node.SetSecondaryOutputs(secondaryOutputs);
+
+                // Surface per-block failures (and clear them on recovery). Nodes in
+                // cycles are not in the engine's execution order, so they get no
+                // runtime error here; the editor marks those separately.
+                node.SetErrorText(simulationNode.LastError);
 
                 var oldValue = _nodeValueCache.GetValueOrDefault(node.Id, false);
                 var lastUpd = _lastNodeUpdate.GetValueOrDefault(node.Id, DateTime.MinValue);

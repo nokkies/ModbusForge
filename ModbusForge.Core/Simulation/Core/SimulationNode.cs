@@ -40,6 +40,14 @@ namespace ModbusForge.Core.Simulation.Core
         /// </summary>
         public Dictionary<string, object?> Parameters { get; } = new(StringComparer.Ordinal);
 
+        /// <summary>
+        /// Runtime-only: the last evaluation (or output-write) failure message, or null
+        /// when the block last ran cleanly. The engine sets it in the per-node error
+        /// handler and clears it on the next successful evaluation, so a block that
+        /// throws stays visibly frozen instead of failing silently. Not serialized.
+        /// </summary>
+        public string? LastError { get; set; }
+
         public SimulationNode(string id, string name, IFunctionBlock block)
         {
             if (string.IsNullOrWhiteSpace(id))

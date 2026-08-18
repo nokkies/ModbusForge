@@ -179,6 +179,34 @@ namespace ModbusForge.Models
         private string _secondaryOutputText = string.Empty;
 
         /// <summary>
+        /// Runtime-only reason this block is not producing fresh output: a per-tick
+        /// evaluation failure ("..."), a failed output write, or the editor's loop-lock
+        /// marker. Null when the block is healthy. Rendered as a red node border and a
+        /// warning badge with a tooltip. Refreshed by the simulation service each tick
+        /// (cleared on stop), so it is never persisted.
+        /// </summary>
+        [JsonIgnore]
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasError))]
+        private string? _errorText;
+
+        /// <summary>
+        /// True while <see cref="ErrorText"/> carries a reason; drives the node's
+        /// error styling without a null-check converter in XAML.
+        /// </summary>
+        public bool HasError => !string.IsNullOrEmpty(ErrorText);
+
+        /// <summary>
+        /// Replaces the error reason without raising a change when the text is
+        /// unchanged (the simulation service pushes it every tick).
+        /// </summary>
+        public void SetErrorText(string? errorText)
+        {
+            if (ErrorText == errorText) return;
+            ErrorText = errorText;
+        }
+
+        /// <summary>
         /// Cached integer value from the last simulation tick (used by the two-phase evaluator).
         /// </summary>
         public int IntValue { get; set; } = 0;

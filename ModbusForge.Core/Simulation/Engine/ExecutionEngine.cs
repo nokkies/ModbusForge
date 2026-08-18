@@ -92,9 +92,15 @@ namespace ModbusForge.Core.Simulation.Engine
                 try
                 {
                     EvaluateNode(node, dataStore, currentTime, elapsed, CycleCount);
+                    node.LastError = null;
                 }
                 catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
+                    // The block stays frozen (its last outputs remain visible) and the
+                    // error is surfaced on the node so the host can show it; the
+                    // exception itself stays out of the loop, so one bad block cannot
+                    // stop the rest of the graph.
+                    node.LastError = ex.Message;
                     _logger.LogDebug(ex, "Failed to evaluate node {NodeId} ({BlockType})", node.Id, node.Block.TypeId);
                 }
             }
@@ -108,6 +114,7 @@ namespace ModbusForge.Core.Simulation.Engine
                 }
                 catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
+                    node.LastError = $"Output write failed: {ex.Message}";
                     _logger.LogDebug(ex, "Failed to write outputs for node {NodeId}", node.Id);
                 }
             }

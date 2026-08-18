@@ -387,6 +387,16 @@ Drag nodes from the palette to the canvas. Connect nodes by dragging from output
 ### Properties Panel (Right)
 Configure selected node parameters.
 
+## Block Problems
+While the simulation runs, a block that cannot produce fresh output is marked with a
+red border and a red dot in its top-right corner; hover the dot for the reason:
+- **Evaluation failed** — the block threw while computing (for example, a Boolean
+  input bound to a register that holds a non-boolean value). The block keeps its
+  last outputs and retries every cycle; the marker clears as soon as it runs cleanly.
+- **Locked in a loop** — blocks that form a cycle are excluded from the execution
+  order entirely and are marked this way. Break the loop to make them run again.
+When the simulation stops, all markers are cleared.
+
 ## Keyboard Shortcuts
 
 ### Editor Operations

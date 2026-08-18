@@ -292,9 +292,92 @@ namespace ModbusForge.Tests.Simulation
             Assert.True(dataStore.CoilDiscretes[10]);
         }
 
+        [Fact]
+        public void Execute_ThrowingBlock_SetsLastError_AndRestOfGraphStillRuns()
+        {
+            var throwing = new ThrowingBlock(shouldThrow: true, "simulated block fault");
+
+            var engine = new ExecutionEngine(_catalog);
+            var bad = CreateNode("bad", throwing);
+            var healthy = CreateNode("ok", new InputIntBlock());
+            healthy.InputBindings[PortNames.Value] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 1 };
+            var output = CreateNode("out", new OutputIntBlock());
+            output.OutputBindings[PortNames.BoolOutput] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 20 };
+
+            engine.LoadGraph(
+                new[] { bad, healthy, output },
+                new[] { new SimulationConnection("ok", "Output", "out", "Input1") });
+
+            var dataStore = CreateDataStore();
+            dataStore.HoldingRegisters[1] = 7;
+
+            engine.Execute(dataStore);
+
+            // The failing node carries its error for the host to surface...
+            Assert.Equal("simulated block fault", bad.LastError);
+            // ...and it does not take the rest of the graph down with it.
+            Assert.Equal(7, dataStore.HoldingRegisters[20]);
+            Assert.Null(healthy.LastError);
+            Assert.Null(output.LastError);
+        }
+
+        [Fact]
+        public void Execute_ThrowingBlockRecovers_ClearsLastError()
+        {
+            var throwing = new ThrowingBlock(shouldThrow: true, "simulated block fault");
+
+            var engine = new ExecutionEngine(_catalog);
+            var bad = CreateNode("bad", throwing);
+            engine.LoadGraph(new[] { bad }, Array.Empty<SimulationConnection>());
+
+            engine.Execute(CreateDataStore());
+            Assert.Equal("simulated block fault", bad.LastError);
+
+            // The block heals on the next cycle: a clean run removes the marker so
+            // the host stops rendering the error state.
+            throwing.ShouldThrow = false;
+            engine.Execute(CreateDataStore());
+            Assert.Null(bad.LastError);
+        }
+
         private static SimulationNode CreateNode(string id, IFunctionBlock block)
         {
             return new SimulationNode(id, id, block);
+        }
+
+        /// <summary>
+        /// Test-only block whose failure is scriptable: throws while
+        /// <see cref="ShouldThrow"/> is set, writes a constant output otherwise.
+        /// </summary>
+        private sealed class ThrowingBlock : IFunctionBlock
+        {
+            private readonly string _message;
+
+            public ThrowingBlock(bool shouldThrow, string message)
+            {
+                ShouldThrow = shouldThrow;
+                _message = message;
+            }
+
+            public bool ShouldThrow { get; set; }
+
+            public string TypeId => "ThrowingBlock";
+            public string DisplayName => "Throwing";
+            public string Category => "Test";
+            public IReadOnlyList<IPort> Ports { get; } = new List<IPort>
+            {
+                new PortDefinition("Q", PortDirection.Output, SimulationDataType.Int32)
+            };
+            public IReadOnlyList<BlockParameterDescriptor> Parameters { get; } =
+                Array.Empty<BlockParameterDescriptor>();
+
+            public void Execute(IExecutionContext context)
+            {
+                if (ShouldThrow)
+                    throw new InvalidOperationException(_message);
+
+                context.WriteOutput("Q", SimulationValue.Int32(1));
+            }
         }
 
         private static ModbusForge.Data.DataStore CreateDataStore()

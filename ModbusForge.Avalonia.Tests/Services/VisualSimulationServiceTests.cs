@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using ModbusForge.Core.Simulation.Core;
 using ModbusForge.Core.Simulation.Engine;
 using ModbusForge.Data;
 using ModbusForge.Models;
@@ -276,6 +277,103 @@ namespace ModbusForge.Avalonia.Tests.Services
             service.Stop();
 
             Assert.False(service.GetNodeValue("in1"));
+        }
+
+        [Fact]
+        public void Tick_PropagatesEngineFailure_ToNodeErrorText_RecoversOnCleanRun()
+        {
+            // The engine records a failure on the SimulationNode (recording itself
+            // is covered by the ThrowingBlock engine tests); the service must copy
+            // it onto the visual node so the editor can mark the block, and clear
+            // the marker once the block runs cleanly again.
+            var service = new TestableVisualSimulationService();
+            var config = new VisualNodeEditorConfig
+            {
+                Nodes = new ObservableCollection<VisualNode>
+                {
+                    new()
+                    {
+                        Id = "in1",
+                        Name = "IN",
+                        ElementType = PlcElementType.InputBool,
+                        Input1Address = new PlcAddressReference
+                        {
+                            Area = PlcArea.Coil,
+                            Address = 1
+                        }
+                    }
+                }
+            };
+            SetConfig(service, config);
+            service.IsRunningForTest = true;
+            service.UpdateNodeValues();
+
+            var node = config.Nodes[0];
+            Assert.Null(node.ErrorText);
+
+            // Record a failure on the engine's node, then freeze the block: a
+            // disabled node skips evaluation, so the marker survives the next
+            // tick and the propagation step is observable in isolation.
+            // Disabling also changes the graph hash, and the rebuild must REUSE
+            // the SimulationNode (with its LastError) instead of dropping it.
+            GetSimNode(service, "in1").LastError = "injected failure";
+            node.IsEnabled = false;
+            service.UpdateNodeValues();
+
+            Assert.Equal("injected failure", node.ErrorText);
+            Assert.True(node.HasError);
+
+            // Re-enable: the block evaluates cleanly and the marker clears.
+            node.IsEnabled = true;
+            service.UpdateNodeValues();
+
+            Assert.Null(node.ErrorText);
+            Assert.False(node.HasError);
+
+            service.Stop();
+        }
+
+        [Fact]
+        public void Stop_ClearsErrorText()
+        {
+            var service = new TestableVisualSimulationService();
+            var config = new VisualNodeEditorConfig
+            {
+                Nodes = new ObservableCollection<VisualNode>
+                {
+                    new()
+                    {
+                        Id = "in1",
+                        Name = "IN",
+                        ElementType = PlcElementType.InputBool,
+                        Input1Address = new PlcAddressReference
+                        {
+                            Area = PlcArea.Coil,
+                            Address = 1
+                        }
+                    }
+                }
+            };
+            SetConfig(service, config);
+            service.IsRunningForTest = true;
+            service.UpdateNodeValues();
+
+            GetSimNode(service, "in1").LastError = "injected failure";
+            config.Nodes[0].IsEnabled = false;
+            service.UpdateNodeValues();
+            Assert.Equal("injected failure", config.Nodes[0].ErrorText);
+
+            service.Stop();
+
+            Assert.Null(config.Nodes[0].ErrorText);
+        }
+
+        private static SimulationNode GetSimNode(AvaloniaVisualSimulationService service, string nodeId)
+        {
+            var baseType = typeof(AvaloniaVisualSimulationService).BaseType;
+            var field = baseType!.GetField("_simNodes", BindingFlags.NonPublic | BindingFlags.Instance);
+            var dict = (Dictionary<string, SimulationNode>)field!.GetValue(service)!;
+            return dict[nodeId];
         }
     }
 }

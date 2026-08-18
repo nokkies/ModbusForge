@@ -1,6 +1,10 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Input;
+using ModbusForge.Core.Simulation.Blocks;
+using ModbusForge.Core.Simulation.Core;
 using ModbusForge.Models;
 using ModbusForge.Avalonia.ViewModels;
 using ModbusForge.Services;
@@ -236,6 +240,47 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             Assert.Single(vm.Connections);
         }
 
+        [Fact]
+        public void CyclesChanged_MarksLockedNodes_AndUnmarksWhenLoopIsBroken()
+        {
+            using var service = new FakeVisualSimulationService();
+            using var vm = new VisualNodeEditorViewModel(service, NoopTagWindowService.Instance);
+
+            var a = vm.AddNodeAt(PlcElementType.TON, 0, 0)!;
+            var b = vm.AddNodeAt(PlcElementType.AND, 0, 100)!;
+
+            service.RaiseCycles(new[] { a.Id });
+
+            Assert.Equal(VisualNodeEditorViewModel.CycleLockErrorText, a.ErrorText);
+            Assert.Null(b.ErrorText);
+            Assert.Contains("loop", vm.StatusText);
+
+            // The graph edit dissolves the loop: the marker comes off.
+            service.RaiseCycles(Array.Empty<string>());
+
+            Assert.Null(a.ErrorText);
+            Assert.Null(b.ErrorText);
+        }
+
+        [Fact]
+        public void Start_RaisingCyclesDuringStart_LoopWarningSurvivesStatusUpdate()
+        {
+            // The real service rebuilds the graph during Start and fires
+            // CyclesChanged synchronously; the subsequent "Simulation running"
+            // status update must not swallow the loop warning.
+            using var service = new FakeVisualSimulationService();
+            using var vm = new VisualNodeEditorViewModel(service, NoopTagWindowService.Instance);
+
+            var a = vm.AddNodeAt(PlcElementType.TON, 0, 0)!;
+            service.CyclesOnStart = new[] { a.Id };
+
+            vm.StopCommand.Execute(null);
+            vm.RunCommand.Execute(null);
+
+            Assert.Contains("loop", vm.StatusText);
+            Assert.Equal(VisualNodeEditorViewModel.CycleLockErrorText, a.ErrorText);
+        }
+
         private static VisualNodeEditorViewModel CreateVm()
             => new(new AvaloniaVisualSimulationService(), NoopTagWindowService.Instance);
 
@@ -247,6 +292,52 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             public static readonly NoopTagWindowService Instance = new();
             public void ShowTagBrowser() { }
             public void ShowWatchWindow() { }
+        }
+
+        /// <summary>
+        /// Scriptable stand-in for the simulation service: no timer, no engine,
+        /// and a manually raisable CyclesChanged event (optionally during Start,
+        /// mirroring the real service's synchronous graph-rebuild notification).
+        /// </summary>
+        private sealed class FakeVisualSimulationService : IVisualSimulationService
+        {
+            public bool IsRunning { get; private set; }
+
+            /// <summary>
+            /// The editor builds parameter fields from the catalog on node add,
+            /// so the fake must know the block types the tests create.
+            /// </summary>
+            public FunctionBlockCatalog Catalog { get; } = CreateCatalog();
+
+            private static FunctionBlockCatalog CreateCatalog()
+            {
+                var catalog = new FunctionBlockCatalog();
+                catalog.Register(new TonBlock());
+                catalog.Register(new AndBlock());
+                return catalog;
+            }
+            public int ScanIntervalMs => 100;
+            public string StoreMode => "local";
+
+            public IReadOnlyList<string>? CyclesOnStart { get; set; }
+
+            public event Action<IReadOnlyList<string>>? CyclesChanged;
+
+            public void Start(VisualNodeEditorConfig config)
+            {
+                IsRunning = true;
+                if (CyclesOnStart is { Count: > 0 })
+                    CyclesChanged?.Invoke(CyclesOnStart);
+            }
+
+            public void Stop() => IsRunning = false;
+            public void UpdateNodeValues() { }
+            public void SetScanIntervalMs(int ms) { }
+            public bool GetNodeValue(string nodeId) => false;
+            public void WriteNodeValue(string nodeId, double value) { }
+            public void Dispose() { }
+
+            public void RaiseCycles(IReadOnlyList<string> nodeIds) => CyclesChanged?.Invoke(nodeIds);
         }
     }
 }
