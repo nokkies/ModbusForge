@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using LiveChartsCore;
+using LiveChartsCore.Defaults;
+using LiveChartsCore.SkiaSharpView;
+using LiveChartsCore.SkiaSharpView.Painting;
 using Microsoft.Extensions.Options;
 using ModbusForge.Avalonia.ViewModels;
 using ModbusForge.Configuration;
@@ -17,6 +21,17 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             logger = new FakeTrendLogger();
             var options = Options.Create(new LoggingSettings());
             return new TrendViewModel(logger, options, new SyncDispatcher());
+        }
+
+        private static TrendViewModel CreateViewModelWithPenServices(out FakeTrendLogger logger,
+            out FakeTrendSubscriptions subscriptions, out FakeTrendAddDialog dialog)
+        {
+            logger = new FakeTrendLogger();
+            subscriptions = new FakeTrendSubscriptions();
+            dialog = new FakeTrendAddDialog();
+            var options = Options.Create(new LoggingSettings());
+            return new TrendViewModel(logger, options, new SyncDispatcher(),
+                fileDialogService: null, subscriptionService: subscriptions, addDialogService: dialog);
         }
 
         [Fact]
@@ -363,8 +378,203 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             Assert.Equal(TimeSpan.TicksPerSecond, vm.XAxes[0].MinStep);
         }
 
+        [Fact]
+        public void AddPenCommand_SharesDialogResultWithSubscriptionService()
+        {
+            var vm = CreateViewModelWithPenServices(out _, out var subscriptions, out var dialog);
+            dialog.Result = new ModbusForge.Avalonia.Services.TrendAddDialogResult("HoldingRegister", 5, "HR 5", 500);
+
+            vm.AddPenCommand.Execute(null);
+
+            var add = Assert.Single(subscriptions.AddPenCalls);
+            Assert.Equal("HoldingRegister", add.area);
+            Assert.Equal(5, add.address);
+            Assert.Equal("HR 5", add.name);
+            Assert.Equal(500, add.readPeriodMs);
+            Assert.Contains("HR 5", vm.StatusMessage);
+        }
+
+        [Fact]
+        public void AddPenCommand_CanceledDialog_DoesNotSubscribe()
+        {
+            var vm = CreateViewModelWithPenServices(out _, out var subscriptions, out var dialog);
+            dialog.Result = null;
+
+            vm.AddPenCommand.Execute(null);
+
+            Assert.Empty(subscriptions.AddPenCalls);
+            Assert.Equal(string.Empty, vm.StatusMessage);
+        }
+
+        [Fact]
+        public void RemovePen_WatchEntryPen_UnsubscribesAtSource_AndSeriesIsGone()
+        {
+            // Regression: pens were hidden side-effects of watch entries and
+            // "Delete" only removed the chart series - the entry kept
+            // publishing, so the pen re-appeared on the next read. Deleting a
+            // pen must stop the feed at the source (Trend flag on the entry).
+            var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
+            logger.Start();
+            // Simulate the watch entry that feeds this pen.
+            subscriptions.WatchEntries.Add("HR Trend 7");
+            logger.Publish("HR Trend 7", 1.5, DateTime.UtcNow);
+            var item = Assert.Single(vm.SeriesItems);
+
+            vm.RemovePenCommand.Execute(item);
+
+            Assert.Single(subscriptions.RemovePenCalls);
+            Assert.Equal("HR Trend 7", subscriptions.RemovePenCalls[0]);
+            Assert.Empty(vm.SeriesItems);
+            Assert.Empty(vm.Series);
+            Assert.Equal(0, vm.PenCount);
+        }
+
+        [Fact]
+        public void RemovePen_ImportedPen_FallsBackToLoggerRemoval()
+        {
+            var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
+            logger.Start();
+            logger.Publish("Imported:file", 1.0, DateTime.UtcNow);
+            var item = Assert.Single(vm.SeriesItems);
+
+            vm.RemovePenCommand.Execute(item);
+
+            Assert.Empty(subscriptions.RemovePenCalls);
+            Assert.Contains("Imported:file", logger.RemovedCalls);
+            Assert.Empty(vm.SeriesItems);
+        }
+
+        [Fact]
+        public void Clear_UnsubscribesWatchPens_AndRemovesImportedPens()
+        {
+            var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
+            logger.Start();
+            subscriptions.WatchEntries.Add("HR Trend 1");
+            logger.Publish("HR Trend 1", 1.0, DateTime.UtcNow);
+            logger.Publish("Imported:file", 2.0, DateTime.UtcNow);
+            Assert.Equal(2, vm.PenCount);
+
+            vm.ClearCommand.Execute(null);
+
+            Assert.Contains("HR Trend 1", subscriptions.RemovePenCalls);
+            Assert.Contains("Imported:file", logger.RemovedCalls);
+            Assert.Equal(0, vm.PenCount);
+        }
+
+        [Fact]
+        public void TogglingPenVisibility_TogglesTheChartSeries()
+        {
+            var vm = CreateViewModelWithPenServices(out var logger, out _, out _);
+            logger.Start();
+            logger.Publish("k1", 1.0, DateTime.UtcNow);
+            var item = Assert.Single(vm.SeriesItems);
+
+            item.IsVisible = false;
+            Assert.False(((global::LiveChartsCore.Kernel.ChartElement)vm.Series[0]).IsVisible);
+
+            item.IsVisible = true;
+            Assert.True(((global::LiveChartsCore.Kernel.ChartElement)vm.Series[0]).IsVisible);
+        }
+
+        [Fact]
+        public void RenamingPen_UpdatesTheChartSeriesName()
+        {
+            var vm = CreateViewModelWithPenServices(out var logger, out _, out _);
+            logger.Start();
+            logger.Publish("HR Trend 9", 1.0, DateTime.UtcNow);
+            var item = Assert.Single(vm.SeriesItems);
+
+            item.Name = "Motor speed";
+
+            Assert.Equal("Motor speed", vm.Series[0].Name);
+        }
+
+        [Fact]
+        public void Samples_UpdateThePenLastValue()
+        {
+            var vm = CreateViewModelWithPenServices(out var logger, out _, out _);
+            logger.Start();
+            logger.Publish("k1", 1.0, DateTime.UtcNow);
+            var item = Assert.Single(vm.SeriesItems);
+            Assert.Equal(1.0, item.LastValue);
+
+            logger.Publish("k1", 42.5, DateTime.UtcNow.AddSeconds(1));
+
+            Assert.Equal(42.5, item.LastValue);
+        }
+
+        [Fact]
+        public void CycleColorCommand_RotatesThePenColor()
+        {
+            var vm = CreateViewModelWithPenServices(out var logger, out _, out _);
+            logger.Start();
+            logger.Publish("k1", 1.0, DateTime.UtcNow);
+            var item = Assert.Single(vm.SeriesItems);
+            Assert.NotNull(item.CycleColorCommand);
+            var before = item.Color;
+
+            item.CycleColorCommand!.Execute(null);
+
+            Assert.NotEqual(before, item.Color);
+            var series = Assert.IsAssignableFrom<LineSeries<DateTimePoint>>(vm.Series[0]);
+            var stroke = Assert.IsType<SolidColorPaint>(series.Stroke);
+            Assert.Equal(item.Color, stroke.Color);
+        }
+
+        [Fact]
+        public void PenCount_TracksSeriesAdditionsAndRemovals()
+        {
+            var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
+            logger.Start();
+            logger.Publish("k1", 1.0, DateTime.UtcNow);
+            Assert.Equal(1, vm.PenCount);
+
+            vm.RemovePenCommand.Execute(vm.SeriesItems[0]);
+            Assert.Equal(0, vm.PenCount);
+        }
+
+        private sealed class FakeTrendSubscriptions : ModbusForge.Avalonia.Services.ITrendSubscriptionService
+        {
+            public List<(string area, int address, string? name, int readPeriodMs)> AddPenCalls { get; } = new();
+            public List<string> RemovePenCalls { get; } = new();
+
+            /// <summary>Series keys that have a backing watch entry (Trend=true).</summary>
+            public HashSet<string> WatchEntries { get; } = new();
+
+            public string AddPen(string area, int address, string? requestedName, int readPeriodMs,
+                string? type = null, string? initialValue = null)
+            {
+                AddPenCalls.Add((area, address, requestedName, readPeriodMs));
+                var key = string.IsNullOrWhiteSpace(requestedName) ? $"{area} {address}" : requestedName;
+                WatchEntries.Add(key);
+                return key;
+            }
+
+            public bool RemovePen(string key)
+            {
+                if (!WatchEntries.Remove(key)) return false;
+                RemovePenCalls.Add(key);
+                return true;
+            }
+
+            public string DefaultName(string area, int address) => $"{area} Trend {address}";
+        }
+
+        private sealed class FakeTrendAddDialog : ModbusForge.Avalonia.Services.ITrendAddDialogService
+        {
+            public ModbusForge.Avalonia.Services.TrendAddDialogResult? Result { get; set; }
+            public int ShowCalls { get; private set; }
+
+            public ModbusForge.Avalonia.Services.TrendAddDialogResult? TryGetAddTrendPen()
+            {
+                ShowCalls++;
+                return Result;
+            }
+        }
+
         private sealed class FakeTrendLogger : ITrendLogger
         {
+            public List<string> RemovedCalls { get; } = new();
             public int RetentionMinutes { get; private set; } = 5;
             public string ExportFolder => "Exports";
             public bool IsRunning { get; private set; }
@@ -393,6 +603,7 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
 
             public void Remove(string key)
             {
+                RemovedCalls.Add(key);
                 if (Removed is { } handler) handler(key);
             }
 

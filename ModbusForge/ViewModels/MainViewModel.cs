@@ -40,6 +40,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly IDockingHost? _dockingHost;
         private readonly ITrendLogger? _trendLogger;
         private readonly TagService? _tagService;
+        private readonly ITrendSubscriptionService? _trendSubscriptionService;
         private CancellationTokenSource? _pollCts;
         private readonly object _pollLifecycleLock = new();
         private readonly object _pendingPollLock = new();
@@ -288,6 +289,29 @@ namespace ModbusForge.Avalonia.ViewModels
         /// </summary>
         public UnitIdConfiguration CurrentConfig => _unitConfigurationStore.CurrentConfig;
 
+        /// <summary>
+        /// Adds a register to the trend pen list (used by the register-grid
+        /// context menus). Shares the subscription plumbing with the Trends
+        /// view's Add dialog, so pens can be managed from one place.
+        /// </summary>
+        public void AddRegisterToTrend(int address, string area, string? type, string? value)
+        {
+            if (_trendSubscriptionService is null)
+            {
+                StatusMessage = "Trend subscriptions are not available.";
+                return;
+            }
+
+            var key = _trendSubscriptionService.AddPen(
+                area,
+                address,
+                _trendSubscriptionService.DefaultName(area, address),
+                1000,
+                type,
+                value);
+            StatusMessage = $"Added {area} {address} to trend logger.";
+        }
+
         public ObservableCollection<ConnectionProfile> ConnectionProfiles => _connectionManager.Profiles;
 
         /// <summary>
@@ -427,7 +451,8 @@ namespace ModbusForge.Avalonia.ViewModels
             IUnitConfigurationStore? unitConfigurationStore = null,
             IFileSystem? fileSystem = null,
             IDockingHost? dockingHost = null,
-            TagService? tagService = null)
+            TagService? tagService = null,
+            ITrendSubscriptionService? trendSubscriptionService = null)
         {
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -447,6 +472,7 @@ namespace ModbusForge.Avalonia.ViewModels
             _dockingHost = dockingHost;
             _trendLogger = trendLogger;
             _tagService = tagService;
+            _trendSubscriptionService = trendSubscriptionService;
             TrendViewModel = trendViewModel;
             FrameInspectorViewModel = frameInspectorViewModel;
             MqttViewModel = mqttViewModel;

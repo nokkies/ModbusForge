@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LiveChartsCore;
@@ -14,6 +15,7 @@ using LiveChartsCore.SkiaSharpView.Painting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using ModbusForge.Avalonia.Services;
 using ModbusForge.Configuration;
 using ModbusForge.Services;
 using SkiaSharp;
@@ -34,6 +36,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private readonly ITrendLogger _trendLogger;
         private readonly IFileDialogService? _fileDialogService;
+        private readonly ITrendSubscriptionService? _subscriptionService;
+        private readonly ITrendAddDialogService? _addDialogService;
         private readonly ILogger<TrendViewModel> _logger;
         private readonly IDispatcher _dispatcher;
         private readonly Dictionary<string, TrendPoints> _valuesByKey = new();
@@ -129,17 +133,29 @@ namespace ModbusForge.Avalonia.ViewModels
         [ObservableProperty]
         private string _statusMessage = string.Empty;
 
+        /// <summary>
+        /// Number of pens (series). Observable because the pen-list header and
+        /// the chart empty state both display it; ObservableCollection.Count
+        /// does not raise property-changed.
+        /// </summary>
+        [ObservableProperty]
+        private int _penCount;
+
         public TrendViewModel(
             ITrendLogger trendLogger,
             IOptions<LoggingSettings> options,
             IDispatcher dispatcher,
             ILogger<TrendViewModel>? logger = null,
-            IFileDialogService? fileDialogService = null)
+            IFileDialogService? fileDialogService = null,
+            ITrendSubscriptionService? subscriptionService = null,
+            ITrendAddDialogService? addDialogService = null)
         {
             _trendLogger = trendLogger ?? throw new ArgumentNullException(nameof(trendLogger));
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
             _logger = logger ?? NullLogger<TrendViewModel>.Instance;
             _fileDialogService = fileDialogService;
+            _subscriptionService = subscriptionService;
+            _addDialogService = addDialogService;
 
             var settings = options?.Value ?? new LoggingSettings();
             settings.Clamp();
@@ -163,6 +179,8 @@ namespace ModbusForge.Avalonia.ViewModels
             StartCommand = new RelayCommand(Start);
             StopCommand = new RelayCommand(Stop);
             DeleteSelectedCommand = new RelayCommand(RemoveSelected, CanDeleteSelected);
+            AddPenCommand = new RelayCommand(AddPen);
+            RemovePenCommand = new RelayCommand<TrendSeriesItem>(RemovePen, item => item is not null);
             ClearCommand = new RelayCommand(Clear);
             ChangeColorCommand = new RelayCommand(ChangeColor, CanDeleteSelected);
             ResetViewCommand = new RelayCommand(ResetView);
@@ -178,6 +196,8 @@ namespace ModbusForge.Avalonia.ViewModels
         public IRelayCommand StartCommand { get; }
         public IRelayCommand StopCommand { get; }
         public IRelayCommand DeleteSelectedCommand { get; }
+        public IRelayCommand AddPenCommand { get; }
+        public IRelayCommand<TrendSeriesItem> RemovePenCommand { get; }
         public IRelayCommand ClearCommand { get; }
         public IRelayCommand ChangeColorCommand { get; }
         public IRelayCommand ResetViewCommand { get; }
@@ -188,12 +208,6 @@ namespace ModbusForge.Avalonia.ViewModels
         public IRelayCommand ApplyRetentionCommand { get; }
         public IAsyncRelayCommand ExportCsvCommand { get; }
         public IAsyncRelayCommand ImportCsvCommand { get; }
-
-        public class TrendSeriesItem
-        {
-            public string Key { get; init; } = string.Empty;
-            public string Name { get; init; } = string.Empty;
-        }
 
         private void Start()
         {
@@ -211,21 +225,93 @@ namespace ModbusForge.Avalonia.ViewModels
             StatusMessage = "Trend logging stopped.";
         }
 
-        private void RemoveSelected()
+        private void RemoveSelected() => RemovePen(SelectedSeriesItem);
+
+        /// <summary>
+        /// Deletes one pen from the trend view.
+        ///
+        /// Pens backed by a watch entry (added from the register grids or the
+        /// Add dialog) are unsubscribed at the source: the entry's Trend flag
+        /// is cleared, so sampling stops and the pen stays gone. The watch
+        /// entry itself survives in Custom Watch, where it can still be
+        /// re-enabled for trend there.
+        ///
+        /// Imported pens (no watch entry) fall back to removing the series
+        /// from the logger, as before.
+        /// </summary>
+        private void RemovePen(TrendSeriesItem? item)
         {
-            if (SelectedSeriesItem == null) return;
-            _trendLogger.Remove(SelectedSeriesItem.Key);
+            if (item is null) return;
+
+            if (_subscriptionService is not null && _subscriptionService.RemovePen(item.Key))
+            {
+                RemoveSeriesInternal(item.Key);
+                StatusMessage = $"Pen \"{item.Name}\" removed. Its watch entry is kept in Custom Watch.";
+            }
+            else
+            {
+                _trendLogger.Remove(item.Key);
+                StatusMessage = $"Pen \"{item.Name}\" removed.";
+            }
+        }
+
+        /// <summary>
+        /// Shows the Add Trend Pen dialog (register or tag) and subscribes the
+        /// chosen address through the shared watch-entry plumbing. The series
+        /// appears as soon as the first sample is read.
+        /// </summary>
+        private void AddPen()
+        {
+            if (_addDialogService is null)
+            {
+                StatusMessage = "Add pen dialog is not available.";
+                return;
+            }
+            if (_subscriptionService is null)
+            {
+                StatusMessage = "Trend subscriptions are not available.";
+                return;
+            }
+
+            var result = _addDialogService.TryGetAddTrendPen();
+            if (result is null) return;
+
+            try
+            {
+                var key = _subscriptionService.AddPen(result.Area, result.Address, result.Name, result.ReadPeriodMs);
+                StatusMessage = string.Equals(key, result.Name, StringComparison.Ordinal)
+                    ? $"Pen \"{key}\" added. It appears in the chart as data is read."
+                    : $"Address {result.Address} is already watched as \"{key}\" - that pen now trends.";
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogError(ex, "Add trend pen failed");
+                StatusMessage = $"Add pen failed: {ex.Message}";
+            }
         }
 
         private void Clear()
         {
             var keys = _valuesByKey.Keys.ToList();
+            var removedEntries = 0;
             foreach (var key in keys)
             {
-                _trendLogger.Remove(key);
+                if (_subscriptionService is not null && _subscriptionService.RemovePen(key))
+                {
+                    // Unsubscribe at the source so the pen does not re-appear
+                    // on the next read.
+                    RemoveSeriesInternal(key);
+                    removedEntries++;
+                }
+                else
+                {
+                    _trendLogger.Remove(key);
+                }
             }
 
-            StatusMessage = "Trend series cleared.";
+            StatusMessage = removedEntries > 0
+                ? $"Trend pens cleared ({removedEntries} watch entries kept in Custom Watch)."
+                : "Trend series cleared.";
         }
 
         private async Task ExportCsv()
@@ -457,6 +543,7 @@ namespace ModbusForge.Avalonia.ViewModels
             var values = new TrendPoints();
             _valuesByKey[key] = values;
             _samplesByKey[key] = new List<(DateTime ts, double v)>();
+            var item = new TrendSeriesItem(key, name, color);
 
             var series = new LineSeries<DateTimePoint>
             {
@@ -467,34 +554,70 @@ namespace ModbusForge.Avalonia.ViewModels
                 Stroke = new SolidColorPaint(color) { StrokeThickness = 2 }
             };
 
+            // Keep the chart series in sync with the pen-list row.
+            item.PropertyChanged += (sender, e) =>
+            {
+                if (e.PropertyName == nameof(TrendSeriesItem.Name))
+                {
+                    series.Name = item.Name;
+                }
+                else if (e.PropertyName == nameof(TrendSeriesItem.IsVisible))
+                {
+                    // IsVisible lives on the ChartElement base class of all
+                    // concrete series (the ISeries interface does not expose it).
+                    if (series is global::LiveChartsCore.Kernel.ChartElement chartSeries)
+                    {
+                        chartSeries.IsVisible = item.IsVisible;
+                    }
+                }
+                else if (e.PropertyName == nameof(TrendSeriesItem.Color))
+                {
+                    series.GeometryFill = new SolidColorPaint(item.Color);
+                    series.GeometryStroke = new SolidColorPaint(SKColors.White) { StrokeThickness = 1.5f };
+                    series.Stroke = new SolidColorPaint(item.Color) { StrokeThickness = 2 };
+                }
+            };
+            item.RemoveCommand = new RelayCommand(() => RemovePen(item));
+            item.CycleColorCommand = new RelayCommand(() => CycleColor(item));
+
             Series.Add(series);
-            SeriesItems.Add(new TrendSeriesItem { Key = key, Name = name });
+            SeriesItems.Add(item);
+            PenCount = SeriesItems.Count;
+        }
+
+        /// <summary>
+        /// Removes a pen's series, samples, and color from the chart-side
+        /// collections. Called both when the logger removes a key (CSV
+        /// import) and when a pen is deleted locally.
+        /// </summary>
+        private void RemoveSeriesInternal(string key)
+        {
+            _valuesByKey.Remove(key);
+            _samplesByKey.Remove(key);
+            ReleaseColor(key);
+
+            var item = SeriesItems.FirstOrDefault(seriesItem => seriesItem.Key == key);
+            if (item is not null)
+            {
+                var index = SeriesItems.IndexOf(item);
+                SeriesItems.RemoveAt(index);
+                if (ReferenceEquals(SelectedSeriesItem, item))
+                {
+                    SelectedSeriesItem = null;
+                }
+
+                if (index >= 0 && index < Series.Count)
+                {
+                    Series.RemoveAt(index);
+                }
+            }
+
+            PenCount = SeriesItems.Count;
         }
 
         private void OnRemoved(string key)
         {
-            _dispatcher.Invoke(() =>
-            {
-                _valuesByKey.Remove(key);
-                _samplesByKey.Remove(key);
-                ReleaseColor(key);
-
-                var item = SeriesItems.FirstOrDefault(seriesItem => seriesItem.Key == key);
-                if (item is not null)
-                {
-                    var index = SeriesItems.IndexOf(item);
-                    SeriesItems.RemoveAt(index);
-                    if (ReferenceEquals(SelectedSeriesItem, item))
-                    {
-                        SelectedSeriesItem = null;
-                    }
-
-                    if (index >= 0 && index < Series.Count)
-                    {
-                        Series.RemoveAt(index);
-                    }
-                }
-            });
+            _dispatcher.Invoke(() => RemoveSeriesInternal(key));
         }
 
         private void OnSampled(string key, double value, DateTime timestampUtc)
@@ -519,6 +642,11 @@ namespace ModbusForge.Avalonia.ViewModels
                 samples.Add((timestamp, value));
                 TrimSeriesToRetention(key);
                 TrimSeriesToMaxPoints(key);
+
+                if (SeriesItems.FirstOrDefault(item => item.Key == key) is { } item)
+                {
+                    item.LastValue = value;
+                }
 
                 if (IsFollowing)
                 {
@@ -721,9 +849,15 @@ namespace ModbusForge.Avalonia.ViewModels
             _usedColors.Remove(color);
         }
 
-        private void ChangeColor()
+        private void ChangeColor() => CycleColor(SelectedSeriesItem);
+
+        /// <summary>
+        /// Rotates the pen to the next free palette color. The series' paint
+        /// is updated through the item's Color change (kept in sync in
+        /// AddSeries), so the pen-list swatch, legend, and line all follow.
+        /// </summary>
+        private void CycleColor(TrendSeriesItem? item)
         {
-            var item = SelectedSeriesItem;
             if (item is null || !_colorByKey.TryGetValue(item.Key, out var current)) return;
 
             _usedColors.Remove(current);
@@ -741,13 +875,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
             _colorByKey[item.Key] = next;
             _usedColors.Add(next);
-
-            var seriesIndex = SeriesItems.IndexOf(item);
-            if (seriesIndex >= 0 && seriesIndex < Series.Count && Series[seriesIndex] is LineSeries<DateTimePoint> series)
-            {
-                series.Stroke = new SolidColorPaint(next) { StrokeThickness = 2 };
-                series.GeometryFill = new SolidColorPaint(next);
-            }
+            item.Color = next;
         }
 
         public void Dispose()

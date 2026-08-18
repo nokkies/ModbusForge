@@ -194,6 +194,8 @@ namespace ModbusForge.Avalonia
             // Trend logging
             services.Configure<LoggingSettings>(_ => { });
             services.AddSingleton<ITrendLogger, TrendLoggingService>();
+            services.AddSingleton<ITrendSubscriptionService, TrendSubscriptionService>();
+            services.AddSingleton<ITrendAddDialogService, AvaloniaTrendAddDialogService>();
 
             // Frame inspector & pcap import
             services.AddSingleton<FrameInspectorViewModel>();
