@@ -1481,7 +1481,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 OnPropertyChanged(nameof(IsConnectionErrorVisible));
                 OnPropertyChanged(nameof(ConnectionStatusText));
                 OnPropertyChanged(nameof(ServerIpAddress));
-            OnPropertyChanged(nameof(ActiveProfileDisplayName));
+                OnPropertyChanged(nameof(ActiveProfileDisplayName));
                 OnPropertyChanged(nameof(DebugSummary));
                 OnPropertyChanged(nameof(CanConnect));
                 OnPropertyChanged(nameof(CanDisconnect));
@@ -1517,7 +1517,7 @@ namespace ModbusForge.Avalonia.ViewModels
             if (e.PropertyName == nameof(ConnectionProfile.Port))
             {
                 OnPropertyChanged(nameof(ServerIpAddress));
-            OnPropertyChanged(nameof(ActiveProfileDisplayName));
+                OnPropertyChanged(nameof(ActiveProfileDisplayName));
             }
 
             if (e.PropertyName == nameof(ConnectionProfile.UnitId))
