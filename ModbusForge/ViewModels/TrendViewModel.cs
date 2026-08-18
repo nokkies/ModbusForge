@@ -276,10 +276,10 @@ namespace ModbusForge.Avalonia.ViewModels
 
             try
             {
-                var key = _subscriptionService.AddPen(result.Area, result.Address, result.Name, result.ReadPeriodMs, result.Type);
-                StatusMessage = string.Equals(key, result.Name, StringComparison.Ordinal)
-                    ? $"Pen \"{key}\" added. It appears in the chart as data is read."
-                    : $"Address {result.Address} already has a pen named \"{key}\" - it keeps trending.";
+                var pen = _subscriptionService.AddPen(result.Area, result.Address, result.Name, result.ReadPeriodMs, result.Type);
+                StatusMessage = string.Equals(pen.Name, result.Name, StringComparison.Ordinal)
+                    ? $"Pen \"{pen.Name}\" added. It appears in the chart as data is read."
+                    : $"Address {result.Address} already has a pen named \"{pen.Name}\" - it keeps trending.";
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
@@ -531,11 +531,11 @@ namespace ModbusForge.Avalonia.ViewModels
 
             foreach (var pen in _subscriptionService.Pens)
             {
-                if (string.IsNullOrWhiteSpace(pen.Name)) continue;
-                if (_valuesByKey.ContainsKey(pen.Name)) continue;
+                if (string.IsNullOrWhiteSpace(pen.Key)) continue;
+                if (_valuesByKey.ContainsKey(pen.Key)) continue;
 
-                AddSeries(pen.Name, pen.Name);
-                SetRowStatus(pen.Name, pen.IsFailing, pen.LastError);
+                AddSeries(pen.Key, pen.Name);
+                SetRowStatus(pen.Key, pen.IsFailing, pen.LastError);
             }
         }
 
@@ -604,6 +604,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 if (e.PropertyName == nameof(TrendSeriesItem.Name))
                 {
                     series.Name = item.Name;
+                    OnSeriesRenamed(item);
                 }
                 else if (e.PropertyName == nameof(TrendSeriesItem.IsVisible))
                 {
@@ -627,6 +628,42 @@ namespace ModbusForge.Avalonia.ViewModels
             Series.Add(series);
             SeriesItems.Add(item);
             PenCount = SeriesItems.Count;
+        }
+
+        /// <summary>
+        /// Persists an inline rename of a pen-list row back to the unit's
+        /// <see cref="TrendPen"/> (and the trend logger's display name), so
+        /// the new name survives a project save and reload. The series key
+        /// is untouched, so the chart keeps its full history. Rows for
+        /// imported series have no unit pen behind them; their rename is
+        /// display-only, as before.
+        /// </summary>
+        private void OnSeriesRenamed(TrendSeriesItem item)
+        {
+            if (_subscriptionService is null) return;
+
+            var pen = _subscriptionService.Pens.FirstOrDefault(p => p.Key == item.Key);
+            if (pen is null) return;
+
+            // A blank name would leave the pen anonymous after a reload.
+            if (string.IsNullOrWhiteSpace(item.Name))
+            {
+                item.Name = pen.Name;
+                return;
+            }
+
+            if (pen.Name == item.Name) return;
+
+            if (_subscriptionService.RenamePen(item.Key, item.Name))
+            {
+                _trendLogger.SetDisplayName(item.Key, item.Name);
+            }
+            else
+            {
+                // Another pen in the unit already has that name.
+                StatusMessage = $"A pen named \"{item.Name}\" already exists.";
+                item.Name = pen.Name;
+            }
         }
 
         /// <summary>

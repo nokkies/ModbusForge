@@ -90,6 +90,10 @@ namespace ModbusForge.Services
 
             lock (_sync)
             {
+                // Every configuration enters the store through this method
+                // (project load, unit imports), so this is the single place
+                // old pen records get their stable series keys backfilled.
+                configuration.EnsurePenKeys();
                 _configurations[unitId] = configuration.Clone();
             }
         }
@@ -120,6 +124,7 @@ namespace ModbusForge.Services
                         // before they enter the store.
                         var clone = kvp.Value.Clone();
                         clone.MigrateLegacyTrendEntries();
+                        clone.EnsurePenKeys();
                         _configurations[kvp.Key] = clone;
                     }
                 }

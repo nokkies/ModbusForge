@@ -68,11 +68,13 @@ namespace ModbusForge.Models
 
             // Clone trend pens (runtime LastReadUtc is not carried over, like
             // the entries' read stamps - a clone is a fresh copy, not a
-            // continuation).
+            // continuation). The stable Key IS carried over: a clone of a unit
+            // keeps trending the same series.
             foreach (var pen in TrendPens)
             {
                 clone.TrendPens.Add(new TrendPen
                 {
+                    Key = pen.Key,
                     Name = pen.Name,
                     Area = pen.Area,
                     Address = pen.Address,
@@ -114,9 +116,11 @@ namespace ModbusForge.Models
 
                 if (!alreadyCovered)
                 {
+                    var name = MakeUniquePenName(TrendPens, string.IsNullOrWhiteSpace(entry.Name) ? $"Trend {entry.Address}" : entry.Name);
                     TrendPens.Add(new TrendPen
                     {
-                        Name = MakeUniquePenName(TrendPens, string.IsNullOrWhiteSpace(entry.Name) ? $"Trend {entry.Address}" : entry.Name),
+                        Key = name,
+                        Name = name,
                         Area = entry.Area ?? "HoldingRegister",
                         Address = entry.Address,
                         Type = string.IsNullOrWhiteSpace(entry.Type) ? "int" : entry.Type,
@@ -129,6 +133,24 @@ namespace ModbusForge.Models
             }
 
             return moved;
+        }
+
+        /// <summary>
+        /// Fills <see cref="TrendPen.Key"/> for pens saved before pens had
+        /// explicit stable keys, when the key was implicit in the pen's name.
+        /// The backfill is the old name itself, so every existing series keeps
+        /// the key its samples were published under and no chart history is
+        /// orphaned by the upgrade. Idempotent - pens with a key keep it.
+        /// </summary>
+        public void EnsurePenKeys()
+        {
+            foreach (var pen in TrendPens)
+            {
+                if (string.IsNullOrEmpty(pen.Key))
+                {
+                    pen.Key = pen.Name;
+                }
+            }
         }
 
         /// <summary>

@@ -341,9 +341,13 @@ public sealed class ApiApplicationService : IApiApplicationService
                 return existing;
             }
 
+            var name = UnitIdConfiguration.MakeUniquePenName(pens, pen.Name);
             var created = new TrendPen
             {
-                Name = UnitIdConfiguration.MakeUniquePenName(pens, pen.Name),
+                // Same rule as the desktop flow: the key is born with the
+                // unique name and stays stable while the name is renamable.
+                Key = name,
+                Name = name,
                 Area = pen.Area ?? "HoldingRegister",
                 Address = pen.Address,
                 Type = string.IsNullOrWhiteSpace(pen.Type) ? "int" : pen.Type,

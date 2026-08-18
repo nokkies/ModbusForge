@@ -307,13 +307,13 @@ namespace ModbusForge.Avalonia.ViewModels
                 return;
             }
 
-            var key = _trendSubscriptionService.AddPen(
+            var pen = _trendSubscriptionService.AddPen(
                 area,
                 address,
                 _trendSubscriptionService.DefaultName(area, address),
                 1000,
                 type);
-            StatusMessage = $"Trend pen '{key}' added. It appears in the chart as data is read.";
+            StatusMessage = $"Trend pen '{pen.Name}' added. It appears in the chart as data is read.";
         }
 
         public ObservableCollection<ConnectionProfile> ConnectionProfiles => _connectionManager.Profiles;
@@ -2985,7 +2985,7 @@ namespace ModbusForge.Avalonia.ViewModels
             bool firstInEpisode;
             lock (_failingTrendPensLock)
             {
-                firstInEpisode = _failingTrendPens.Add(pen.Name);
+                firstInEpisode = _failingTrendPens.Add(pen.Key);
             }
             if (!firstInEpisode)
             {
@@ -3000,7 +3000,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     StatusMessage = $"Trend pen '{pen.Name}' failed to read: {exception.Message}";
                     pen.IsFailing = true;
                     pen.LastError = exception.Message;
-                    TrendViewModel?.SetPenStatus(pen.Name, failing: true, exception.Message);
+                    TrendViewModel?.SetPenStatus(pen.Key, failing: true, exception.Message);
                 });
             }
             catch (OperationCanceledException)
@@ -3042,7 +3042,7 @@ namespace ModbusForge.Avalonia.ViewModels
                         {
                             pen.IsFailing = false;
                             pen.LastError = null;
-                            TrendViewModel?.SetPenStatus(pen.Name, failing: false, null);
+                            TrendViewModel?.SetPenStatus(pen.Key, failing: false, null);
                         }
                     }
                 });
@@ -3355,7 +3355,7 @@ namespace ModbusForge.Avalonia.ViewModels
                         {
                             var value = await ReadTrendPenValueSerializedAsync(pen, token);
                             var readAt = DateTime.UtcNow;
-                            var recovered = MarkTrendPenRecovered(pen.Name);
+                            var recovered = MarkTrendPenRecovered(pen.Key);
                             await _dispatcher.InvokeAsync(() =>
                             {
                                 pen.LastReadUtc = readAt;
@@ -3363,13 +3363,16 @@ namespace ModbusForge.Avalonia.ViewModels
                                 {
                                     pen.IsFailing = false;
                                     pen.LastError = null;
-                                    TrendViewModel?.SetPenStatus(pen.Name, failing: false, null);
+                                    TrendViewModel?.SetPenStatus(pen.Key, failing: false, null);
                                 }
                             });
 
                             if (_trendLogger != null && TryParseTrendValue(value, out var trendValue))
                             {
-                                _trendLogger.Publish(pen.Name, trendValue, readAt);
+                                // The stable key - not the display name - is
+                                // what the chart series is identified by, so
+                                // a pen rename never splits its history.
+                                _trendLogger.Publish(pen.Key, trendValue, readAt);
                             }
                         }
                         catch (OperationCanceledException)

@@ -319,7 +319,7 @@ A pen appears in the pen list immediately; its line draws as soon as the first s
 
 The pen list on the right shows every pen:
 
-- **Rename** inline (updates the chart legend)
+- **Rename** inline - updates the chart legend and is saved with the unit configuration. The pen keeps its series history: only the label changes, the data line is untouched
 - **Click the swatch** to cycle the pen's color
 - **Eye** toggles the pen's line on the chart
 - **Red dot** - the pen's reads are failing; hover the dot for the last error. Failing pens keep retrying every cycle and recover on their own when reads succeed again

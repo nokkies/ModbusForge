@@ -416,7 +416,7 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
             logger.Start();
             // Simulate the unit pen that feeds this series.
-            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen { Name = "HR Trend 7" });
+            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen { Key = "HR Trend 7", Name = "HR Trend 7" });
             logger.Publish("HR Trend 7", 1.5, DateTime.UtcNow);
             var item = Assert.Single(vm.SeriesItems);
 
@@ -449,7 +449,7 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         {
             var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
             logger.Start();
-            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen { Name = "HR Trend 1" });
+            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen { Key = "HR Trend 1", Name = "HR Trend 1" });
             logger.Publish("HR Trend 1", 1.0, DateTime.UtcNow);
             logger.Publish("Imported:file", 2.0, DateTime.UtcNow);
             Assert.Equal(2, vm.PenCount);
@@ -470,7 +470,7 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             var vm = CreateViewModelWithPenServices(out _, out var subscriptions, out _);
             subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
             {
-                Name = "HR Trend 9", Area = "HoldingRegister", Address = 9
+                Key = "HR Trend 9", Name = "HR Trend 9", Area = "HoldingRegister", Address = 9
             });
 
             vm.RefreshPens();
@@ -489,7 +489,7 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
             logger.Start();
             logger.Publish("HR Trend 1", 1.0, DateTime.UtcNow);
-            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen { Name = "HR Trend 1" });
+            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen { Key = "HR Trend 1", Name = "HR Trend 1" });
 
             vm.RefreshPens();
 
@@ -525,7 +525,7 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             logger.Start();
             subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
             {
-                Name = "HR Trend 42", Area = "HoldingRegister", Address = 42
+                Key = "HR Trend 42", Name = "HR Trend 42", Area = "HoldingRegister", Address = 42
             });
 
             vm.SetPenStatus("HR Trend 42", failing: true, "timeout");
@@ -535,6 +535,125 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             Assert.True(item.IsFailing);
             Assert.Equal("timeout", item.FailureMessage);
             Assert.Null(item.LastValue);
+        }
+
+        [Fact]
+        public void RenamePenRow_PersistsNewName_KeepsSeriesKeyAndHistory()
+        {
+            // The inline rename is the pen's display name changing, not the
+            // series being re-keyed: the unit pen gets the new name, the
+            // stable key (and therefore the accumulated samples) is kept,
+            // and the chart legend follows.
+            var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
+            logger.Start();
+            logger.Publish("HR Trend 5", 1.0, DateTime.UtcNow);
+            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
+            {
+                Key = "HR Trend 5", Name = "HR Trend 5", Area = "HoldingRegister", Address = 5
+            });
+
+            var item = Assert.Single(vm.SeriesItems);
+            item.Name = "Pressure";
+
+            var pen = Assert.Single(subscriptions.PensList);
+            Assert.Equal("Pressure", pen.Name);
+            Assert.Equal("HR Trend 5", pen.Key);
+
+            Assert.Equal(("HR Trend 5", "Pressure"), Assert.Single(subscriptions.RenamePenCalls));
+            Assert.Equal(("HR Trend 5", "Pressure"), Assert.Single(logger.SetDisplayNameCalls));
+
+            // The row is the same row: key intact, sample intact, legend renamed.
+            Assert.Single(vm.SeriesItems);
+            Assert.Equal("HR Trend 5", vm.SeriesItems[0].Key);
+            Assert.Equal("Pressure", vm.SeriesItems[0].Name);
+            Assert.Equal(1.0, vm.SeriesItems[0].LastValue);
+            Assert.Equal("Pressure", vm.Series[0].Name);
+        }
+
+        [Fact]
+        public void RenamePenRow_BlankName_RevertsToPreviousName()
+        {
+            var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
+            logger.Start();
+            logger.Publish("HR Trend 5", 1.0, DateTime.UtcNow);
+            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
+            {
+                Key = "HR Trend 5", Name = "HR Trend 5", Area = "HoldingRegister", Address = 5
+            });
+
+            var item = Assert.Single(vm.SeriesItems);
+            item.Name = "";
+
+            // A blank name would leave the pen anonymous after a reload.
+            Assert.Equal("HR Trend 5", item.Name);
+            Assert.Equal("HR Trend 5", Assert.Single(subscriptions.PensList).Name);
+            Assert.Empty(subscriptions.RenamePenCalls);
+            Assert.Empty(logger.SetDisplayNameCalls);
+        }
+
+        [Fact]
+        public void RenamePenRow_CollidingName_RevertsAndReportsTheConflict()
+        {
+            var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
+            logger.Start();
+            logger.Publish("HR Trend 5", 1.0, DateTime.UtcNow);
+            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
+            {
+                Key = "HR Trend 5", Name = "HR Trend 5", Area = "HoldingRegister", Address = 5
+            });
+            // A second pen already owns the target name.
+            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
+            {
+                Key = "IR Trend 9", Name = "Taken", Area = "InputRegister", Address = 9
+            });
+
+            var item = vm.SeriesItems.Single(s => s.Key == "HR Trend 5");
+            item.Name = "Taken";
+
+            Assert.Equal("HR Trend 5", item.Name);
+            Assert.Equal("HR Trend 5", subscriptions.PensList[0].Name);
+            Assert.Empty(subscriptions.RenamePenCalls);
+            Assert.Contains("already exists", vm.StatusMessage);
+        }
+
+        [Fact]
+        public void RefreshPens_RowsAreKeyedByPenKey_NotByName()
+        {
+            // A pen renamed in an earlier session: display name and stable
+            // key differ. The row must be keyed by the key so the pen's
+            // samples keep feeding the same series.
+            var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
+            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
+            {
+                Key = "HR Trend 8", Name = "Flow", Area = "HoldingRegister", Address = 8
+            });
+
+            vm.RefreshPens();
+
+            var item = Assert.Single(vm.SeriesItems);
+            Assert.Equal("HR Trend 8", item.Key);
+            Assert.Equal("Flow", item.Name);
+
+            logger.Start();
+            logger.Publish("HR Trend 8", 3.5, DateTime.UtcNow);
+            Assert.Equal(3.5, vm.SeriesItems[0].LastValue);
+        }
+
+        [Fact]
+        public void RenameImportedSeriesRow_DoesNotTouchUnitPens()
+        {
+            // Rows without a unit pen behind them (CSV imports) keep their
+            // display-only rename; the subscription service is not involved.
+            var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
+            logger.Start();
+            logger.Publish("Imported:file", 1.0, DateTime.UtcNow);
+
+            var item = Assert.Single(vm.SeriesItems);
+            item.Name = "Renamed import";
+
+            Assert.Equal("Renamed import", vm.SeriesItems[0].Name);
+            Assert.Empty(subscriptions.RenamePenCalls);
+            Assert.Empty(logger.SetDisplayNameCalls);
         }
 
         [Fact]
@@ -613,33 +732,46 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         {
             public List<(string area, int address, string? name, int readPeriodMs)> AddPenCalls { get; } = new();
             public List<string> RemovePenCalls { get; } = new();
+            public List<(string key, string name)> RenamePenCalls { get; } = new();
 
             /// <summary>The current unit's pens (the source the pen list mirrors).</summary>
             public List<ModbusForge.Models.TrendPen> PensList { get; } = new();
 
             public IReadOnlyCollection<ModbusForge.Models.TrendPen> Pens => PensList;
 
-            public string AddPen(string area, int address, string? requestedName, int readPeriodMs,
+            public ModbusForge.Models.TrendPen AddPen(string area, int address, string? requestedName, int readPeriodMs,
                 string? type = null)
             {
                 AddPenCalls.Add((area, address, requestedName, readPeriodMs));
-                var key = string.IsNullOrWhiteSpace(requestedName) ? $"{area} {address}" : requestedName;
-                PensList.Add(new ModbusForge.Models.TrendPen
+                var name = string.IsNullOrWhiteSpace(requestedName) ? $"{area} {address}" : requestedName;
+                var pen = new ModbusForge.Models.TrendPen
                 {
-                    Name = key,
+                    Key = name,
+                    Name = name,
                     Area = area,
                     Address = address,
                     Type = type ?? "int"
-                });
-                return key;
+                };
+                PensList.Add(pen);
+                return pen;
             }
 
             public bool RemovePen(string key)
             {
-                var pen = PensList.FirstOrDefault(p => p.Name == key);
+                var pen = PensList.FirstOrDefault(p => p.Key == key);
                 if (pen is null) return false;
                 PensList.Remove(pen);
                 RemovePenCalls.Add(key);
+                return true;
+            }
+
+            public bool RenamePen(string key, string? newName)
+            {
+                var pen = PensList.FirstOrDefault(p => p.Key == key);
+                if (pen is null || string.IsNullOrWhiteSpace(newName)) return false;
+                if (PensList.Any(p => !ReferenceEquals(p, pen) && p.Name == newName)) return false;
+                pen.Name = newName;
+                RenamePenCalls.Add((key, newName));
                 return true;
             }
 
@@ -661,6 +793,7 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         private sealed class FakeTrendLogger : ITrendLogger
         {
             public List<string> RemovedCalls { get; } = new();
+            public List<(string key, string name)> SetDisplayNameCalls { get; } = new();
             public int RetentionMinutes { get; private set; } = 5;
             public string ExportFolder => "Exports";
             public bool IsRunning { get; private set; }
@@ -691,6 +824,11 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             {
                 RemovedCalls.Add(key);
                 if (Removed is { } handler) handler(key);
+            }
+
+            public void SetDisplayName(string key, string displayName)
+            {
+                SetDisplayNameCalls.Add((key, displayName));
             }
 
             public void Publish(string key, double value, DateTime timestampUtc)

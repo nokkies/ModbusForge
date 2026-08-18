@@ -18,6 +18,13 @@ namespace ModbusForge.Services
         void Add(string key, string displayName);
         void Remove(string key);
 
+        /// <summary>
+        /// Updates the display name of an active series (a pen rename). The
+        /// key - and therefore the accumulated samples - is untouched.
+        /// No-op for unknown keys and blank names.
+        /// </summary>
+        void SetDisplayName(string key, string displayName);
+
         // Push a sample for an existing key
         void Publish(string key, double value, DateTime timestampUtc);
 

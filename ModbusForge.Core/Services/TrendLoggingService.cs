@@ -87,6 +87,17 @@ namespace ModbusForge.Services
             if (existed) Removed?.Invoke(key);
         }
 
+        public void SetDisplayName(string key, string displayName)
+        {
+            if (string.IsNullOrWhiteSpace(key)) return;
+            if (string.IsNullOrWhiteSpace(displayName)) return;
+            lock (_sync)
+            {
+                if (!_keys.TryGetValue(key, out var current) || current == displayName) return;
+                _keys[key] = displayName;
+            }
+        }
+
         public void Publish(string key, double value, DateTime timestampUtc)
         {
             if (string.IsNullOrWhiteSpace(key)) return;

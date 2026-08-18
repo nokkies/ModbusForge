@@ -176,6 +176,42 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
+        public void SetDisplayName_UpdatesTheActiveKeyWithoutTouchingSamples()
+        {
+            // Arrange
+            var service = new TrendLoggingService(_mockOptions.Object);
+            service.Add("pen-key", "Original name");
+            service.Start();
+            service.Publish("pen-key", 42.0, DateTime.UtcNow);
+
+            // Act - a pen rename: display label changes, key (and samples) do not.
+            service.SetDisplayName("pen-key", "Renamed pen");
+
+            // Assert
+            Assert.Equal("Renamed pen", service.ActiveKeys["pen-key"]);
+            // The key still resolves, so the chart keeps feeding the same series.
+            Assert.Contains("pen-key", service.ActiveKeys.Keys);
+        }
+
+        [Fact]
+        public void SetDisplayName_UnknownKeyOrBlankName_IsANoop()
+        {
+            // Arrange
+            var service = new TrendLoggingService(_mockOptions.Object);
+            service.Add("pen-key", "Original name");
+
+            // Act
+            service.SetDisplayName("missing-key", "Whatever");
+            service.SetDisplayName("pen-key", "   ");
+            service.SetDisplayName("", "Whatever");
+
+            // Assert - a blank display name falls back to the key, which is
+            // the current value, so nothing changes.
+            Assert.Equal("Original name", service.ActiveKeys["pen-key"]);
+            Assert.Single(service.ActiveKeys);
+        }
+
+        [Fact]
         public void Remove_ShouldRaiseRemovedEvent()
         {
             // Arrange

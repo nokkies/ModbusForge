@@ -13,8 +13,21 @@ namespace ModbusForge.Models
     public sealed class TrendPen
     {
         /// <summary>
-        /// Stable series key and display name. Unique per unit - the key the
-        /// samples are published to the trend logger with.
+        /// Stable series key: the identity the samples are published to the
+        /// trend logger with, the chart series and pen-list row are keyed by.
+        /// Assigned once (initialized with the pen's unique name at creation)
+        /// and never changed, so renaming a pen keeps its chart history.
+        /// Persisted; backfilled from <see cref="Name"/> for configurations
+        /// saved before pens had explicit keys (see
+        /// <see cref="UnitIdConfiguration.EnsurePenKeys"/>).
+        /// </summary>
+        public string Key { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Display name of the pen: shown in the pen list and the chart
+        /// legend. Free to rename inline; the rename is persisted with the
+        /// unit configuration while <see cref="Key"/> keeps the series stable.
+        /// Unique per unit (enforced at creation, not on rename).
         /// </summary>
         public string Name { get; set; } = string.Empty;
 
