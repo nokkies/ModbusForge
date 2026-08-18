@@ -52,6 +52,11 @@ namespace ModbusForge.Avalonia.ViewModels
         private readonly object _monitorFailureLock = new();
         private readonly Dictionary<PlcArea, int> _monitorFailureCounts = new();
         private readonly Dictionary<PlcArea, DateTime> _lastMonitorFailureUtc = new();
+        // Pens keep polling through transient failures (pausing a trend is
+        // worse than a stale point), so a failing pen is reported once per
+        // failure episode instead of once per cycle.
+        private readonly object _failingTrendPensLock = new();
+        private readonly HashSet<string> _failingTrendPens = new();
         private bool _disposed;
         private bool _isApplyingUnitConfiguration;
         private DateTime _lastHoldingReadUtc;
@@ -294,7 +299,7 @@ namespace ModbusForge.Avalonia.ViewModels
         /// context menus). Shares the subscription plumbing with the Trends
         /// view's Add dialog, so pens can be managed from one place.
         /// </summary>
-        public void AddRegisterToTrend(int address, string area, string? type, string? value)
+        public void AddRegisterToTrend(int address, string area, string? type)
         {
             if (_trendSubscriptionService is null)
             {
@@ -307,9 +312,8 @@ namespace ModbusForge.Avalonia.ViewModels
                 address,
                 _trendSubscriptionService.DefaultName(area, address),
                 1000,
-                type,
-                value);
-            StatusMessage = $"Added {area} {address} to trend logger.";
+                type);
+            StatusMessage = $"Trend pen '{key}' added. It appears in the chart as data is read.";
         }
 
         public ObservableCollection<ConnectionProfile> ConnectionProfiles => _connectionManager.Profiles;
@@ -602,6 +606,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
             ShowAllTabs();
             HookCustomEntries();
+            HookTrendPens();
             UpdateCustomWatchMonitoringState();
         }
 
@@ -1067,6 +1072,7 @@ namespace ModbusForge.Avalonia.ViewModels
             if (e.PropertyName == nameof(CustomEntries))
             {
                 HookCustomEntries();
+                HookTrendPens();
                 UpdateCustomWatchMonitoringState();
             }
         }
@@ -1129,11 +1135,38 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void UpdateCustomWatchMonitoringState()
         {
-            var shouldMonitor = CustomEntries.Any(entry => entry.Monitor || entry.Continuous);
+            // Trend pens poll in the same loop: a unit with pens but no
+            // monitored watch entries still needs the loop running.
+            var shouldMonitor = CustomEntries.Any(entry => entry.Monitor || entry.Continuous)
+                || CurrentConfig.TrendPens.Count > 0;
             if (IsCustomWatchMonitoring != shouldMonitor)
             {
                 IsCustomWatchMonitoring = shouldMonitor;
             }
+        }
+
+        // The current unit's pen collection is hooked (like the entries
+        // collection) so any pen mutation - Trends view, context menus, API
+        // - re-evaluates whether the polling loop must run.
+        private ObservableCollection<TrendPen>? _hookedTrendPens;
+
+        private void HookTrendPens()
+        {
+            var pens = CurrentConfig.TrendPens;
+            if (_hookedTrendPens == pens) return;
+
+            if (_hookedTrendPens != null)
+            {
+                _hookedTrendPens.CollectionChanged -= OnTrendPensCollectionChanged;
+            }
+
+            _hookedTrendPens = pens;
+            pens.CollectionChanged += OnTrendPensCollectionChanged;
+        }
+
+        private void OnTrendPensCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            UpdateCustomWatchMonitoringState();
         }
 
         partial void OnActiveProfileChanged(ConnectionProfile? value)
@@ -2921,6 +2954,57 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
+        private async Task<string> ReadTrendPenValueSerializedAsync(TrendPen pen, CancellationToken token)
+        {
+            await _modbusIoGate.WaitAsync(token);
+            try
+            {
+                return await ReadAddressValueAsync(pen.Area, pen.Address, pen.Type);
+            }
+            finally
+            {
+                _modbusIoGate.Release();
+            }
+        }
+
+        /// <summary>
+        /// Reports a failed trend pen read. A pen is not paused on failure
+        /// (that would strand the trend with no recovery), so it is reported
+        /// once per failure episode: the first failure of a pen gets a log
+        /// line and a status message; repeats stay silent until a read
+        /// succeeds again (<see cref="MarkTrendPenRecovered"/>).
+        /// </summary>
+        private async Task ReportTrendPenFailureAsync(TrendPen pen, Exception exception)
+        {
+            bool firstInEpisode;
+            lock (_failingTrendPensLock)
+            {
+                firstInEpisode = _failingTrendPens.Add(pen.Name);
+            }
+            if (!firstInEpisode)
+            {
+                return;
+            }
+
+            _logger.LogError(exception, "Trend pen {PenName} ({Area} {Address}) read failed; retrying each cycle until it recovers", pen.Name, pen.Area, pen.Address);
+            try
+            {
+                await _dispatcher.InvokeAsync(() => StatusMessage = $"Trend pen '{pen.Name}' failed to read: {exception.Message}");
+            }
+            catch (OperationCanceledException)
+            {
+                // Loop is going away; the status bar is irrelevant.
+            }
+        }
+
+        private void MarkTrendPenRecovered(string penName)
+        {
+            lock (_failingTrendPensLock)
+            {
+                _failingTrendPens.Remove(penName);
+            }
+        }
+
         /// <summary>
         /// Reports a failed custom-entry operation. A modal dialog is only shown for
         /// explicit single operations (the user asked for this exact entry and must
@@ -2947,14 +3031,22 @@ namespace ModbusForge.Avalonia.ViewModels
         }
 
         private async Task<string> ReadCustomValueAsync(CustomEntry entry)
+            => await ReadAddressValueAsync(entry.Area, entry.Address, entry.Type);
+
+        /// <summary>
+        /// Reads one address from the active connection. Shared by custom watch
+        /// entries and trend pens, which differ only in where the result goes
+        /// (entry.Value vs the trend logger).
+        /// </summary>
+        private async Task<string> ReadAddressValueAsync(string? area, int address, string? type)
         {
             var service = ActiveService;
             if (service == null || ActiveProfile == null)
                 throw new InvalidOperationException("No active service.");
 
             var unitId = EffectiveUnitId;
-            var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
-            var type = (entry.Type ?? "int").ToLowerInvariant();
+            area = (area ?? "HoldingRegister").ToLowerInvariant();
+            type = (type ?? "int").ToLowerInvariant();
 
             switch (area)
             {
@@ -2963,8 +3055,8 @@ namespace ModbusForge.Avalonia.ViewModels
                     int count = type == "real" ? 2 : 1;
                     var areaEnum = area == "holdingregister" ? PlcArea.HoldingRegister : PlcArea.InputRegister;
                     var values = areaEnum == PlcArea.HoldingRegister
-                        ? await service.ReadHoldingRegistersAsync(unitId, entry.Address, count)
-                        : await service.ReadInputRegistersAsync(unitId, entry.Address, count);
+                        ? await service.ReadHoldingRegistersAsync(unitId, address, count)
+                        : await service.ReadInputRegistersAsync(unitId, address, count);
 
                     if (values == null || values.Length == 0)
                         throw new InvalidOperationException("Read returned no response.");
@@ -2983,13 +3075,13 @@ namespace ModbusForge.Avalonia.ViewModels
                 case "coil":
                 case "discreteinput":
                     var coilValues = area == "coil"
-                        ? await service.ReadCoilsAsync(unitId, entry.Address, 1)
-                        : await service.ReadDiscreteInputsAsync(unitId, entry.Address, 1);
+                        ? await service.ReadCoilsAsync(unitId, address, 1)
+                        : await service.ReadDiscreteInputsAsync(unitId, address, 1);
                     if (coilValues == null || coilValues.Length == 0) return "No response";
                     return coilValues[0] ? "1" : "0";
 
                 default:
-                    return $"Unknown area: {entry.Area}";
+                    return $"Unknown area: {area}";
             }
         }
 
@@ -3091,6 +3183,9 @@ namespace ModbusForge.Avalonia.ViewModels
                         {
                             CustomEntries.Add(e);
                         }
+                        // Legacy files may carry the old Trend flag on entries;
+                        // convert those into pens of the current unit.
+                        CurrentConfig.MigrateLegacyTrendEntries();
                         ReadAllCustomNowCommand.NotifyCanExecuteChanged();
                     });
                     StatusMessage = $"Loaded {entries.Count} custom entries.";
@@ -3155,11 +3250,6 @@ namespace ModbusForge.Avalonia.ViewModels
                                     entry.Value = value;
                                     entry.LastReadUtc = readAt;
                                 });
-
-                                if (entry.Trend && _trendLogger != null && TryParseTrendValue(value, out var trendValue))
-                                {
-                                    _trendLogger.Publish(entry.Name, trendValue, readAt);
-                                }
                             }
                             catch (OperationCanceledException)
                             {
@@ -3195,6 +3285,44 @@ namespace ModbusForge.Avalonia.ViewModels
                                 await _dispatcher.InvokeAsync(() => entry.Continuous = false);
                                 await ReportCustomOperationFailureAsync("write", entry, ex, true, showDialog: false);
                             }
+                        }
+                    }
+
+                    // Trend pens: first-class series sources polled in the
+                    // same cycle. Unlike watch entries, a failing pen keeps
+                    // retrying (pausing a trend would leave a flat line with
+                    // no way to recover it), reported once per episode.
+                    var pens = await _dispatcher.InvokeAsync(() => CurrentConfig.TrendPens.ToList());
+                    foreach (var pen in pens)
+                    {
+                        token.ThrowIfCancellationRequested();
+
+                        var penPeriod = pen.ReadPeriodMs <= 0 ? DefaultCustomPeriodMs : pen.ReadPeriodMs;
+                        if ((now - pen.LastReadUtc).TotalMilliseconds < penPeriod)
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            var value = await ReadTrendPenValueSerializedAsync(pen, token);
+                            var readAt = DateTime.UtcNow;
+                            await _dispatcher.InvokeAsync(() => pen.LastReadUtc = readAt);
+
+                            if (_trendLogger != null && TryParseTrendValue(value, out var trendValue))
+                            {
+                                _trendLogger.Publish(pen.Name, trendValue, readAt);
+                            }
+
+                            MarkTrendPenRecovered(pen.Name);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex) when (ex is not OutOfMemoryException)
+                        {
+                            await ReportTrendPenFailureAsync(pen, ex);
                         }
                     }
 
@@ -3688,6 +3816,9 @@ namespace ModbusForge.Avalonia.ViewModels
                     {
                         var configuration = pair.Value.Clone();
                         configuration.UnitId = pair.Key;
+                        // Projects saved before trend pens existed carry the
+                        // old Trend flag on watch entries; convert them.
+                        configuration.MigrateLegacyTrendEntries();
                         _unitConfigurationStore.SetConfiguration(pair.Key, configuration);
                     }
                 }

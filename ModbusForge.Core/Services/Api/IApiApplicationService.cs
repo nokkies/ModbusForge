@@ -74,4 +74,14 @@ public interface IApiApplicationService
 
     /// <summary>Adds a trend series key with an optional display name.</summary>
     Task AddTrendAsync(string key, string displayName, CancellationToken token);
+
+    /// <summary>Returns a snapshot of the current unit's trend pens.</summary>
+    Task<System.Collections.Generic.IReadOnlyList<Models.TrendPen>> GetTrendPensAsync(CancellationToken token);
+
+    /// <summary>
+    /// Adds a trend pen to the current unit. Reuses the pen that already
+    /// covers the same area + address. Returns the pen (its Name is the
+    /// stable series key samples are published with).
+    /// </summary>
+    Task<Models.TrendPen> AddTrendPenAsync(Models.TrendPen pen, CancellationToken token);
 }

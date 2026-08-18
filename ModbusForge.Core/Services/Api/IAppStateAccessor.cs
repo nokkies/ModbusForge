@@ -30,5 +30,6 @@ public interface IAppStateAccessor : INotifyPropertyChanged
     ICommand DisconnectCommand { get; }
 
     ObservableCollection<CustomEntry> CustomEntries { get; }
+    ObservableCollection<TrendPen> TrendPens { get; }
     ObservableCollection<VisualNode> SimulationNodes { get; }
 }

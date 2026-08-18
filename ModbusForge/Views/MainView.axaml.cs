@@ -149,8 +149,7 @@ namespace ModbusForge.Avalonia.Views
                 Continuous = false,
                 PeriodMs = 1000,
                 Monitor = false,
-                ReadPeriodMs = 1000,
-                Trend = false
+                ReadPeriodMs = 1000
             });
 
             vm.StatusMessage = $"Added {area} {entry.Address} to watch list.";
@@ -182,8 +181,7 @@ namespace ModbusForge.Avalonia.Views
                 Continuous = false,
                 PeriodMs = 1000,
                 Monitor = false,
-                ReadPeriodMs = 1000,
-                Trend = false
+                ReadPeriodMs = 1000
             });
 
             vm.StatusMessage = $"Added {area} {entry.Address} to watch list.";
@@ -194,8 +192,7 @@ namespace ModbusForge.Avalonia.Views
             var vm = ViewModel;
             if (vm == null) return;
 
-            var initialValue = string.IsNullOrEmpty(entry.ValueText) ? entry.Value.ToString(CultureInfo.InvariantCulture) : entry.ValueText;
-            vm.AddRegisterToTrend(entry.Address, area, entry.Type, initialValue);
+            vm.AddRegisterToTrend(entry.Address, area, entry.Type);
         }
 
         private void AddCoilToTrend(CoilEntry entry, string area)
@@ -203,8 +200,7 @@ namespace ModbusForge.Avalonia.Views
             var vm = ViewModel;
             if (vm == null) return;
 
-            var value = entry.State ? "1" : "0";
-            vm.AddRegisterToTrend(entry.Address, area, "uint", value);
+            vm.AddRegisterToTrend(entry.Address, area, "uint");
         }
 
         #region Holding Registers Context Menu

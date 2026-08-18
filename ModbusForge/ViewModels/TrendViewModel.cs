@@ -230,14 +230,12 @@ namespace ModbusForge.Avalonia.ViewModels
         /// <summary>
         /// Deletes one pen from the trend view.
         ///
-        /// Pens backed by a watch entry (added from the register grids or the
-        /// Add dialog) are unsubscribed at the source: the entry's Trend flag
-        /// is cleared, so sampling stops and the pen stays gone. The watch
-        /// entry itself survives in Custom Watch, where it can still be
-        /// re-enabled for trend there.
+        /// Unit pens (added from the register grids or the Add dialog) are
+        /// removed at the source: the polling loop stops feeding them, so the
+        /// pen stays gone.
         ///
-        /// Imported pens (no watch entry) fall back to removing the series
-        /// from the logger, as before.
+        /// Imported pens (no unit pen behind them) fall back to removing the
+        /// series from the logger, as before.
         /// </summary>
         private void RemovePen(TrendSeriesItem? item)
         {
@@ -246,7 +244,7 @@ namespace ModbusForge.Avalonia.ViewModels
             if (_subscriptionService is not null && _subscriptionService.RemovePen(item.Key))
             {
                 RemoveSeriesInternal(item.Key);
-                StatusMessage = $"Pen \"{item.Name}\" removed. Its watch entry is kept in Custom Watch.";
+                StatusMessage = $"Pen \"{item.Name}\" removed.";
             }
             else
             {
@@ -278,10 +276,10 @@ namespace ModbusForge.Avalonia.ViewModels
 
             try
             {
-                var key = _subscriptionService.AddPen(result.Area, result.Address, result.Name, result.ReadPeriodMs);
+                var key = _subscriptionService.AddPen(result.Area, result.Address, result.Name, result.ReadPeriodMs, result.Type);
                 StatusMessage = string.Equals(key, result.Name, StringComparison.Ordinal)
                     ? $"Pen \"{key}\" added. It appears in the chart as data is read."
-                    : $"Address {result.Address} is already watched as \"{key}\" - that pen now trends.";
+                    : $"Address {result.Address} already has a pen named \"{key}\" - it keeps trending.";
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
@@ -293,7 +291,6 @@ namespace ModbusForge.Avalonia.ViewModels
         private void Clear()
         {
             var keys = _valuesByKey.Keys.ToList();
-            var removedEntries = 0;
             foreach (var key in keys)
             {
                 if (_subscriptionService is not null && _subscriptionService.RemovePen(key))
@@ -301,7 +298,6 @@ namespace ModbusForge.Avalonia.ViewModels
                     // Unsubscribe at the source so the pen does not re-appear
                     // on the next read.
                     RemoveSeriesInternal(key);
-                    removedEntries++;
                 }
                 else
                 {
@@ -309,9 +305,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 }
             }
 
-            StatusMessage = removedEntries > 0
-                ? $"Trend pens cleared ({removedEntries} watch entries kept in Custom Watch)."
-                : "Trend series cleared.";
+            StatusMessage = "Trend pens cleared.";
         }
 
         private async Task ExportCsv()

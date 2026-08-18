@@ -317,4 +317,40 @@ public sealed class ApiApplicationService : IApiApplicationService
     public Task AddTrendAsync(string key, string displayName, CancellationToken token)
         => _dispatcher.InvokeAsync(() =>
             _trendLogger.Add(key, string.IsNullOrEmpty(displayName) ? key : displayName));
+
+    public Task<IReadOnlyList<TrendPen>> GetTrendPensAsync(CancellationToken token)
+        => _dispatcher.InvokeAsync<IReadOnlyList<TrendPen>>(
+            () => _appState.TrendPens.ToList());
+
+    public async Task<TrendPen> AddTrendPenAsync(TrendPen pen, CancellationToken token)
+    {
+        if (pen is null) throw new ArgumentNullException(nameof(pen));
+        if (string.IsNullOrWhiteSpace(pen.Name)) throw new ArgumentException("A pen name is required.", nameof(pen));
+        if (pen.Address < 0) throw new ArgumentOutOfRangeException(nameof(pen), "Address cannot be negative.");
+
+        return await _dispatcher.InvokeAsync(() =>
+        {
+            var pens = _appState.TrendPens;
+
+            var existing = pens.FirstOrDefault(p =>
+                p.Address == pen.Address &&
+                string.Equals(p.Area, pen.Area ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+            {
+                if (pen.ReadPeriodMs > 0) existing.ReadPeriodMs = pen.ReadPeriodMs;
+                return existing;
+            }
+
+            var created = new TrendPen
+            {
+                Name = UnitIdConfiguration.MakeUniquePenName(pens, pen.Name),
+                Area = pen.Area ?? "HoldingRegister",
+                Address = pen.Address,
+                Type = string.IsNullOrWhiteSpace(pen.Type) ? "int" : pen.Type,
+                ReadPeriodMs = pen.ReadPeriodMs <= 0 ? 1000 : pen.ReadPeriodMs
+            };
+            pens.Add(created);
+            return created;
+        });
+    }
 }

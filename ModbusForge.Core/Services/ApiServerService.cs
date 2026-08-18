@@ -376,6 +376,19 @@ public class ApiServerService : IApiServerService
 
             var entry = MapToCustomEntry(req);
             var created = await svc.AddCustomTagAsync(entry, ct);
+
+            if (req.Trend)
+            {
+                await svc.AddTrendPenAsync(new TrendPen
+                {
+                    Name = entry.Name,
+                    Area = entry.Area,
+                    Address = entry.Address,
+                    Type = entry.Type,
+                    ReadPeriodMs = entry.ReadPeriodMs
+                }, ct);
+            }
+
             return Results.Ok(created);
         });
 
@@ -497,6 +510,45 @@ public class ApiServerService : IApiServerService
             await svc.AddTrendAsync(key, displayName ?? key, ct);
             return Results.Ok(new ApiOperationResult(true));
         }).WithTags("Trends");
+
+        apiGroup.MapGet("/trends/pens", async (IApiApplicationService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetTrendPensAsync(ct)))
+            .WithTags("Trends");
+
+        apiGroup.MapPost("/trends/pens", async (
+            IApiApplicationService svc,
+            HttpContext ctx,
+            [FromBody] CreateTrendPenRequest? req,
+            CancellationToken ct) =>
+        {
+            if (!RequireApiKey(ctx, out var authResult))
+                return authResult!;
+            if (req is null)
+                return Results.BadRequest(ApiError.BadRequest("Request body is required."));
+            if (req.Address < 0 || req.Address > MaxAddress)
+                return Results.BadRequest(ApiError.BadRequest("Address must be 0..65535."));
+            if (req.ReadPeriodMs < 100)
+                return Results.BadRequest(ApiError.BadRequest("ReadPeriodMs must be ≥100."));
+
+            var pen = new TrendPen
+            {
+                // Same default naming as the app's context menus.
+                Name = string.IsNullOrWhiteSpace(req.Name)
+                    ? req.Area switch
+                    {
+                        "HoldingRegister" => $"HR Trend {req.Address}",
+                        "InputRegister" => $"IR Trend {req.Address}",
+                        _ => $"{req.Area} Trend {req.Address}"
+                    }
+                    : req.Name,
+                Area = req.Area,
+                Address = req.Address,
+                Type = req.Type,
+                ReadPeriodMs = req.ReadPeriodMs
+            };
+            var created = await svc.AddTrendPenAsync(pen, ct);
+            return Results.Ok(created);
+        }).WithTags("Trends");
     }
 
     // ─── API key authentication ───────────────────────────────────────────────
@@ -610,8 +662,8 @@ public class ApiServerService : IApiServerService
         PeriodMs = req.PeriodMs,
         Monitor = req.Monitor,
         ReadPeriodMs = req.ReadPeriodMs,
-        Area = req.Area,
-        Trend = req.Trend
+        Area = req.Area
+        // req.Trend is handled by the endpoint, which creates a trend pen.
     };
 
     private static VisualNode MapToVisualNode(CreateSimulationNodeRequest req) => new()

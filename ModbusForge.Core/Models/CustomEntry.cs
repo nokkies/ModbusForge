@@ -29,7 +29,12 @@ namespace ModbusForge.Models
         /// Available data type options for custom watch entries.
         /// </summary>
         public static IReadOnlyList<string> AvailableTypes { get; } = new[] { "int", "uint", "real", "string" };
-        // Trend selection support
+        // Legacy trend flag. Trending is now done through first-class
+        // TrendPen objects (UnitIdConfiguration.TrendPens); this flag is kept
+        // only so old saved files/projects can be read, and
+        // UnitIdConfiguration.MigrateLegacyTrendEntries() converts any
+        // Trend=true entries into pens on load. It is no longer written by
+        // the app or honored by the polling loop.
         private bool _trend = false;
 
         public string Name { get => _name; set { if (_name != value) { _name = value; OnPropertyChanged(nameof(Name)); } } }

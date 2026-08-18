@@ -407,16 +407,16 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         }
 
         [Fact]
-        public void RemovePen_WatchEntryPen_UnsubscribesAtSource_AndSeriesIsGone()
+        public void RemovePen_UnitPen_UnsubscribesAtSource_AndSeriesIsGone()
         {
             // Regression: pens were hidden side-effects of watch entries and
-            // "Delete" only removed the chart series - the entry kept
+            // "Delete" only removed the chart series - the feed kept
             // publishing, so the pen re-appeared on the next read. Deleting a
-            // pen must stop the feed at the source (Trend flag on the entry).
+            // pen must stop the feed at the source (the unit's pen list).
             var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
             logger.Start();
-            // Simulate the watch entry that feeds this pen.
-            subscriptions.WatchEntries.Add("HR Trend 7");
+            // Simulate the unit pen that feeds this series.
+            subscriptions.Pens.Add("HR Trend 7");
             logger.Publish("HR Trend 7", 1.5, DateTime.UtcNow);
             var item = Assert.Single(vm.SeriesItems);
 
@@ -445,11 +445,11 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         }
 
         [Fact]
-        public void Clear_UnsubscribesWatchPens_AndRemovesImportedPens()
+        public void Clear_UnsubscribesUnitPens_AndRemovesImportedPens()
         {
             var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
             logger.Start();
-            subscriptions.WatchEntries.Add("HR Trend 1");
+            subscriptions.Pens.Add("HR Trend 1");
             logger.Publish("HR Trend 1", 1.0, DateTime.UtcNow);
             logger.Publish("Imported:file", 2.0, DateTime.UtcNow);
             Assert.Equal(2, vm.PenCount);
@@ -538,21 +538,21 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             public List<(string area, int address, string? name, int readPeriodMs)> AddPenCalls { get; } = new();
             public List<string> RemovePenCalls { get; } = new();
 
-            /// <summary>Series keys that have a backing watch entry (Trend=true).</summary>
-            public HashSet<string> WatchEntries { get; } = new();
+            /// <summary>Series keys that have a backing unit pen.</summary>
+            public HashSet<string> Pens { get; } = new();
 
             public string AddPen(string area, int address, string? requestedName, int readPeriodMs,
-                string? type = null, string? initialValue = null)
+                string? type = null)
             {
                 AddPenCalls.Add((area, address, requestedName, readPeriodMs));
                 var key = string.IsNullOrWhiteSpace(requestedName) ? $"{area} {address}" : requestedName;
-                WatchEntries.Add(key);
+                Pens.Add(key);
                 return key;
             }
 
             public bool RemovePen(string key)
             {
-                if (!WatchEntries.Remove(key)) return false;
+                if (!Pens.Remove(key)) return false;
                 RemovePenCalls.Add(key);
                 return true;
             }

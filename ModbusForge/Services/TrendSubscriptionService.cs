@@ -15,53 +15,47 @@ namespace ModbusForge.Avalonia.Services
             _configStore = configStore ?? throw new ArgumentNullException(nameof(configStore));
         }
 
-        public string AddPen(string area, int address, string? requestedName, int readPeriodMs,
-            string? type = null, string? initialValue = null)
+        public string AddPen(string area, int address, string? requestedName, int readPeriodMs, string? type = null)
         {
             if (string.IsNullOrWhiteSpace(area)) throw new ArgumentException("An area is required.", nameof(area));
             if (address < 0) throw new ArgumentOutOfRangeException(nameof(address), "Address cannot be negative.");
 
-            var entries = _configStore.CurrentConfig.CustomEntries;
+            var pens = _configStore.CurrentConfig.TrendPens;
 
-            var existing = entries.FirstOrDefault(e => e.Area == area && e.Address == address);
+            var existing = pens.FirstOrDefault(p =>
+                p.Address == address &&
+                string.Equals(p.Area, area, StringComparison.OrdinalIgnoreCase));
             if (existing != null)
             {
-                // Reuse: the entry's name is the stable series key, and its
-                // type/value are whatever the user already configured.
-                existing.Trend = true;
-                existing.Monitor = true;
+                // Reuse: the pen's name is the stable series key. Keep the
+                // existing type; a new read period wins when given.
                 if (readPeriodMs > 0) existing.ReadPeriodMs = readPeriodMs;
                 return existing.Name;
             }
 
-            var entry = new CustomEntry
+            var pen = new TrendPen
             {
-                Name = string.IsNullOrWhiteSpace(requestedName) ? DefaultName(area, address) : requestedName.Trim(),
-                Address = address,
+                Name = UnitIdConfiguration.MakeUniquePenName(
+                    pens,
+                    string.IsNullOrWhiteSpace(requestedName) ? DefaultName(area, address) : requestedName.Trim()),
                 Area = area,
+                Address = address,
                 Type = string.IsNullOrWhiteSpace(type) ? "int" : type,
-                Value = string.IsNullOrWhiteSpace(initialValue) ? "0" : initialValue,
-                WriteValue = string.IsNullOrWhiteSpace(initialValue) ? "0" : initialValue,
-                Continuous = false,
-                PeriodMs = 1000,
-                Monitor = true,
-                ReadPeriodMs = readPeriodMs <= 0 ? 1000 : readPeriodMs,
-                Trend = true
+                ReadPeriodMs = readPeriodMs <= 0 ? 1000 : readPeriodMs
             };
-            entries.Add(entry);
-            return entry.Name;
+            pens.Add(pen);
+            return pen.Name;
         }
 
         public bool RemovePen(string key)
         {
             if (string.IsNullOrWhiteSpace(key)) return false;
 
-            var entries = _configStore.CurrentConfig.CustomEntries;
-            var entry = entries.FirstOrDefault(e => e.Name == key);
-            if (entry == null) return false;
+            var pens = _configStore.CurrentConfig.TrendPens;
+            var pen = pens.FirstOrDefault(p => string.Equals(p.Name, key, StringComparison.Ordinal));
+            if (pen == null) return false;
 
-            entry.Trend = false;
-            return true;
+            return pens.Remove(pen);
         }
 
         public string DefaultName(string area, int address)

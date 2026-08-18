@@ -512,7 +512,6 @@
               <DataGridTextColumn Header="Write Period (ms)" Binding="{Binding PeriodMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="135" />
               <DataGridCheckBoxColumn Header="Read" Binding="{Binding Monitor, Mode=TwoWay}" Width="70" />
               <DataGridTextColumn Header="Read Period (ms)" Binding="{Binding ReadPeriodMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="125" />
-              <DataGridCheckBoxColumn Header="Trend" Binding="{Binding Trend, Mode=TwoWay}" Width="70" />
               <DataGridTemplateColumn Header="Actions" Width="Auto">
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate x:DataType="models:CustomEntry">

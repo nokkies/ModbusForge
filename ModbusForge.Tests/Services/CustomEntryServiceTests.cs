@@ -96,6 +96,64 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
+        public async Task LoadCustomAsync_LegacyFileWithTrendFlag_StillReadsTheFlag()
+        {
+            // Files saved before trend pens existed carry a "Trend" flag on
+            // watch entries. Load must keep reading it so the one-time
+            // migration to pens works.
+            var tempFile = Path.GetTempFileName();
+            var entries = new[]
+            {
+                new { Name = "Legacy", Address = 4, Type = "int", Value = "0", Area = "HoldingRegister", Monitor = true, Trend = true }
+            };
+            var json = JsonSerializer.Serialize(entries);
+            await File.WriteAllTextAsync(tempFile, json);
+
+            try
+            {
+                _mockFileDialogService.Setup(s => s.ShowOpenFileDialog(It.IsAny<string>(), It.IsAny<string>()))
+                    .Returns(tempFile);
+
+                var result = await _service.LoadCustomAsync();
+
+                var entry = Assert.Single(result!);
+                Assert.True(entry.Trend);
+            }
+            finally
+            {
+                if (File.Exists(tempFile)) File.Delete(tempFile);
+            }
+        }
+
+        [Fact]
+        public async Task SaveCustomAsync_NoLongerWritesTheLegacyTrendFlag()
+        {
+            // Trend membership now lives in the unit configuration's pens;
+            // the custom-entries JSON must not gain/lose it anymore.
+            var tempFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            var entries = new ObservableCollection<CustomEntry>
+            {
+                new CustomEntry { Name = "NoTrendFlag", Address = 10, Value = "50", Trend = true }
+            };
+
+            _mockFileDialogService.Setup(s => s.ShowSaveFileDialog(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Returns(tempFile);
+
+            try
+            {
+                await _service.SaveCustomAsync(entries);
+
+                var json = await File.ReadAllTextAsync(tempFile);
+                var doc = JsonDocument.Parse(json);
+                Assert.False(doc.RootElement[0].TryGetProperty("Trend", out _));
+            }
+            finally
+            {
+                if (File.Exists(tempFile)) File.Delete(tempFile);
+            }
+        }
+
+        [Fact]
         public async Task SaveCustomAsync_SavesFile_Successfully()
         {
             // Arrange

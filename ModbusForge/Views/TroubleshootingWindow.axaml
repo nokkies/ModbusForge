@@ -31,7 +31,7 @@
         <Border BorderBrush="Gray" BorderThickness="1" Padding="12" CornerRadius="4">
           <StackPanel Spacing="4">
             <TextBlock Text="Charts are empty" FontWeight="Bold" FontSize="14" />
-            <TextBlock Text="Enable the Trend checkbox on a numeric Custom Watch entry and start monitoring. Values appear after the first successful poll." TextWrapping="Wrap" />
+            <TextBlock Text="Add a trend pen from the Trends tab (or right-click a register and choose Add to Trend) and make sure the connection is active. Values appear after the first successful poll of the pen's address." TextWrapping="Wrap" />
           </StackPanel>
         </Border>
 

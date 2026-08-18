@@ -735,6 +735,8 @@ namespace ModbusForge.Tests.Services
         public Task<bool> RemoveScriptRuleAsync(string name, CancellationToken t) => Task.FromResult(false);
         public Task<IReadOnlyList<string>> GetLogsAsync(CancellationToken t) => Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
         public Task AddTrendAsync(string k, string d, CancellationToken t) => Task.CompletedTask;
+        public Task<IReadOnlyList<TrendPen>> GetTrendPensAsync(CancellationToken t) => Task.FromResult<IReadOnlyList<TrendPen>>(Array.Empty<TrendPen>());
+        public Task<TrendPen> AddTrendPenAsync(TrendPen pen, CancellationToken t) => Task.FromResult(pen);
     }
 
     /// <summary>Fake IAppStateAccessor that tracks PropertyChanged subscriber count.</summary>
@@ -799,6 +801,7 @@ namespace ModbusForge.Tests.Services
             () => ShouldExecuteDisconnect);
 
         public ObservableCollection<CustomEntry> CustomEntries { get; } = new();
+        public ObservableCollection<TrendPen> TrendPens { get; } = new();
         public ObservableCollection<VisualNode> SimulationNodes { get; } = new();
     }
 

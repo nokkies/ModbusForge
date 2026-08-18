@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
+using ModbusForge.Avalonia.Services;
 using ModbusForge.Avalonia.ViewModels;
 using ModbusForge.Models;
 using ModbusForge.Services;
@@ -513,6 +514,50 @@ namespace ModbusForge.Avalonia.Tests
 
             Assert.Same(second, manager.ActiveProfile);
             Assert.Same(second, vm.ActiveProfile);
+        }
+
+        [Fact]
+        public void Trend_pens_alone_start_the_watch_monitoring_loop()
+        {
+            // Regression: pens used to ride on watch entries, so adding a pen
+            // always created a monitored entry that kept the loop alive. With
+            // first-class pens the loop must be started by the pens alone -
+            // a unit can have pens and no watch entries at all.
+            var manager = new FakeConnectionManager();
+            using var vm = new MainViewModel(
+                manager,
+                NullLogger<MainViewModel>.Instance,
+                new SyncDispatcher());
+
+            Assert.False(vm.IsCustomWatchMonitoring);
+
+            vm.CurrentConfig.TrendPens.Add(new TrendPen { Name = "HR Trend 1", Address = 1 });
+            Assert.True(vm.IsCustomWatchMonitoring);
+
+            vm.CurrentConfig.TrendPens.Clear();
+            Assert.False(vm.IsCustomWatchMonitoring);
+        }
+
+        [Fact]
+        public void AddRegisterToTrend_CreatesAPen_WithoutTouchingWatchEntries()
+        {
+            var manager = new FakeConnectionManager();
+            var store = new UnitConfigurationStore(new SyncDispatcher());
+            var subscriptions = new TrendSubscriptionService(store);
+            using var vm = new MainViewModel(
+                manager,
+                NullLogger<MainViewModel>.Instance,
+                new SyncDispatcher(),
+                unitConfigurationStore: store,
+                trendSubscriptionService: subscriptions);
+
+            vm.AddRegisterToTrend(5, "HoldingRegister", "int");
+
+            var pen = Assert.Single(store.CurrentConfig.TrendPens);
+            Assert.Equal("HR Trend 5", pen.Name);
+            Assert.Equal(5, pen.Address);
+            Assert.Empty(store.CurrentConfig.CustomEntries);
+            Assert.True(vm.IsCustomWatchMonitoring);
         }
 
         private static int GetFreePort()

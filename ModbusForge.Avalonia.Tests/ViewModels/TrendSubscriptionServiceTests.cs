@@ -1,10 +1,15 @@
 using ModbusForge.Avalonia.Services;
-using ModbusForge.Avalonia.ViewModels;
+using ModbusForge.Models;
 using ModbusForge.Services;
 using Xunit;
 
 namespace ModbusForge.Avalonia.Tests.ViewModels
 {
+    /// <summary>
+    /// The subscription service now manages first-class trend pens on the
+    /// unit configuration - it must never create or mutate custom watch
+    /// entries.
+    /// </summary>
     public class TrendSubscriptionServiceTests
     {
         private static (TrendSubscriptionService service, UnitConfigurationStore store) CreateService()
@@ -14,19 +19,32 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         }
 
         [Fact]
-        public void AddPen_CreatesWatchEntry_WithTrendAndMonitoringEnabled()
+        public void AddPen_CreatesPen_WithRequestedDetails()
         {
             var (service, store) = CreateService();
 
-            var key = service.AddPen("HoldingRegister", 5, "HR 5", 1000);
+            var key = service.AddPen("HoldingRegister", 5, "HR 5", 1000, "real");
 
-            var entry = Assert.Single(store.CurrentConfig.CustomEntries);
-            Assert.Equal(key, entry.Name);
-            Assert.Equal(5, entry.Address);
-            Assert.Equal("HoldingRegister", entry.Area);
-            Assert.True(entry.Trend);
-            Assert.True(entry.Monitor);
-            Assert.Equal(1000, entry.ReadPeriodMs);
+            var pen = Assert.Single(store.CurrentConfig.TrendPens);
+            Assert.Equal(key, pen.Name);
+            Assert.Equal("HR 5", pen.Name);
+            Assert.Equal(5, pen.Address);
+            Assert.Equal("HoldingRegister", pen.Area);
+            Assert.Equal("real", pen.Type);
+            Assert.Equal(1000, pen.ReadPeriodMs);
+
+            // Full decoupling: no watch entry is created or touched.
+            Assert.Empty(store.CurrentConfig.CustomEntries);
+        }
+
+        [Fact]
+        public void AddPen_Defaults_TypeToInt_WhenNoneGiven()
+        {
+            var (service, store) = CreateService();
+
+            service.AddPen("HoldingRegister", 5, "HR 5", 1000);
+
+            Assert.Equal("int", Assert.Single(store.CurrentConfig.TrendPens).Type);
         }
 
         [Fact]
@@ -37,53 +55,58 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             var key = service.AddPen("HoldingRegister", 5, null, 1000);
 
             Assert.Equal("HR Trend 5", key);
-            var entry = Assert.Single(store.CurrentConfig.CustomEntries);
-            Assert.Equal("HR Trend 5", entry.Name);
+            Assert.Equal("HR Trend 5", Assert.Single(store.CurrentConfig.TrendPens).Name);
         }
 
         [Fact]
-        public void AddPen_ReusesExistingEntry_KeepingItsNameAsTheStableKey()
+        public void AddPen_ReusesExistingPen_KeepingItsNameAsTheStableKey()
         {
             var (service, store) = CreateService();
-            store.CurrentConfig.CustomEntries.Add(new ModbusForge.Models.CustomEntry
+            store.CurrentConfig.TrendPens.Add(new TrendPen
             {
-                Name = "My custom watch",
-                Address = 5,
+                Name = "Speed",
                 Area = "HoldingRegister",
+                Address = 5,
                 Type = "real",
-                Value = "1.5",
-                WriteValue = "1.5",
-                Monitor = false,
-                Trend = false
+                ReadPeriodMs = 250
             });
 
             var key = service.AddPen("HoldingRegister", 5, "HR 5", 500);
 
-            Assert.Equal("My custom watch", key);
-            var entry = Assert.Single(store.CurrentConfig.CustomEntries);
-            Assert.True(entry.Trend);
-            Assert.True(entry.Monitor);
-            Assert.Equal(500, entry.ReadPeriodMs);
-            // Existing configuration is untouched.
-            Assert.Equal("real", entry.Type);
-            Assert.Equal("1.5", entry.Value);
+            Assert.Equal("Speed", key);
+            var pen = Assert.Single(store.CurrentConfig.TrendPens);
+            Assert.Equal("real", pen.Type);
+            Assert.Equal(500, pen.ReadPeriodMs);
         }
 
         [Fact]
-        public void RemovePen_ClearsTrendButKeepsTheWatchEntry()
+        public void AddPen_NameCollision_IsMadeUniqueWithinTheUnit()
+        {
+            var (service, store) = CreateService();
+            store.CurrentConfig.TrendPens.Add(new TrendPen
+            {
+                Name = "Speed",
+                Area = "InputRegister",
+                Address = 1
+            });
+
+            var key = service.AddPen("HoldingRegister", 2, "Speed", 1000);
+
+            Assert.Equal("Speed 2", key);
+            Assert.Equal(2, store.CurrentConfig.TrendPens.Count);
+        }
+
+        [Fact]
+        public void RemovePen_RemovesThePen_FromTheUnit()
         {
             var (service, store) = CreateService();
             service.AddPen("Coil", 3, "Coil Trend 3", 1000);
-            var entry = Assert.Single(store.CurrentConfig.CustomEntries);
-            Assert.True(entry.Trend);
+            Assert.Single(store.CurrentConfig.TrendPens);
 
             Assert.True(service.RemovePen("Coil Trend 3"));
 
-            // The entry survives (it is still a watch item in Custom Watch)
-            // but no longer feeds the trend, so the pen stays removed.
-            var kept = Assert.Single(store.CurrentConfig.CustomEntries);
-            Assert.Equal("Coil Trend 3", kept.Name);
-            Assert.False(kept.Trend);
+            Assert.Empty(store.CurrentConfig.TrendPens);
+            Assert.Empty(store.CurrentConfig.CustomEntries);
         }
 
         [Fact]

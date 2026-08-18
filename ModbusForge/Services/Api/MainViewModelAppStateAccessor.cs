@@ -30,6 +30,9 @@ internal sealed class MainViewModelAppStateAccessor : IAppStateAccessor
 
     public ObservableCollection<CustomEntry> CustomEntries => _vm.CustomEntries;
 
+    public ObservableCollection<TrendPen> TrendPens
+        => _vm.CurrentConfig.TrendPens;
+
     public ObservableCollection<VisualNode> SimulationNodes
         => _vm.CurrentConfig.SimulationSettings.VisualNodes;
 

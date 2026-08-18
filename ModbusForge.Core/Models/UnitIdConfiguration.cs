@@ -1,4 +1,6 @@
+using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using ModbusForge.Models;
 
 namespace ModbusForge.Models
@@ -12,6 +14,9 @@ namespace ModbusForge.Models
         
         // Custom entries specific to this Unit ID
         public ObservableCollection<CustomEntry> CustomEntries { get; set; } = new();
+        
+        // Trend pens specific to this Unit ID
+        public ObservableCollection<TrendPen> TrendPens { get; set; } = new();
         
         // Simulation settings specific to this Unit ID
         public SimulationSettings SimulationSettings { get; set; } = new();
@@ -54,10 +59,28 @@ namespace ModbusForge.Models
                     Monitor = entry.Monitor,
                     ReadPeriodMs = entry.ReadPeriodMs,
                     Area = entry.Area,
+                    // Legacy shim: carried so a clone made before
+                    // MigrateLegacyTrendEntries() still sees the old Trend
+                    // flags (see below).
                     Trend = entry.Trend
                 });
             }
-            
+
+            // Clone trend pens (runtime LastReadUtc is not carried over, like
+            // the entries' read stamps - a clone is a fresh copy, not a
+            // continuation).
+            foreach (var pen in TrendPens)
+            {
+                clone.TrendPens.Add(new TrendPen
+                {
+                    Name = pen.Name,
+                    Area = pen.Area,
+                    Address = pen.Address,
+                    Type = pen.Type,
+                    ReadPeriodMs = pen.ReadPeriodMs
+                });
+            }
+
             // Clone simulation settings
             clone.SimulationSettings = SimulationSettings.Clone();
             
@@ -68,6 +91,65 @@ namespace ModbusForge.Models
             clone.RegisterSettings = RegisterSettings.Clone();
             
             return clone;
+        }
+
+        /// <summary>
+        /// One-time upgrade: converts legacy custom watch entries that were
+        /// flagged for trending (<see cref="CustomEntry.Trend"/>, pre-pen
+        /// persistence) into first-class <see cref="TrendPen"/>s, clearing the
+        /// flag so the entries behave as plain watch items again. Idempotent -
+        /// a second call finds nothing to move.
+        /// </summary>
+        /// <returns>The number of entries converted into pens.</returns>
+        public int MigrateLegacyTrendEntries()
+        {
+            TrendPens ??= new ObservableCollection<TrendPen>();
+
+            var moved = 0;
+            foreach (var entry in CustomEntries.Where(e => e.Trend).ToList())
+            {
+                var alreadyCovered = TrendPens.Any(p =>
+                    p.Address == entry.Address &&
+                    string.Equals(p.Area, entry.Area ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+
+                if (!alreadyCovered)
+                {
+                    TrendPens.Add(new TrendPen
+                    {
+                        Name = MakeUniquePenName(TrendPens, string.IsNullOrWhiteSpace(entry.Name) ? $"Trend {entry.Address}" : entry.Name),
+                        Area = entry.Area ?? "HoldingRegister",
+                        Address = entry.Address,
+                        Type = string.IsNullOrWhiteSpace(entry.Type) ? "int" : entry.Type,
+                        ReadPeriodMs = entry.ReadPeriodMs > 0 ? entry.ReadPeriodMs : 1000
+                    });
+                    moved++;
+                }
+
+                entry.Trend = false;
+            }
+
+            return moved;
+        }
+
+        /// <summary>
+        /// Returns <paramref name="requested"/> or "<paramref name="requested"/> 2",
+        /// "... 3", ... until the name is unique among <paramref name="existing"/>.
+        /// </summary>
+        internal static string MakeUniquePenName(IEnumerable<TrendPen> existing, string requested)
+        {
+            if (existing.All(p => !string.Equals(p.Name, requested, StringComparison.Ordinal)))
+            {
+                return requested;
+            }
+
+            for (var suffix = 2; ; suffix++)
+            {
+                var candidate = $"{requested} {suffix}";
+                if (existing.All(p => !string.Equals(p.Name, candidate, StringComparison.Ordinal)))
+                {
+                    return candidate;
+                }
+            }
         }
     }
 

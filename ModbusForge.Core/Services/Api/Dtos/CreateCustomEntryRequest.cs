@@ -33,5 +33,10 @@ public sealed class CreateCustomEntryRequest
     [RegularExpression("^(HoldingRegister|Coil|InputRegister|DiscreteInput)$")]
     public string Area { get; set; } = "HoldingRegister";
 
+    /// <summary>
+    /// When true, a trend pen for the same address is created alongside the
+    /// tag, so the value starts feeding the Trends chart. (Historically this
+    /// flagged the watch entry itself; pens are now first-class.)
+    /// </summary>
     public bool Trend { get; set; } = false;
 }

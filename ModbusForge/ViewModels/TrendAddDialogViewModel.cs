@@ -165,7 +165,8 @@ namespace ModbusForge.Avalonia.ViewModels
                     tag.Area.ToString(),
                     tag.Address,
                     Name.Trim(),
-                    ReadPeriodMs);
+                    ReadPeriodMs,
+                    TrendReadTypeFor(tag.DataType));
             }
             else
             {
@@ -183,6 +184,21 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             RequestClose?.Invoke(this, new TrendAddDialogResultEventArgs(null));
         }
+
+        /// <summary>
+        /// Maps a tag's data type to the trend pipeline's read formats. Only
+        /// whole-register 16-bit types and single-register floats map cleanly;
+        /// 32-bit and Double tags fall back to "int" (their low word) rather
+        /// than producing a mis-parsed value.
+        /// </summary>
+        private static string? TrendReadTypeFor(TagDataType dataType) => dataType switch
+        {
+            TagDataType.Int16 => "int",
+            TagDataType.UInt16 or TagDataType.Bool => "uint",
+            TagDataType.Float => "real",
+            TagDataType.String => "string",
+            _ => null
+        };
     }
 
     public sealed class TrendAddDialogResultEventArgs(TrendAddDialogResult? result) : EventArgs

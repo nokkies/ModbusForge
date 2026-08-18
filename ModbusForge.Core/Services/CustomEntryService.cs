@@ -84,8 +84,10 @@ namespace ModbusForge.Services
                     e.PeriodMs,
                     e.Monitor,
                     e.ReadPeriodMs,
-                    e.Area,
-                    e.Trend
+                    e.Area
+                    // Legacy note: the old "Trend" flag is no longer written;
+                    // trend pens live in the unit configuration. Load still
+                    // reads it so legacy files migrate cleanly.
                 });
             }
 

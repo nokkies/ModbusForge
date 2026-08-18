@@ -115,7 +115,12 @@ namespace ModbusForge.Services
                 {
                     if (!_configurations.ContainsKey(kvp.Key))
                     {
-                        _configurations[kvp.Key] = kvp.Value.Clone();
+                        // Imported configurations may still carry legacy
+                        // Trend flags on watch entries; convert them to pens
+                        // before they enter the store.
+                        var clone = kvp.Value.Clone();
+                        clone.MigrateLegacyTrendEntries();
+                        _configurations[kvp.Key] = clone;
                     }
                 }
             }
