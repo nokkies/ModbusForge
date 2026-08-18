@@ -62,6 +62,11 @@ namespace ModbusForge.Tests.Simulation
             catalog.Register(new MotorDolBlock());
             catalog.Register(new VsdBlock());
 
+            // Signal conditioning
+            catalog.Register(new ScaleBlock());
+            catalog.Register(new EdgeDetectBlock());
+            catalog.Register(new MovingAverageBlock());
+
             return catalog;
         }
 
@@ -106,6 +111,9 @@ namespace ModbusForge.Tests.Simulation
         [InlineData("Valve", new[] { "OpenCmd", "CloseCmd" }, new[] { "Open", "Fault" })]
         [InlineData("MotorDol", new[] { "Start", "Stop" }, new[] { "Run" })]
         [InlineData("Vsd", new[] { "Run", "SpeedReference" }, new[] { "Running", "SpeedFeedback", "AtSpeed" })]
+        [InlineData("Scale", new[] { "Value" }, new[] { "Q" })]
+        [InlineData("EdgeDetect", new[] { "IN" }, new[] { "Q" })]
+        [InlineData("MovingAverage", new[] { "Value" }, new[] { "Q" })]
         public void Block_Ports_UseTheCanonicalNames(string typeId, string[] expectedInputs, string[] expectedOutputs)
         {
             var descriptor = CreateCatalog().GetDescriptor(typeId);

@@ -368,6 +368,68 @@ namespace ModbusForge.Avalonia.Tests.Services
             Assert.Null(config.Nodes[0].ErrorText);
         }
 
+        [Fact]
+        public void Tick_ScaleGraph_ReadsRegister_ScalesAndWritesRegister()
+        {
+            // End-to-end for the Signal Conditioning blocks: an integer input
+            // bound to a register feeds a Scale block (0..100 raw -> 0..1000),
+            // whose output is bound to a second register. One engine tick must
+            // read, scale, and write.
+            var service = new TestableVisualSimulationService();
+            var config = new VisualNodeEditorConfig
+            {
+                Nodes = new ObservableCollection<VisualNode>
+                {
+                    new()
+                    {
+                        Id = "in1",
+                        Name = "IN",
+                        ElementType = PlcElementType.InputInt,
+                        Input1Address = new PlcAddressReference
+                        {
+                            Area = PlcArea.HoldingRegister,
+                            Address = 1
+                        }
+                    },
+                    new()
+                    {
+                        Id = "scale1",
+                        Name = "Scale",
+                        ElementType = PlcElementType.Scale,
+                        ScaleFromMin = 0.0,
+                        ScaleFromMax = 100.0,
+                        ScaleToMin = 0.0,
+                        ScaleToMax = 1000.0,
+                        OutputAddress = new PlcAddressReference
+                        {
+                            Area = PlcArea.HoldingRegister,
+                            Address = 2
+                        }
+                    }
+                },
+                Connections = new ObservableCollection<NodeConnection>
+                {
+                    new NodeConnection("in1", "scale1", "Input1")
+                }
+            };
+            SetConfig(service, config);
+            service.IsRunningForTest = true;
+
+            var dataStore = GetDataStore(service)!;
+            dataStore.HoldingRegisters[1] = 50;
+
+            service.UpdateNodeValues();
+
+            Assert.Equal((ushort)500, dataStore.HoldingRegisters[2]);
+
+            // A later tick with a new raw value follows the mapping.
+            dataStore.HoldingRegisters[1] = 100;
+            service.UpdateNodeValues();
+            Assert.Equal((ushort)1000, dataStore.HoldingRegisters[2]);
+
+            service.Stop();
+        }
+
         private static SimulationNode GetSimNode(AvaloniaVisualSimulationService service, string nodeId)
         {
             var baseType = typeof(AvaloniaVisualSimulationService).BaseType;

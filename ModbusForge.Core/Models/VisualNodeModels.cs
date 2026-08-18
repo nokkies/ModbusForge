@@ -170,7 +170,29 @@ namespace ModbusForge.Models
 
         [ObservableProperty]
         private double _vsdAtSpeedTolerance = 2.0;
-        
+
+        // Signal conditioning parameters
+        [ObservableProperty]
+        private double _scaleFromMin = 0.0;
+
+        [ObservableProperty]
+        private double _scaleFromMax = 100.0;
+
+        [ObservableProperty]
+        private double _scaleToMin = 0.0;
+
+        [ObservableProperty]
+        private double _scaleToMax = 100.0;
+
+        [ObservableProperty]
+        private bool _scaleClamp = true;
+
+        [ObservableProperty]
+        private string _edgeDetectDirection = "Rising";
+
+        [ObservableProperty]
+        private int _maWindowSize = 10;
+
         /// <summary>
         /// Formatted display of the node's secondary output ports (e.g. "Fault: OFF · Speed: 42.5"),
         /// refreshed by the simulation service each tick. Empty when the block has a single output.
@@ -386,6 +408,47 @@ namespace ModbusForge.Models
 
         partial void OnCompareValueChanged(int value)
         {
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnScaleFromMinChanged(double value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnScaleFromMaxChanged(double value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnScaleToMinChanged(double value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnScaleToMaxChanged(double value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnScaleClampChanged(bool value)
+        {
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnEdgeDetectDirectionChanged(string value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
+            OnPropertyChanged(nameof(ParameterDisplay));
+        }
+
+        partial void OnMaWindowSizeChanged(int value)
+        {
+            OnPropertyChanged(nameof(DisplayName));
             OnPropertyChanged(nameof(ParameterDisplay));
         }
 

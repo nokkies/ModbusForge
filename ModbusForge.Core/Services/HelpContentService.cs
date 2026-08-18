@@ -383,6 +383,7 @@ Contains available nodes organized by category:
 - **Sources**: Signal generators, constants
 - **Math**: Mathematical operations
 - **Logic**: Boolean operations
+- **Signal Conditioning**: scale, edge detect, moving average
 - **Transform**: Data conversions
 
 ### Canvas (Center)
@@ -435,6 +436,11 @@ Fixed values for testing.
 
 ### Math Nodes
 Perform mathematical operations on signals.
+
+### Signal Conditioning
+- **Scale (LIN)**: linearly maps an analog value from one range to another (e.g. a 0..100 raw register to 0..120 °C). Configure the From/To ranges; when Clamp is on, results stay inside the To range.
+- **Edge Detect**: emits a single-cycle pulse on the selected transition (Rising or Falling) of a Boolean input — useful for triggering timers or counters from noisy or held signals.
+- **Moving Average (MAVG)**: smooths an analog signal by averaging the last N samples (window 1..1024). The window fills gradually after startup.
 
 ## Tips
 - Use the search box in the palette to quickly find nodes

@@ -32,6 +32,13 @@ namespace ModbusForge.Services
             ["VsdRampUpMs"] = n => n.VsdRampUpMs,
             ["VsdRampDownMs"] = n => n.VsdRampDownMs,
             ["VsdAtSpeedTolerance"] = n => n.VsdAtSpeedTolerance,
+            ["ScaleFromMin"] = n => n.ScaleFromMin,
+            ["ScaleFromMax"] = n => n.ScaleFromMax,
+            ["ScaleToMin"] = n => n.ScaleToMin,
+            ["ScaleToMax"] = n => n.ScaleToMax,
+            ["ScaleClamp"] = n => n.ScaleClamp,
+            ["EdgeDetectDirection"] = n => n.EdgeDetectDirection,
+            ["MaWindowSize"] = n => n.MaWindowSize,
         };
 
         private static readonly Dictionary<string, Action<VisualNode, object?>> Setters = new(StringComparer.Ordinal)
@@ -55,6 +62,13 @@ namespace ModbusForge.Services
             ["VsdRampUpMs"] = (n, v) => n.VsdRampUpMs = ToInt(v),
             ["VsdRampDownMs"] = (n, v) => n.VsdRampDownMs = ToInt(v),
             ["VsdAtSpeedTolerance"] = (n, v) => n.VsdAtSpeedTolerance = ToDouble(v),
+            ["ScaleFromMin"] = (n, v) => n.ScaleFromMin = ToDouble(v),
+            ["ScaleFromMax"] = (n, v) => n.ScaleFromMax = ToDouble(v),
+            ["ScaleToMin"] = (n, v) => n.ScaleToMin = ToDouble(v),
+            ["ScaleToMax"] = (n, v) => n.ScaleToMax = ToDouble(v),
+            ["ScaleClamp"] = (n, v) => n.ScaleClamp = v is bool b && b,
+            ["EdgeDetectDirection"] = (n, v) => n.EdgeDetectDirection = v as string ?? "Rising",
+            ["MaWindowSize"] = (n, v) => n.MaWindowSize = ToInt(v),
         };
 
         /// <summary>

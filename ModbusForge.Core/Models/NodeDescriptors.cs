@@ -194,6 +194,21 @@ namespace ModbusForge.Models
                 displayNameFormatter: n => $"VSD ({n.VsdMaxSpeed}max)",
                 parameterDisplayFormatter: n => $"Max: {n.VsdMaxSpeed}, RUp: {n.VsdRampUpMs}ms, RDown: {n.VsdRampDownMs}ms, Tol: {n.VsdAtSpeedTolerance}");
 
+            // Signal conditioning (analog in, analog/bool out; the input can be a
+            // wire or a bound Modbus address)
+            Add(PlcElementType.Scale, "Scale", "Scale", "Scale (LIN)", "Signal Conditioning", RgbColor.FromRgb(0, 131, 143), "LIN",
+                hasParameters: true, hasInput1Address: true, hasOutputAddress: true,
+                displayNameFormatter: n => $"Scale ({n.ScaleFromMin:0.##}..{n.ScaleFromMax:0.##} → {n.ScaleToMin:0.##}..{n.ScaleToMax:0.##})",
+                parameterDisplayFormatter: n => $"{n.ScaleFromMin:0.##}..{n.ScaleFromMax:0.##} → {n.ScaleToMin:0.##}..{n.ScaleToMax:0.##}");
+            Add(PlcElementType.EdgeDetect, "EdgeDetect", "Edge Detect", "Edge Detect", "Signal Conditioning", RgbColor.FromRgb(230, 74, 25), "EDGE",
+                hasParameters: true, hasInput1Address: true, hasOutputAddress: true,
+                displayNameFormatter: n => $"Edge ({n.EdgeDetectDirection})",
+                parameterDisplayFormatter: n => $"Edge: {n.EdgeDetectDirection}");
+            Add(PlcElementType.MovingAverage, "MovingAverage", "Moving Avg", "Moving Average", "Signal Conditioning", RgbColor.FromRgb(56, 142, 60), "MAVG",
+                hasParameters: true, hasInput1Address: true, hasOutputAddress: true,
+                displayNameFormatter: n => $"MAVG ({n.MaWindowSize})",
+                parameterDisplayFormatter: n => $"Window: {n.MaWindowSize}");
+
             // Sources (the signal generator has no input ports - only an output).
             Add(PlcElementType.SignalGenerator, "SignalGenerator", "SignalGen", "Signal Generator", "Sources", RgbColor.FromRgb(141, 110, 189), "SIG",
                 hasParameters: true,

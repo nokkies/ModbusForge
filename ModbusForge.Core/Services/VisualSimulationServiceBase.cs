@@ -165,6 +165,11 @@ namespace ModbusForge.Services
             catalog.Register(new MotorDolBlock());
             catalog.Register(new VsdBlock());
 
+            // Signal conditioning
+            catalog.Register(new ScaleBlock());
+            catalog.Register(new EdgeDetectBlock());
+            catalog.Register(new MovingAverageBlock());
+
             return catalog;
         }
 

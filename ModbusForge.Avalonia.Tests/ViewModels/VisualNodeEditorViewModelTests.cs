@@ -281,6 +281,70 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             Assert.Equal(VisualNodeEditorViewModel.CycleLockErrorText, a.ErrorText);
         }
 
+        [Fact]
+        public void DuplicateProgram_CopiesEveryNodeParameter()
+        {
+            // Regression: node cloning used to copy only the first generation of
+            // parameter properties, so VSD/valve/real-math nodes — and any block
+            // added later — silently reset to defaults in the duplicated program.
+            using var vm = CreateVm();
+
+            var program = new ProgramModel
+            {
+                Name = "Original",
+                Nodes =
+                {
+                    new VisualNode
+                    {
+                        Id = "vsd1",
+                        Name = "VSD",
+                        ElementType = PlcElementType.Vsd,
+                        VsdMaxSpeed = 55.0,
+                        VsdRampUpMs = 333,
+                        VsdRampDownMs = 444,
+                        VsdAtSpeedTolerance = 7.5
+                    },
+                    new VisualNode
+                    {
+                        Id = "scale1",
+                        Name = "Scale",
+                        ElementType = PlcElementType.Scale,
+                        ScaleFromMax = 50.0,
+                        ScaleToMax = 7.5,
+                        ScaleClamp = false
+                    },
+                    new VisualNode
+                    {
+                        Id = "edge1",
+                        Name = "Edge",
+                        ElementType = PlcElementType.EdgeDetect,
+                        EdgeDetectDirection = "Falling"
+                    }
+                }
+            };
+
+            vm.DuplicateProgramCommand.Execute(program);
+
+            var duplicate = vm.ProgramTree.Programs.Single(p => p.Name == "Original_Copy");
+
+            var vsd = duplicate.Nodes.Single(n => n.ElementType == PlcElementType.Vsd);
+            Assert.Equal(55.0, vsd.VsdMaxSpeed);
+            Assert.Equal(333, vsd.VsdRampUpMs);
+            Assert.Equal(444, vsd.VsdRampDownMs);
+            Assert.Equal(7.5, vsd.VsdAtSpeedTolerance);
+
+            var scale = duplicate.Nodes.Single(n => n.ElementType == PlcElementType.Scale);
+            Assert.Equal(50.0, scale.ScaleFromMax);
+            Assert.Equal(7.5, scale.ScaleToMax);
+            Assert.False(scale.ScaleClamp);
+
+            var edge = duplicate.Nodes.Single(n => n.ElementType == PlcElementType.EdgeDetect);
+            Assert.Equal("Falling", edge.EdgeDetectDirection);
+
+            // The copies are new nodes, not shared references.
+            Assert.NotEqual("vsd1", vsd.Id);
+        }
+
         private static VisualNodeEditorViewModel CreateVm()
             => new(new AvaloniaVisualSimulationService(), NoopTagWindowService.Instance);
 
