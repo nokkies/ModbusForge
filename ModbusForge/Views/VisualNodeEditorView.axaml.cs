@@ -311,7 +311,7 @@ namespace ModbusForge.Avalonia.Views
                 return;
             }
 
-            if (node.OutputPortNames.Contains(connector))
+            if (node.HasOutputConnector(connector))
             {
                 if (ViewModel.IsConnectMode)
                 {

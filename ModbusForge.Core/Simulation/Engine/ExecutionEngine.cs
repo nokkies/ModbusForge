@@ -247,9 +247,7 @@ namespace ModbusForge.Core.Simulation.Engine
 
             if (connectorName == "Output")
             {
-                var outputs = node.Block.Ports.Where(p => p.Direction == PortDirection.Output).ToList();
-                var primary = outputs.FirstOrDefault(p => p.Name == "Output")?.Name
-                              ?? outputs.FirstOrDefault()?.Name;
+                var primary = BlockPorts.PrimaryOutput(node.Block.Ports);
                 if (primary != null && node.OutputValues.ContainsKey(primary))
                     return primary;
             }

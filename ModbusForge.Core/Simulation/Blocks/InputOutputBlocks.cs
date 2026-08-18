@@ -26,20 +26,20 @@ namespace ModbusForge.Core.Simulation.Blocks
             OutputDataType = outputDataType;
             Ports = new List<IPort>
             {
-                new PortDefinition("Input1", PortDirection.Input, outputDataType),
-                new PortDefinition("Output", PortDirection.Output, outputDataType)
+                new PortDefinition(PortNames.Value, PortDirection.Input, outputDataType),
+                new PortDefinition(PortNames.BoolOutput, PortDirection.Output, outputDataType)
             };
         }
 
         public void Execute(IExecutionContext context)
         {
-            var input = context.ReadInput("Input1");
+            var input = context.ReadInput(PortNames.Value);
             if (input == null)
             {
                 input = SimulationValue.FromObject(OutputDataType, 0);
             }
 
-            context.WriteOutput("Output", input);
+            context.WriteOutput(PortNames.BoolOutput, input);
         }
     }
 
@@ -81,20 +81,20 @@ namespace ModbusForge.Core.Simulation.Blocks
             InputDataType = inputDataType;
             Ports = new List<IPort>
             {
-                new PortDefinition("Input1", PortDirection.Input, inputDataType),
-                new PortDefinition("Output", PortDirection.Output, inputDataType)
+                new PortDefinition(PortNames.Value, PortDirection.Input, inputDataType),
+                new PortDefinition(PortNames.BoolOutput, PortDirection.Output, inputDataType)
             };
         }
 
         public void Execute(IExecutionContext context)
         {
-            var input = context.ReadInput("Input1");
+            var input = context.ReadInput(PortNames.Value);
             if (input == null)
             {
                 input = SimulationValue.FromObject(InputDataType, 0);
             }
 
-            context.WriteOutput("Output", input);
+            context.WriteOutput(PortNames.BoolOutput, input);
         }
     }
 

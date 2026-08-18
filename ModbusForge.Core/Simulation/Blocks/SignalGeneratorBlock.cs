@@ -59,7 +59,7 @@ namespace ModbusForge.Core.Simulation.Blocks
         {
             Ports = new List<IPort>
             {
-                new PortDefinition("Output", PortDirection.Output, OutputDataType)
+                new PortDefinition(PortNames.Value, PortDirection.Output, OutputDataType)
             };
         }
 
@@ -88,7 +88,7 @@ namespace ModbusForge.Core.Simulation.Blocks
                 ? SimulationValue.Real(value)
                 : SimulationValue.Int32((int)Math.Round(value));
 
-            context.WriteOutput("Output", output);
+            context.WriteOutput(PortNames.Value, output);
         }
 
         internal sealed class SignalGeneratorState

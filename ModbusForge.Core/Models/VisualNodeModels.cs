@@ -191,6 +191,14 @@ namespace ModbusForge.Models
         public IReadOnlyList<ParameterField>? ParameterFields { get; set; }
 
         /// <summary>
+        /// The block's real port names for the node's connector slots, resolved by the editor
+        /// view model from the function block catalog. Rendered as canvas pin labels and
+        /// tooltips. Rebuilt when the node's block type changes.
+        /// </summary>
+        [ObservableProperty]
+        private NodePortLabels? _portLabels;
+
+        /// <summary>
         /// Replaces the secondary-output display text (no-op when unchanged).
         /// </summary>
         public void SetSecondaryOutputs(IReadOnlyList<KeyValuePair<string, string>> namedValues)
@@ -232,6 +240,18 @@ namespace ModbusForge.Models
         public string ParameterDisplay => NodeDescriptors.Get(ElementType).GetParameterDisplay(this);
 
         public bool HasOutput => !NodeDescriptors.Get(ElementType).IsOutput;
+
+        /// <summary>
+        /// True when a wire can leave this node from the given connector: the generic
+        /// "Output" connector (which stands for the block's primary output port, e.g.
+        /// "Q" or "Running") or one of the block's declared output port names.
+        /// </summary>
+        public bool HasOutputConnector(string? connectorName)
+        {
+            if (connectorName is null) return false;
+            if (connectorName == "Output") return OutputPortNames.Count > 0;
+            return OutputPortNames.Contains(connectorName, StringComparer.Ordinal);
+        }
 
         // Cached handler so we can unsubscribe from the previous PlcAddressReference instance.
         private PropertyChangedEventHandler? _addressPropertyChangedHandler;

@@ -29,14 +29,14 @@ namespace ModbusForge.Tests.Simulation
             var engine = new ExecutionEngine(_catalog);
 
             var inA = CreateNode("inA", new InputIntBlock());
-            inA.InputBindings["Input1"] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 1 };
+            inA.InputBindings[PortNames.Value] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 1 };
 
             var inB = CreateNode("inB", new InputIntBlock());
-            inB.InputBindings["Input1"] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 2 };
+            inB.InputBindings[PortNames.Value] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 2 };
 
             var add = CreateNode("add", new MathBlock(MathOperation.Add));
             var output = CreateNode("out", new OutputIntBlock());
-            output.OutputBindings["Output"] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 20 };
+            output.OutputBindings[PortNames.BoolOutput] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 20 };
 
             var dataStore = CreateDataStore();
             dataStore.HoldingRegisters[1] = 10;
@@ -86,11 +86,11 @@ namespace ModbusForge.Tests.Simulation
             var engine = new ExecutionEngine(_catalog);
 
             var input = CreateNode("in", new InputBoolBlock());
-            input.InputBindings["Input1"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 };
+            input.InputBindings[PortNames.Value] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 };
 
             var and = CreateNode("and", new AndBlock());
             var output = CreateNode("out", new OutputBoolBlock());
-            output.OutputBindings["Output"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 };
+            output.OutputBindings[PortNames.BoolOutput] = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 };
 
             var dataStore = CreateDataStore();
             dataStore.CoilDiscretes[1] = true;
@@ -109,7 +109,7 @@ namespace ModbusForge.Tests.Simulation
 
             // Now connect the second input to true as well.
             var input2 = CreateNode("in2", new InputBoolBlock());
-            input2.InputBindings["Input1"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 2 };
+            input2.InputBindings[PortNames.Value] = new PlcAddressReference { Area = PlcArea.Coil, Address = 2 };
             dataStore.CoilDiscretes[2] = true;
 
             engine.LoadGraph(
@@ -132,10 +132,10 @@ namespace ModbusForge.Tests.Simulation
             var engine = new ExecutionEngine(_catalog);
 
             var input = CreateNode("in", new InputBoolBlock());
-            input.InputBindings["Input1"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1, Not = true };
+            input.InputBindings[PortNames.Value] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1, Not = true };
 
             var output = CreateNode("out", new OutputBoolBlock());
-            output.OutputBindings["Output"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 };
+            output.OutputBindings[PortNames.BoolOutput] = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 };
 
             engine.LoadGraph(
                 new[] { input, output },
@@ -160,13 +160,13 @@ namespace ModbusForge.Tests.Simulation
             var engine = new ExecutionEngine(catalog);
 
             var input = CreateNode("in", new InputBoolBlock());
-            input.InputBindings["Input1"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 };
+            input.InputBindings[PortNames.Value] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 };
 
             var ton = CreateNode("ton", new TonBlock());
             ton.Parameters["TimerPresetMs"] = 10000;
 
             var output = CreateNode("out", new OutputBoolBlock());
-            output.OutputBindings["Output"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 };
+            output.OutputBindings[PortNames.BoolOutput] = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 };
 
             engine.LoadGraph(
                 new[] { input, ton, output },
@@ -190,11 +190,11 @@ namespace ModbusForge.Tests.Simulation
             var engine = new ExecutionEngine(_catalog);
 
             var math = CreateNode("math", new MathBlock(MathOperation.Add));
-            math.InputBindings["Input1"] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 1 };
-            math.InputBindings["Input2"] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 2 };
+            math.InputBindings[PortNames.OperandA] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 1 };
+            math.InputBindings[PortNames.OperandB] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 2 };
 
             var output = CreateNode("out", new OutputIntBlock());
-            output.OutputBindings["Output"] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 20 };
+            output.OutputBindings[PortNames.BoolOutput] = new PlcAddressReference { Area = PlcArea.HoldingRegister, Address = 20 };
 
             engine.LoadGraph(
                 new[] { math, output },
@@ -221,7 +221,7 @@ namespace ModbusForge.Tests.Simulation
             var engine = new ExecutionEngine(catalog);
 
             var input = CreateNode("in", new InputBoolBlock());
-            input.InputBindings["Input1"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 };
+            input.InputBindings[PortNames.Value] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 };
 
             var motor = CreateNode("motor", new MotorDolBlock());
             motor.Parameters["MotorDolRunDelayMs"] = 0;
@@ -235,7 +235,7 @@ namespace ModbusForge.Tests.Simulation
 
             engine.Execute(dataStore);
 
-            Assert.True(motor.OutputValues["Output"].AsBool());
+            Assert.True(motor.OutputValues[PortNames.MotorRun].AsBool());
         }
 
         [Fact]
@@ -249,7 +249,7 @@ namespace ModbusForge.Tests.Simulation
 
             var motor = CreateNode("motor", new MotorDolBlock());
             motor.Parameters["MotorDolRunDelayMs"] = 0;
-            motor.InputBindings["Start"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 5 };
+            motor.InputBindings[PortNames.Start] = new PlcAddressReference { Area = PlcArea.Coil, Address = 5 };
 
             engine.LoadGraph(new[] { motor }, Array.Empty<SimulationConnection>());
 
@@ -258,7 +258,7 @@ namespace ModbusForge.Tests.Simulation
 
             engine.Execute(dataStore);
 
-            Assert.True(motor.OutputValues["Output"].AsBool());
+            Assert.True(motor.OutputValues[PortNames.MotorRun].AsBool());
         }
 
         [Fact]
@@ -273,12 +273,12 @@ namespace ModbusForge.Tests.Simulation
             var engine = new ExecutionEngine(catalog);
 
             var vsd = CreateNode("vsd", new VsdBlock());
-            vsd.InputBindings["Run"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 };
+            vsd.InputBindings[PortNames.Run] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 };
             vsd.Parameters["VsdRampUpMs"] = 0;
             vsd.Parameters["VsdRampDownMs"] = 0;
 
             var output = CreateNode("out", new OutputBoolBlock());
-            output.OutputBindings["Output"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 };
+            output.OutputBindings[PortNames.BoolOutput] = new PlcAddressReference { Area = PlcArea.Coil, Address = 10 };
 
             engine.LoadGraph(
                 new[] { vsd, output },

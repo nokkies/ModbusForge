@@ -26,7 +26,7 @@ namespace ModbusForge.Tests.Simulation
 
             var ton = new SimulationNode("ton1", "ton1", new TonBlock());
             ton.Parameters["TimerPresetMs"] = 1000;
-            ton.InputBindings["Input1"] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 };
+            ton.InputBindings[PortNames.TimerInput] = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 };
 
             engine.LoadGraph(new[] { ton }, Array.Empty<SimulationConnection>());
 
@@ -36,7 +36,7 @@ namespace ModbusForge.Tests.Simulation
             lock (dataStore) { engine.Execute(dataStore); }
             await Task.Delay(500);
             lock (dataStore) { engine.Execute(dataStore); }
-            Assert.False(ton.OutputValues["Output"].AsBool());
+            Assert.False(ton.OutputValues[PortNames.BoolOutput].AsBool());
 
             // A mid-run graph reload that reuses the SimulationNode (state must survive).
             engine.LoadGraph(new[] { ton }, Array.Empty<SimulationConnection>());
@@ -45,7 +45,7 @@ namespace ModbusForge.Tests.Simulation
             lock (dataStore) { engine.Execute(dataStore); }
 
             // ~1100ms total (> preset): the TON completes only if the accumulator survived.
-            Assert.True(ton.OutputValues["Output"].AsBool());
+            Assert.True(ton.OutputValues[PortNames.BoolOutput].AsBool());
         }
     }
 }

@@ -52,9 +52,9 @@ namespace ModbusForge.Core.Simulation.Blocks
             var dataType = isReal ? SimulationDataType.Real : SimulationDataType.Int32;
             Ports = new List<IPort>
             {
-                new PortDefinition("Input1", PortDirection.Input, dataType),
-                new PortDefinition("Input2", PortDirection.Input, dataType),
-                new PortDefinition("Output", PortDirection.Output, dataType)
+                new PortDefinition(PortNames.OperandA, PortDirection.Input, dataType),
+                new PortDefinition(PortNames.OperandB, PortDirection.Input, dataType),
+                new PortDefinition(PortNames.BoolOutput, PortDirection.Output, dataType)
             };
 
             Parameters = new[]
@@ -73,9 +73,9 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public void Execute(IExecutionContext context)
         {
-            double in1 = context.ReadInput("Input1")?.AsReal() ?? 0.0;
-            double in2 = context.ReadInput("Input2") is not null
-                ? context.ReadInput("Input2")!.AsReal()
+            double in1 = context.ReadInput(PortNames.OperandA)?.AsReal() ?? 0.0;
+            double in2 = context.ReadInput(PortNames.OperandB) is not null
+                ? context.ReadInput(PortNames.OperandB)!.AsReal()
                 : IsReal
                     ? context.ReadParameter("ConstantReal", 0.0)
                     : context.ReadParameter("Constant", 0);
@@ -93,7 +93,7 @@ namespace ModbusForge.Core.Simulation.Blocks
                 ? SimulationValue.Real(result)
                 : SimulationValue.Int32((int)Math.Round(result));
 
-            context.WriteOutput("Output", output);
+            context.WriteOutput(PortNames.BoolOutput, output);
         }
     }
 }

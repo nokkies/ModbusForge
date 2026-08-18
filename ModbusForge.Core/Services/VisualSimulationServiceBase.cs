@@ -393,21 +393,15 @@ namespace ModbusForge.Services
         }
 
         /// <summary>
-        /// Picks the port used for the node's primary live value: "Output" when present,
-        /// otherwise the first declared output port (multi-output blocks such as the VSD).
+        /// Picks the port used for the node's primary live value: the block's primary
+        /// output port ("Output" when declared, otherwise the first declared output,
+        /// e.g. the VSD's "Running").
         /// </summary>
-        private static (string Port, ISimulationValue? Value) GetPrimaryOutput(SimulationNode simulationNode)
+        private static (string? Port, ISimulationValue? Value) GetPrimaryOutput(SimulationNode simulationNode)
         {
-            if (simulationNode.OutputValues.TryGetValue("Output", out var outputValue))
-                return ("Output", outputValue);
-
-            var firstPort = simulationNode.Block.Ports
-                .FirstOrDefault(p => p.Direction == PortDirection.Output);
-
-            if (firstPort != null && simulationNode.OutputValues.TryGetValue(firstPort.Name, out var firstValue))
-                return (firstPort.Name, firstValue);
-
-            return (firstPort?.Name ?? "Output", null);
+            var primaryPort = BlockPorts.PrimaryOutput(simulationNode.Block.Ports) ?? "Output";
+            var value = simulationNode.OutputValues.TryGetValue(primaryPort, out var v) ? v : null;
+            return (primaryPort, value);
         }
 
         private static string FormatValue(ISimulationValue value)
@@ -675,13 +669,10 @@ namespace ModbusForge.Services
             simulationNode.InputBindings.Clear();
             simulationNode.OutputBindings.Clear();
 
-            var outputPorts = simulationNode.Block.Ports.Where(p => p.Direction == PortDirection.Output).ToList();
-
             // The primary output ("Output" when present, else the first declared output,
             // e.g. the VSD's "Running") is addressed via the node's main OutputAddress;
             // the remaining outputs use the per-port bindings.
-            var primaryOutput = outputPorts.FirstOrDefault(p => p.Name == "Output")?.Name
-                                ?? outputPorts.FirstOrDefault()?.Name;
+            var primaryOutput = BlockPorts.PrimaryOutput(simulationNode.Block.Ports);
 
             // Address bindings are only honored for slots the node type exposes in the UI
             // (descriptor flags). Other node types stay wire-driven, so their default
@@ -691,7 +682,7 @@ namespace ModbusForge.Services
             // Input addresses bind positionally onto the declared input ports: the editor's
             // "Input1"/"Input2" slots map to the block's first/second input port, whatever
             // its declared name ("Start", "Run", ...).
-            var inputPorts = simulationNode.Block.Ports.Where(p => p.Direction == PortDirection.Input).ToList();
+            var inputPorts = BlockPorts.Inputs(simulationNode.Block.Ports);
             if (descriptor?.HasInput1Address == true && inputPorts.Count > 0 &&
                 visualNode.Input1Address is { } input1 && input1.Address >= 0)
             {

@@ -17,11 +17,11 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public IReadOnlyList<IPort> Ports { get; } = new List<IPort>
         {
-            new PortDefinition("Run", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("SpeedReference", PortDirection.Input, SimulationDataType.Real),
-            new PortDefinition("Running", PortDirection.Output, SimulationDataType.Bool),
-            new PortDefinition("SpeedFeedback", PortDirection.Output, SimulationDataType.Real),
-            new PortDefinition("AtSpeed", PortDirection.Output, SimulationDataType.Bool)
+            new PortDefinition(PortNames.Run, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.SpeedReference, PortDirection.Input, SimulationDataType.Real),
+            new PortDefinition(PortNames.VsdRunning, PortDirection.Output, SimulationDataType.Bool),
+            new PortDefinition(PortNames.SpeedFeedback, PortDirection.Output, SimulationDataType.Real),
+            new PortDefinition(PortNames.AtSpeed, PortDirection.Output, SimulationDataType.Bool)
         };
 
         public IReadOnlyList<BlockParameterDescriptor> Parameters { get; } = new[]
@@ -68,8 +68,8 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public void Execute(IExecutionContext context)
         {
-            var run = context.ReadInput("Run")?.AsBool() ?? false;
-            var speedReference = context.ReadInput("SpeedReference")?.AsReal() ?? 0.0;
+            var run = context.ReadInput(PortNames.Run)?.AsBool() ?? false;
+            var speedReference = context.ReadInput(PortNames.SpeedReference)?.AsReal() ?? 0.0;
 
             var maxSpeed = context.ReadParameter("VsdMaxSpeed", 100.0);
             var rampUpMs = context.ReadParameter("VsdRampUpMs", 2000);
@@ -111,9 +111,9 @@ namespace ModbusForge.Core.Simulation.Blocks
 
             var atSpeed = Math.Abs(state.CurrentSpeed - targetSpeed) <= atSpeedTolerance;
 
-            context.WriteOutput("Running", SimulationValue.Bool(run));
-            context.WriteOutput("SpeedFeedback", SimulationValue.Real(state.CurrentSpeed));
-            context.WriteOutput("AtSpeed", SimulationValue.Bool(atSpeed));
+            context.WriteOutput(PortNames.VsdRunning, SimulationValue.Bool(run));
+            context.WriteOutput(PortNames.SpeedFeedback, SimulationValue.Real(state.CurrentSpeed));
+            context.WriteOutput(PortNames.AtSpeed, SimulationValue.Bool(atSpeed));
         }
 
         private static double Clamp(double value, double min, double max)

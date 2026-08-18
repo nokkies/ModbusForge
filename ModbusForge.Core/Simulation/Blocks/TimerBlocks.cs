@@ -25,15 +25,15 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public IReadOnlyList<IPort> Ports { get; } = new List<IPort>
         {
-            new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
+            new PortDefinition(PortNames.TimerInput, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.BoolOutput, PortDirection.Output, SimulationDataType.Bool)
         };
 
         public IReadOnlyList<BlockParameterDescriptor> Parameters => TimerParameters;
 
         public void Execute(IExecutionContext context)
         {
-            var input = context.ReadInput("Input1")?.AsBool() ?? false;
+            var input = context.ReadInput(PortNames.TimerInput)?.AsBool() ?? false;
             var preset = context.ReadParameter("TimerPresetMs", 1000);
             var state = context.State.GetOrCreate<TimerState>("TimerState");
 
@@ -50,7 +50,7 @@ namespace ModbusForge.Core.Simulation.Blocks
             }
 
             state.LastInput = input;
-            context.WriteOutput("Output", SimulationValue.Bool(state.Output));
+            context.WriteOutput(PortNames.BoolOutput, SimulationValue.Bool(state.Output));
         }
     }
 
@@ -62,15 +62,15 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public IReadOnlyList<IPort> Ports { get; } = new List<IPort>
         {
-            new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
+            new PortDefinition(PortNames.TimerInput, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.BoolOutput, PortDirection.Output, SimulationDataType.Bool)
         };
 
         public IReadOnlyList<BlockParameterDescriptor> Parameters => TonBlock.TimerParameters;
 
         public void Execute(IExecutionContext context)
         {
-            var input = context.ReadInput("Input1")?.AsBool() ?? false;
+            var input = context.ReadInput(PortNames.TimerInput)?.AsBool() ?? false;
             var preset = context.ReadParameter("TimerPresetMs", 1000);
             var state = context.State.GetOrCreate<TimerState>("TimerState");
 
@@ -90,7 +90,7 @@ namespace ModbusForge.Core.Simulation.Blocks
             }
 
             state.LastInput = input;
-            context.WriteOutput("Output", SimulationValue.Bool(state.Output));
+            context.WriteOutput(PortNames.BoolOutput, SimulationValue.Bool(state.Output));
         }
     }
 
@@ -102,15 +102,15 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public IReadOnlyList<IPort> Ports { get; } = new List<IPort>
         {
-            new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
+            new PortDefinition(PortNames.TimerInput, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.BoolOutput, PortDirection.Output, SimulationDataType.Bool)
         };
 
         public IReadOnlyList<BlockParameterDescriptor> Parameters => TonBlock.TimerParameters;
 
         public void Execute(IExecutionContext context)
         {
-            var input = context.ReadInput("Input1")?.AsBool() ?? false;
+            var input = context.ReadInput(PortNames.TimerInput)?.AsBool() ?? false;
             var preset = context.ReadParameter("TimerPresetMs", 1000);
             var state = context.State.GetOrCreate<TimerState>("TimerState");
 
@@ -129,7 +129,7 @@ namespace ModbusForge.Core.Simulation.Blocks
             }
 
             state.LastInput = input;
-            context.WriteOutput("Output", SimulationValue.Bool(state.Output));
+            context.WriteOutput(PortNames.BoolOutput, SimulationValue.Bool(state.Output));
         }
     }
 

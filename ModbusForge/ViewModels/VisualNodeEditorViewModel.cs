@@ -635,12 +635,13 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void RefreshAllParameterFields()
         {
-            // Rebuild every node's parameter editor fields so the right panel and the
-            // node footers track the active blocks' declared parameters (after a program
-            // load, demo, or clear the node set has changed).
+            // Rebuild every node's parameter editor fields and pin labels so the right
+            // panel, the node footers, and the canvas pins track the active blocks'
+            // declarations (after a program load, demo, or clear the node set has changed).
             foreach (var node in Config.Nodes)
             {
                 BuildParameterFields(node);
+                BuildPortLabels(node);
             }
         }
 
@@ -896,6 +897,15 @@ namespace ModbusForge.Avalonia.ViewModels
                 BuildParameterFields(node);
             }
 
+            if (node.PortLabels == null)
+            {
+                BuildPortLabels(node);
+            }
+
+            // Keep the node's output port names in sync with the catalog: loaded nodes may
+            // carry names from an older version, and per-port bindings must follow them.
+            UpdateOutputPortNames(node);
+
             InitializeNodeEditBaselines(node);
             AttachAddressReferenceHandlers(node);
         }
@@ -981,6 +991,30 @@ namespace ModbusForge.Avalonia.ViewModels
             node.ParameterFields = fields;
         }
 
+        /// <summary>
+        /// Resolves the node's pin labels from the function block's declared ports
+        /// (via the catalog), so the canvas shows the block's real port names
+        /// ("IN"/"Q", "S"/"R"/"Q", "A"/"B"/"Q", ...) instead of the generic
+        /// "Input 1"/"Input 2"/"Output" slot names.
+        /// </summary>
+        private void BuildPortLabels(VisualNode node)
+        {
+            var descriptor = _visualSimulation?.Catalog.GetDescriptor(node.ElementType.ToString());
+            if (descriptor == null)
+            {
+                node.PortLabels = null;
+                return;
+            }
+
+            var inputs = BlockPorts.Inputs(descriptor.Ports);
+            node.PortLabels = new NodePortLabels
+            {
+                Input1 = inputs.ElementAtOrDefault(0)?.Name,
+                Input2 = inputs.ElementAtOrDefault(1)?.Name,
+                Output = BlockPorts.PrimaryOutput(descriptor.Ports)
+            };
+        }
+
         private void DetachNode(VisualNode node)
         {
             if (_attachedNodes.Remove(node))
@@ -1027,9 +1061,13 @@ namespace ModbusForge.Avalonia.ViewModels
 
             if (e.PropertyName == nameof(VisualNode.ElementType))
             {
-                // The block type changed: rebuild the data-driven parameter fields.
+                // The block type changed: rebuild the data-driven parameter fields and
+                // the pin labels from the new block's declaration.
                 if (sender is VisualNode node)
+                {
                     BuildParameterFields(node);
+                    BuildPortLabels(node);
+                }
             }
 
             if (!_suppressingNodeEdits
@@ -1790,8 +1828,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 return;
             }
 
-            var names = descriptor.Ports
-                .Where(p => p.Direction == PortDirection.Output)
+            var names = BlockPorts.Outputs(descriptor.Ports)
                 .Select(p => p.Name)
                 .ToList();
 
@@ -1803,7 +1840,7 @@ namespace ModbusForge.Avalonia.ViewModels
             // The primary output ("Output" when present, else the first output, e.g. the
             // VSD's "Running") is addressed via the node's main OutputAddress, so it gets
             // no per-port binding.
-            var primary = names.FirstOrDefault(n => n == "Output") ?? names.FirstOrDefault();
+            var primary = BlockPorts.PrimaryOutput(descriptor.Ports);
 
             foreach (var name in names)
             {
@@ -1968,7 +2005,7 @@ namespace ModbusForge.Avalonia.ViewModels
             }
 
             var sourcePort = string.IsNullOrWhiteSpace(sourceConnector) ? "Output" : sourceConnector;
-            if (!source.OutputPortNames.Contains(sourcePort))
+            if (!source.HasOutputConnector(sourcePort))
             {
                 StatusText = $"{source.Name} has no {sourcePort} output port.";
                 return false;
@@ -2501,10 +2538,12 @@ namespace ModbusForge.Avalonia.ViewModels
             SelectedNode = null;
             SelectedConnection = null;
 
+            // 100px gaps between nodes: the canvas pin labels extend ~75px past each
+            // edge, so touching nodes would render their labels on top of each other.
             var input1 = AddNodeAt(PlcElementType.InputBool, 80, 80);
             var input2 = AddNodeAt(PlcElementType.InputBool, 80, 240);
-            var and = AddNodeAt(PlcElementType.AND, 320, 160);
-            var output = AddNodeAt(PlcElementType.OutputBool, 560, 160);
+            var and = AddNodeAt(PlcElementType.AND, 420, 160);
+            var output = AddNodeAt(PlcElementType.OutputBool, 760, 160);
 
             if (input1 != null && input2 != null && and != null && output != null)
             {

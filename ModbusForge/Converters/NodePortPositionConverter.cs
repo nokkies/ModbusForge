@@ -22,6 +22,8 @@ namespace ModbusForge.Avalonia.Converters
                 return 0.0;
 
             const double PortSize = 10.0;
+            const double LabelWidth = 70.0;
+            const double LabelGap = 3.0;
 
             return parameter?.ToString() switch
             {
@@ -30,6 +32,17 @@ namespace ModbusForge.Avalonia.Converters
                 "Input1X" or "Input2X" => -PortSize / 2.0,
                 "OutputX" => width - PortSize / 2.0,
                 "OutputY" => height / 2.0 - PortSize / 2.0,
+
+                // Pin labels sit flush against their port: input labels right-aligned
+                // ending just left of the pin, the output label left-aligned starting
+                // just right of the pin. A small vertical nudge keeps the 9px text
+                // centered on the 10px port.
+                "Input1LabelX" => -(PortSize / 2.0 + LabelGap + LabelWidth),
+                "Input2LabelX" => -(PortSize / 2.0 + LabelGap + LabelWidth),
+                "OutputLabelX" => width + PortSize / 2.0 + LabelGap,
+                "Input1LabelY" => height * 0.32 - PortSize / 2.0 - 1.5,
+                "Input2LabelY" => height * 0.68 - PortSize / 2.0 - 1.5,
+                "OutputLabelY" => height / 2.0 - PortSize / 2.0 - 1.5,
                 _ => 0.0
             };
         }

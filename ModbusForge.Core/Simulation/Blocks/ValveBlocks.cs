@@ -22,10 +22,10 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public IReadOnlyList<IPort> Ports { get; } = new List<IPort>
         {
-            new PortDefinition("OpenCmd", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("CloseCmd", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool),
-            new PortDefinition("Fault", PortDirection.Output, SimulationDataType.Bool)
+            new PortDefinition(PortNames.OpenCmd, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.CloseCmd, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.ValveOpen, PortDirection.Output, SimulationDataType.Bool),
+            new PortDefinition(PortNames.Fault, PortDirection.Output, SimulationDataType.Bool)
         };
 
         public IReadOnlyList<BlockParameterDescriptor> Parameters { get; } = new[]
@@ -58,8 +58,8 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public void Execute(IExecutionContext context)
         {
-            var openCmd = context.ReadInput("OpenCmd")?.AsBool() ?? false;
-            var closeCmd = context.ReadInput("CloseCmd")?.AsBool() ?? false;
+            var openCmd = context.ReadInput(PortNames.OpenCmd)?.AsBool() ?? false;
+            var closeCmd = context.ReadInput(PortNames.CloseCmd)?.AsBool() ?? false;
 
             var travelTimeMs = context.ReadParameter("ValveTravelTimeMs", 5000);
             var normallyOpen = context.ReadParameter("ValveNormallyOpen", false);
@@ -111,8 +111,8 @@ namespace ModbusForge.Core.Simulation.Blocks
                 }
             }
 
-            context.WriteOutput("Output", SimulationValue.Bool(state.CurrentOpen));
-            context.WriteOutput("Fault", SimulationValue.Bool(state.FaultActive));
+            context.WriteOutput(PortNames.ValveOpen, SimulationValue.Bool(state.CurrentOpen));
+            context.WriteOutput(PortNames.Fault, SimulationValue.Bool(state.FaultActive));
         }
 
         private sealed class ValveState

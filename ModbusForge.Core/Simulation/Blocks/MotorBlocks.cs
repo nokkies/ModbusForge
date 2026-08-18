@@ -16,9 +16,9 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public IReadOnlyList<IPort> Ports { get; } = new List<IPort>
         {
-            new PortDefinition("Start", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Stop", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
+            new PortDefinition(PortNames.Start, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.Stop, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.MotorRun, PortDirection.Output, SimulationDataType.Bool)
         };
 
         public IReadOnlyList<BlockParameterDescriptor> Parameters { get; } = new[]
@@ -37,8 +37,8 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public void Execute(IExecutionContext context)
         {
-            var start = context.ReadInput("Start")?.AsBool() ?? false;
-            var stop = context.ReadInput("Stop")?.AsBool() ?? false;
+            var start = context.ReadInput(PortNames.Start)?.AsBool() ?? false;
+            var stop = context.ReadInput(PortNames.Stop)?.AsBool() ?? false;
             var runDelayMs = context.ReadParameter("MotorDolRunDelayMs", 100);
 
             var state = context.State.GetOrCreate<MotorDolState>(nameof(MotorDolState));
@@ -70,7 +70,7 @@ namespace ModbusForge.Core.Simulation.Blocks
                 state.DelayAccumulatorMs = 0;
             }
 
-            context.WriteOutput("Output", SimulationValue.Bool(state.Running));
+            context.WriteOutput(PortNames.MotorRun, SimulationValue.Bool(state.Running));
         }
 
         private sealed class MotorDolState
