@@ -732,7 +732,7 @@ sudo systemctl enable --now modbusforge-headless
 **A:** Application settings are saved to `%AppData%\ModbusForge\settings.json`. Connection profiles are saved to `%AppData%\ModbusForge\connection-profiles.json`.
 
 ### Q: How do I export trend data?
-**A:** Open the Trend tab and use the **Trend** menu to export to CSV or PNG.
+**A:** Open the Trends tab and use the **Export CSV** or **Export PNG** buttons in the Data group. Select a pen in the pen list to export just that series, or leave none selected to export everything.
 
 ### Q: What file format does the Script Editor use?
 **A:** Scripts are saved as `.mbscript` files in JSON format.

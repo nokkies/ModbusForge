@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using ModbusForge.Models;
 using ModbusForge.Services;
@@ -14,6 +15,8 @@ namespace ModbusForge.Avalonia.Services
         {
             _configStore = configStore ?? throw new ArgumentNullException(nameof(configStore));
         }
+
+        public IReadOnlyCollection<TrendPen> Pens => _configStore.CurrentConfig.TrendPens;
 
         public string AddPen(string area, int address, string? requestedName, int readPeriodMs, string? type = null)
         {

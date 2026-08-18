@@ -416,7 +416,7 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
             logger.Start();
             // Simulate the unit pen that feeds this series.
-            subscriptions.Pens.Add("HR Trend 7");
+            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen { Name = "HR Trend 7" });
             logger.Publish("HR Trend 7", 1.5, DateTime.UtcNow);
             var item = Assert.Single(vm.SeriesItems);
 
@@ -449,7 +449,7 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         {
             var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
             logger.Start();
-            subscriptions.Pens.Add("HR Trend 1");
+            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen { Name = "HR Trend 1" });
             logger.Publish("HR Trend 1", 1.0, DateTime.UtcNow);
             logger.Publish("Imported:file", 2.0, DateTime.UtcNow);
             Assert.Equal(2, vm.PenCount);
@@ -459,6 +459,82 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             Assert.Contains("HR Trend 1", subscriptions.RemovePenCalls);
             Assert.Contains("Imported:file", logger.RemovedCalls);
             Assert.Equal(0, vm.PenCount);
+        }
+
+        [Fact]
+        public void RefreshPens_CreatesRows_ForPensWithoutData()
+        {
+            // A pen whose reads have not succeeded yet has no samples - the
+            // pen list must still show a row for it (name, no value) so it
+            // is visible and manageable before the first sample arrives.
+            var vm = CreateViewModelWithPenServices(out _, out var subscriptions, out _);
+            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
+            {
+                Name = "HR Trend 9", Area = "HoldingRegister", Address = 9
+            });
+
+            vm.RefreshPens();
+
+            var item = Assert.Single(vm.SeriesItems);
+            Assert.Equal("HR Trend 9", item.Name);
+            Assert.Null(item.LastValue);
+            Assert.False(item.IsFailing);
+            Assert.Equal(1, vm.PenCount);
+            Assert.Single(vm.Series);
+        }
+
+        [Fact]
+        public void RefreshPens_SkipsPensThatAlreadyHaveRows()
+        {
+            var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
+            logger.Start();
+            logger.Publish("HR Trend 1", 1.0, DateTime.UtcNow);
+            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen { Name = "HR Trend 1" });
+
+            vm.RefreshPens();
+
+            Assert.Single(vm.SeriesItems);
+            Assert.Equal(1.0, vm.SeriesItems[0].LastValue);
+        }
+
+        [Fact]
+        public void SetPenStatus_MarksTheRowFailing_AndClearsOnRecovery()
+        {
+            var vm = CreateViewModelWithPenServices(out var logger, out _, out _);
+            logger.Start();
+            logger.Publish("HR Trend 3", 2.5, DateTime.UtcNow);
+
+            vm.SetPenStatus("HR Trend 3", failing: true, "connection lost");
+            var item = Assert.Single(vm.SeriesItems);
+            Assert.True(item.IsFailing);
+            Assert.Equal("connection lost", item.FailureMessage);
+
+            vm.SetPenStatus("HR Trend 3", failing: false, null);
+            Assert.False(item.IsFailing);
+            Assert.Null(item.FailureMessage);
+        }
+
+        [Fact]
+        public void SetPenStatus_ForFailingPenWithoutSamples_CreatesARow()
+        {
+            // The pen's address has never been read successfully (device
+            // offline, bad address): no samples exist yet, but the pen must
+            // be visible with its failure state so the user can see and
+            // remove it.
+            var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
+            logger.Start();
+            subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
+            {
+                Name = "HR Trend 42", Area = "HoldingRegister", Address = 42
+            });
+
+            vm.SetPenStatus("HR Trend 42", failing: true, "timeout");
+
+            var item = Assert.Single(vm.SeriesItems);
+            Assert.Equal("HR Trend 42", item.Name);
+            Assert.True(item.IsFailing);
+            Assert.Equal("timeout", item.FailureMessage);
+            Assert.Null(item.LastValue);
         }
 
         [Fact]
@@ -538,21 +614,31 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             public List<(string area, int address, string? name, int readPeriodMs)> AddPenCalls { get; } = new();
             public List<string> RemovePenCalls { get; } = new();
 
-            /// <summary>Series keys that have a backing unit pen.</summary>
-            public HashSet<string> Pens { get; } = new();
+            /// <summary>The current unit's pens (the source the pen list mirrors).</summary>
+            public List<ModbusForge.Models.TrendPen> PensList { get; } = new();
+
+            public IReadOnlyCollection<ModbusForge.Models.TrendPen> Pens => PensList;
 
             public string AddPen(string area, int address, string? requestedName, int readPeriodMs,
                 string? type = null)
             {
                 AddPenCalls.Add((area, address, requestedName, readPeriodMs));
                 var key = string.IsNullOrWhiteSpace(requestedName) ? $"{area} {address}" : requestedName;
-                Pens.Add(key);
+                PensList.Add(new ModbusForge.Models.TrendPen
+                {
+                    Name = key,
+                    Area = area,
+                    Address = address,
+                    Type = type ?? "int"
+                });
                 return key;
             }
 
             public bool RemovePen(string key)
             {
-                if (!Pens.Remove(key)) return false;
+                var pen = PensList.FirstOrDefault(p => p.Name == key);
+                if (pen is null) return false;
+                PensList.Remove(pen);
                 RemovePenCalls.Add(key);
                 return true;
             }

@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Serialization;
 
 namespace ModbusForge.Models
 {
@@ -35,5 +36,20 @@ namespace ModbusForge.Models
         /// every pen at once.
         /// </summary>
         public DateTime LastReadUtc { get; set; } = DateTime.MinValue;
+
+        /// <summary>
+        /// True while the polling loop's reads for this pen are failing.
+        /// Runtime-only: never persisted, and not set by headless consumers
+        /// that publish samples without the desktop watch loop.
+        /// </summary>
+        [JsonIgnore]
+        public bool IsFailing { get; set; }
+
+        /// <summary>
+        /// Message of the most recent failed read, for the pen list tooltip.
+        /// Cleared on the next successful read. Runtime-only.
+        /// </summary>
+        [JsonIgnore]
+        public string? LastError { get; set; }
     }
 }

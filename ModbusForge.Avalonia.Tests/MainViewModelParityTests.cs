@@ -560,6 +560,51 @@ namespace ModbusForge.Avalonia.Tests
             Assert.True(vm.IsCustomWatchMonitoring);
         }
 
+        [Fact]
+        public async Task Failing_pen_read_MarksPenFailing_AndDisconnectionClearsTheState()
+        {
+            // The watch loop must surface pen failures (red dot source) once
+            // per episode and clear the stale state when polling stops, so
+            // the pen list never shows a failure for a pen nobody polls.
+            var profile = new ConnectionProfile("Test", "127.0.0.1", 502, 1)
+            {
+                IsConnected = true,
+                Status = "Connected"
+            };
+            var manager = new FakeConnectionManager(new ThrowingModbusService(), profile);
+            using var vm = new MainViewModel(
+                manager,
+                NullLogger<MainViewModel>.Instance,
+                new SyncDispatcher());
+
+            vm.HoldingMonitorEnabled = false;
+            manager.RaiseConnected(profile);
+
+            var pen = new TrendPen { Name = "HR Trend 1", Address = 1 };
+            vm.CurrentConfig.TrendPens.Add(pen); // starts the loop (pens count as a monitored source)
+
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (!pen.IsFailing && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(10);
+            }
+
+            Assert.True(pen.IsFailing, "pen should be marked failing after the loop's read fails");
+            Assert.Contains("simulated", pen.LastError, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("failed to read", vm.StatusMessage, StringComparison.OrdinalIgnoreCase);
+
+            // Disconnect: polling stops, the stale failing state must clear.
+            await manager.DisconnectProfileAsync(profile);
+            deadline = DateTime.UtcNow.AddSeconds(5);
+            while (pen.IsFailing && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(10);
+            }
+
+            Assert.False(pen.IsFailing, "failing state should be cleared when the loop stops");
+            Assert.Null(pen.LastError);
+        }
+
         private static int GetFreePort()
         {
             using var listener = new TcpListener(IPAddress.Loopback, 0);

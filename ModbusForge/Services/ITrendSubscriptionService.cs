@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using ModbusForge.Models;
+
 namespace ModbusForge.Avalonia.Services
 {
     /// <summary>
@@ -12,6 +15,13 @@ namespace ModbusForge.Avalonia.Services
     /// </summary>
     public interface ITrendSubscriptionService
     {
+        /// <summary>
+        /// The pens of the current unit, in configuration order. The Trends
+        /// view lists a row per pen, so a pen that has not sampled yet (or
+        /// whose reads are failing) is still visible and manageable.
+        /// </summary>
+        IReadOnlyCollection<TrendPen> Pens { get; }
+
         /// <summary>
         /// Creates the trend pen for the given area + address, or reuses the
         /// pen that already covers it (its name is the stable series key).

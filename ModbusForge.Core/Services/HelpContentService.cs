@@ -277,7 +277,7 @@ The Custom Data tab allows you to define custom register/coil configurations for
 - **Read Now**: Read the entry once
 - **Write Now**: Write a value to the entry
 - **Continuous Write**: Continuously write a value
-- **Add to Trend**: Add entry to trend chart
+- **Add to Trend**: Add a trend pen that polls the entry's address
 
 ### Continuous Read
 When ""Global Continuous Read"" is enabled, all custom entries are read automatically at the configured interval.
@@ -296,47 +296,62 @@ When ""Global Continuous Read"" is enabled, all custom entries are read automati
         {
             return @"# Trend & Logging
 
-The Trend feature provides real-time data visualization for Modbus registers and custom entries.
+The Trends tab plots live data as named **pens**. Each pen polls one register (or coil) address - or mirrors an existing tag - at its own read period while a connection is active. Pens are stored per unit and persist with the project; they are independent of Custom Watch entries.
 
 ## Access
-Click the ""Trends"" button in the toolbar or go to the Trend tab.
+Go to the **Trends** tab (or press Ctrl+T).
 
-## Adding Trend Lines
+## Adding Pens
 
-### From Registers
-1. Read registers to populate the data grid
-2. Right-click a register row
+### From the Add dialog
+1. Click **Add** in the pen list
+2. Choose the source: **Register** (area + address) or **Tag**
+3. Optionally set a name and read period, then click OK
+
+### From a register or custom entry
+1. Read registers to populate the data grid, or go to the Custom Data tab
+2. Right-click a register row or a custom entry
 3. Select ""Add to Trend""
 
-### From Custom Entries
-1. Go to Custom Data tab
-2. Right-click a custom entry
-3. Select ""Add to Trend""
+A pen appears in the pen list immediately; its line draws as soon as the first samples are read.
+
+## Pen List
+
+The pen list on the right shows every pen:
+
+- **Rename** inline (updates the chart legend)
+- **Click the swatch** to cycle the pen's color
+- **Eye** toggles the pen's line on the chart
+- **Red dot** - the pen's reads are failing; hover the dot for the last error. Failing pens keep retrying every cycle and recover on their own when reads succeed again
+- **✕** removes the pen (the trend data is dropped; Custom Watch entries are untouched)
+
+**Clear** in the Data group removes all pens at once.
 
 ## Trend Features
 
 ### Real-Time Visualization
-- Data updates automatically when continuous read is enabled
-- Multiple trend lines can be displayed simultaneously
-- Each line has a unique color
+- Pens are polled automatically while a connection is active - no continuous read setting required
+- Multiple pens can be displayed simultaneously
+- Each pen has a unique color
 
 ### Zoom and Pan
 - **Scroll Wheel**: Zoom in/out
 - **Click and Drag**: Pan the chart
-- **Double-Click**: Reset zoom to fit all data
+- **Reset** button: Reset zoom to fit all data
 
 ### Data Retention
 Configure how long data is kept:
 - Range: 1 to 60 minutes
 - Older data is automatically discarded
 
-### Export
-- **Export to CSV**: Export trend data to CSV file
-- **Export to PNG**: Save the current chart as an image
+### Import and Export
+- **Export CSV**: Export the selected pen, or all pens if none is selected
+- **Import CSV**: Plot a previously exported capture (e.g. historical data)
+- **Export PNG**: Save the current chart as an image
 
 ## Tips
-- Use descriptive names for trend lines
-- Limit the number of trend lines for better performance
+- Use descriptive pen names - they are the series keys in exports
+- Limit the number of pens for better performance
 - Adjust retention based on your monitoring needs";
         }
 

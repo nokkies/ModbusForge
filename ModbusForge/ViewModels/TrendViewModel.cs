@@ -517,6 +517,56 @@ namespace ModbusForge.Avalonia.ViewModels
             _dispatcher.Invoke(() => AddSeries(key, displayName));
         }
 
+        /// <summary>
+        /// Materializes a pen-list row for every unit pen that does not have
+        /// one yet, seeding its failing state from the pen. A pen whose reads
+        /// have never succeeded (bad address, device offline) would otherwise
+        /// be invisible - no samples, no row, no way to see or remove it.
+        /// Call on the UI thread; unit pens are per-unit, so the caller
+        /// invokes this after unit switches and project loads too.
+        /// </summary>
+        public void RefreshPens()
+        {
+            if (_subscriptionService is null) return;
+
+            foreach (var pen in _subscriptionService.Pens)
+            {
+                if (string.IsNullOrWhiteSpace(pen.Name)) continue;
+                if (_valuesByKey.ContainsKey(pen.Name)) continue;
+
+                AddSeries(pen.Name, pen.Name);
+                SetRowStatus(pen.Name, pen.IsFailing, pen.LastError);
+            }
+        }
+
+        /// <summary>
+        /// Pushes the read health of one pen into its pen-list row. Called by
+        /// the watch loop on failure-episode start and recovery. If the pen
+        /// has not sampled yet there is no row, so a failing pen triggers a
+        /// refresh that materializes one.
+        /// </summary>
+        public void SetPenStatus(string key, bool failing, string? message)
+        {
+            if (string.IsNullOrEmpty(key)) return;
+
+            _dispatcher.Post(() =>
+            {
+                if (SeriesItems.FirstOrDefault(item => item.Key == key) is null)
+                {
+                    RefreshPens();
+                }
+                SetRowStatus(key, failing, message);
+            });
+        }
+
+        private void SetRowStatus(string key, bool failing, string? message)
+        {
+            if (SeriesItems.FirstOrDefault(item => item.Key == key) is not { } item) return;
+
+            item.IsFailing = failing;
+            item.FailureMessage = failing ? message : null;
+        }
+
         // The connection lifecycle also starts/stops the logger without going
         // through this view; without this sync the Start/Stop button would go
         // stale. Post (not Invoke) so a worker-thread Start/Stop never blocks.

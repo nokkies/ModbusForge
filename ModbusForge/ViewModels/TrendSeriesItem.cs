@@ -25,6 +25,19 @@ namespace ModbusForge.Avalonia.ViewModels
         [ObservableProperty]
         private double? _lastValue;
 
+        /// <summary>
+        /// True while the polling loop's reads for this pen are failing.
+        /// The pen list shows a red dot with the failure message; the chart
+        /// keeps the last good line so the context is not lost.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(AutomationLabel))]
+        private bool _isFailing;
+
+        /// <summary>Message of the most recent failed read, for the tooltip.</summary>
+        [ObservableProperty]
+        private string? _failureMessage;
+
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(ColorHex))]
         [NotifyPropertyChangedFor(nameof(ColorBrush))]
@@ -51,9 +64,10 @@ namespace ModbusForge.Avalonia.ViewModels
 
         /// <summary>
         /// Automation name for the row, so assistive tech (and UI automation)
-        /// reads the pen by its name instead of the type name.
+        /// reads the pen by its name instead of the type name, and hears
+        /// when the pen is failing to read.
         /// </summary>
-        public string AutomationLabel => Name;
+        public string AutomationLabel => IsFailing ? $"{Name} (read failing)" : Name;
 
         /// <summary>Wired by the view model when the pen is created.</summary>
         public IRelayCommand? RemoveCommand { get; set; }

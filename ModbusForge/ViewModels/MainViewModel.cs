@@ -1074,6 +1074,9 @@ namespace ModbusForge.Avalonia.ViewModels
                 HookCustomEntries();
                 HookTrendPens();
                 UpdateCustomWatchMonitoringState();
+                // The pen list follows the unit configuration: unit switches,
+                // project loads, and snapshot applies all re-raise this.
+                TrendViewModel?.RefreshPens();
             }
         }
 
@@ -1167,6 +1170,9 @@ namespace ModbusForge.Avalonia.ViewModels
         private void OnTrendPensCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             UpdateCustomWatchMonitoringState();
+            // A new pen (Add dialog, context menu, API, or migration) gets its
+            // pen-list row immediately, even before the first sample arrives.
+            TrendViewModel?.RefreshPens();
         }
 
         partial void OnActiveProfileChanged(ConnectionProfile? value)
@@ -2971,8 +2977,8 @@ namespace ModbusForge.Avalonia.ViewModels
         /// Reports a failed trend pen read. A pen is not paused on failure
         /// (that would strand the trend with no recovery), so it is reported
         /// once per failure episode: the first failure of a pen gets a log
-        /// line and a status message; repeats stay silent until a read
-        /// succeeds again (<see cref="MarkTrendPenRecovered"/>).
+        /// line, a status message, and the failing state (pen list red dot)
+        /// until a read succeeds again (<see cref="MarkTrendPenRecovered"/>).
         /// </summary>
         private async Task ReportTrendPenFailureAsync(TrendPen pen, Exception exception)
         {
@@ -2989,7 +2995,13 @@ namespace ModbusForge.Avalonia.ViewModels
             _logger.LogError(exception, "Trend pen {PenName} ({Area} {Address}) read failed; retrying each cycle until it recovers", pen.Name, pen.Area, pen.Address);
             try
             {
-                await _dispatcher.InvokeAsync(() => StatusMessage = $"Trend pen '{pen.Name}' failed to read: {exception.Message}");
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    StatusMessage = $"Trend pen '{pen.Name}' failed to read: {exception.Message}";
+                    pen.IsFailing = true;
+                    pen.LastError = exception.Message;
+                    TrendViewModel?.SetPenStatus(pen.Name, failing: true, exception.Message);
+                });
             }
             catch (OperationCanceledException)
             {
@@ -2997,11 +3009,47 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
-        private void MarkTrendPenRecovered(string penName)
+        /// <summary>
+        /// Clears a pen's failure-episode tracking. Returns true when the pen
+        /// was actually failing, so the caller knows the failing state needs
+        /// to be cleared from the pen and the pen list.
+        /// </summary>
+        private bool MarkTrendPenRecovered(string penName)
         {
             lock (_failingTrendPensLock)
             {
-                _failingTrendPens.Remove(penName);
+                return _failingTrendPens.Remove(penName);
+            }
+        }
+
+        /// <summary>
+        /// Clears the runtime failing state of the current unit's pens. Called
+        /// when the polling loop truly stops (disconnect, toggle off, app
+        /// shutdown) so the pen list never shows a stale failure for a pen
+        /// that is no longer being polled.
+        /// </summary>
+        private void ClearTrendPenFailingState()
+        {
+            if (_disposed) return;
+
+            try
+            {
+                _dispatcher.Post(() =>
+                {
+                    foreach (var pen in CurrentConfig.TrendPens)
+                    {
+                        if (pen.IsFailing)
+                        {
+                            pen.IsFailing = false;
+                            pen.LastError = null;
+                            TrendViewModel?.SetPenStatus(pen.Name, failing: false, null);
+                        }
+                    }
+                });
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogDebug(ex, "Clearing trend pen failure state failed");
             }
         }
 
@@ -3307,14 +3355,22 @@ namespace ModbusForge.Avalonia.ViewModels
                         {
                             var value = await ReadTrendPenValueSerializedAsync(pen, token);
                             var readAt = DateTime.UtcNow;
-                            await _dispatcher.InvokeAsync(() => pen.LastReadUtc = readAt);
+                            var recovered = MarkTrendPenRecovered(pen.Name);
+                            await _dispatcher.InvokeAsync(() =>
+                            {
+                                pen.LastReadUtc = readAt;
+                                if (recovered)
+                                {
+                                    pen.IsFailing = false;
+                                    pen.LastError = null;
+                                    TrendViewModel?.SetPenStatus(pen.Name, failing: false, null);
+                                }
+                            });
 
                             if (_trendLogger != null && TryParseTrendValue(value, out var trendValue))
                             {
                                 _trendLogger.Publish(pen.Name, trendValue, readAt);
                             }
-
-                            MarkTrendPenRecovered(pen.Name);
                         }
                         catch (OperationCanceledException)
                         {
@@ -3354,6 +3410,13 @@ namespace ModbusForge.Avalonia.ViewModels
                 if (restart)
                 {
                     StartCustomWatchMonitoring();
+                }
+                else
+                {
+                    // The loop is truly stopping: drop any stale failing
+                    // state so the pen list does not keep a red dot for a
+                    // pen nobody is polling anymore.
+                    ClearTrendPenFailingState();
                 }
             }
         }

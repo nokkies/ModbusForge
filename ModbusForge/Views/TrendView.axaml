@@ -8,6 +8,7 @@
   <UserControl.Resources>
     <converters:LockToZoomModeConverter x:Key="LockToZoomModeConverter" />
     <converters:CountToBoolConverter x:Key="CountToBoolConverter" />
+    <converters:FailingOpacityConverter x:Key="FailingOpacityConverter" />
   </UserControl.Resources>
 
   <UserControl.Styles>
@@ -103,7 +104,7 @@
                       ToolTip.Tip="Add a pen from a register address or an existing tag" />
             </StackPanel>
             <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,4,0,0" Opacity="0.6"
-                       Text="Rename inline; click the swatch to recolor; the eye toggles the chart line." FontSize="11" TextWrapping="Wrap" />
+                       Text="Rename inline; click the swatch to recolor; the eye toggles the chart line; a red dot marks a pen whose reads are failing (hover for the error)." FontSize="11" TextWrapping="Wrap" />
           </Grid>
 
           <ListBox ItemsSource="{Binding SeriesItems}"
@@ -126,9 +127,19 @@
                   <TextBox Grid.Column="1" Margin="6,0" MinWidth="0"
                            Watermark="name"
                            Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                           ToolTip.Tip="Pen name (legend, export, watch entry)" />
-                  <TextBlock Grid.Column="2" Margin="6,0" VerticalAlignment="Center" Opacity="0.75"
-                             Text="{Binding LastValue, StringFormat='{}{0:0.###}'}" />
+                           ToolTip.Tip="Pen name (shown in the chart legend)" />
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="6,0" Spacing="4"
+                              IsHitTestVisible="{Binding IsFailing}">
+                    <!-- Failure dot: the pen's reads are failing; the tooltip
+                         carries the last error. The chart keeps the last good
+                         line, so the value stays visible but dimmed. -->
+                    <Ellipse Width="8" Height="8" Fill="#C62828" VerticalAlignment="Center"
+                             IsVisible="{Binding IsFailing}"
+                             ToolTip.Tip="{Binding FailureMessage, StringFormat='Read failing: {0}'}" />
+                    <TextBlock VerticalAlignment="Center"
+                               Opacity="{Binding IsFailing, Converter={StaticResource FailingOpacityConverter}}"
+                               Text="{Binding LastValue, StringFormat='{}{0:0.###}'}" />
+                  </StackPanel>
                   <CheckBox Grid.Column="3" VerticalAlignment="Center"
                             IsChecked="{Binding IsVisible, Mode=TwoWay}"
                             ToolTip.Tip="Show this pen on the chart" />
