@@ -38,6 +38,7 @@
                 SelectedItem="{Binding SelectedCommand}"
                 Tag="{Binding CommandTypes}"
                 AutoGenerateColumns="False"
+                CanUserResizeColumns="True"
                 GridLinesVisibility="All">
         <DataGrid.Columns>
           <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding IsEnabled}" Width="70">
@@ -119,7 +120,17 @@
               <TextBlock Text="Message" ToolTip.Tip="Text for log and message commands" />
             </DataGridTextColumn.Header>
           </DataGridTextColumn>
-          <DataGridTextColumn Header="Description" Binding="{Binding DisplayText}" Width="*" MinWidth="200" IsReadOnly="True" />
+          <!-- Every column uses a fixed width on purpose: with any star-width
+               column present, Avalonia's DataGrid (11.2.x) disables header
+               resizing for the whole grid, which left users unable to widen
+               the cramped headers. Fixed widths keep every column
+               user-resizable; the grid scrolls horizontally when the window
+               is too narrow. -->
+          <DataGridTextColumn Binding="{Binding DisplayText}" Width="220" IsReadOnly="True">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Description" ToolTip.Tip="Plain-language summary of the command and its parameters" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
           <DataGridTextColumn Binding="{Binding LastResult}" Width="120" IsReadOnly="True">
             <DataGridTextColumn.Header>
               <TextBlock Text="Last Result" ToolTip.Tip="Outcome of the most recent run of this command" />

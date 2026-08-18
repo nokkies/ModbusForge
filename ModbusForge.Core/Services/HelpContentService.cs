@@ -230,6 +230,10 @@ Milliseconds to wait between each command execution.
 ### Stop on Error
 If enabled, the script stops when an error occurs.
 
+## Command Grid
+
+Each command row has one column per property; most commands only use a few of them. **Hover a column header** to see what that column controls, and **drag the edge of a header** to resize the column so the labels fit.
+
 ## Example Script
 ```
 1. Read Holding Registers (Address: 0, Count: 10)
