@@ -3503,32 +3503,145 @@ namespace ModbusForge.Avalonia.ViewModels
             return false;
         }
 
-        private IEnumerable<MqttTagUpdate> BuildMqttSnapshot()
+        /// <summary>
+        /// Builds the tag snapshot the MQTT gateway publishes on its publish
+        /// period: every Custom Watch entry plus every loaded register-grid row
+        /// (holding/input registers and coils/discrete inputs), so the broker
+        /// sees what is on screen instead of only the custom watch. Where a
+        /// custom entry and a grid row describe the same area + address, the
+        /// custom entry wins - it is the user's named tag. Rows still carrying
+        /// a read error are skipped (stale values must not be published).
+        /// Internal so the snapshot composition can be unit tested.
+        /// </summary>
+        internal IEnumerable<MqttTagUpdate> BuildMqttSnapshot()
         {
+            var now = DateTime.UtcNow;
             var updates = new List<MqttTagUpdate>();
+            var seen = new HashSet<(PlcArea Area, int Address)>();
+            var unitId = (byte)UnitId;
 
-            var entries = CustomEntries.ToList();
-            var unitId = UnitId;
-
-            foreach (var entry in entries)
+            foreach (var entry in SafeToList(CustomEntries))
             {
-                if (!Enum.TryParse<PlcArea>(entry.Area, true, out var area))
-                {
-                    area = PlcArea.HoldingRegister;
-                }
+                var area = Enum.TryParse<PlcArea>(entry.Area, true, out var parsed) ? parsed : PlcArea.HoldingRegister;
+                if (!seen.Add((area, entry.Address)))
+                    continue;
 
                 updates.Add(new MqttTagUpdate
                 {
-                    UnitId = (byte)unitId,
+                    UnitId = unitId,
                     TagName = entry.Name,
                     Area = area,
                     Address = entry.Address,
-                    Value = entry.Value,
-                    Timestamp = entry.LastReadUtc == default ? DateTime.UtcNow : entry.LastReadUtc
+                    Value = ParseCustomValue(entry),
+                    Timestamp = entry.LastReadUtc == default ? now : entry.LastReadUtc
                 });
             }
 
+            AddRegisterRows(updates, seen, unitId, HoldingRegisters, PlcArea.HoldingRegister, "HR", now);
+            AddRegisterRows(updates, seen, unitId, InputRegisters, PlcArea.InputRegister, "IR", now);
+            AddBitRows(updates, seen, unitId, Coils, PlcArea.Coil, "COIL", now);
+            AddBitRows(updates, seen, unitId, DiscreteInputs, PlcArea.DiscreteInput, "DI", now);
+
             return updates;
+        }
+
+        /// <summary>
+        /// Publishes custom values as the type the entry declares (a numeric
+        /// "int"/"uint"/"real" value arrives as a JSON number, not a string);
+        /// an unparseable value falls back to the raw text.
+        /// </summary>
+        private static object? ParseCustomValue(CustomEntry entry)
+        {
+            var type = (entry.Type ?? "int").ToLowerInvariant();
+            var raw = entry.Value ?? string.Empty;
+
+            switch (type)
+            {
+                case "int" when short.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var shortValue):
+                    return shortValue;
+                case "uint" when ushort.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ushortValue):
+                    return ushortValue;
+                case "real" when float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var floatValue):
+                    return floatValue;
+                default:
+                    return raw;
+            }
+        }
+
+        private static void AddRegisterRows(
+            List<MqttTagUpdate> updates,
+            HashSet<(PlcArea Area, int Address)> seen,
+            byte unitId,
+            ObservableCollection<RegisterEntry> rows,
+            PlcArea area,
+            string prefix,
+            DateTime now)
+        {
+            foreach (var row in SafeToList(rows))
+            {
+                if (row.IsReadError)
+                    continue;
+
+                if (!seen.Add((area, row.Address)))
+                    continue;
+
+                updates.Add(new MqttTagUpdate
+                {
+                    UnitId = unitId,
+                    TagName = $"{prefix}_{row.Address}",
+                    Area = area,
+                    Address = row.Address,
+                    Value = row.Value,
+                    Timestamp = now
+                });
+            }
+        }
+
+        private static void AddBitRows(
+            List<MqttTagUpdate> updates,
+            HashSet<(PlcArea Area, int Address)> seen,
+            byte unitId,
+            ObservableCollection<CoilEntry> rows,
+            PlcArea area,
+            string prefix,
+            DateTime now)
+        {
+            foreach (var row in SafeToList(rows))
+            {
+                if (row.IsReadError)
+                    continue;
+
+                if (!seen.Add((area, row.Address)))
+                    continue;
+
+                updates.Add(new MqttTagUpdate
+                {
+                    UnitId = unitId,
+                    TagName = $"{prefix}_{row.Address}",
+                    Area = area,
+                    Address = row.Address,
+                    Value = row.State,
+                    Timestamp = now
+                });
+            }
+        }
+
+        /// <summary>
+        /// The snapshot runs on the gateway's worker thread while a read in
+        /// flight may still be mutating these collections on the UI thread; if
+        /// the enumeration loses that race, drop the collection for this cycle
+        /// rather than taking the publish loop down.
+        /// </summary>
+        private static List<T> SafeToList<T>(IReadOnlyCollection<T> source)
+        {
+            try
+            {
+                return source.ToList();
+            }
+            catch (InvalidOperationException)
+            {
+                return new List<T>();
+            }
         }
 
         #endregion

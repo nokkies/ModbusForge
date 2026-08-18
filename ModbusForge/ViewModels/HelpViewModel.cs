@@ -38,6 +38,7 @@ namespace ModbusForge.Avalonia.ViewModels
             new HelpTopic { TopicId = "visual-editor", Title = "Visual Node Editor" },
             new HelpTopic { TopicId = "preferences", Title = "Preferences" },
             new HelpTopic { TopicId = "mcp-server", Title = "API & MCP Server" },
+            new HelpTopic { TopicId = "mqtt", Title = "MQTT Gateway" },
             new HelpTopic { TopicId = "keyboard-shortcuts", Title = "Keyboard Shortcuts" },
             new HelpTopic { TopicId = "partial-reads", Title = "Partial or Chunked Reads" },
             new HelpTopic { TopicId = "troubleshooting", Title = "Troubleshooting" }

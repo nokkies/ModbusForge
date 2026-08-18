@@ -55,6 +55,7 @@ namespace ModbusForge.Services
                 ["visual-editor"] = GetVisualEditorContent(),
                 ["preferences"] = GetPreferencesContent(),
                 ["mcp-server"] = GetMcpServerContent(),
+                ["mqtt"] = GetMqttContent(),
                 ["keyboard-shortcuts"] = GetKeyboardShortcutsContent(),
                 ["partial-reads"] = GetPartialReadsContent(),
                 ["troubleshooting"] = GetTroubleshootingContent()
@@ -684,6 +685,35 @@ To connect an LLM or AI coding assistant using the Model Context Protocol (MCP):
 - Send a query to the status endpoint:
   `curl http://localhost:5000/api/status`
   It should return `{""status"":""Running""}`.";
+        }
+
+        private string GetMqttContent()
+        {
+            return @"# MQTT Gateway
+
+The MQTT tab publishes tag values to an MQTT broker, so SCADA systems, dashboards, and other MQTT-aware tools can consume live Modbus data.
+
+## Access
+Go to the **MQTT** tab and tick **Enabled**, then press **Apply & Connect**.
+
+## What Is Published
+Every **publish period** the gateway publishes a snapshot of the current tags:
+- All **Custom Watch** entries, tagged by entry name with the value in its declared type (integers and reals arrive as JSON numbers).
+- All **loaded register rows**: Holding Registers (`HR_<address>`), Input Registers (`IR_<address>`), Coils (`COIL_<address>`) and Discrete Inputs (`DI_<address>`).
+
+Rows still carrying a read error are skipped, and where a custom entry and a register row point at the same area + address the custom entry wins (it is your named tag).
+
+## Settings
+- **Broker Host / Port / Client ID / Username / Password**: standard MQTT connection settings.
+- **Topic Template**: placeholders {UnitId}, {Tag}, {Area}, {Address} - for example `modbusforge/{UnitId}/{Tag}`.
+- **QoS**: 0 (at most once), 1 (at least once), 2 (exactly once).
+- **Retain**: the broker keeps the last value on each topic for new subscribers.
+- **Publish Period**: how often the snapshot is published; 0 disables periodic publishing.
+
+## Behavior
+- If the broker is unreachable the gateway retries automatically with a backoff (1 s up to 30 s); the tab shows ""Retrying connection..."" while it is down.
+- An enabled gateway is resumed automatically when the application next starts.
+- The same gateway runs in `ModbusForge.Headless` via the `--mqtt-*` switches.";
         }
 
         private string GetPartialReadsContent()
