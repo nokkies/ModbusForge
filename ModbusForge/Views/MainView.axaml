@@ -230,6 +230,7 @@
                     AutomationProperties.Name="Holding Registers Grid"
                     AutoGenerateColumns="False"
                     IsReadOnly="False"
+                    CanUserResizeColumns="True"
                     GridLinesVisibility="All"
                     VerticalAlignment="Stretch"
                     HorizontalAlignment="Stretch"
@@ -306,6 +307,7 @@
                     AutomationProperties.Name="Coils Grid"
                     AutoGenerateColumns="False"
                     IsReadOnly="False"
+                    CanUserResizeColumns="True"
                     GridLinesVisibility="All"
                     VerticalAlignment="Stretch"
                     HorizontalAlignment="Stretch"
@@ -358,6 +360,7 @@
                     AutomationProperties.Name="Input Registers Grid"
                     AutoGenerateColumns="False"
                     IsReadOnly="True"
+                    CanUserResizeColumns="True"
                     GridLinesVisibility="All"
                     VerticalAlignment="Stretch"
                     HorizontalAlignment="Stretch">
@@ -425,6 +428,7 @@
                     AutomationProperties.Name="Discrete Inputs Grid"
                     AutoGenerateColumns="False"
                     IsReadOnly="True"
+                    CanUserResizeColumns="True"
                     GridLinesVisibility="All"
                     VerticalAlignment="Stretch"
                     HorizontalAlignment="Stretch">
@@ -470,6 +474,7 @@
                     SelectedItem="{Binding SelectedCustomEntry}"
                     AutoGenerateColumns="False"
                     IsReadOnly="False"
+                    CanUserResizeColumns="True"
                     GridLinesVisibility="All">
             <DataGrid.Columns>
               <DataGridTextColumn Header="Name" Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="120" />

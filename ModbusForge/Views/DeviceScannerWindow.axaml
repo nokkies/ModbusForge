@@ -83,6 +83,7 @@
                     SelectedItem="{Binding SelectedDevice, Mode=TwoWay}"
                     AutoGenerateColumns="False"
                     IsReadOnly="True"
+                    CanUserResizeColumns="True"
                     HeadersVisibility="Column"
                     GridLinesVisibility="Horizontal">
             <DataGrid.Columns>
@@ -92,7 +93,9 @@
               <DataGridTextColumn Header="Latency (ms)" Binding="{Binding LatencyMs}" Width="90" />
               <DataGridTextColumn Header="Function codes" Binding="{Binding SupportedFunctionCodesText}" Width="130" />
               <DataGridTextColumn Header="Identification" Binding="{Binding Identification}" Width="180" />
-              <DataGridTextColumn Header="Details" Binding="{Binding Message}" Width="*" />
+              <!-- Fixed width: a star-width column would disable column resizing
+                   for the whole grid (Avalonia 11.2.x). -->
+              <DataGridTextColumn Header="Details" Binding="{Binding Message}" Width="300" />
             </DataGrid.Columns>
           </DataGrid>
 
@@ -102,12 +105,13 @@
                     ItemsSource="{Binding SelectedDevice.Registers}"
                     AutoGenerateColumns="False"
                     IsReadOnly="True"
+                    CanUserResizeColumns="True"
                     HeadersVisibility="Column"
                     GridLinesVisibility="Horizontal">
             <DataGrid.Columns>
               <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="90" />
               <DataGridTextColumn Header="Value" Binding="{Binding DisplayValue}" Width="90" />
-              <DataGridTextColumn Header="Error" Binding="{Binding Error}" Width="*" />
+              <DataGridTextColumn Header="Error" Binding="{Binding Error}" Width="240" />
             </DataGrid.Columns>
           </DataGrid>
         </Grid>

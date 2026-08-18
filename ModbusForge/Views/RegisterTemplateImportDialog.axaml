@@ -32,6 +32,7 @@
       <DataGrid x:Name="PreviewGrid"
                 AutoGenerateColumns="False"
                 IsReadOnly="True"
+                CanUserResizeColumns="True"
                 HeadersVisibility="Column"
                 GridLinesVisibility="Horizontal">
         <DataGrid.Columns>
@@ -50,7 +51,9 @@
           <DataGridTextColumn Header="Unit" Binding="{Binding Unit}" Width="70" />
           <DataGridTextColumn Header="Access" Binding="{Binding Access}" Width="80" />
           <DataGridTextColumn Header="Enum" Binding="{Binding Enum}" Width="130" />
-          <DataGridTextColumn Header="Issues" Binding="{Binding Issues}" Width="*" />
+          <!-- Fixed width: a star-width column would disable column resizing
+               for the whole grid (Avalonia 11.2.x). -->
+          <DataGridTextColumn Header="Issues" Binding="{Binding Issues}" Width="260" />
         </DataGrid.Columns>
       </DataGrid>
     </Border>

@@ -98,6 +98,7 @@ Once connected:
 - Enter the starting address and count
 - Click ""Read"" to fetch data
 - Enable ""Continuous Read"" for automatic polling
+- Drag the edge of any column header to resize that column
 
 ## Next Steps
 - Explore the Connection Manager to save connection profiles

@@ -33,6 +33,7 @@
                 SelectedItem="{Binding SelectedEntry, Mode=TwoWay}"
                 AutoGenerateColumns="False"
                 IsReadOnly="True"
+                CanUserResizeColumns="True"
                 HeadersVisibility="Column"
                 GridLinesVisibility="All">
         <DataGrid.Columns>
@@ -41,7 +42,9 @@
           <DataGridTextColumn Header="Value" Binding="{Binding FormattedValue}" Width="140" />
           <DataGridTextColumn Header="Last Updated" Binding="{Binding LastUpdated, StringFormat='{}{0:HH:mm:ss.fff}'}" Width="120" />
           <DataGridCheckBoxColumn Header="Stale" Binding="{Binding IsStale}" Width="60" />
-          <DataGridTextColumn Header="Alarm" Binding="{Binding AlarmMessage}" Width="*" />
+          <!-- Fixed width: a star-width column would disable column resizing
+               for the whole grid (Avalonia 11.2.x). -->
+          <DataGridTextColumn Header="Alarm" Binding="{Binding AlarmMessage}" Width="260" />
         </DataGrid.Columns>
       </DataGrid>
     </Border>

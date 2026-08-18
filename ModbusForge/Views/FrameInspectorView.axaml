@@ -46,7 +46,10 @@
                 <TextBlock Text="FC" ToolTip.Tip="Modbus function code" />
               </DataGridTextColumn.Header>
             </DataGridTextColumn>
-            <DataGridTextColumn Header="Hex" Binding="{Binding HexString}" Width="*" MinWidth="200" />
+            <!-- Fixed (not star) width on purpose: in Avalonia 11.2.x, any
+                 star-width column disables resizing for the whole grid. The
+                 user can drag this column wider for long frames. -->
+            <DataGridTextColumn Header="Hex" Binding="{Binding HexString}" Width="640" MinWidth="200" />
             <DataGridTemplateColumn Width="60">
               <DataGridTemplateColumn.Header>
                 <TextBlock Text="CRC" ToolTip.Tip="CRC16 check result: check = valid, cross = mismatch, dash = the transport has no checksum" />

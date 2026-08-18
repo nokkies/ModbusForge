@@ -39,6 +39,7 @@
                   ItemsSource="{Binding Rules}"
                   SelectedItem="{Binding SelectedRule, Mode=TwoWay}"
                   AutoGenerateColumns="False"
+                  CanUserResizeColumns="True"
                   GridLinesVisibility="All"
                   VerticalAlignment="Stretch">
           <DataGrid.Columns>
@@ -67,7 +68,9 @@
                 </DataTemplate>
               </DataGridTemplateColumn.CellTemplate>
             </DataGridTemplateColumn>
-            <DataGridTemplateColumn Header="Rule" Width="*">
+            <!-- Fixed width: a star-width column would disable column resizing
+                 for the whole grid (Avalonia 11.2.x). Drag to widen for long rules. -->
+            <DataGridTemplateColumn Header="Rule" Width="320">
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate x:DataType="models:ScriptRule">
                   <TextBlock Text="{Binding Description}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="4,0" />
