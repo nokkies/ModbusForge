@@ -820,6 +820,12 @@ public class ConnectionManagerTests : IDisposable
           ]
         }
         """;
+        var directory = Path.GetDirectoryName(profilePath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
         File.WriteAllText(profilePath, json);
 
         try
