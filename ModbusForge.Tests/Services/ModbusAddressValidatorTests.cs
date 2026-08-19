@@ -158,6 +158,30 @@ namespace ModbusForge.Tests.Services
             Assert.Equal(2000, ranges[1].Count);
         }
 
+        [Fact]
+        public void GetReadRanges_For_DiscreteInput_Request_Uses_2000_Max()
+        {
+            const int count = 4000;
+            var ranges = _validator.GetReadRanges(0, count, PlcArea.DiscreteInput).ToList();
+
+            Assert.Equal(2, ranges.Count);
+            Assert.Equal(2000, ranges[0].Count);
+            Assert.Equal(2000, ranges[1].Count);
+        }
+
+        [Theory]
+        [InlineData(PlcArea.HoldingRegister, true, 123)]
+        [InlineData(PlcArea.InputRegister, true, 123)]
+        [InlineData(PlcArea.Coil, true, 1968)]
+        public void GetReadRanges_For_Writes_Uses_Smaller_Protocol_Max(PlcArea area, bool isWrite, int expectedFirstChunk)
+        {
+            var ranges = _validator.GetReadRanges(0, expectedFirstChunk + 1, area, isWrite).ToList();
+
+            Assert.Equal(2, ranges.Count);
+            Assert.Equal(expectedFirstChunk, ranges[0].Count);
+            Assert.Equal(1, ranges[1].Count);
+        }
+
         [Theory]
         [InlineData(0, 65537)]
         [InlineData(-1, 1)]

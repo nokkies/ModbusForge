@@ -1,4 +1,4 @@
-# ModbusForge v2026.8.24
+# ModbusForge v2026.8.27
 
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows)](https://www.microsoft.com/windows)
@@ -783,30 +783,38 @@ dotnet build ModbusForge.sln -c Release
 ### Publish (Avalonia, self-contained, single-file)
 
 ```powershell
-$version = "2026.8.16"
+$version = "2026.8.27"
 dotnet publish .\ModbusForge\ModbusForge.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o .\publish\avalonia\win-x64
 ```
 
 ### Create a ZIP Artifact
 
 ```powershell
-$version = "2026.8.16"
+$version = "2026.8.27"
 Compress-Archive -Path .\publish\avalonia\win-x64\* -DestinationPath .\ModbusForge-$version-win-x64.zip -Force
 ```
 
 ### Create an Installer
 
 ```powershell
-& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=2026.8.16 "setup\ModbusForge.iss"
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=2026.8.27 "setup\ModbusForge.iss"
 ```
+
+### Automated GitHub Release
+
+Pushing a `v*` tag triggers `.github/workflows/release.yml` and creates a GitHub Release with Windows/Linux Avalonia packages, the headless runtime, checksums, and the installer. See [AGENTS.md](AGENTS.md) for the exact tag-and-version workflow.
 
 ---
 
 ## Versioning
 
-- The window title displays the application version from the assembly ProductVersion
-- Versions follow [Semantic Versioning](https://semver.org/)
-- See [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md) for planned releases
+- The window title displays the application version from the assembly `ProductVersion`.
+- ModbusForge uses a CalVer-style scheme: `YYYY.M.INCREMENT` (e.g. `2026.8.27`).
+  - `YYYY` = year
+  - `M` = month (no leading zero)
+  - `INCREMENT` = release number within that month, starting at 1
+- Tags are prefixed with `v`, e.g. `v2026.8.27`.
+- See [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md) for planned releases.
 
 ---
 

@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 
 namespace ModbusForge.Models
 {
@@ -15,7 +14,7 @@ namespace ModbusForge.Models
     /// <summary>
     /// A single captured Modbus request or response frame.
     /// </summary>
-    public class ModbusFrameLog : INotifyPropertyChanged
+    public class ModbusFrameLog
     {
         public DateTime Timestamp { get; set; } = DateTime.Now;
 
@@ -41,8 +40,6 @@ namespace ModbusForge.Models
         public byte UnitId { get; set; }
 
         public byte FunctionCode { get; set; }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
         /// Returns the raw bytes as a space-delimited hex string.

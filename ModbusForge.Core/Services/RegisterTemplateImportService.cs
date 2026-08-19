@@ -230,7 +230,7 @@ namespace ModbusForge.Services
             var workbookPart = document.WorkbookPart
                 ?? throw new InvalidDataException("The workbook does not contain any content.");
 
-            var sheet = workbookPart.Workbook.Sheets?.Elements<Sheet>().FirstOrDefault()
+            var sheet = workbookPart.Workbook?.Sheets?.Elements<Sheet>().FirstOrDefault()
                 ?? throw new InvalidDataException("The workbook does not contain any worksheets.");
 
             var sheetId = sheet.Id?.Value
@@ -241,7 +241,7 @@ namespace ModbusForge.Services
                 ?.Elements<SharedStringItem>().Select(i => i.InnerText).ToList() ?? new List<string>();
 
             var rows = new List<List<string>>();
-            foreach (var row in worksheetPart.Worksheet.Descendants<Row>())
+            foreach (var row in worksheetPart.Worksheet?.Descendants<Row>() ?? Enumerable.Empty<Row>())
             {
                 var values = new List<string>();
                 foreach (var cell in row.Elements<Cell>())

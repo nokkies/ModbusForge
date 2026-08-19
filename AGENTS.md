@@ -35,21 +35,21 @@ The release workflow is automated via `.github/workflows/release.yml`. It trigge
 
 1. **Update version in all three `.csproj` files** (`ModbusForge`, `ModbusForge.Core`, `ModbusForge.Headless`):
    ```xml
-   <Version>2026.7.12</Version>
-   <AssemblyVersion>2026.7.12</AssemblyVersion>
-   <FileVersion>2026.7.12</FileVersion>
+   <Version>2026.8.27</Version>
+   <AssemblyVersion>2026.8.27</AssemblyVersion>
+   <FileVersion>2026.8.27</FileVersion>
    ```
 
 2. **Commit version bump**:
    ```powershell
-   git add -A; git commit -m "v2026.7.12: Description of changes"
+   git add -A; git commit -m "v2026.8.27: Description of changes"
    ```
 
 3. **Create and push tag**:
    ```powershell
-   git tag -a v2026.7.12 -m "v2026.7.12 release"
+   git tag -a v2026.8.27 -m "v2026.8.27 release"
    git push origin master
-   git push origin v2026.7.12
+   git push origin v2026.8.27
    ```
 
    Pushing the tag will automatically build, test, package, and create a GitHub Release with the installer, Windows/Linux Avalonia zips, and Windows/Linux Headless zips.
@@ -61,7 +61,7 @@ The release workflow is automated via `.github/workflows/release.yml`. It trigge
 
 ## Versioning
 
-As of the v6.1.0 / headless split work, ModbusForge uses **CalVer-style** versions in the form `YYYY.M.INCREMENT` (e.g. `2026.7.1`):
+As of the v6.1.0 / headless split work, ModbusForge uses **CalVer-style** versions in the form `YYYY.M.INCREMENT` (e.g. `2026.8.27`):
 
 - `YYYY` = year
 - `M` = month (no leading zero)
@@ -70,12 +70,12 @@ As of the v6.1.0 / headless split work, ModbusForge uses **CalVer-style** versio
 Update the version in all three `.csproj` files before tagging (`ModbusForge`, `ModbusForge.Core`, `ModbusForge.Headless`):
 
 ```xml
-<Version>2026.7.1</Version>
-<AssemblyVersion>2026.7.1</AssemblyVersion>
-<FileVersion>2026.7.1</FileVersion>
+<Version>2026.8.27</Version>
+<AssemblyVersion>2026.8.27</AssemblyVersion>
+<FileVersion>2026.8.27</FileVersion>
 ```
 
-Tags should still be prefixed with `v`, e.g. `v2026.7.1`.
+Tags should still be prefixed with `v`, e.g. `v2026.8.27`.
 
 ## Release Files Policy
 
