@@ -86,7 +86,7 @@ namespace ModbusForge.Avalonia
             services.AddOptions();
             services.Configure<ServerSettings>(_ => { });
 
-            // Modbus client / server stack (mirrors WPF registration)
+            // Modbus client / server stack
             services.AddSingleton<ModbusTcpService>();
             services.AddSingleton<ModbusServerService>();
             services.AddSingleton<IModbusService>(provider =>

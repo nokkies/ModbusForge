@@ -26,8 +26,8 @@ namespace ModbusForge.Services
     }
 
     /// <summary>
-    /// Shared engine and graph-mapping logic for the WPF and Avalonia visual simulation services.
-    /// Derived types only supply a platform-specific timer and (for WPF) marshalling.
+    /// Shared engine and graph-mapping logic for the visual simulation service.
+    /// Derived types only supply a platform-specific timer and UI marshalling.
     /// </summary>
     public abstract class VisualSimulationServiceBase<T> : IVisualSimulationService, IDisposable
         where T : class

@@ -2,7 +2,7 @@ namespace ModbusForge.Services
 {
     /// <summary>
     /// Abstraction for showing tag-related tool windows (Tag Browser, Watch Window).
-    /// Keeps ViewModels free of direct WPF Window references and App.Current usage.
+    /// Keeps ViewModels free of direct desktop Window references and App.Current usage.
     /// </summary>
     public interface ITagWindowService
     {

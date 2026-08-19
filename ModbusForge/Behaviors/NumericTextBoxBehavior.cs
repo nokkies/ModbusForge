@@ -10,7 +10,7 @@ namespace ModbusForge.Avalonia.Behaviors
 {
     /// <summary>
     /// Attached behavior that restricts <see cref="TextBox"/> input to numeric values,
-    /// similar to the WPF NumericTextBoxBehavior.
+    /// similar to the original desktop NumericTextBoxBehavior.
     /// </summary>
     public class NumericTextBoxBehavior
     {

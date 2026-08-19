@@ -14,7 +14,7 @@ namespace ModbusForge.Services.Api;
 /// Shared, UI-agnostic implementation of <see cref="IApiApplicationService"/>.
 /// All access to UI-owned objects is marshalled through <see cref="IDispatcher"/>.
 /// Does NOT depend on any UI framework directly; the constructor receives
-/// narrow interfaces so the service can be used across WPF, Avalonia and tests.
+/// narrow interfaces so the service can be used across the Avalonia desktop UI and tests.
 /// </summary>
 public sealed class ApiApplicationService : IApiApplicationService
 {

@@ -21,7 +21,7 @@ namespace ModbusForge.Tests.Services
 {
     /// <summary>
     /// Tests for Phase-5 API refactoring:
-    /// – Facade-based design (no WPF IServiceProvider)
+    /// – Facade-based design (no UI IServiceProvider)
     /// – Input validation
     /// – Error handling (no raw ex.Message)
     /// – Cancellation / concurrency controls

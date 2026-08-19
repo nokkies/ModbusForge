@@ -3,7 +3,7 @@ using System;
 namespace ModbusForge.Services
 {
     /// <summary>
-    /// Abstraction over WPF-UI theme management so the rest of the app can be tested.
+    /// Abstraction over desktop theme management so the rest of the app can be tested.
     /// </summary>
     public interface IThemeService
     {

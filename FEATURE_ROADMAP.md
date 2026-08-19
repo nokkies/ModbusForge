@@ -8,7 +8,7 @@
 ## Recently Completed (v5.8.1 - v5.8.11)
 
 - **v5.8.1** - Stabilized tag hierarchy with stable GroupId/ParentGroupId, versioned persistence schema, and atomic saves.
-- **v5.8.2** - Refactored local API: removed WPF service-provider resolution, added facade/DTOs, validation, rate limiting, and optional API-key auth.
+- **v5.8.2** - Refactored local API: removed legacy UI service-provider resolution, added facade/DTOs, validation, rate limiting, and optional API-key auth.
 - **v5.8.3** - Removed window globals from visual editor workflows via ITagWindowService and IWindowOwnerProvider.
 - **v5.8.4** - Implemented transactional tag-group deletion with preview dialog and rollback on save failure.
 - **v5.8.5** - Replaced MainWindow service locator with IShellWindowService and IApplicationLifetime.

@@ -49,7 +49,7 @@ public class ApiServerService : IApiServerService
     // ─── Constructor ──────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Primary constructor. The WPF <see cref="IServiceProvider"/> is NO LONGER injected;
+    /// Primary constructor. The desktop <see cref="IServiceProvider"/> is NO LONGER injected;
     /// all application interactions go through the focused <see cref="IApiApplicationService"/> facade.
     /// </summary>
     public ApiServerService(

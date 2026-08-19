@@ -5,7 +5,7 @@ using ModbusForge.Models;
 namespace ModbusForge.Services
 {
     /// <summary>
-    /// Common interface for the visual node simulation service used by both WPF and Avalonia.
+    /// Common interface for the visual node simulation service used by the Avalonia desktop UI.
     /// </summary>
     public interface IVisualSimulationService : IDisposable
     {

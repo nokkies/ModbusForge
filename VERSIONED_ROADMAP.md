@@ -4,7 +4,7 @@ Version format: `YYYY.M.INCREMENT`. All `.csproj` files are bumped together.
 
 ## Important: baseline reset to `2026.7.1`
 
-The baseline reset occurred at `2026.7.1`. The `v2026.7.2`–`v2026.7.11` tags still exist in history, but they represent premature/fake milestones. This roadmap is now the living **Avalonia = WPF parity plan**. Items will only be marked **Done** when the Avalonia feature works end-to-end. Real versions resumed at `2026.7.12` so we do not overwrite the historical tags.
+The baseline reset occurred at `2026.7.1`. The `v2026.7.2`–`v2026.7.11` tags still exist in history, but they represent premature/fake milestones. This roadmap is now the living **Avalonia parity plan**. Items will only be marked **Done** when the Avalonia feature works end-to-end. Real versions resumed at `2026.7.12` so we do not overwrite the historical tags.
 
 ## Legend
 
@@ -18,7 +18,7 @@ The baseline reset occurred at `2026.7.1`. The `v2026.7.2`–`v2026.7.11` tags s
 
 | Version | State | Notes |
 |---------|-------|-------|
-| `2026.7.1` | [x] | WPF / Core / Headless shipped. Baseline reset. |
+| `2026.7.1` | [x] | Legacy desktop / Core / Headless shipped. Baseline reset. |
 | `2026.7.12` | [x] | Avalonia per-area registers (Start/Count, monitoring, inline edit, per-area R/W, Quick Write). |
 | `2026.7.13` | [x] | Avalonia shell navigation, status bar, View toggles, Diagnostics, File/Tools menu parity, and Debug/Console tabs. |
 | `2026.7.14` | [x] | Avalonia Dashboard tab with connection status, quick actions, and recent profile summary. |
@@ -42,8 +42,8 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ## Main Shell & Navigation — [x] 2026.8.1 shipped
 
-| Feature | WPF | Avalonia | Target |
-|---------|-----|----------|--------|
+| Feature | Legacy | Avalonia | Target |
+|---------|--------|----------|--------|
 | Left NavigationView with icons | Yes | Sidebar equivalent | 2026.7.13 |
 | Status bar at bottom (status, version, connection) | Yes | Yes | 2026.7.13 |
 | View menu: dark mode, sim visibility, tab visibility toggles | Yes | Yes | 2026.7.13 |
@@ -76,8 +76,8 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ## Registers — [x] 2026.7.16 shipped
 
-| Feature | WPF | Avalonia | Target |
-|---------|-----|----------|--------|
+| Feature | Legacy | Avalonia | Target |
+|---------|--------|----------|--------|
 | 4 register tabs | Yes | Yes | — |
 | Per-area Start/Count | Yes | Yes | 2026.7.12 |
 | Per-area monitoring toggle + period + auto-pause | Yes | Yes | 2026.7.12 |
@@ -103,8 +103,8 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ## Custom Watch — [x] 2026.7.17 shipped
 
-| Feature | WPF | Avalonia | Target |
-|---------|-----|----------|--------|
+| Feature | Legacy | Avalonia | Target |
+|---------|--------|----------|--------|
 | Grid columns | Yes | Yes | 2026.7.17 |
 | Continuous Read | Yes | Yes | — |
 | Continuous Write | Yes | Yes | 2026.7.17 |
@@ -121,8 +121,8 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ## Trends — [x] 2026.7.18 shipped
 
-| Feature | WPF | Avalonia | Target |
-|---------|-----|----------|--------|
+| Feature | Legacy | Avalonia | Target |
+|---------|--------|----------|--------|
 | Series management | Yes | Yes | 2026.7.18 |
 | Play/Pause | Yes | Yes | — |
 | Lock X/Y zoom controls | Yes | Yes | 2026.7.18 |
@@ -142,8 +142,8 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ## Decode View — [x] 2026.7.19 shipped
 
-| Feature | WPF | Avalonia | Target |
-|---------|-----|----------|--------|
+| Feature | Legacy | Avalonia | Target |
+|---------|--------|----------|--------|
 | 16-bit decoder (None, Swap Bytes, Swap Words, Swap B+W) | Yes | Yes | 2026.7.19 |
 | 32-bit decoder (UInt32, Int32, Float32, ASCII 4) | Yes | Yes | 2026.7.19 |
 
@@ -155,8 +155,8 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ## Connection, Transport & Frame Tools — [x] 2026.7.20 shipped
 
-| Feature | WPF | Avalonia | Target |
-|---------|-----|----------|--------|
+| Feature | Legacy | Avalonia | Target |
+|---------|--------|----------|--------|
 | Connection profile management (TCP/Serial) | Yes | Yes | — |
 | Serial RTU/ASCII settings | Yes | Yes | — |
 | Frame Inspector | Yes | Yes (with extra features) | — |
@@ -173,8 +173,8 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ## Scripting & Advanced Functions — [x] 2026.7.21 shipped
 
-| Feature | WPF | Avalonia | Target |
-|---------|-----|----------|--------|
+| Feature | Legacy | Avalonia | Target |
+|---------|--------|----------|--------|
 | Script editor | Yes | Yes | — |
 | Advanced Functions (FC22, FC23, FC43) | Yes | Yes | 2026.7.21 |
 
@@ -186,8 +186,8 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ## Visual Simulation — [x] 2026.8.1 shipped
 
-| Feature | WPF | Avalonia | Target |
-|---------|-----|----------|--------|
+| Feature | Legacy | Avalonia | Target |
+|---------|--------|----------|--------|
 | Node palette | Yes | Yes | 2026.7.22 |
 | Drag-drop canvas | Yes | Yes | 2026.7.22 |
 | POU tree (programs) | Yes | Yes (hierarchical folders) | 2026.8.1 |
@@ -221,8 +221,8 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ## Project Save/Load & Unit ID State — [x] 2026.7.24 core shipped
 
-| Feature | WPF | Avalonia | Target |
-|---------|-----|----------|--------|
+| Feature | Legacy | Avalonia | Target |
+|---------|--------|----------|--------|
 | Project save/load (.mfp) | Full (per-unit configs, visual nodes) | Yes (workspace snapshot) | 2026.7.24 |
 | Import/Export Unit IDs | Yes | Yes (workspace plus legacy byte-list import) | 2026.7.24 |
 | Per-Unit ID state (UnitConfigurationStore) | Yes | Yes | 2026.7.24 |
@@ -236,8 +236,8 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ## Missing Tool Windows — [x] 2026.7.25 core shipped
 
-| Feature | WPF | Avalonia | Target |
-|---------|-----|----------|--------|
+| Feature | Legacy | Avalonia | Target |
+|---------|--------|----------|--------|
 | Tag Browser | Yes | Yes | 2026.7.25 |
 | Register Template Import | Yes | Yes (through Tag Browser) | 2026.7.25 |
 
@@ -259,8 +259,8 @@ The `v2026.7.2`–`v2026.7.11` tags were created during the previous fake milest
 
 ## Notes
 
-- WPF is the source of truth.
+- The legacy desktop implementation is the source of truth.
 - Every feature must be verified end-to-end before it is marked `[x]`.
 - Core improvements (fixing `ModbusServerService` bounds, etc.) can ship independently but do not count as Avalonia parity.
-- Avalonia functional parity with the WPF baseline has been reached as of `2026.8.1`.
+- Avalonia functional parity with the legacy desktop baseline has been reached as of `2026.8.1`.
 - Remaining differences are implementation-specific (e.g. lightweight custom docking instead of Dirkster.AvalonDock) and do not affect functional parity.

@@ -5,7 +5,7 @@ namespace ModbusForge.Services
 {
     /// <summary>
     /// Synchronous dispatcher that executes actions immediately on the calling thread.
-    /// Useful for unit tests that have no WPF message loop.
+    /// Useful for unit tests that have no UI message loop.
     /// </summary>
     public class ImmediateDispatcher : IDispatcher
     {

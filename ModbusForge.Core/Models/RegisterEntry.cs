@@ -15,7 +15,7 @@ namespace ModbusForge.Models
         /// </summary>
         public static IReadOnlyList<string> AvailableTypes { get; } = new[] { "int", "uint", "real", "string" };
         private bool _swapWords;
-        private string _valueText = "0"; // used for editing/display to avoid WPF ConvertBack to ushort
+        private string _valueText = "0"; // used for editing/display to avoid data-binding ConvertBack to ushort
         private bool _isReadError;
         private string? _readErrorMessage;
 

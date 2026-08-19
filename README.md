@@ -138,13 +138,13 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 - **Headless runtime improvements**: `ModbusForge.Headless` now supports `ConnectionProfile` for TCP and RTU/ASCII serial, environment-specific `appsettings.<Environment>.json`, `MODBUSFORGE_` environment variables, structured Serilog console and file output, MQTT publishing via `MqttGatewayService`, `--help`, CLI validation, and graceful shutdown.
 - **Hardened CI/release workflow**: Resolved `secrets` context usage in conditional steps, added environment-specific build/test jobs, and prevented recursive release runs from the `github-actions[bot]` tag push.
-- **Avalonia-only desktop**: WPF project and assets fully removed; Avalonia is the only desktop UI.
+- **Avalonia-only desktop**: the legacy Windows-only desktop project and assets have been fully removed; Avalonia is the only desktop UI.
 - **Connection Manager serial improvements**: COM port dropdown now auto-detects ports and shows device names in brackets (e.g. `COM3 (MOXA ...)`); a **Custom port...** option allows manual COM port entry; baud rate is now a preset dropdown of standard Modbus rates; and an **Auto-detect settings** button scans common baud/parity/data/stop-bit combinations and reports the first valid Modbus response.
 - **Version bumped to `2026.8.18`** in all projects.
 
 ### 2026.8.16 — Industrial Simulation Blocks & Engine Unification
 
-- **Simulation engine unified in Core**: `VisualSimulationServiceBase` and `IVisualSimulationService` now host the engine and block catalog in `ModbusForge.Core`, shared by WPF and Avalonia.
+- **Simulation engine unified in Core**: `VisualSimulationServiceBase` and `IVisualSimulationService` now host the engine and block catalog in `ModbusForge.Core`, shared with the Avalonia desktop UI.
 - **Multi-output port support**: Nodes can expose named output ports (`Fault`, `SpeedFeedback`, `AtSpeed`, etc.) and bind each to its own Modbus address.
 - **Valve block** (`v2026.8.13`): Motorised valve with `OpenCmd`/`CloseCmd`, configurable travel time, normally-open rest position, and `Fault` output for simultaneous commands.
 - **DOL motor block** (`v2026.8.14`): Direct-on-line starter with `Start`/`Stop`, sealed contactor, configurable run pickup delay, and `Fault` output.
@@ -169,9 +169,9 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 - **Application menu in Avalonia**: Added File, Edit, View, Tools, and Help menus to `MainView` with Save, Load, Exit, Read/Refresh, Preferences, Toggle Theme, Check for Updates, Help, Keyboard Shortcuts, Troubleshooting, and About commands.
 - **Preferences window**: Full Avalonia port with sections for Connection, Diagnostics, Console, Performance, Application, API (with API key generation), and MQTT. Persists through the existing `SettingsService`.
-- **Help, About, Keyboard Shortcuts, and Troubleshooting windows**: Avalonia windows with content reused from the WPF implementation and core `IHelpContentService`.
+- **Help, About, Keyboard Shortcuts, and Troubleshooting windows**: Avalonia windows with content reused from the previous desktop implementation and core `IHelpContentService`.
 - **Global keyboard shortcuts**: `Ctrl+R` / `F5` read, `Ctrl+T` open Trends, `Ctrl+S` save, `Ctrl+P` preferences, `Ctrl+Q` exit, `F1` help.
-- **Theme toggle**: Added `ToggleTheme()` to `IThemeService` and implementations for WPF and Avalonia.
+- **Theme toggle**: Added `ToggleTheme()` to `IThemeService` with an Avalonia implementation and a test-friendly stub.
 - **Auto-updater**: Wired `IUpdateService` into Avalonia; checks GitHub releases for the latest tag and compares to the running version. On a newer release it offers to open the release page; the existing `UpdateService` also supports installer download and silent launch.
 
 ### 2026.7.9 — Visual Simulation
@@ -229,13 +229,13 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 - **CalVer versioning**: Switched from SemVer (`6.x.x`) to `YYYY.M.INCREMENT` starting with `2026.7.1`.
 - **Cross-platform core extraction**: New `ModbusForge.Core` class library targets `net8.0` and contains the view-agnostic models, helpers, configuration and services (Modbus, polling, MQTT, pcap import, logging, etc.).
-- **New `RgbColor` model**: Replaced WPF `System.Windows.Media.Color` in `NodeDescriptors` with a portable `RgbColor` struct; the WPF UI converts back when creating brushes.
+- **New `RgbColor` model**: Replaced the legacy `System.Windows.Media.Color` in `NodeDescriptors` with a portable `RgbColor` struct; the Avalonia UI converts back when creating brushes.
 - **Headless Linux runtime**: New `ModbusForge.Headless` console app targets `net8.0`, uses `ModbusForge.Core`, and polls Modbus TCP registers/coil/discrete-input areas from the command line with `--host`, `--port`, `--unit-id`, `--start`, `--count`, `--interval` and `--area` options.
-- **Solution restructure**: `ModbusForge` WPF app now references `ModbusForge.Core`; `ModbusForge.Headless` and `ModbusForge.Core` added to the solution.
+- **Solution restructure**: `ModbusForge` desktop app now references `ModbusForge.Core`; `ModbusForge.Headless` and `ModbusForge.Core` added to the solution.
 
 ### v6.1.0
 
-- **Channels-based background polling engine**: New `PollingEngine` runs Modbus reads off the WPF UI thread using `System.Threading.Channels`. `MonitoringCoordinator` now enqueues `PollingCommand`s, the worker executes the I/O, and results are drained and applied to the UI at 50ms ticks. Area commands coalesce by unit/area so only the latest pending request is processed under back-pressure.
+- **Channels-based background polling engine**: New `PollingEngine` runs Modbus reads off the UI thread using `System.Threading.Channels`. `MonitoringCoordinator` now enqueues `PollingCommand`s, the worker executes the I/O, and results are drained and applied to the UI at 50ms ticks. Area commands coalesce by unit/area so only the latest pending request is processed under back-pressure.
 - **Separated I/O from UI formatting**: `RegisterCoordinator` now has `Apply*` methods for holding/input registers, coils and discrete inputs, letting the polling engine update collections on the UI thread without blocking it during Modbus transactions.
 - **50ms / 20-unit benchmark**: Added `PollingThroughputTests` verifying 20 concurrent unit reads at 50ms intervals complete within one second.
 
@@ -268,7 +268,7 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ### v6.0.4
 
-- **Fixed startup crash (wpfgfx_cor3.dll EntryPointNotFoundException)**: Removed WPF native runtime DLLs from the installer. These DLLs are part of the shared `Microsoft.WindowsDesktop.App` runtime; shipping them with the app caused a mismatch when the installed .NET runtime was patched to a newer version, leading to a startup `XamlParseException`.
+- **Fixed startup crash (wpfgfx_cor3.dll EntryPointNotFoundException)**: Removed legacy native runtime DLLs from the installer. These DLLs are part of the shared `Microsoft.WindowsDesktop.App` runtime; shipping them with the app caused a mismatch when the installed .NET runtime was patched to a newer version, leading to a startup `XamlParseException`.
 
 ### v6.0.3
 
