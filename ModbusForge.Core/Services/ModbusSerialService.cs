@@ -122,10 +122,12 @@ namespace ModbusForge.Services
                         ? (IModbusSerialTransport)_factory.CreateRtuTransport(new LoggingStreamResource(adapter, _frameLogger))
                         : (IModbusSerialTransport)_factory.CreateAsciiTransport(new LoggingStreamResource(adapter, _frameLogger));
 
-                    _client = _factory.CreateMaster(transport);
+                    var client = _factory.CreateMaster(transport);
+                    var oldClient = Interlocked.Exchange(ref _client, client);
+                    (oldClient as IDisposable)?.Dispose();
 
-                    _client.Transport.ReadTimeout = 5000;
-                    _client.Transport.WriteTimeout = 5000;
+                    client.Transport.ReadTimeout = 5000;
+                    client.Transport.WriteTimeout = 5000;
 
                     var message = $"Connected to Modbus {Transport} on {profile.ComPort} ({profile.BaudRate}/{profile.DataBits}{ParityChar(profile.Parity)}{StopBitsChar(profile.StopBits)})";
                     _logger.LogInformation(message);
@@ -553,23 +555,25 @@ namespace ModbusForge.Services
 
         private void DisconnectCore()
         {
-            try { (_client as IDisposable)?.Dispose(); } catch { }
-            _client = null;
-
-            try
-            {
-                _serialPort?.Close();
-            }
-            catch { }
-
-            try
-            {
-                _serialPort?.Dispose();
-            }
-            catch { }
-
-            _serialPort = null;
+            // Capture fields before disposal so concurrent checks don't observe
+            // objects that are mid-dispose.
+            var client = Interlocked.Exchange(ref _client, null);
+            var serialPort = Interlocked.Exchange(ref _serialPort, null);
             _connectionProfile = null;
+
+            try { (client as IDisposable)?.Dispose(); } catch { }
+
+            try
+            {
+                serialPort?.Close();
+            }
+            catch { }
+
+            try
+            {
+                serialPort?.Dispose();
+            }
+            catch { }
         }
 
         public virtual Task<ConnectionDiagnosticResult> RunDiagnosticsAsync(string ipAddress, int port, byte unitId)

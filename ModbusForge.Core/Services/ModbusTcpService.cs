@@ -123,14 +123,22 @@ namespace ModbusForge.Services
             {
                 _lastIpAddress = ipAddress;
                 _lastPort = port;
+
                 var tcpClient = new TcpClient();
+                IModbusMaster? client = null;
                 try
                 {
                     await tcpClient.ConnectAsync(ipAddress, port, cancellationToken).ConfigureAwait(false);
-                    _tcpClient = tcpClient;
                     var streamResource = new LoggingStreamResource(ModbusStreamAdapterFactory.CreateTcpAdapter(tcpClient), _frameLogger);
                     var transport = _factory.CreateIpTransport(streamResource);
-                    _client = new ModbusIpMaster(transport);
+                    client = new ModbusIpMaster(transport);
+
+                    // Swap in the new connection and dispose any previous one atomically.
+                    var oldClient = Interlocked.Exchange(ref _client, client);
+                    var oldTcpClient = Interlocked.Exchange(ref _tcpClient, tcpClient);
+                    (oldClient as IDisposable)?.Dispose();
+                    oldTcpClient?.Close();
+
                     var message = $"Connected to Modbus server at {ipAddress}:{port}";
                     _logger.LogInformation(message);
                     _consoleLoggerService?.Log(message);
@@ -141,10 +149,8 @@ namespace ModbusForge.Services
                     var message = $"Failed to connect to Modbus server at {ipAddress}:{port}: {ex.Message}";
                     _logger.LogError(ex, message);
                     _consoleLoggerService?.Log(message);
-                    (_client as IDisposable)?.Dispose();
-                    _client = null;
+                    (client as IDisposable)?.Dispose();
                     tcpClient.Dispose();
-                    _tcpClient = null;
                     return false;
                 }
             }
@@ -164,10 +170,14 @@ namespace ModbusForge.Services
                     var message = $"Disconnecting from Modbus server at {_lastIpAddress}:{_lastPort}";
                     _logger.LogInformation(message);
                     _consoleLoggerService?.Log(message);
-                    (_client as IDisposable)?.Dispose();
-                    _client = null;
-                    _tcpClient?.Close();
-                    _tcpClient = null;
+
+                    // Null out fields before disposing so IsConnected doesn't observe a
+                    // client that is mid-dispose.
+                    var client = Interlocked.Exchange(ref _client, null);
+                    var tcpClient = Interlocked.Exchange(ref _tcpClient, null);
+                    (client as IDisposable)?.Dispose();
+                    tcpClient?.Close();
+
                     var disconnectMessage = "Successfully disconnected from Modbus server";
                     _logger.LogInformation(disconnectMessage);
                     _consoleLoggerService?.Log(disconnectMessage);
@@ -436,11 +446,8 @@ namespace ModbusForge.Services
                     try
                     {
                         _logger.LogDebug($"{debugLogMessage} (Unit ID: {unitId})");
-                        // NModbus uses 0-based protocol addresses, convert from 1-based UI address
-                        ushort protocolAddress = (ushort)(address > 0 ? address - 1 : 0);
-
                         if (_client != null)
-                            writeAction(_client, protocolAddress);
+                            writeAction(_client, ToProtocolAddress(address));
                     }
                     catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
@@ -460,10 +467,12 @@ namespace ModbusForge.Services
             _logger.LogInformation("Client is disconnected. Cleaning up connection.");
             try
             {
-                (_client as IDisposable)?.Dispose();
-                _client = null;
-                _tcpClient?.Close();
-                _tcpClient = null;
+                // Null fields before disposal so concurrent IsConnected checks don't
+                // observe a client mid-dispose.
+                var client = Interlocked.Exchange(ref _client, null);
+                var tcpClient = Interlocked.Exchange(ref _tcpClient, null);
+                (client as IDisposable)?.Dispose();
+                tcpClient?.Close();
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
@@ -492,8 +501,10 @@ namespace ModbusForge.Services
                 await _ioLock.WaitAsync().ConfigureAwait(false);
                 try
                 {
-                    (_client as IDisposable)?.Dispose();
-                    _tcpClient?.Close();
+                    var client = Interlocked.Exchange(ref _client, null);
+                    var tcpClient = Interlocked.Exchange(ref _tcpClient, null);
+                    (client as IDisposable)?.Dispose();
+                    tcpClient?.Close();
                 }
                 finally
                 {
@@ -511,12 +522,12 @@ namespace ModbusForge.Services
 
             if (disposing)
             {
-                // Dispose the underlying connection first so any in-flight I/O is
-                // aborted, allowing the operation holding the lock to release it.
-                (_client as IDisposable)?.Dispose();
-                _client = null;
-                _tcpClient?.Close();
-                _tcpClient = null;
+                // Null fields and capture the old connection before disposal so
+                // concurrent IsConnected checks don't observe a client mid-dispose.
+                var client = Interlocked.Exchange(ref _client, null);
+                var tcpClient = Interlocked.Exchange(ref _tcpClient, null);
+                (client as IDisposable)?.Dispose();
+                tcpClient?.Close();
 
                 // Acquire the lock on the calling thread (bounded wait) before
                 // disposing the semaphore. Disposing while still holding it means
