@@ -1,4 +1,4 @@
-﻿namespace ModbusForge.Tests;
+namespace ModbusForge.Tests;
 
 public class UnitTest1
 {

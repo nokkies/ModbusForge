@@ -506,13 +506,13 @@ namespace ModbusForge.Tests.Services
             var service = CreateService(out _, out _);
 
             var defaultGroup = service.Groups.First(g => g.Name == "Default");
-            var parent       = await service.CreateGroup("Parent");
-            var child        = await service.CreateGroup("Child", "Parent");
-            var grandChild   = await service.CreateGroup("GrandChild", "Child");
+            var parent = await service.CreateGroup("Parent");
+            var child = await service.CreateGroup("Child", "Parent");
+            var grandChild = await service.CreateGroup("GrandChild", "Child");
 
-            var parentTag    = await service.CreateTag("ParentTag",    "Parent",     PlcArea.HoldingRegister, 1, TagDataType.UInt16);
-            var childTag     = await service.CreateTag("ChildTag",     "Child",      PlcArea.HoldingRegister, 2, TagDataType.UInt16);
-            var grandChildTag = await service.CreateTag("GrandChildTag","GrandChild", PlcArea.HoldingRegister, 3, TagDataType.UInt16);
+            var parentTag = await service.CreateTag("ParentTag", "Parent", PlcArea.HoldingRegister, 1, TagDataType.UInt16);
+            var childTag = await service.CreateTag("ChildTag", "Child", PlcArea.HoldingRegister, 2, TagDataType.UInt16);
+            var grandChildTag = await service.CreateTag("GrandChildTag", "GrandChild", PlcArea.HoldingRegister, 3, TagDataType.UInt16);
 
             return (service, defaultGroup, parent, child, grandChild, parentTag, childTag, grandChildTag);
         }
@@ -539,7 +539,7 @@ namespace ModbusForge.Tests.Services
         {
             var service = CreateService(out _, out _);
             var parent = await service.CreateGroup("Parent");
-            var child  = await service.CreateGroup("Child", "Parent");
+            var child = await service.CreateGroup("Child", "Parent");
 
             var result = await service.DeleteGroupAsync(child.Id, GroupDeletionMode.MoveToParent);
 
@@ -718,8 +718,8 @@ namespace ModbusForge.Tests.Services
         public async Task DeleteGroup_Persistence_NoDanglingGroupIds()
         {
             var service = CreateService(out var tagsFilePath, out _);
-            var parent  = await service.CreateGroup("ToDeleteGroup");
-            var child   = await service.CreateGroup("ChildOfToDelete", "ToDeleteGroup");
+            var parent = await service.CreateGroup("ToDeleteGroup");
+            var child = await service.CreateGroup("ChildOfToDelete", "ToDeleteGroup");
             await service.CreateTag("T1", "ChildOfToDelete", PlcArea.HoldingRegister, 1, TagDataType.UInt16);
 
             await service.DeleteGroupAsync(parent.Id, GroupDeletionMode.CascadeDelete);
@@ -751,11 +751,11 @@ namespace ModbusForge.Tests.Services
         public async Task DeleteGroup_SaveFailure_RollsBackInMemoryChanges()
         {
             var service = CreateService(out var tagsFilePath, out _);
-            var group   = await service.CreateGroup("ToDelete");
-            var tag     = await service.CreateTag("T1", "ToDelete", PlcArea.HoldingRegister, 1, TagDataType.UInt16);
+            var group = await service.CreateGroup("ToDelete");
+            var tag = await service.CreateTag("T1", "ToDelete", PlcArea.HoldingRegister, 1, TagDataType.UInt16);
 
             // Capture state before deletion attempt
-            int tagsBefore   = service.Tags.Count;
+            int tagsBefore = service.Tags.Count;
             int groupsBefore = service.GetAllGroupsFlat().Count();
 
             // Sabotage the save path so SaveTagsAsync will throw
@@ -773,7 +773,7 @@ namespace ModbusForge.Tests.Services
             Assert.Contains("rolled back", result.Message, StringComparison.OrdinalIgnoreCase);
 
             // Collections should be unchanged
-            Assert.Equal(tagsBefore,   service.Tags.Count);
+            Assert.Equal(tagsBefore, service.Tags.Count);
             Assert.Equal(groupsBefore, service.GetAllGroupsFlat().Count());
             Assert.NotNull(service.Tags.FirstOrDefault(t => t.Id == tag.Id));
         }
@@ -786,10 +786,10 @@ namespace ModbusForge.Tests.Services
         public async Task DeleteGroup_Cancellation_LeavesCollectionsUnchanged()
         {
             var service = CreateService(out _, out _);
-            var group   = await service.CreateGroup("CancelGroup");
+            var group = await service.CreateGroup("CancelGroup");
             await service.CreateTag("CT1", "CancelGroup", PlcArea.HoldingRegister, 1, TagDataType.UInt16);
 
-            int tagsBefore   = service.Tags.Count;
+            int tagsBefore = service.Tags.Count;
             int groupsBefore = service.GetAllGroupsFlat().Count();
 
             using var cts = new CancellationTokenSource();
@@ -799,7 +799,7 @@ namespace ModbusForge.Tests.Services
                 group.Id, GroupDeletionMode.CascadeDelete, cts.Token);
 
             Assert.False(result.Success);
-            Assert.Equal(tagsBefore,   service.Tags.Count);
+            Assert.Equal(tagsBefore, service.Tags.Count);
             Assert.Equal(groupsBefore, service.GetAllGroupsFlat().Count());
         }
 

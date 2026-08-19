@@ -35,7 +35,7 @@ namespace ModbusForge.Services
             _modbusService = modbusService ?? throw new ArgumentNullException(nameof(modbusService));
             _consoleLoggerService = consoleLoggerService ?? throw new ArgumentNullException(nameof(consoleLoggerService));
             _serverSettings = serverSettings ?? throw new ArgumentNullException(nameof(serverSettings));
-            
+
             // Initialize evaluation timer (runs every 250ms)
             _evaluationTimer = new Timer(EvaluateRulesCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(250));
         }
@@ -43,7 +43,7 @@ namespace ModbusForge.Services
         public void AddRule(ScriptRule rule)
         {
             if (rule == null) return;
-            
+
             Rules.Add(rule);
             _logger.LogInformation("Added script rule: {RuleName}", rule.Name);
             _consoleLoggerService.Log($"Script rule added: {rule.Name}");
@@ -52,7 +52,7 @@ namespace ModbusForge.Services
         public void RemoveRule(ScriptRule rule)
         {
             if (rule == null) return;
-            
+
             if (Rules.Remove(rule))
             {
                 _logger.LogInformation("Removed script rule: {RuleName}", rule.Name);
@@ -63,7 +63,7 @@ namespace ModbusForge.Services
         public void UpdateRule(ScriptRule rule)
         {
             if (rule == null) return;
-            
+
             var existingRule = Rules.FirstOrDefault(r => r.Name == rule.Name);
             if (existingRule != null)
             {
@@ -86,12 +86,12 @@ namespace ModbusForge.Services
                     if (conditionMet)
                     {
                         await ExecuteActionAsync(rule);
-                        
+
                         if (rule.OneTime)
                         {
                             rule.Triggered = true;
                         }
-                        
+
                         _logger.LogInformation("Script rule triggered: {RuleName}", rule.Name);
                         _consoleLoggerService.Log($"Rule triggered: {rule.GetDescription()}");
                     }
@@ -124,7 +124,7 @@ namespace ModbusForge.Services
         private async void EvaluateRulesCallback(object? state)
         {
             if (!_modbusService.IsConnected) return;
-            
+
             try
             {
                 await EvaluateRulesAsync();
@@ -153,19 +153,19 @@ namespace ModbusForge.Services
                     case "holdingregister":
                         var hr = await _modbusService.ReadHoldingRegistersAsync(_serverSettings.Value.DefaultUnitId, address, 1);
                         return hr?.FirstOrDefault();
-                    
+
                     case "inputregister":
                         var ir = await _modbusService.ReadInputRegistersAsync(_serverSettings.Value.DefaultUnitId, address, 1);
                         return ir?.FirstOrDefault();
-                    
+
                     case "coil":
                         var coils = await _modbusService.ReadCoilsAsync(_serverSettings.Value.DefaultUnitId, address, 1);
                         return coils?.FirstOrDefault();
-                    
+
                     case "discreteinput":
                         var di = await _modbusService.ReadDiscreteInputsAsync(_serverSettings.Value.DefaultUnitId, address, 1);
                         return di?.FirstOrDefault();
-                    
+
                     default:
                         return null;
                 }
@@ -244,7 +244,7 @@ namespace ModbusForge.Services
             }
             catch (InvalidCastException ex)
             {
-                _logger.LogWarning(ex, "Invalid cast during numeric comparison. Current type: '{CurrentType}', Trigger type: '{TriggerType}'", 
+                _logger.LogWarning(ex, "Invalid cast during numeric comparison. Current type: '{CurrentType}', Trigger type: '{TriggerType}'",
                     currentValue?.GetType().Name, triggerValue?.GetType().Name);
                 return false;
             }
@@ -273,15 +273,15 @@ namespace ModbusForge.Services
                 case "SetRegister":
                     await SetRegisterAsync(rule.ActionArea, rule.ActionAddress, rule.ActionValue);
                     break;
-                
+
                 case "SetCoil":
                     await SetCoilAsync(rule.ActionAddress, rule.ActionValue);
                     break;
-                
+
                 case "LogMessage":
                     _consoleLoggerService.Log($"Rule '{rule.Name}': {rule.LogMessage}");
                     break;
-                
+
                 default:
                     _logger.LogWarning("Unknown action type: {ActionType}", rule.ActionType);
                     break;

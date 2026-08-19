@@ -563,7 +563,7 @@ namespace ModbusForge.Services
             try
             {
                 _logger.LogInformation($"Diagnostics: Testing TCP connection to {ipAddress}:{port}");
-                
+
                 // Use async connect with timeout
                 var connectTask = testClient.ConnectAsync(ipAddress, port);
                 if (await Task.WhenAny(connectTask, Task.Delay(5000)) != connectTask)
@@ -608,40 +608,40 @@ namespace ModbusForge.Services
                     master.Transport.WriteTimeout = 5000;
 
                     // Try to read a single holding register - this is the most basic Modbus operation
-                try
-                {
-                    var registers = master.ReadHoldingRegisters(unitId, 0, 1);
-                    result.ModbusLatencyMs = (int)sw.ElapsedMilliseconds;
-                    result.ModbusResponding = true;
-                    _logger.LogInformation($"Diagnostics: Modbus responded in {result.ModbusLatencyMs}ms, read value: {registers[0]}");
-                }
-                catch (NModbus.SlaveException slaveEx)
-                {
-                    // Slave responded with an exception - this means Modbus IS working, just the request was invalid
-                    result.ModbusLatencyMs = (int)sw.ElapsedMilliseconds;
-                    result.ModbusResponding = true; // Device responded, even if with error
-                    result.ModbusError = $"Device responded with exception code {slaveEx.SlaveExceptionCode}: {GetModbusExceptionDescription(slaveEx.SlaveExceptionCode)}";
-                    _logger.LogInformation($"Diagnostics: Modbus device responded with exception - {result.ModbusError}");
-                }
-                catch (IOException ioEx)
-                {
-                    result.ModbusResponding = false;
-                    if (ioEx.InnerException is SocketException innerSock)
+                    try
                     {
-                        result.ModbusError = $"Connection reset by device - {GetSocketErrorDescription(innerSock.SocketErrorCode)}. Device may have rejected the Modbus request or closed the connection.";
+                        var registers = master.ReadHoldingRegisters(unitId, 0, 1);
+                        result.ModbusLatencyMs = (int)sw.ElapsedMilliseconds;
+                        result.ModbusResponding = true;
+                        _logger.LogInformation($"Diagnostics: Modbus responded in {result.ModbusLatencyMs}ms, read value: {registers[0]}");
                     }
-                    else
+                    catch (NModbus.SlaveException slaveEx)
                     {
-                        result.ModbusError = $"I/O error: {ioEx.Message}. Device may have closed the connection.";
+                        // Slave responded with an exception - this means Modbus IS working, just the request was invalid
+                        result.ModbusLatencyMs = (int)sw.ElapsedMilliseconds;
+                        result.ModbusResponding = true; // Device responded, even if with error
+                        result.ModbusError = $"Device responded with exception code {slaveEx.SlaveExceptionCode}: {GetModbusExceptionDescription(slaveEx.SlaveExceptionCode)}";
+                        _logger.LogInformation($"Diagnostics: Modbus device responded with exception - {result.ModbusError}");
                     }
-                    _logger.LogWarning($"Diagnostics: Modbus I/O failed - {result.ModbusError}");
-                }
-                catch (TimeoutException)
-                {
-                    result.ModbusResponding = false;
-                    result.ModbusError = "Modbus timeout - device accepted TCP but did not respond to Modbus request. Check Unit ID or device may not support Modbus TCP.";
-                    _logger.LogWarning($"Diagnostics: Modbus timeout");
-                }
+                    catch (IOException ioEx)
+                    {
+                        result.ModbusResponding = false;
+                        if (ioEx.InnerException is SocketException innerSock)
+                        {
+                            result.ModbusError = $"Connection reset by device - {GetSocketErrorDescription(innerSock.SocketErrorCode)}. Device may have rejected the Modbus request or closed the connection.";
+                        }
+                        else
+                        {
+                            result.ModbusError = $"I/O error: {ioEx.Message}. Device may have closed the connection.";
+                        }
+                        _logger.LogWarning($"Diagnostics: Modbus I/O failed - {result.ModbusError}");
+                    }
+                    catch (TimeoutException)
+                    {
+                        result.ModbusResponding = false;
+                        result.ModbusError = "Modbus timeout - device accepted TCP but did not respond to Modbus request. Check Unit ID or device may not support Modbus TCP.";
+                        _logger.LogWarning($"Diagnostics: Modbus timeout");
+                    }
                 }
                 finally
                 {

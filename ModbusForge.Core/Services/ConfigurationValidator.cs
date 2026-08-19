@@ -80,7 +80,7 @@ namespace ModbusForge.Services
             {
                 errors.Add("ServerSettings.Mode cannot be empty");
             }
-            else if (!settings.Mode.Equals("Client", StringComparison.OrdinalIgnoreCase) && 
+            else if (!settings.Mode.Equals("Client", StringComparison.OrdinalIgnoreCase) &&
                      !settings.Mode.Equals("Server", StringComparison.OrdinalIgnoreCase))
             {
                 errors.Add($"ServerSettings.Mode must be 'Client' or 'Server', got: {settings.Mode}");

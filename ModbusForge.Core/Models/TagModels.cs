@@ -123,7 +123,7 @@ namespace ModbusForge.Models
             get
             {
                 if (CurrentValue == null) return null;
-                
+
                 try
                 {
                     var raw = Convert.ToDouble(CurrentValue);
@@ -173,7 +173,7 @@ namespace ModbusForge.Models
                 {
                     return $"{scaled.Value:F2} {Units}";
                 }
-                
+
                 return CurrentValue.ToString() ?? "---";
             }
         }

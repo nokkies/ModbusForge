@@ -13,11 +13,11 @@ namespace ModbusForge.Models
         public ProjectInfo ProjectInfo { get; set; } = new();
         public GlobalSettings GlobalSettings { get; set; } = new();
         public Dictionary<byte, UnitIdConfiguration> UnitConfigurations { get; set; } = new();
-        
+
         // Visual Simulation Data
         public List<VisualNode> VisualNodes { get; set; } = new();
         public List<NodeConnection> VisualConnections { get; set; } = new();
-        
+
         public ProjectConfiguration()
         {
             // Initialize with default Unit ID 1 configuration
@@ -47,7 +47,7 @@ namespace ModbusForge.Models
         public int Port { get; set; } = 502;
         public string ServerUnitId { get; set; } = "1";
         public byte ClientUnitId { get; set; } = 1;
-        
+
         // UI state (global)
         public int WindowWidth { get; set; } = 1200;
         public int WindowHeight { get; set; } = 800;
@@ -70,7 +70,7 @@ namespace ModbusForge.Models
         public List<PlcSimulationElement> PlcElements { get; set; } = new();
         public List<VisualNode> VisualNodes { get; set; } = new();
         public List<NodeConnection> VisualConnections { get; set; } = new();
-        
+
         // Legacy monitoring settings (will be migrated to Unit ID 1)
         public bool GlobalMonitorEnabled { get; set; } = false;
         public bool HoldingMonitorEnabled { get; set; } = false;
@@ -83,13 +83,13 @@ namespace ModbusForge.Models
         public int DiscreteInputsMonitorPeriodMs { get; set; } = 1000;
         public bool CustomMonitorEnabled { get; set; } = false;
         public bool CustomReadMonitorEnabled { get; set; } = false;
-        
+
         // Legacy simulation settings
         public bool SimulationEnabled { get; set; } = false;
         public int SimulationPeriodMs { get; set; } = 500;
         public bool PlcSimulationEnabled { get; set; } = false;
         public int PlcSimulationPeriodMs { get; set; } = 100;
-        
+
         // Legacy register settings
         public int RegisterStart { get; set; } = 1;
         public int RegisterCount { get; set; } = 10;

@@ -54,27 +54,27 @@ namespace ModbusForge.Services
             {
                 try
                 {
-                    _logger.LogDebug("Attempting {OperationName} (attempt {Attempt}/{MaxRetries})", 
+                    _logger.LogDebug("Attempting {OperationName} (attempt {Attempt}/{MaxRetries})",
                         operationName, attempt + 1, maxRetries + 1);
 
                     var result = await operation();
-                    
+
                     if (attempt > 0)
                     {
-                        _logger.LogInformation("Operation {OperationName} succeeded after {Attempt} attempts", 
+                        _logger.LogInformation("Operation {OperationName} succeeded after {Attempt} attempts",
                             operationName, attempt + 1);
                     }
-                    
+
                     return result;
                 }
                 catch (Exception ex) when (IsRetryableException(ex) && attempt < maxRetries)
                 {
                     lastException = ex;
                     attempt++;
-                    
+
                     var delay = CalculateDelay(attempt, initialDelayMs, maxDelayMs);
-                    
-                    _logger.LogWarning(ex, 
+
+                    _logger.LogWarning(ex,
                         "Operation {OperationName} failed (attempt {Attempt}/{MaxRetries}). Retrying in {Delay}ms...",
                         operationName, attempt, maxRetries + 1, delay);
 
@@ -83,13 +83,13 @@ namespace ModbusForge.Services
                 catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     lastException = ex;
-                    _logger.LogError(ex, "Operation {OperationName} failed after {Attempt} attempts", 
+                    _logger.LogError(ex, "Operation {OperationName} failed after {Attempt} attempts",
                         operationName, attempt + 1);
                     throw;
                 }
             }
 
-            _logger.LogError("Operation {OperationName} failed after {MaxRetries} retries", 
+            _logger.LogError("Operation {OperationName} failed after {MaxRetries} retries",
                 operationName, maxRetries);
             throw new InvalidOperationException(
                 $"Operation '{operationName}' failed after {maxRetries} retries", lastException);
@@ -112,7 +112,7 @@ namespace ModbusForge.Services
         private bool IsRetryableException(Exception ex)
         {
             // Retry on network-related exceptions
-            if (ex is System.IO.IOException || 
+            if (ex is System.IO.IOException ||
                 ex is System.TimeoutException ||
                 ex is System.Net.Sockets.SocketException)
             {

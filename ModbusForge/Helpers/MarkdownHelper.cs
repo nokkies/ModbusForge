@@ -43,7 +43,7 @@ namespace ModbusForge.Avalonia.Helpers
             foreach (var line in lines)
             {
                 var trimmed = line.Trim();
-                
+
                 // Code block handling
                 if (trimmed.StartsWith("```"))
                 {

@@ -13,9 +13,9 @@ namespace ModbusForge.Helpers
         public static EndiannessFormat GetEndianness(bool swapBytes, bool swapWords) => (swapBytes, swapWords) switch
         {
             (false, false) => EndiannessFormat.ABCD_BigEndian,
-            (true, false)  => EndiannessFormat.BADC_ByteSwap,
-            (false, true)  => EndiannessFormat.CDAB_WordSwap,
-            (true, true)   => EndiannessFormat.DCBA_LittleEndian
+            (true, false) => EndiannessFormat.BADC_ByteSwap,
+            (false, true) => EndiannessFormat.CDAB_WordSwap,
+            (true, true) => EndiannessFormat.DCBA_LittleEndian
         };
 
         public static float ToSingle(ushort high, ushort low, bool swapBytes = false, bool swapWords = false)

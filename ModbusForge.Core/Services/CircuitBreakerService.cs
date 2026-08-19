@@ -64,7 +64,7 @@ namespace ModbusForge.Services
                 }
                 else
                 {
-                    _logger.LogWarning("Circuit {CircuitName} is OPEN, blocking request until {OpenUntil}", 
+                    _logger.LogWarning("Circuit {CircuitName} is OPEN, blocking request until {OpenUntil}",
                         circuitName, state.OpenUntil);
                     throw new CircuitBreakerOpenException($"Circuit '{circuitName}' is open until {state.OpenUntil}");
                 }
@@ -97,7 +97,7 @@ namespace ModbusForge.Services
                 }
                 else
                 {
-                    _logger.LogWarning("Circuit {CircuitName} is OPEN, blocking request until {OpenUntil}", 
+                    _logger.LogWarning("Circuit {CircuitName} is OPEN, blocking request until {OpenUntil}",
                         circuitName, state.OpenUntil);
                     throw new CircuitBreakerOpenException($"Circuit '{circuitName}' is open until {state.OpenUntil}");
                 }
@@ -174,7 +174,7 @@ namespace ModbusForge.Services
             lock (_lock)
             {
                 state.ConsecutiveSuccesses++;
-                _logger.LogDebug("Circuit {CircuitName} success recorded. Consecutive successes: {Count}", 
+                _logger.LogDebug("Circuit {CircuitName} success recorded. Consecutive successes: {Count}",
                     circuitName, state.ConsecutiveSuccesses);
 
                 if (state.State == CircuitState.HalfOpen)
@@ -205,12 +205,12 @@ namespace ModbusForge.Services
                 state.LastFailureTime = DateTime.UtcNow;
                 state.ConsecutiveSuccesses = 0;
 
-                _logger.LogWarning(exception, "Circuit {CircuitName} failure recorded. Total failures: {Count}", 
+                _logger.LogWarning(exception, "Circuit {CircuitName} failure recorded. Total failures: {Count}",
                     circuitName, state.FailureCount);
 
                 if (state.FailureCount >= state.Config.FailureThreshold)
                 {
-                    _logger.LogError("Circuit {CircuitName} opening due to {FailureCount} failures", 
+                    _logger.LogError("Circuit {CircuitName} opening due to {FailureCount} failures",
                         circuitName, state.FailureCount);
                     state.State = CircuitState.Open;
                     state.OpenUntil = DateTime.UtcNow.Add(state.Config.OpenTimeout);

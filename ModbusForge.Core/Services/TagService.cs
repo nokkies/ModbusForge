@@ -603,11 +603,11 @@ namespace ModbusForge.Services
                 .Where(g => !string.IsNullOrEmpty(g.ParentGroupId) && IsDescendantOf(g, groupId))
                 .ToList();
 
-            int directSubCount  = group.SubGroups.Count;
+            int directSubCount = group.SubGroups.Count;
             int recursiveSubCount = allDescendants.Count;
 
             // Tags: count by GroupId references
-            int directTagCount    = Tags.Count(t => t.GroupId == groupId);
+            int directTagCount = Tags.Count(t => t.GroupId == groupId);
             int recursiveTagCount = allDescendants.Sum(sub => Tags.Count(t => t.GroupId == sub.Id))
                                     + directTagCount;
 
@@ -633,17 +633,17 @@ namespace ModbusForge.Services
 
             return new GroupDeletionPreview
             {
-                GroupId                = group.Id,
-                GroupName              = group.Name,
-                FullPath               = group.FullPath,
-                DirectSubgroupCount    = directSubCount,
+                GroupId = group.Id,
+                GroupName = group.Name,
+                FullPath = group.FullPath,
+                DirectSubgroupCount = directSubCount,
                 RecursiveSubgroupCount = recursiveSubCount,
-                DirectTagCount         = directTagCount,
-                RecursiveTagCount      = recursiveTagCount,
-                WatchEntriesToRemove   = watchToRemove,
-                DestinationGroupId     = destinationGroup?.Id   ?? string.Empty,
-                DestinationGroupName   = destinationGroup?.Name ?? "Default",
-                IsProtected            = isDefault
+                DirectTagCount = directTagCount,
+                RecursiveTagCount = recursiveTagCount,
+                WatchEntriesToRemove = watchToRemove,
+                DestinationGroupId = destinationGroup?.Id ?? string.Empty,
+                DestinationGroupName = destinationGroup?.Name ?? "Default",
+                IsProtected = isDefault
             };
         }
 
@@ -685,9 +685,9 @@ namespace ModbusForge.Services
             // Destination for move modes
             TagGroup? destinationGroup = mode switch
             {
-                GroupDeletionMode.MoveToParent  => parentGroup,
+                GroupDeletionMode.MoveToParent => parentGroup,
                 GroupDeletionMode.MoveToDefault => defaultGroup,
-                _                               => null   // CascadeDelete – no destination
+                _ => null   // CascadeDelete – no destination
             };
 
             // Collect all descendant groups (bottom-up to remove children first when cascading)
@@ -711,8 +711,8 @@ namespace ModbusForge.Services
 
             // ---- Snapshot for rollback ----
             // Snapshots: parent's SubGroups list, tags collection, watch entries, group Tags
-            var snapshotTags        = Tags.ToList();
-            var snapshotGroups      = GetAllGroupsFlat().ToList();
+            var snapshotTags = Tags.ToList();
+            var snapshotGroups = GetAllGroupsFlat().ToList();
             var snapshotWatchEntries = WatchEntries.ToList();
 
             // Per-group Tags-collection snapshots (needed to restore group.Tags on rollback)
@@ -727,7 +727,7 @@ namespace ModbusForge.Services
                 if (cancellationToken.IsCancellationRequested)
                     return Fail("Operation was cancelled.");
 
-                int movedTagCount   = 0;
+                int movedTagCount = 0;
                 int deletedTagCount = 0;
                 int removedWatchCount = 0;
 
@@ -741,7 +741,7 @@ namespace ModbusForge.Services
                     foreach (var we in affectedWatchEntries)
                         WatchEntries.Remove(we);
 
-                    deletedTagCount  = affectedTags.Count;
+                    deletedTagCount = affectedTags.Count;
                     removedWatchCount = affectedWatchEntries.Count;
                 }
                 else
@@ -754,7 +754,7 @@ namespace ModbusForge.Services
                     foreach (var tag in affectedTags.Where(t => t.GroupId == groupId).ToList())
                     {
                         tag.GroupId = destinationGroup.Id;
-                        tag.Group   = destinationGroup.Name;
+                        tag.Group = destinationGroup.Name;
                         group.Tags.Remove(tag);
                         destinationGroup.Tags.Add(tag);
                         movedTagCount++;
@@ -764,7 +764,7 @@ namespace ModbusForge.Services
                     foreach (var sub in group.SubGroups.ToList())
                     {
                         sub.ParentGroupId = destinationGroup.Id;
-                        sub.ParentGroup   = destinationGroup.Name;
+                        sub.ParentGroup = destinationGroup.Name;
                         group.SubGroups.Remove(sub);
                         destinationGroup.SubGroups.Add(sub);
                     }
@@ -810,11 +810,11 @@ namespace ModbusForge.Services
 
                 return new GroupDeletionResult
                 {
-                    Success               = true,
-                    Message               = $"Group '{group.Name}' deleted successfully.",
-                    DeletedGroupCount     = 1 + allDescendants.Count,
-                    MovedTagCount         = movedTagCount,
-                    DeletedTagCount       = deletedTagCount,
+                    Success = true,
+                    Message = $"Group '{group.Name}' deleted successfully.",
+                    DeletedGroupCount = 1 + allDescendants.Count,
+                    MovedTagCount = movedTagCount,
+                    DeletedTagCount = deletedTagCount,
                     RemovedWatchEntryCount = removedWatchCount
                 };
             }
@@ -930,9 +930,9 @@ namespace ModbusForge.Services
         private static GroupDeletionPreview ErrorPreview(string groupId, string message) =>
             new()
             {
-                GroupId     = groupId,
+                GroupId = groupId,
                 IsProtected = true,
-                Message     = message
+                Message = message
             };
 
         /// <summary>
