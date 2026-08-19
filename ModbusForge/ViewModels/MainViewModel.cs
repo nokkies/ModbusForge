@@ -726,25 +726,55 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public bool IsConnectionErrorVisible => HasConnectionError && !IsConnected;
 
-        public string ServerIpAddress
+        public string ServerIpAddress => ServerIpAddressSummary;
+
+        /// <summary>
+        /// All server endpoints (IP:port) for the active profile. Empty when not in server mode.
+        /// Used by the IP dropdown in the main toolbar.
+        /// </summary>
+        public IReadOnlyList<string> ServerIpAddresses
         {
             get
             {
                 if (!IsServerMode)
-                    return string.Empty;
+                    return Array.Empty<string>();
 
                 var port = ActiveProfile?.Port ?? 502;
                 if (ActiveService is ModbusServerService server && IsConnected)
                 {
-                    return server.BoundEndpoint;
+                    var endpoint = server.BoundEndpoint;
+                    return string.IsNullOrWhiteSpace(endpoint)
+                        ? new[] { $"127.0.0.1:{port}" }
+                        : new[] { endpoint };
                 }
 
                 var ips = IpRangeHelper.GetAllLocalIPv4();
                 if (ips.Count == 0)
-                    return $"127.0.0.1:{port}";
+                    return new[] { $"127.0.0.1:{port}" };
 
-                var withPort = ips.Select(ip => $"{ip}:{port}");
-                return string.Join(", ", withPort);
+                return ips.Select(ip => $"{ip}:{port}").ToList();
+            }
+        }
+
+        /// <summary>
+        /// Compact, bounded summary of <see cref="ServerIpAddresses"/> for the toolbar.
+        /// Shows at most two endpoints, plus the count of any additional ones.
+        /// </summary>
+        public string ServerIpAddressSummary
+        {
+            get
+            {
+                var ips = ServerIpAddresses;
+                if (ips.Count == 0)
+                    return string.Empty;
+
+                if (ips.Count == 1)
+                    return ips[0];
+
+                if (ips.Count == 2)
+                    return $"{ips[0]}, {ips[1]}";
+
+                return $"{ips[0]}, {ips[1]} (+{ips.Count - 2} more)";
             }
         }
 
@@ -756,7 +786,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     return "None";
 
                 if (IsServerMode)
-                    return $"{ActiveProfile.Name} ({ServerIpAddress})";
+                    return $"{ActiveProfile.Name} ({ServerIpAddressSummary})";
 
                 return ActiveProfile.DisplayName;
             }
@@ -1210,6 +1240,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
             OnPropertyChanged(nameof(ActiveService));
             OnPropertyChanged(nameof(ServerIpAddress));
+            OnPropertyChanged(nameof(ServerIpAddresses));
+            OnPropertyChanged(nameof(ServerIpAddressSummary));
             OnPropertyChanged(nameof(ActiveProfileDisplayName));
             OnPropertyChanged(nameof(UnitId));
             OnPropertyChanged(nameof(Mode));
@@ -1575,6 +1607,8 @@ namespace ModbusForge.Avalonia.ViewModels
                 OnPropertyChanged(nameof(IsConnectionErrorVisible));
                 OnPropertyChanged(nameof(ConnectionStatusText));
                 OnPropertyChanged(nameof(ServerIpAddress));
+            OnPropertyChanged(nameof(ServerIpAddresses));
+            OnPropertyChanged(nameof(ServerIpAddressSummary));
                 OnPropertyChanged(nameof(ActiveProfileDisplayName));
                 OnPropertyChanged(nameof(DebugSummary));
                 OnPropertyChanged(nameof(CanConnect));
@@ -1609,6 +1643,8 @@ namespace ModbusForge.Avalonia.ViewModels
             if (e.PropertyName == nameof(ConnectionProfile.Port))
             {
                 OnPropertyChanged(nameof(ServerIpAddress));
+            OnPropertyChanged(nameof(ServerIpAddresses));
+            OnPropertyChanged(nameof(ServerIpAddressSummary));
                 OnPropertyChanged(nameof(ActiveProfileDisplayName));
             }
 
@@ -1706,6 +1742,8 @@ namespace ModbusForge.Avalonia.ViewModels
             OnPropertyChanged(nameof(IsConnectionErrorVisible));
             OnPropertyChanged(nameof(ConnectionStatusText));
             OnPropertyChanged(nameof(ServerIpAddress));
+            OnPropertyChanged(nameof(ServerIpAddresses));
+            OnPropertyChanged(nameof(ServerIpAddressSummary));
             OnPropertyChanged(nameof(ActiveProfileDisplayName));
             OnPropertyChanged(nameof(DebugSummary));
 
@@ -1758,6 +1796,8 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             _logger.LogInformation("Profile disconnected: {Name}", e.Name);
             OnPropertyChanged(nameof(ServerIpAddress));
+            OnPropertyChanged(nameof(ServerIpAddresses));
+            OnPropertyChanged(nameof(ServerIpAddressSummary));
             OnPropertyChanged(nameof(ActiveProfileDisplayName));
             OnPropertyChanged(nameof(IsConnected));
             OnPropertyChanged(nameof(IsDisconnected));
