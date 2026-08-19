@@ -1,5 +1,7 @@
 # ModbusForge Feature Roadmap
 
+> **Historical:** This is the pre-CalVer, pre-Avalonia feature roadmap. The project now uses [CalVer](README.md#versioning) (e.g. `2026.8.27`) and [VERSIONED_ROADMAP.md](VERSIONED_ROADMAP.md) for versioned planning.
+
 ## Current Version
 **v5.8.11** - Tag hierarchy stable, service-locator globals removed, local API hardened, MainViewModel slimmed, dependencies reviewed
 

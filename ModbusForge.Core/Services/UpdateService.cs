@@ -208,7 +208,7 @@ namespace ModbusForge.Services
         {
             if (string.IsNullOrWhiteSpace(tag)) return null;
 
-            // Tags are typically 'v5.8.12' or '5.8.12.0'
+            // Tags are CalVer-style, e.g. 'v2026.8.27' or '2026.8.27.0'
             var versionString = tag.Trim().ToLowerInvariant();
             if (versionString.StartsWith("v", StringComparison.Ordinal))
             {

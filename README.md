@@ -268,7 +268,7 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ### v6.0.4
 
-- **Fixed startup crash (wpfgfx_cor3.dll EntryPointNotFoundException)**: Removed legacy native runtime DLLs from the installer. These DLLs are part of the shared `Microsoft.WindowsDesktop.App` runtime; shipping them with the app caused a mismatch when the installed .NET runtime was patched to a newer version, leading to a startup `XamlParseException`.
+- **Fixed startup crash (native runtime DLL EntryPointNotFoundException)**: Removed legacy native runtime DLLs from the installer. These DLLs are part of the shared `Microsoft.WindowsDesktop.App` runtime; shipping them with the app caused a mismatch when the installed .NET runtime was patched to a newer version, leading to a startup `XamlParseException`.
 
 ### v6.0.3
 
