@@ -30,8 +30,8 @@ This workflow ensures commits and tags are properly pushed to GitHub.
 
 5. If creating a release, create and push tag:
    ```powershell
-   git tag -a v4.5.14 -m "v4.5.14 release"
-   git push origin v4.5.14
+   git tag -a v2026.8.27 -m "v2026.8.27 release"
+   git push origin v2026.8.27
    ```
 
 ## Common Issues

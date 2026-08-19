@@ -2,84 +2,49 @@
 
 ## Overview
 
-This test project provides comprehensive testing for ModbusForge using xUnit, Moq, and .NET 8.0.
+This test project provides unit and integration tests for ModbusForge using xUnit, Moq, and .NET 8.
 
 ## Test Structure
 
 ```
 ModbusForge.Tests/
-├── Coordinators/          # Unit tests for coordinator classes
-│   ├── ConnectionCoordinatorTests.cs
-│   ├── RegisterCoordinatorTests.cs
-│   ├── CustomEntryCoordinatorTests.cs
-│   ├── TrendCoordinatorTests.cs
-│   └── ConfigurationCoordinatorTests.cs
-├── Services/              # Unit tests for service classes
-├── Integration/           # Integration tests
-└── README.md             # This file
+├── Fakes/                 # Fake implementations of IModbusService and other dependencies
+├── Helpers/               # Test helpers (FlaUI app automation, etc.)
+├── Integration/           # End-to-end integration tests
+├── Performance/           # Polling throughput benchmarks
+├── Services/              # Unit tests for Core services
+├── SmokeTests/            # Avalonia smoke tests (excluded from default CI run)
+└── README.md              # This file
 ```
 
 ## Running Tests
 
-### Run all tests
-```bash
-dotnet test
+### Run all unit/integration/performance tests
+```powershell
+dotnet test ModbusForge.Tests/ModbusForge.Tests.csproj --filter "FullyQualifiedName!~UITests & FullyQualifiedName!~SmokeTests"
 ```
 
 ### Run with detailed output
-```bash
+```powershell
 dotnet test --verbosity normal
 ```
 
-### Run specific test class
-```bash
-dotnet test --filter "FullyQualifiedName~ConnectionCoordinatorTests"
+### Run a specific test class
+```powershell
+dotnet test --filter "FullyQualifiedName~ConnectionManagerTests"
 ```
 
 ### Generate code coverage
-```bash
+```powershell
 dotnet test --collect:"XPlat Code Coverage"
 ```
 
 ## Testing Framework
 
-- **xUnit 2.9.2** - Test framework
+- **xUnit 2.9.3** - Test framework
 - **Moq 4.20.72** - Mocking framework
 - **Microsoft.NET.Test.Sdk 17.12.0** - Test SDK
 - **coverlet.collector 6.0.2** - Code coverage
-
-## Test Categories
-
-### Unit Tests
-Test individual components in isolation using mocks for dependencies.
-
-**Example:**
-```csharp
-[Fact]
-public void CanConnect_WhenNotConnected_ReturnsTrue()
-{
-    // Arrange
-    bool isConnected = false;
-
-    // Act
-    var result = _coordinator.CanConnect(isConnected);
-
-    // Assert
-    Assert.True(result);
-}
-```
-
-### Integration Tests
-Test coordinator interactions and end-to-end workflows.
-
-**Example:**
-```csharp
-[Fact]
-public async Task CompleteReadWriteCycle_Success()
-{
-    // Test full read/write cycle with real services
-}
-```
 
 ## Mocking Strategy
 
@@ -104,26 +69,12 @@ mockService.Setup(s => s.ConnectAsync(It.IsAny<string>(), It.IsAny<int>()))
 4. **Mock only what you need** - Don't over-mock
 5. **Test behavior, not implementation** - Focus on outcomes
 
-## Coverage Goals
-
-- **Coordinators**: 80%+ coverage
-- **Services**: 70%+ coverage
-- **ViewModels**: 60%+ coverage (UI-heavy code)
-
 ## CI/CD Integration
 
 Tests run automatically on:
 - Pull requests
-- Commits to main branch
+- Commits to `master`
 - Release tags
-
-## Future Enhancements
-
-- [ ] UI automation tests (WPF UI Automation)
-- [ ] Performance tests
-- [ ] Load tests for server mode
-- [ ] End-to-end scenario tests
-- [ ] Mutation testing
 
 ## Troubleshooting
 

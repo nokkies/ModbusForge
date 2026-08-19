@@ -66,7 +66,7 @@ The release will contain:
 
 ## Release Notes
 
-The workflow auto-generates release notes from commits (`generate_release_notes: true`).
+The workflow extracts release notes from the `README.md` `## What's New` section. If you want GitHub's auto-generated notes, set `generate_release_notes: true` in `.github/workflows/release.yml`.
 
 To provide custom release notes, create `RELEASE-vYYYY.M.I.md` in the repo root
 **before** tagging. The file is for human reference only — the workflow body
