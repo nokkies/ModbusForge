@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g. 2026.8.18)'
+        description: 'Version to release (e.g. 2026.8.27)'
         required: true
         type: string
       draft:

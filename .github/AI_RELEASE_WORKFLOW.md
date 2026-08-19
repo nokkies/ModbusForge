@@ -107,7 +107,7 @@ If you need to customise the GitHub Release body, edit
 ## Troubleshooting
 
 ### Release workflow not triggered
-- Verify the tag format is `v` followed by the version, e.g. `v2026.8.16`
+- Verify the tag format is `v` followed by the version, e.g. `v2026.8.27`
 - Check: `git tag -l` to confirm local tag exists
 - Check: `git push origin vYYYY.M.I` output confirms the remote received it
 
@@ -136,18 +136,18 @@ git push origin vYYYY.M.I
 
 ---
 
-## Complete Example (v2026.8.16)
+## Complete Example (v2026.8.27)
 
 ```powershell
-# 1. Bump version in ModbusForge/ModbusForge.csproj to 2026.8.16
+# 1. Bump version in ModbusForge/ModbusForge.csproj to 2026.8.27
 # 2. Commit
 git add ModbusForge/ModbusForge.csproj
-git commit -m "v2026.8.16: Description of changes"
+git commit -m "v2026.8.27: Description of changes"
 git push origin master
 
 # 3. Tag and push — this triggers the full release pipeline
-git tag v2026.8.16
-git push origin v2026.8.16
+git tag v2026.8.27
+git push origin v2026.8.27
 
 # 4. Monitor at:
 #    https://github.com/nokkies/ModbusForge/actions
