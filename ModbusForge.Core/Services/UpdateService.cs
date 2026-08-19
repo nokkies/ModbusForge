@@ -273,7 +273,7 @@ namespace ModbusForge.Services
                                 firstInstallerUrl = url;
 
                             // Prefer an asset whose filename contains the release version to avoid
-                            // stale installers (e.g. old ModbusForge-2.0.2-setup.exe attached to v6.0.8).
+                            // stale installers (e.g. an old installer .exe attached to a newer release).
                             if (version is not null &&
                                 name.Contains(version.ToString(), StringComparison.OrdinalIgnoreCase))
                             {
