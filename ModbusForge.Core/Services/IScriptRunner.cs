@@ -30,7 +30,7 @@ public class ScriptExecutionEventArgs : EventArgs
 public interface IScriptRunner
 {
     bool IsRunning { get; }
-    
+
     event EventHandler<ScriptExecutionEventArgs>? CommandExecuted;
     event EventHandler<string>? LogMessage;
     event EventHandler? ScriptStarted;
@@ -41,7 +41,7 @@ public interface IScriptRunner
     /// completing, successfully or with errors).
     /// </summary>
     event EventHandler? ScriptCancelled;
-    
+
     Task RunScriptAsync(Script script, IModbusService modbusService, byte unitId, CancellationToken cancellationToken = default);
     void Stop();
 }

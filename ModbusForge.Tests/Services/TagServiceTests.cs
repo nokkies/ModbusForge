@@ -990,9 +990,9 @@ namespace ModbusForge.Tests.Services
             // ParentGroupId fields that move modes rewrite, so a rolled-back
             // deletion left tags silently re-parented in the next save.
             var service = CreateService(out var tagsFilePath, out _);
-            var source  = await service.CreateGroup("SourceGroup");
-            var child   = await service.CreateGroup("ChildOfSource", "SourceGroup");
-            var tag     = await service.CreateTag("T1", "SourceGroup", PlcArea.HoldingRegister, 1, TagDataType.UInt16);
+            var source = await service.CreateGroup("SourceGroup");
+            var child = await service.CreateGroup("ChildOfSource", "SourceGroup");
+            var tag = await service.CreateTag("T1", "SourceGroup", PlcArea.HoldingRegister, 1, TagDataType.UInt16);
             var childTag = await service.CreateTag("T2", "ChildOfSource", PlcArea.HoldingRegister, 2, TagDataType.UInt16);
             service.AddToWatch(tag.Id);
 
@@ -1029,9 +1029,9 @@ namespace ModbusForge.Tests.Services
             // Regression: tags living in deeper descendant groups were counted
             // as "moved" although nothing was rewritten for them.
             var service = CreateService(out _, out _);
-            var root    = await service.CreateGroup("Root");
-            var child   = await service.CreateGroup("Child", "Root");
-            var grand   = await service.CreateGroup("Grand", "Child");
+            var root = await service.CreateGroup("Root");
+            var child = await service.CreateGroup("Child", "Root");
+            var grand = await service.CreateGroup("Grand", "Child");
             await service.CreateTag("Direct1", "Root", PlcArea.HoldingRegister, 1, TagDataType.UInt16);
             await service.CreateTag("ChildTag", "Child", PlcArea.HoldingRegister, 2, TagDataType.UInt16);
             await service.CreateTag("GrandTag", "Grand", PlcArea.HoldingRegister, 3, TagDataType.UInt16);

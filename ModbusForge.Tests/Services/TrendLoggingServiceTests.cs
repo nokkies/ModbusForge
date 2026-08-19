@@ -76,7 +76,7 @@ namespace ModbusForge.Tests.Services
             // Assert
             Assert.Equal("InitialFolder", service.ExportFolder);
 
-             // Act
+            // Act
             service.UpdateSettings(10, "");
 
             // Assert
@@ -147,7 +147,7 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public void Add_ShouldNotRaiseEventIfKeyAlreadyExists()
         {
-             // Arrange
+            // Arrange
             var service = new TrendLoggingService(_mockOptions.Object);
             int callCount = 0;
             service.Added += (k, n) => callCount++;
@@ -163,7 +163,7 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public void Add_ShouldIgnoreEmptyKey()
         {
-             // Arrange
+            // Arrange
             var service = new TrendLoggingService(_mockOptions.Object);
             int callCount = 0;
             service.Added += (k, n) => callCount++;
@@ -291,7 +291,7 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public void Publish_ShouldIgnoreEmptyKey()
         {
-             // Arrange
+            // Arrange
             var service = new TrendLoggingService(_mockOptions.Object);
             service.Start();
             int callCount = 0;

@@ -652,15 +652,10 @@ public class ConnectionManagerTests : IDisposable
         _manager.SaveProfiles();
 
         // Assert
-        var profilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "ModbusForge",
-            "connection-profiles.json");
-
-        Assert.True(File.Exists(profilePath));
-        var json = File.ReadAllText(profilePath);
+        Assert.True(File.Exists(_tempProfilePath), $"Expected file not found: {_tempProfilePath}");
+        var json = File.ReadAllText(_tempProfilePath);
         Assert.Contains("Custom Profile", json);
-        Assert.False(File.Exists(profilePath + ".tmp"));
+        Assert.False(File.Exists(_tempProfilePath + ".tmp"));
     }
 
     [Fact]

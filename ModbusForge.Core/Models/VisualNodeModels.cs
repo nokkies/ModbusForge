@@ -21,31 +21,31 @@ namespace ModbusForge.Models
 
         [ObservableProperty]
         private string _id = Guid.NewGuid().ToString();
-        
+
         [ObservableProperty]
         private string _name = "";
-        
+
         [ObservableProperty]
         private PlcElementType _elementType = PlcElementType.Input;
-        
+
         [ObservableProperty]
         private double _x = 100;
-        
+
         [ObservableProperty]
         private double _y = 100;
-        
+
         [ObservableProperty]
         private double _width = 240;
-        
+
         [ObservableProperty]
         private double _height = 140;
-        
+
         [ObservableProperty]
         private bool _isSelected = false;
-        
+
         [ObservableProperty]
         private bool _currentValue = false;
-        
+
         [ObservableProperty]
         private double _currentValueDouble = 0;
 
@@ -80,31 +80,31 @@ namespace ModbusForge.Models
                 ValueChangedCallback?.Invoke(this, value);
             }
         }
-        
+
         [ObservableProperty]
         private bool _showLiveValues = false;
-        
+
         [ObservableProperty]
         private bool _isEnabled = true;
-        
+
         [ObservableProperty]
         private string? _waveform = "Ramp";
-        
+
         [ObservableProperty]
         private int _periodMs = 1000;
-        
+
         [ObservableProperty]
         private double _amplitude = 100;
-        
+
         [ObservableProperty]
         private double _offset = 0;
-        
+
         [ObservableProperty]
         private PlcAddressReference _input1Address = new PlcAddressReference();
-        
+
         [ObservableProperty]
         private PlcAddressReference _input2Address = new PlcAddressReference();
-        
+
         [ObservableProperty]
         private PlcAddressReference _outputAddress = new PlcAddressReference();
 
@@ -119,17 +119,17 @@ namespace ModbusForge.Models
         /// </summary>
         [ObservableProperty]
         private ObservableCollection<string> _outputPortNames = new(new[] { "Output" });
-        
+
         // Timer/Counter parameters
         [ObservableProperty]
         private int _timerPresetMs = 1000;
-        
+
         [ObservableProperty]
         private bool _setDominant = true;
-        
+
         [ObservableProperty]
         private int _counterPreset = 10;
-        
+
         [ObservableProperty]
         private int _compareValue = 0;
 
@@ -257,7 +257,7 @@ namespace ModbusForge.Models
             if (SecondaryOutputText != text)
                 SecondaryOutputText = text;
         }
-        
+
         public string DisplayName => NodeDescriptors.Get(ElementType).GetDisplayName(this);
 
         public string AddressDisplay
@@ -483,7 +483,7 @@ namespace ModbusForge.Models
             }
         }
     }
-    
+
     /// <summary>
     /// Connection between two visual nodes
     /// </summary>
@@ -491,34 +491,34 @@ namespace ModbusForge.Models
     {
         [ObservableProperty]
         private string _id = Guid.NewGuid().ToString();
-        
+
         [ObservableProperty]
         private string _sourceNodeId = "";
-        
+
         [ObservableProperty]
         private string _targetNodeId = "";
-        
+
         [ObservableProperty]
         private string _sourceConnector = "Output"; // Always output for now
-        
+
         [ObservableProperty]
         private string _targetConnector = "Input1"; // Input1 or Input2
-        
+
         [ObservableProperty]
         private double _startX = 0;
-        
+
         [ObservableProperty]
         private double _startY = 0;
-        
+
         [ObservableProperty]
         private double _endX = 0;
-        
+
         [ObservableProperty]
         private double _endY = 0;
-        
+
         [ObservableProperty]
         private bool _isConnected = true;
-        
+
         public NodeConnection(string sourceNodeId, string targetNodeId, string targetConnector = "Input1")
         {
             SourceNodeId = sourceNodeId;
@@ -526,7 +526,7 @@ namespace ModbusForge.Models
             TargetConnector = targetConnector;
         }
     }
-    
+
     /// <summary>
     /// Configuration for a connector (input/output) that links to a Modbus address
     /// </summary>
@@ -534,28 +534,28 @@ namespace ModbusForge.Models
     {
         [ObservableProperty]
         private string _nodeId = "";
-        
+
         [ObservableProperty]
         private string _connectorType = ""; // "Input1", "Input2", "Output"
-        
+
         [ObservableProperty]
         private bool _isConfigured = false;
-        
+
         [ObservableProperty]
         private PlcArea _area = PlcArea.Coil;
-        
+
         [ObservableProperty]
         private int _address = 1;
-        
+
         [ObservableProperty]
         private bool _not = false;
-        
+
         [ObservableProperty]
         private string _tag = ""; // User-friendly tag name
-        
+
         public string DisplayAddress => $"{Area}:{Address}{(Not ? " (NOT)" : "")}";
     }
-    
+
     /// <summary>
     /// Visual node editor configuration
     /// </summary>
@@ -563,10 +563,10 @@ namespace ModbusForge.Models
     {
         [ObservableProperty]
         private double _canvasWidth = 2000;
-        
+
         [ObservableProperty]
         private double _canvasHeight = 2000;
-        
+
         [ObservableProperty]
         private double _zoomLevel = 1.0;
 
@@ -579,22 +579,22 @@ namespace ModbusForge.Models
         [ObservableProperty]
         private int _scanIntervalMs = 100;
 
-        
+
         [ObservableProperty]
         private bool _showGrid = true;
-        
+
         [ObservableProperty]
         private bool _snapToGrid = true;
-        
+
         [ObservableProperty]
         private double _gridSize = 20;
-        
+
         [ObservableProperty]
         private ObservableCollection<VisualNode> _nodes = new ObservableCollection<VisualNode>();
-        
+
         [ObservableProperty]
         private ObservableCollection<NodeConnection> _connections = new ObservableCollection<NodeConnection>();
-        
+
         [ObservableProperty]
         private ObservableCollection<ConnectorConfiguration> _connectorConfigs = new ObservableCollection<ConnectorConfiguration>();
     }

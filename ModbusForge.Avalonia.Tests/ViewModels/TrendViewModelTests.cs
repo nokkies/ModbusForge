@@ -470,7 +470,10 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             var vm = CreateViewModelWithPenServices(out _, out var subscriptions, out _);
             subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
             {
-                Key = "HR Trend 9", Name = "HR Trend 9", Area = "HoldingRegister", Address = 9
+                Key = "HR Trend 9",
+                Name = "HR Trend 9",
+                Area = "HoldingRegister",
+                Address = 9
             });
 
             vm.RefreshPens();
@@ -525,7 +528,10 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             logger.Start();
             subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
             {
-                Key = "HR Trend 42", Name = "HR Trend 42", Area = "HoldingRegister", Address = 42
+                Key = "HR Trend 42",
+                Name = "HR Trend 42",
+                Area = "HoldingRegister",
+                Address = 42
             });
 
             vm.SetPenStatus("HR Trend 42", failing: true, "timeout");
@@ -549,7 +555,10 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             logger.Publish("HR Trend 5", 1.0, DateTime.UtcNow);
             subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
             {
-                Key = "HR Trend 5", Name = "HR Trend 5", Area = "HoldingRegister", Address = 5
+                Key = "HR Trend 5",
+                Name = "HR Trend 5",
+                Area = "HoldingRegister",
+                Address = 5
             });
 
             var item = Assert.Single(vm.SeriesItems);
@@ -578,7 +587,10 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             logger.Publish("HR Trend 5", 1.0, DateTime.UtcNow);
             subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
             {
-                Key = "HR Trend 5", Name = "HR Trend 5", Area = "HoldingRegister", Address = 5
+                Key = "HR Trend 5",
+                Name = "HR Trend 5",
+                Area = "HoldingRegister",
+                Address = 5
             });
 
             var item = Assert.Single(vm.SeriesItems);
@@ -599,12 +611,18 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             logger.Publish("HR Trend 5", 1.0, DateTime.UtcNow);
             subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
             {
-                Key = "HR Trend 5", Name = "HR Trend 5", Area = "HoldingRegister", Address = 5
+                Key = "HR Trend 5",
+                Name = "HR Trend 5",
+                Area = "HoldingRegister",
+                Address = 5
             });
             // A second pen already owns the target name.
             subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
             {
-                Key = "IR Trend 9", Name = "Taken", Area = "InputRegister", Address = 9
+                Key = "IR Trend 9",
+                Name = "Taken",
+                Area = "InputRegister",
+                Address = 9
             });
 
             var item = vm.SeriesItems.Single(s => s.Key == "HR Trend 5");
@@ -625,7 +643,10 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             var vm = CreateViewModelWithPenServices(out var logger, out var subscriptions, out _);
             subscriptions.PensList.Add(new ModbusForge.Models.TrendPen
             {
-                Key = "HR Trend 8", Name = "Flow", Area = "HoldingRegister", Address = 8
+                Key = "HR Trend 8",
+                Name = "Flow",
+                Area = "HoldingRegister",
+                Address = 8
             });
 
             vm.RefreshPens();

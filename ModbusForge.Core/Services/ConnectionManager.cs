@@ -15,11 +15,12 @@ namespace ModbusForge.Services;
 
 public class ConnectionManager : IConnectionManager
 {
-    private static readonly string ProfilesFilePath = Path.Combine(
+    private static readonly string DefaultProfilesFilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "ModbusForge",
         "connection-profiles.json");
 
+    private readonly string _profilesFilePath;
     private readonly ILogger<ConnectionManager> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IValidationService? _validationService;
@@ -34,23 +35,23 @@ public class ConnectionManager : IConnectionManager
     public ConnectionProfile? ActiveProfile => _activeProfile;
 
     public IModbusService? ActiveService => _activeProfile != null ? GetServiceForProfile(_activeProfile) : null;
-
     public event EventHandler<ConnectionProfile?>? ActiveProfileChanged;
     public event EventHandler<ConnectionProfile>? ProfileConnected;
     public event EventHandler<ConnectionProfile>? ProfileDisconnected;
 
-    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService = null)
-        : this(logger, loggerFactory, validationService, null, null, null)
+    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService = null, string? profilesFilePath = null)
+        : this(logger, loggerFactory, validationService, null, null, null, profilesFilePath)
     {
     }
 
-    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService, ICorrelationContext? correlationContext, IModbusAddressValidator? addressValidator)
-        : this(logger, loggerFactory, validationService, correlationContext, addressValidator, null)
+    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService, ICorrelationContext? correlationContext, IModbusAddressValidator? addressValidator, string? profilesFilePath = null)
+        : this(logger, loggerFactory, validationService, correlationContext, addressValidator, null, profilesFilePath)
     {
     }
 
-    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService, ICorrelationContext? correlationContext, IModbusAddressValidator? addressValidator, IDispatcher? uiDispatcher)
+    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService, ICorrelationContext? correlationContext, IModbusAddressValidator? addressValidator, IDispatcher? uiDispatcher, string? profilesFilePath = null)
     {
+        _profilesFilePath = profilesFilePath ?? DefaultProfilesFilePath;
         _logger = logger;
         _loggerFactory = loggerFactory;
         _validationService = validationService;
@@ -376,7 +377,7 @@ public class ConnectionManager : IConnectionManager
     {
         try
         {
-            var directory = Path.GetDirectoryName(ProfilesFilePath);
+            var directory = Path.GetDirectoryName(_profilesFilePath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
@@ -405,7 +406,7 @@ public class ConnectionManager : IConnectionManager
             };
 
             var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-            WriteAllTextAtomic(ProfilesFilePath, json);
+            WriteAllTextAtomic(_profilesFilePath, json);
             _logger.LogInformation("Saved {Count} connection profiles", Profiles.Count);
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
@@ -439,12 +440,12 @@ public class ConnectionManager : IConnectionManager
     {
         try
         {
-            if (!File.Exists(ProfilesFilePath))
+            if (!File.Exists(_profilesFilePath))
             {
                 return;
             }
 
-            var json = File.ReadAllText(ProfilesFilePath);
+            var json = File.ReadAllText(_profilesFilePath);
             var data = JsonSerializer.Deserialize<ProfilesData>(json, _profileJsonOptions);
 
             if (data?.Profiles != null)
