@@ -91,7 +91,7 @@ public partial class ScriptCommand : ObservableObject
                 ScriptCommandType.ReadDeviceIdentification => $"Read Device Id Object {ObjectId}",
                 ScriptCommandType.Delay => $"Delay {DelayMs}ms",
                 ScriptCommandType.Log => $"Log: {Message}",
-                ScriptCommandType.Loop => $"Loop {LoopCount} times",
+                ScriptCommandType.Loop => $"Loop: repeat the rest of the script {LoopCount} time(s)",
                 _ => "Unknown"
             };
         }

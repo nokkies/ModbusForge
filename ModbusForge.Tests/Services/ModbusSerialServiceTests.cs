@@ -1,7 +1,10 @@
 using System;
+using System.IO;
 using System.IO.Ports;
+using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using NModbus;
 using ModbusForge.Models;
 using ModbusForge.Services;
 using Moq;
@@ -11,6 +14,26 @@ namespace ModbusForge.Tests.Services
 {
     public class ModbusSerialServiceTests
     {
+        /// <summary>
+        /// Subclass that reports as connected without a real port, so the
+        /// write path (and its error handling) can be exercised with a mocked master.
+        /// </summary>
+        private sealed class TestableSerialService : ModbusSerialService
+        {
+            public TestableSerialService(ILogger<ModbusSerialService> logger)
+                : base(logger, null, null, null, null, TransportType.Rtu)
+            {
+            }
+
+            public override bool IsConnected => true;
+        }
+
+        private static void InjectClient(ModbusSerialService service, IModbusMaster master)
+        {
+            var field = typeof(ModbusSerialService).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            field.SetValue(service, master);
+        }
+
         [Fact]
         public void Constructor_InvalidTransport_Throws()
         {
@@ -65,6 +88,114 @@ namespace ModbusForge.Tests.Services
 
             Assert.False(result);
             Assert.False(service.IsConnected);
+        }
+
+        [Fact]
+        public async Task WriteSingleRegisterAsync_SlaveException_KeepsConnection()
+        {
+            var loggerMock = new Mock<ILogger<ModbusSerialService>>();
+            var master = new Mock<IModbusMaster>();
+            master
+                .Setup(m => m.WriteSingleRegister(It.IsAny<byte>(), It.IsAny<ushort>(), It.IsAny<ushort>()))
+                .Throws(new SlaveException("Slave returned exception code 2 (ILLEGAL DATA ADDRESS)"));
+
+            var service = new TestableSerialService(loggerMock.Object);
+            InjectClient(service, master.Object);
+
+            bool connectionLost = false;
+            service.ConnectionLost += (_, _) => connectionLost = true;
+
+            await service.WriteSingleRegisterAsync(1, 100, 42);
+
+            // A slave exception response must not be treated as a dead line:
+            Assert.False(connectionLost);
+            loggerMock.Verify(
+                l => l.Log(
+                    LogLevel.Error,
+                    It.IsAny<EventId>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Never,
+                "Slave exception must not be logged as an error");
+            loggerMock.Verify(
+                l => l.Log(
+                    LogLevel.Warning,
+                    It.IsAny<EventId>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Once,
+                "Slave exception must be logged as a warning");
+        }
+
+        [Fact]
+        public async Task WriteSingleCoilAsync_SlaveException_KeepsConnection()
+        {
+            var loggerMock = new Mock<ILogger<ModbusSerialService>>();
+            var master = new Mock<IModbusMaster>();
+            master
+                .Setup(m => m.WriteSingleCoil(It.IsAny<byte>(), It.IsAny<ushort>(), It.IsAny<bool>()))
+                .Throws(new SlaveException("Slave returned exception code 4 (SLAVE DEVICE FAILURE)"));
+
+            var service = new TestableSerialService(loggerMock.Object);
+            InjectClient(service, master.Object);
+
+            bool connectionLost = false;
+            service.ConnectionLost += (_, _) => connectionLost = true;
+
+            await service.WriteSingleCoilAsync(1, 100, true);
+
+            Assert.False(connectionLost);
+            loggerMock.Verify(
+                l => l.Log(
+                    LogLevel.Error,
+                    It.IsAny<EventId>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Never);
+        }
+
+        [Fact]
+        public async Task WriteSingleRegisterAsync_TransportError_StillDisconnects()
+        {
+            var loggerMock = new Mock<ILogger<ModbusSerialService>>();
+            var master = new Mock<IModbusMaster>();
+            master
+                .Setup(m => m.WriteSingleRegister(It.IsAny<byte>(), It.IsAny<ushort>(), It.IsAny<ushort>()))
+                .Throws(new IOException("port disconnected"));
+
+            var service = new TestableSerialService(loggerMock.Object);
+            InjectClient(service, master.Object);
+
+            bool connectionLost = false;
+            service.ConnectionLost += (_, _) => connectionLost = true;
+
+            await service.WriteSingleRegisterAsync(1, 100, 42);
+
+            // A genuine transport failure must still tear the connection down.
+            Assert.True(connectionLost);
+        }
+
+        [Fact]
+        public async Task WriteSingleCoilAsync_TransportError_StillDisconnects()
+        {
+            var loggerMock = new Mock<ILogger<ModbusSerialService>>();
+            var master = new Mock<IModbusMaster>();
+            master
+                .Setup(m => m.WriteSingleCoil(It.IsAny<byte>(), It.IsAny<ushort>(), It.IsAny<bool>()))
+                .Throws(new TimeoutException("no response"));
+
+            var service = new TestableSerialService(loggerMock.Object);
+            InjectClient(service, master.Object);
+
+            bool connectionLost = false;
+            service.ConnectionLost += (_, _) => connectionLost = true;
+
+            await service.WriteSingleCoilAsync(1, 100, true);
+
+            Assert.True(connectionLost);
         }
 
         [Fact]

@@ -27,6 +27,8 @@ namespace ModbusForge.Services
         private int _lastPort;
 
         private const int DisposeLockTimeoutMs = 5000;
+
+        private static readonly TimeSpan DisconnectLockTimeout = TimeSpan.FromSeconds(10);
         private const byte DeviceIdMoreFollows = 0xFF;
         private const int MaxDeviceIdTransactions = 16;
 
@@ -96,6 +98,8 @@ namespace ModbusForge.Services
 
         public virtual string BoundEndpoint => string.Empty;
 
+        public event EventHandler? ConnectionLost;
+
         public ModbusFrameLogger FrameLogger => _frameLogger;
 
         public virtual bool IsConnected
@@ -124,21 +128,19 @@ namespace ModbusForge.Services
                 _lastIpAddress = ipAddress;
                 _lastPort = port;
 
+                // A reconnect replaces the previous transport. Dispose it first
+                // (we hold the I/O lock, so nothing can be using it) — otherwise
+                // a double-connect leaks the old socket and master.
+                DisposeTransport();
+
                 var tcpClient = new TcpClient();
-                IModbusMaster? client = null;
                 try
                 {
                     await tcpClient.ConnectAsync(ipAddress, port, cancellationToken).ConfigureAwait(false);
+                    _tcpClient = tcpClient;
                     var streamResource = new LoggingStreamResource(ModbusStreamAdapterFactory.CreateTcpAdapter(tcpClient), _frameLogger);
                     var transport = _factory.CreateIpTransport(streamResource);
-                    client = new ModbusIpMaster(transport);
-
-                    // Swap in the new connection and dispose any previous one atomically.
-                    var oldClient = Interlocked.Exchange(ref _client, client);
-                    var oldTcpClient = Interlocked.Exchange(ref _tcpClient, tcpClient);
-                    (oldClient as IDisposable)?.Dispose();
-                    oldTcpClient?.Close();
-
+                    _client = new ModbusIpMaster(transport);
                     var message = $"Connected to Modbus server at {ipAddress}:{port}";
                     _logger.LogInformation(message);
                     _consoleLoggerService?.Log(message);
@@ -149,8 +151,10 @@ namespace ModbusForge.Services
                     var message = $"Failed to connect to Modbus server at {ipAddress}:{port}: {ex.Message}";
                     _logger.LogError(ex, message);
                     _consoleLoggerService?.Log(message);
-                    (client as IDisposable)?.Dispose();
+                    (_client as IDisposable)?.Dispose();
+                    _client = null;
                     tcpClient.Dispose();
+                    _tcpClient = null;
                     return false;
                 }
             }
@@ -162,22 +166,37 @@ namespace ModbusForge.Services
 
         public virtual async Task DisconnectAsync()
         {
-            await _ioLock.WaitAsync().ConfigureAwait(false);
+            // Bound the wait: a request stuck on a half-open socket must not
+            // block the disconnect forever. If we time out, tear the transport
+            // down anyway — the in-flight request will fail on the closed socket
+            // and release the lock on its own.
+            var acquired = await _ioLock.WaitAsync(DisconnectLockTimeout).ConfigureAwait(false);
+            if (!acquired)
+            {
+                _logger.LogWarning("Timed out waiting for an in-flight request before disconnect; closing the transport anyway.");
+                try
+                {
+                    (_client as IDisposable)?.Dispose();
+                    _client = null;
+                    _tcpClient?.Close();
+                    _tcpClient = null;
+                }
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                {
+                    _logger.LogError(ex, "Error closing the transport after a disconnect timeout.");
+                }
+            }
             try
             {
-                if (IsConnected)
+                if (acquired && IsConnected)
                 {
                     var message = $"Disconnecting from Modbus server at {_lastIpAddress}:{_lastPort}";
                     _logger.LogInformation(message);
                     _consoleLoggerService?.Log(message);
-
-                    // Null out fields before disposing so IsConnected doesn't observe a
-                    // client that is mid-dispose.
-                    var client = Interlocked.Exchange(ref _client, null);
-                    var tcpClient = Interlocked.Exchange(ref _tcpClient, null);
-                    (client as IDisposable)?.Dispose();
-                    tcpClient?.Close();
-
+                    (_client as IDisposable)?.Dispose();
+                    _client = null;
+                    _tcpClient?.Close();
+                    _tcpClient = null;
                     var disconnectMessage = "Successfully disconnected from Modbus server";
                     _logger.LogInformation(disconnectMessage);
                     _consoleLoggerService?.Log(disconnectMessage);
@@ -190,7 +209,10 @@ namespace ModbusForge.Services
             }
             finally
             {
-                _ioLock.Release();
+                if (acquired)
+                {
+                    _ioLock.Release();
+                }
             }
         }
 
@@ -446,8 +468,18 @@ namespace ModbusForge.Services
                     try
                     {
                         _logger.LogDebug($"{debugLogMessage} (Unit ID: {unitId})");
+                        // NModbus uses 0-based protocol addresses, convert from 1-based UI address
+                        ushort protocolAddress = (ushort)(address > 0 ? address - 1 : 0);
+
                         if (_client != null)
-                            writeAction(_client, ToProtocolAddress(address));
+                            writeAction(_client, protocolAddress);
+                    }
+                    catch (NModbus.SlaveException ex)
+                    {
+                        // A slave exception response is a valid Modbus answer (e.g. the
+                        // device rejected the address), not a dead line - keep the
+                        // connection, as ExecuteMasterAsync and the chunked executor do.
+                        _logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
                     }
                     catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
@@ -462,21 +494,52 @@ namespace ModbusForge.Services
             }
         }
 
+        /// <summary>
+        /// Disposes the current master/transport without touching the I/O lock
+        /// (callers must hold it). Null-safe and exception-safe.
+        /// </summary>
+        private void DisposeTransport()
+        {
+            try
+            {
+                (_client as IDisposable)?.Dispose();
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogError(ex, "Error disposing the previous transport during reconnect.");
+            }
+            _client = null;
+
+            try
+            {
+                _tcpClient?.Close();
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogError(ex, "Error closing the previous socket during reconnect.");
+            }
+            _tcpClient = null;
+        }
+
         private void HandleConnectionLoss()
         {
             _logger.LogInformation("Client is disconnected. Cleaning up connection.");
+            bool wasConnected = _client != null;
             try
             {
-                // Null fields before disposal so concurrent IsConnected checks don't
-                // observe a client mid-dispose.
-                var client = Interlocked.Exchange(ref _client, null);
-                var tcpClient = Interlocked.Exchange(ref _tcpClient, null);
-                (client as IDisposable)?.Dispose();
-                tcpClient?.Close();
+                (_client as IDisposable)?.Dispose();
+                _client = null;
+                _tcpClient?.Close();
+                _tcpClient = null;
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
                 _logger.LogError(ex, "Error during explicit disconnect after connection loss.");
+            }
+
+            if (wasConnected)
+            {
+                ConnectionLost?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -501,10 +564,8 @@ namespace ModbusForge.Services
                 await _ioLock.WaitAsync().ConfigureAwait(false);
                 try
                 {
-                    var client = Interlocked.Exchange(ref _client, null);
-                    var tcpClient = Interlocked.Exchange(ref _tcpClient, null);
-                    (client as IDisposable)?.Dispose();
-                    tcpClient?.Close();
+                    (_client as IDisposable)?.Dispose();
+                    _tcpClient?.Close();
                 }
                 finally
                 {
@@ -522,12 +583,12 @@ namespace ModbusForge.Services
 
             if (disposing)
             {
-                // Null fields and capture the old connection before disposal so
-                // concurrent IsConnected checks don't observe a client mid-dispose.
-                var client = Interlocked.Exchange(ref _client, null);
-                var tcpClient = Interlocked.Exchange(ref _tcpClient, null);
-                (client as IDisposable)?.Dispose();
-                tcpClient?.Close();
+                // Dispose the underlying connection first so any in-flight I/O is
+                // aborted, allowing the operation holding the lock to release it.
+                (_client as IDisposable)?.Dispose();
+                _client = null;
+                _tcpClient?.Close();
+                _tcpClient = null;
 
                 // Acquire the lock on the calling thread (bounded wait) before
                 // disposing the semaphore. Disposing while still holding it means
@@ -563,7 +624,7 @@ namespace ModbusForge.Services
             try
             {
                 _logger.LogInformation($"Diagnostics: Testing TCP connection to {ipAddress}:{port}");
-
+                
                 // Use async connect with timeout
                 var connectTask = testClient.ConnectAsync(ipAddress, port);
                 if (await Task.WhenAny(connectTask, Task.Delay(5000)) != connectTask)
@@ -608,40 +669,40 @@ namespace ModbusForge.Services
                     master.Transport.WriteTimeout = 5000;
 
                     // Try to read a single holding register - this is the most basic Modbus operation
-                    try
+                try
+                {
+                    var registers = master.ReadHoldingRegisters(unitId, 0, 1);
+                    result.ModbusLatencyMs = (int)sw.ElapsedMilliseconds;
+                    result.ModbusResponding = true;
+                    _logger.LogInformation($"Diagnostics: Modbus responded in {result.ModbusLatencyMs}ms, read value: {registers[0]}");
+                }
+                catch (NModbus.SlaveException slaveEx)
+                {
+                    // Slave responded with an exception - this means Modbus IS working, just the request was invalid
+                    result.ModbusLatencyMs = (int)sw.ElapsedMilliseconds;
+                    result.ModbusResponding = true; // Device responded, even if with error
+                    result.ModbusError = $"Device responded with exception code {slaveEx.SlaveExceptionCode}: {GetModbusExceptionDescription(slaveEx.SlaveExceptionCode)}";
+                    _logger.LogInformation($"Diagnostics: Modbus device responded with exception - {result.ModbusError}");
+                }
+                catch (IOException ioEx)
+                {
+                    result.ModbusResponding = false;
+                    if (ioEx.InnerException is SocketException innerSock)
                     {
-                        var registers = master.ReadHoldingRegisters(unitId, 0, 1);
-                        result.ModbusLatencyMs = (int)sw.ElapsedMilliseconds;
-                        result.ModbusResponding = true;
-                        _logger.LogInformation($"Diagnostics: Modbus responded in {result.ModbusLatencyMs}ms, read value: {registers[0]}");
+                        result.ModbusError = $"Connection reset by device - {GetSocketErrorDescription(innerSock.SocketErrorCode)}. Device may have rejected the Modbus request or closed the connection.";
                     }
-                    catch (NModbus.SlaveException slaveEx)
+                    else
                     {
-                        // Slave responded with an exception - this means Modbus IS working, just the request was invalid
-                        result.ModbusLatencyMs = (int)sw.ElapsedMilliseconds;
-                        result.ModbusResponding = true; // Device responded, even if with error
-                        result.ModbusError = $"Device responded with exception code {slaveEx.SlaveExceptionCode}: {GetModbusExceptionDescription(slaveEx.SlaveExceptionCode)}";
-                        _logger.LogInformation($"Diagnostics: Modbus device responded with exception - {result.ModbusError}");
+                        result.ModbusError = $"I/O error: {ioEx.Message}. Device may have closed the connection.";
                     }
-                    catch (IOException ioEx)
-                    {
-                        result.ModbusResponding = false;
-                        if (ioEx.InnerException is SocketException innerSock)
-                        {
-                            result.ModbusError = $"Connection reset by device - {GetSocketErrorDescription(innerSock.SocketErrorCode)}. Device may have rejected the Modbus request or closed the connection.";
-                        }
-                        else
-                        {
-                            result.ModbusError = $"I/O error: {ioEx.Message}. Device may have closed the connection.";
-                        }
-                        _logger.LogWarning($"Diagnostics: Modbus I/O failed - {result.ModbusError}");
-                    }
-                    catch (TimeoutException)
-                    {
-                        result.ModbusResponding = false;
-                        result.ModbusError = "Modbus timeout - device accepted TCP but did not respond to Modbus request. Check Unit ID or device may not support Modbus TCP.";
-                        _logger.LogWarning($"Diagnostics: Modbus timeout");
-                    }
+                    _logger.LogWarning($"Diagnostics: Modbus I/O failed - {result.ModbusError}");
+                }
+                catch (TimeoutException)
+                {
+                    result.ModbusResponding = false;
+                    result.ModbusError = "Modbus timeout - device accepted TCP but did not respond to Modbus request. Check Unit ID or device may not support Modbus TCP.";
+                    _logger.LogWarning($"Diagnostics: Modbus timeout");
+                }
                 }
                 finally
                 {

@@ -780,6 +780,273 @@ namespace ModbusForge.Tests.Services
 
         #endregion
 
+        #region Bit tags (packed status words)
+
+        [Fact]
+        public async Task UpdateTagValue_UpdatesAllBitTagsAtAnAddress_WithExtractedBits()
+        {
+            // A vendor map can declare several tags on one status word, one per
+            // bit. Every bit tag must be updated, each with its own bit - not
+            // the whole word, and not just the first tag at the address.
+            var service = CreateService(out _, out _);
+            var tagA = await service.CreateTag("Status_Bit0", "Default", PlcArea.HoldingRegister, 120, TagDataType.Bool);
+            var tagB = await service.CreateTag("Status_Bit3", "Default", PlcArea.HoldingRegister, 120, TagDataType.Bool);
+            tagA.Bit = 0;
+            tagB.Bit = 3;
+
+            // 0b1001: bit 0 set, bit 3 also set - use a value where they differ
+            // so a tag receiving the wrong bit (or the whole word) fails loudly.
+            service.UpdateTagValue(PlcArea.HoldingRegister, 120, (ushort)0b0001);
+
+            Assert.Equal(true, tagA.CurrentValue);  // bit 0 set
+            Assert.Equal(false, tagB.CurrentValue); // bit 3 clear
+        }
+
+        [Fact]
+        public async Task UpdateTagValue_MixedBitAndWholeRegisterTags_BothUpdatedCorrectly()
+        {
+            var service = CreateService(out _, out _);
+            var whole = await service.CreateTag("Status_Word", "Default", PlcArea.HoldingRegister, 120, TagDataType.UInt16);
+            var bit = await service.CreateTag("Status_Bit5", "Default", PlcArea.HoldingRegister, 120, TagDataType.Bool);
+            bit.Bit = 5;
+
+            service.UpdateTagValue(PlcArea.HoldingRegister, 120, (ushort)0b00100000);
+
+            Assert.Equal((ushort)0b00100000, whole.CurrentValue);
+            Assert.Equal(true, bit.CurrentValue);
+        }
+
+        [Fact]
+        public async Task UpdateTagValue_BitTag_HasItsOwnWatchEntryUpdated()
+        {
+            var service = CreateService(out _, out _);
+            var tagB = await service.CreateTag("Status_Bit3", "Default", PlcArea.HoldingRegister, 120, TagDataType.Bool);
+            tagB.Bit = 3;
+            service.AddToWatch(tagB.Id);
+
+            // 0b0100: bit 2 set, bit 3 clear - a different bit being on must not
+            // flip this tag.
+            service.UpdateTagValue(PlcArea.HoldingRegister, 120, (ushort)0b0100);
+
+            var entry = Assert.Single(service.WatchEntries);
+            Assert.Equal(false, entry.CurrentValue); // bit 3 clear
+            Assert.False(entry.IsStale);
+        }
+
+        [Fact]
+        public async Task UpdateRegisterValues_FloatTag_CombinesBothWords()
+        {
+            var service = CreateService(out _, out _);
+            var tag = await service.CreateTag("Level", "Default", PlcArea.HoldingRegister, 5, TagDataType.Float);
+
+            // 12.5f == 0x41480000 -> high word 0x4148, low word 0x0000.
+            service.UpdateRegisterValues(PlcArea.HoldingRegister, 5, new ushort[] { 0x4148, 0x0000 });
+
+            Assert.Equal(12.5f, tag.CurrentValue);
+        }
+
+        [Fact]
+        public async Task UpdateRegisterValues_DoubleTag_CombinesAllFourWords()
+        {
+            var service = CreateService(out _, out _);
+            var tag = await service.CreateTag("Total", "Default", PlcArea.HoldingRegister, 10, TagDataType.Double);
+
+            // 1.0 == 0x3FF0000000000000.
+            service.UpdateRegisterValues(PlcArea.HoldingRegister, 10, new ushort[] { 0x3FF0, 0, 0, 0 });
+
+            Assert.Equal(1.0, tag.CurrentValue);
+        }
+
+        [Fact]
+        public async Task UpdateRegisterValues_Int32Tag_CombinesTwoWords()
+        {
+            var service = CreateService(out _, out _);
+            var tag = await service.CreateTag("Counter", "Default", PlcArea.HoldingRegister, 7, TagDataType.Int32);
+
+            // 0xFFFFFFFF == -1.
+            service.UpdateRegisterValues(PlcArea.HoldingRegister, 7, new ushort[] { 0xFFFF, 0xFFFF });
+
+            Assert.Equal(-1, tag.CurrentValue);
+        }
+
+        [Fact]
+        public async Task UpdateRegisterValues_MultiWordTagAtBatchEnd_LeavesTagUnchanged()
+        {
+            var service = CreateService(out _, out _);
+            var tag = await service.CreateTag("Level", "Default", PlcArea.HoldingRegister, 8, TagDataType.Float);
+
+            // The tag needs words at 8 and 9, but the batch only covers 7 and 8.
+            service.UpdateRegisterValues(PlcArea.HoldingRegister, 7, new ushort[] { 0x0001, 0x0002 });
+
+            // A half-width payload must not be converted into a bogus float.
+            Assert.Null(tag.CurrentValue);
+            Assert.Equal(DateTime.MinValue, tag.LastUpdated);
+        }
+
+        [Fact]
+        public async Task UpdateRegisterValues_SingleWordAndBitTags_UpdatedPointByPoint()
+        {
+            var service = CreateService(out _, out _);
+            var word = await service.CreateTag("Word", "Default", PlcArea.HoldingRegister, 120, TagDataType.UInt16);
+            var bit = await service.CreateTag("Status_Bit0", "Default", PlcArea.HoldingRegister, 120, TagDataType.Bool);
+            bit.Bit = 0;
+
+            service.UpdateRegisterValues(PlcArea.HoldingRegister, 120, new ushort[] { 0b0001 });
+
+            Assert.Equal((ushort)1, word.CurrentValue);
+            Assert.Equal(true, bit.CurrentValue);
+        }
+
+        [Fact]
+        public async Task UpdateRegisterValues_MultiWordTagWithWatchEntry_UpdatesEntry()
+        {
+            var service = CreateService(out _, out _);
+            var tag = await service.CreateTag("Level", "Default", PlcArea.HoldingRegister, 5, TagDataType.Float);
+            service.AddToWatch(tag.Id);
+
+            service.UpdateRegisterValues(PlcArea.HoldingRegister, 5, new ushort[] { 0x4148, 0x0000 });
+
+            var entry = Assert.Single(service.WatchEntries);
+            Assert.Equal(12.5f, entry.CurrentValue);
+            Assert.False(entry.IsStale);
+        }
+
+        [Fact]
+        public void ToTag_CarriesTheBitIndexThrough()
+        {
+            var entry = new RegisterTemplateEntry
+            {
+                TagName = "Fault",
+                RegisterType = PlcArea.HoldingRegister,
+                Address = 10,
+                Bit = 3,
+            };
+
+            var tag = entry.ToTag();
+
+            Assert.Equal(3, tag.Bit);
+            Assert.Equal(TagDataType.Bool, tag.DataType);
+        }
+
+        #endregion
+
+        [Fact]
+        public async Task SaveAndLoad_RoundTripsTheBitField()
+        {
+            var service = CreateService(out var tagsFilePath, out _);
+            var tag = await service.CreateTag("Fault", "Default", PlcArea.HoldingRegister, 120, TagDataType.Bool);
+            tag.Bit = 3;
+            await service.SaveTagsAsync();
+
+            var service2 = CreateService(out _, out _);
+            TagsFilePathField.SetValue(service2, tagsFilePath);
+            await service2.InitializeAsync();
+
+            var loaded = Assert.Single(service2.Tags);
+            Assert.Equal(3, loaded.Bit);
+        }
+
+        #region Group creation guards
+
+        [Fact]
+        public async Task CreateGroup_DuplicateNameAnywhereInHierarchy_Throws()
+        {
+            var service = CreateService(out _, out _);
+            await service.CreateGroup("Pumps");
+            await service.CreateGroup("Pumps.Sub", "Pumps");
+
+            var ex = await Assert.ThrowsAsync<ArgumentException>(
+                () => service.CreateGroup("pumps.sub")); // case-insensitive duplicate
+
+            Assert.Contains("already exists", ex.Message, StringComparison.OrdinalIgnoreCase);
+            // No orphan group was created (Default + Pumps + Pumps.Sub)
+            Assert.Equal(3, service.GetAllGroupsFlat().Count());
+        }
+
+        [Fact]
+        public async Task CreateGroup_WithMissingParent_CreatesFallbackParent()
+        {
+            // Same policy as the v1 migration: a referenced-but-missing parent is
+            // created so the hierarchy intent survives (no dangling name).
+            var service = CreateService(out _, out _);
+
+            var child = await service.CreateGroup("Compressors", "Plants");
+
+            Assert.NotNull(child.ParentGroupId);
+            var parent = service.FindGroupByName("Plants");
+            Assert.NotNull(parent);
+            Assert.Equal(parent.Id, child.ParentGroupId);
+            Assert.Contains(child, parent.SubGroups);
+        }
+
+        #endregion
+
+        #region Rollback restores reference fields
+
+        [Fact]
+        public async Task DeleteGroup_MoveSaveFailure_RollsBackGroupReferences()
+        {
+            // Regression: rollback restored collections but not the GroupId /
+            // ParentGroupId fields that move modes rewrite, so a rolled-back
+            // deletion left tags silently re-parented in the next save.
+            var service = CreateService(out var tagsFilePath, out _);
+            var source  = await service.CreateGroup("SourceGroup");
+            var child   = await service.CreateGroup("ChildOfSource", "SourceGroup");
+            var tag     = await service.CreateTag("T1", "SourceGroup", PlcArea.HoldingRegister, 1, TagDataType.UInt16);
+            var childTag = await service.CreateTag("T2", "ChildOfSource", PlcArea.HoldingRegister, 2, TagDataType.UInt16);
+            service.AddToWatch(tag.Id);
+
+            // Sabotage the save path
+            var readOnlyDir = Path.Combine(Path.GetTempPath(), "RO_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(readOnlyDir);
+            _tempDirs.Add(readOnlyDir);
+            var readOnlyFile = Path.Combine(readOnlyDir, "tags.json");
+            File.Copy(tagsFilePath, readOnlyFile);
+            Directory.CreateDirectory(readOnlyFile + ".tmp");
+            TagsFilePathField.SetValue(service, readOnlyFile);
+
+            var result = await service.DeleteGroupAsync(source.Id, GroupDeletionMode.MoveToDefault);
+
+            Assert.False(result.Success);
+
+            // References must be exactly as before the failed move
+            Assert.Equal(source.Id, tag.GroupId);
+            Assert.Equal(child.Id, childTag.GroupId);
+            Assert.Equal(source.Id, child.ParentGroupId);
+            Assert.Equal("SourceGroup", service.WatchEntries[0].TagGroup);
+
+            // And the persisted file still describes the original hierarchy
+            var json = await File.ReadAllTextAsync(readOnlyFile);
+            var persisted = JsonSerializer.Deserialize<TagDatabase>(json, JsonOptions);
+            Assert.NotNull(persisted);
+            Assert.Equal(source.Id, persisted.Tags.Single(t => t.Name == "T1").GroupId);
+            Assert.Equal(source.Id, persisted.Groups.Single(g => g.Name == "ChildOfSource").ParentGroupId);
+        }
+
+        [Fact]
+        public async Task DeleteGroup_MoveToDefault_ReportsOnlyActuallyMovedTags()
+        {
+            // Regression: tags living in deeper descendant groups were counted
+            // as "moved" although nothing was rewritten for them.
+            var service = CreateService(out _, out _);
+            var root    = await service.CreateGroup("Root");
+            var child   = await service.CreateGroup("Child", "Root");
+            var grand   = await service.CreateGroup("Grand", "Child");
+            await service.CreateTag("Direct1", "Root", PlcArea.HoldingRegister, 1, TagDataType.UInt16);
+            await service.CreateTag("ChildTag", "Child", PlcArea.HoldingRegister, 2, TagDataType.UInt16);
+            await service.CreateTag("GrandTag", "Grand", PlcArea.HoldingRegister, 3, TagDataType.UInt16);
+
+            var result = await service.DeleteGroupAsync(child.Id, GroupDeletionMode.MoveToDefault);
+
+            Assert.True(result.Success);
+            // Only the tag directly in the deleted group changed owners.
+            Assert.Equal(1, result.MovedTagCount);
+            Assert.Equal("GrandTag", service.Tags.Single(t => t.Address == 3).Name);
+            Assert.Equal(grand.Id, service.Tags.Single(t => t.Address == 3).GroupId);
+        }
+
+        #endregion
+
         #region Cancellation leaves collections unchanged
 
         [Fact]

@@ -14,16 +14,20 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public IReadOnlyList<IPort> Ports { get; } = new List<IPort>
         {
-            new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Input2", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
+            new PortDefinition(PortNames.GateInput1, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.GateInput2, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.BoolOutput, PortDirection.Output, SimulationDataType.Bool)
         };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => EmptyParameters;
+
+        public static readonly BlockParameterDescriptor[] EmptyParameters = System.Array.Empty<BlockParameterDescriptor>();
 
         public void Execute(IExecutionContext context)
         {
-            var in1 = context.ReadInput("Input1")?.AsBool() ?? false;
-            var in2 = context.ReadInput("Input2")?.AsBool() ?? false;
-            context.WriteOutput("Output", SimulationValue.Bool(Compute(in1, in2)));
+            var in1 = context.ReadInput(PortNames.GateInput1)?.AsBool() ?? false;
+            var in2 = context.ReadInput(PortNames.GateInput2)?.AsBool() ?? false;
+            context.WriteOutput(PortNames.BoolOutput, SimulationValue.Bool(Compute(in1, in2)));
         }
 
         protected abstract bool Compute(bool in1, bool in2);
@@ -37,14 +41,16 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public IReadOnlyList<IPort> Ports { get; } = new List<IPort>
         {
-            new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
+            new PortDefinition(PortNames.TimerInput, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.BoolOutput, PortDirection.Output, SimulationDataType.Bool)
         };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => BooleanLogicBlock.EmptyParameters;
 
         public void Execute(IExecutionContext context)
         {
-            var value = context.ReadInput("Input1")?.AsBool() ?? false;
-            context.WriteOutput("Output", SimulationValue.Bool(!value));
+            var value = context.ReadInput(PortNames.TimerInput)?.AsBool() ?? false;
+            context.WriteOutput(PortNames.BoolOutput, SimulationValue.Bool(!value));
         }
     }
 
@@ -70,15 +76,26 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public IReadOnlyList<IPort> Ports { get; } = new List<IPort>
         {
-            new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Input2", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
+            new PortDefinition(PortNames.LatchSet, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.LatchReset, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.BoolOutput, PortDirection.Output, SimulationDataType.Bool)
+        };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters { get; } = new[]
+        {
+            new BlockParameterDescriptor
+            {
+                Name = "SetDominant",
+                DisplayName = "Set dominant",
+                Kind = BlockParameterKind.Bool,
+                DefaultValue = true
+            }
         };
 
         public void Execute(IExecutionContext context)
         {
-            var set = context.ReadInput("Input1")?.AsBool() ?? false;
-            var reset = context.ReadInput("Input2")?.AsBool() ?? false;
+            var set = context.ReadInput(PortNames.LatchSet)?.AsBool() ?? false;
+            var reset = context.ReadInput(PortNames.LatchReset)?.AsBool() ?? false;
             var setDominant = context.ReadParameter("SetDominant", true);
 
             var state = context.State.GetOrCreate<RsLatchState>("RsState");
@@ -94,7 +111,7 @@ namespace ModbusForge.Core.Simulation.Blocks
                 if (reset) state.Value = false;
             }
 
-            context.WriteOutput("Output", SimulationValue.Bool(state.Value));
+            context.WriteOutput(PortNames.BoolOutput, SimulationValue.Bool(state.Value));
         }
     }
 

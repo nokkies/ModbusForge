@@ -10,15 +10,17 @@ namespace ModbusForge.Services;
 public class ScriptRunner : IScriptRunner
 {
     private readonly ILogger<ScriptRunner> _logger;
+    private readonly object _ctsGate = new();
     private CancellationTokenSource? _cts;
-    private bool _isRunning;
+    private int _running; // 0 = idle, 1 = running (Interlocked)
 
-    public bool IsRunning => _isRunning;
+    public bool IsRunning => Volatile.Read(ref _running) == 1;
 
     public event EventHandler<ScriptExecutionEventArgs>? CommandExecuted;
     public event EventHandler<string>? LogMessage;
     public event EventHandler? ScriptStarted;
     public event EventHandler<bool>? ScriptCompleted;
+    public event EventHandler? ScriptCancelled;
 
     public ScriptRunner(ILogger<ScriptRunner> logger)
     {
@@ -27,33 +29,58 @@ public class ScriptRunner : IScriptRunner
 
     public async Task RunScriptAsync(Script script, IModbusService modbusService, byte unitId, CancellationToken cancellationToken = default)
     {
-        if (_isRunning)
+        // The runner is a singleton and can be reached from the UI and the REST
+        // API at the same time: claim it atomically instead of check-then-act.
+        if (Interlocked.Exchange(ref _running, 1) == 1)
         {
-            Log("Script is already running");
+            Log("Script is already running; request ignored");
             return;
         }
 
-        _isRunning = true;
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var token = _cts.Token;
+        CancellationTokenSource linked;
+        try
+        {
+            linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        }
+        catch
+        {
+            // The caller's token may belong to a disposed source (e.g. an
+            // HTTP request whose lifetime has ended). Whatever the reason,
+            // the runner must not stay claimed: without the release, every
+            // later RunScriptAsync would be ignored for the process lifetime.
+            Interlocked.Exchange(ref _running, 0);
+            throw;
+        }
+
+        lock (_ctsGate)
+        {
+            _cts = linked;
+        }
+        var token = linked.Token;
+
+        // A file-loaded script could carry RepeatCount 0; 0 would silently run
+        // nothing, so clamp to a single pass.
+        var repeats = Math.Max(1, script.RepeatCount);
 
         ScriptStarted?.Invoke(this, EventArgs.Empty);
         Log($"Starting script: {script.Name}");
 
         bool allSuccess = true;
+        bool cancelled = false;
 
         try
         {
-            for (int repeat = 0; repeat < script.RepeatCount; repeat++)
+            for (int repeat = 0; repeat < repeats; repeat++)
             {
                 if (token.IsCancellationRequested) break;
 
-                if (script.RepeatCount > 1)
+                if (repeats > 1)
                 {
-                    Log($"--- Repeat {repeat + 1} of {script.RepeatCount} ---");
+                    Log($"--- Repeat {repeat + 1} of {repeats} ---");
                 }
 
-                for (int i = 0; i < script.Commands.Count; i++)
+                int i = 0;
+                while (i < script.Commands.Count)
                 {
                     if (token.IsCancellationRequested) break;
 
@@ -61,6 +88,35 @@ public class ScriptRunner : IScriptRunner
                     if (!cmd.IsEnabled)
                     {
                         Log($"Skipping disabled command: {cmd.DisplayText}");
+                        i++;
+                        continue;
+                    }
+
+                    if (cmd.CommandType == ScriptCommandType.Loop)
+                    {
+                        // A Loop command repeats the rest of the script (everything
+                        // after this command) N times and then consumes it, so the
+                        // main pass never runs the looped region a second time.
+                        var (loopSuccess, loopResult) = await ExecuteLoopAsync(
+                            cmd, i, script, modbusService, unitId, token, repeat + 1, repeats);
+
+                        cmd.LastSuccess = loopSuccess;
+                        cmd.LastResult = loopResult;
+
+                        CommandExecuted?.Invoke(this, new ScriptExecutionEventArgs(
+                            cmd, i, script.Commands.Count, loopSuccess, loopResult, repeat + 1, repeats));
+
+                        if (!loopSuccess)
+                        {
+                            allSuccess = false;
+                            if (script.StopOnError)
+                            {
+                                Log($"Script stopped due to error: {loopResult}");
+                                break;
+                            }
+                        }
+
+                        i = script.Commands.Count;
                         continue;
                     }
 
@@ -70,7 +126,7 @@ public class ScriptRunner : IScriptRunner
                     cmd.LastResult = result;
 
                     CommandExecuted?.Invoke(this, new ScriptExecutionEventArgs(
-                        cmd, i, script.Commands.Count, success, result, repeat + 1, script.RepeatCount));
+                        cmd, i, script.Commands.Count, success, result, repeat + 1, repeats));
 
                     if (!success)
                     {
@@ -86,6 +142,8 @@ public class ScriptRunner : IScriptRunner
                     {
                         await Task.Delay(script.DelayBetweenCommandsMs, token);
                     }
+
+                    i++;
                 }
 
                 if (!allSuccess && script.StopOnError) break;
@@ -93,8 +151,7 @@ public class ScriptRunner : IScriptRunner
         }
         catch (OperationCanceledException)
         {
-            Log("Script cancelled");
-            allSuccess = false;
+            cancelled = true;
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
         {
@@ -104,12 +161,110 @@ public class ScriptRunner : IScriptRunner
         }
         finally
         {
-            _isRunning = false;
-            _cts?.Dispose();
-            _cts = null;
-            Log($"Script completed: {(allSuccess ? "SUCCESS" : "FAILED")}");
-            ScriptCompleted?.Invoke(this, allSuccess);
+            Interlocked.Exchange(ref _running, 0);
+            CancellationTokenSource? toDispose;
+            lock (_ctsGate)
+            {
+                toDispose = _cts;
+                _cts = null;
+            }
+            toDispose?.Dispose();
+
+            if (cancelled)
+            {
+                // A user stop is not a failure - the UI must say "stopped", not
+                // "FAILED", or the user cannot tell the two apart.
+                Log("Script stopped by user");
+                ScriptCancelled?.Invoke(this, EventArgs.Empty);
+            }
+            else
+            {
+                Log($"Script completed: {(allSuccess ? "SUCCESS" : "FAILED")}");
+                ScriptCompleted?.Invoke(this, allSuccess);
+            }
         }
+    }
+
+    /// <summary>
+    /// Executes a Loop command: the rest of the script (all commands after the
+    /// Loop) is run <c>LoopCount</c> times in total. The region is then consumed
+    /// by the caller, so those commands are not run again on the main pass.
+    /// </summary>
+    private async Task<(bool success, string result)> ExecuteLoopAsync(
+        ScriptCommand loopCmd, int loopIndex, Script script, IModbusService modbusService,
+        byte unitId, CancellationToken token, int currentRepeat, int totalRepeats)
+    {
+        // Clamp like the script-level RepeatCount: a 0 in a saved file must not
+        // silently run zero iterations.
+        var loopCount = Math.Max(1, loopCmd.LoopCount);
+
+        int regionStart = loopIndex + 1;
+        int regionEnd = script.Commands.Count;
+        var regionCount = regionEnd - regionStart;
+
+        // A Loop inside the looped region would recurse without bound; fail
+        // clearly instead of spinning.
+        for (int k = regionStart; k < regionEnd; k++)
+        {
+            if (script.Commands[k].CommandType == ScriptCommandType.Loop)
+            {
+                Log("Nested loops are not supported");
+                return (false, "Nested loops are not supported");
+            }
+        }
+
+        Log($"Loop {loopCount}x: {regionCount} command(s)");
+
+        bool allOk = true;
+        for (int iteration = 1; iteration <= loopCount; iteration++)
+        {
+            if (loopCount > 1)
+            {
+                Log($"  Loop iteration {iteration} of {loopCount}");
+            }
+
+            for (int k = regionStart; k < regionEnd; k++)
+            {
+                var c = script.Commands[k];
+                if (!c.IsEnabled)
+                {
+                    Log($"Skipping disabled command: {c.DisplayText}");
+                    continue;
+                }
+
+                var (ok, res) = await ExecuteCommandAsync(c, modbusService, unitId, token);
+
+                c.LastSuccess = ok;
+                c.LastResult = res;
+
+                CommandExecuted?.Invoke(this, new ScriptExecutionEventArgs(
+                    c, k, script.Commands.Count, ok, res, currentRepeat, totalRepeats));
+
+                if (!ok)
+                {
+                    allOk = false;
+                    if (script.StopOnError)
+                    {
+                        // The caller reports the stop; just return the failure.
+                        return (false, res);
+                    }
+                }
+
+                // Apply the inter-command delay at iteration boundaries as well
+                // so the spacing between executed commands stays uniform.
+                bool moreInIteration = k < regionEnd - 1;
+                bool moreIterations = iteration < loopCount;
+                if (script.DelayBetweenCommandsMs > 0 && (moreInIteration || moreIterations))
+                {
+                    await Task.Delay(script.DelayBetweenCommandsMs, token);
+                }
+            }
+        }
+
+        var result = allOk
+            ? $"Looped {loopCount}x: {regionCount} command(s)"
+            : $"Looped {loopCount}x: {regionCount} command(s); some commands failed";
+        return (allOk, result);
     }
 
     private async Task<(bool success, string result)> ExecuteCommandAsync(
@@ -120,28 +275,30 @@ public class ScriptRunner : IScriptRunner
             switch (cmd.CommandType)
             {
                 case ScriptCommandType.ReadHoldingRegisters:
+                    // A null result means the device sent no response - that is a
+                    // FAILED read (and must trip StopOnError), not a successful one.
                     var holdingRegs = await modbusService.ReadHoldingRegistersAsync(unitId, cmd.Address, cmd.Count);
-                    var holdingResult = holdingRegs != null ? string.Join(", ", holdingRegs) : "null";
+                    var holdingResult = holdingRegs != null ? string.Join(", ", holdingRegs) : "no response";
                     Log($"Read Holding Registers [{cmd.Address}..{cmd.Address + cmd.Count - 1}]: {holdingResult}");
-                    return (true, holdingResult);
+                    return (holdingRegs != null, holdingResult);
 
                 case ScriptCommandType.ReadInputRegisters:
                     var inputRegs = await modbusService.ReadInputRegistersAsync(unitId, cmd.Address, cmd.Count);
-                    var inputResult = inputRegs != null ? string.Join(", ", inputRegs) : "null";
+                    var inputResult = inputRegs != null ? string.Join(", ", inputRegs) : "no response";
                     Log($"Read Input Registers [{cmd.Address}..{cmd.Address + cmd.Count - 1}]: {inputResult}");
-                    return (true, inputResult);
+                    return (inputRegs != null, inputResult);
 
                 case ScriptCommandType.ReadCoils:
                     var coils = await modbusService.ReadCoilsAsync(unitId, cmd.Address, cmd.Count);
-                    var coilResult = coils != null ? string.Join(", ", Array.ConvertAll(coils, b => b ? "ON" : "OFF")) : "null";
+                    var coilResult = coils != null ? string.Join(", ", Array.ConvertAll(coils, b => b ? "ON" : "OFF")) : "no response";
                     Log($"Read Coils [{cmd.Address}..{cmd.Address + cmd.Count - 1}]: {coilResult}");
-                    return (true, coilResult);
+                    return (coils != null, coilResult);
 
                 case ScriptCommandType.ReadDiscreteInputs:
                     var discreteInputs = await modbusService.ReadDiscreteInputsAsync(unitId, cmd.Address, cmd.Count);
-                    var discreteResult = discreteInputs != null ? string.Join(", ", Array.ConvertAll(discreteInputs, b => b ? "ON" : "OFF")) : "null";
+                    var discreteResult = discreteInputs != null ? string.Join(", ", Array.ConvertAll(discreteInputs, b => b ? "ON" : "OFF")) : "no response";
                     Log($"Read Discrete Inputs [{cmd.Address}..{cmd.Address + cmd.Count - 1}]: {discreteResult}");
-                    return (true, discreteResult);
+                    return (discreteInputs != null, discreteResult);
 
                 case ScriptCommandType.WriteSingleRegister:
                     await modbusService.WriteSingleRegisterAsync(unitId, cmd.Address, cmd.Value);
@@ -212,10 +369,28 @@ public class ScriptRunner : IScriptRunner
 
     public void Stop()
     {
-        if (_isRunning && _cts != null)
+        // Take the current token source under the same gate the runner uses,
+        // then cancel it outside: the script's finally may dispose the source
+        // at any moment, and a Cancel racing a Dispose would otherwise throw
+        // ObjectDisposedException at the caller.
+        CancellationTokenSource? cts;
+        lock (_ctsGate)
         {
-            Log("Stopping script...");
-            _cts.Cancel();
+            cts = IsRunning ? _cts : null;
+        }
+
+        if (cts is null)
+            return;
+
+        Log("Stopping script...");
+        try
+        {
+            cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The script finished between the snapshot and the cancel; the
+            // stop was effectively a no-op.
         }
     }
 

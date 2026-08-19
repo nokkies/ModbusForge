@@ -1,36 +1,80 @@
 <UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
-             x:Class="ModbusForge.Avalonia.Views.FrameInspectorView"
-             x:DataType="vm:FrameInspectorViewModel">
+              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+              xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+              xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core"
+              xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters"
+              x:Class="ModbusForge.Avalonia.Views.FrameInspectorView"
+              x:DataType="vm:FrameInspectorViewModel">
+
+  <UserControl.Resources>
+    <converters:CountToBoolConverter x:Key="CountToBoolConverter" />
+  </UserControl.Resources>
 
   <Grid RowDefinitions="Auto,Auto,*">
     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-      <Button Content="Clear" Command="{Binding ClearCommand}" />
-      <Button Content="Import Pcap" Command="{Binding ImportPcapCommand}" />
-      <CheckBox Content="Auto Scroll" IsChecked="{Binding IsAutoScroll}" />
+      <Button Content="Clear" ToolTip.Tip="Remove all captured frames" Command="{Binding ClearCommand}" />
+      <Button Content="Import Pcap" ToolTip.Tip="Import Modbus frames from a pcap capture file" Command="{Binding ImportPcapCommand}" />
+      <CheckBox Content="Auto Scroll" IsChecked="{Binding IsAutoScroll}" ToolTip.Tip="Keep the newest frames in view" />
       <TextBlock VerticalAlignment="Center" Text="{Binding FrameLogger.Frames.Count, StringFormat='Frames: {0}'}" />
     </StackPanel>
 
     <TextBlock Grid.Row="1" Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" Margin="0,0,0,8" />
 
-    <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="1">
-      <DataGrid ItemsSource="{Binding FrameLogger.Frames}"
-                AutoGenerateColumns="False"
-                IsReadOnly="True"
-                GridLinesVisibility="All"
-                CanUserReorderColumns="True"
-                CanUserResizeColumns="True">
-        <DataGrid.Columns>
-          <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss.fff}'}" Width="110" />
-          <DataGridTextColumn Header="Delta (ms)" Binding="{Binding DeltaMs, StringFormat='{}{0:F2}'}" Width="90" />
-          <DataGridTextColumn Header="Dir" Binding="{Binding Direction}" Width="50" />
-          <DataGridTextColumn Header="Unit" Binding="{Binding UnitId}" Width="60" />
-          <DataGridTextColumn Header="FC" Binding="{Binding FunctionCode}" Width="50" />
-          <DataGridTextColumn Header="Hex" Binding="{Binding HexString}" Width="*" MinWidth="200" />
-          <DataGridTextColumn Header="CRC" Binding="{Binding IsValidCrc, FallbackValue='-'}" Width="60" />
-        </DataGrid.Columns>
-      </DataGrid>
-    </Border>
+    <Grid Grid.Row="2">
+      <Border BorderBrush="Gray" BorderThickness="1">
+        <DataGrid ItemsSource="{Binding FrameLogger.Frames}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  GridLinesVisibility="All"
+                  CanUserReorderColumns="True"
+                  CanUserResizeColumns="True">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss.fff}'}" Width="110" />
+            <DataGridTextColumn Binding="{Binding DeltaMs, StringFormat='{}{0:F2}'}" Width="90">
+              <DataGridTextColumn.Header>
+                <TextBlock Text="Delta (ms)" ToolTip.Tip="Time since the previous captured frame" />
+              </DataGridTextColumn.Header>
+            </DataGridTextColumn>
+            <DataGridTextColumn Binding="{Binding Direction}" Width="50">
+              <DataGridTextColumn.Header>
+                <TextBlock Text="Dir" ToolTip.Tip="Tx = sent to the device, Rx = received from the device" />
+              </DataGridTextColumn.Header>
+            </DataGridTextColumn>
+            <DataGridTextColumn Header="Unit" Binding="{Binding UnitId}" Width="60" />
+            <DataGridTextColumn Binding="{Binding FunctionCode}" Width="50">
+              <DataGridTextColumn.Header>
+                <TextBlock Text="FC" ToolTip.Tip="Modbus function code" />
+              </DataGridTextColumn.Header>
+            </DataGridTextColumn>
+            <!-- Fixed (not star) width on purpose: in Avalonia 11.2.x, any
+                 star-width column disables resizing for the whole grid. The
+                 user can drag this column wider for long frames. -->
+            <DataGridTextColumn Header="Hex" Binding="{Binding HexString}" Width="640" MinWidth="200" />
+            <DataGridTemplateColumn Width="60">
+              <DataGridTemplateColumn.Header>
+                <TextBlock Text="CRC" ToolTip.Tip="CRC16 check result: check = valid, cross = mismatch, dash = the transport has no checksum" />
+              </DataGridTemplateColumn.Header>
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate x:DataType="models:ModbusFrameLog">
+                  <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                    <TextBlock Text="&#x2713;" Foreground="#2E8B57" FontWeight="Bold"
+                               IsVisible="{Binding IsCrcValid}" ToolTip.Tip="CRC valid" />
+                    <TextBlock Text="&#x2717;" Foreground="#C62828" FontWeight="Bold"
+                               IsVisible="{Binding IsCrcInvalid}" ToolTip.Tip="CRC mismatch" />
+                    <TextBlock Text="&#x2014;" Opacity="0.5"
+                               IsVisible="{Binding IsCrcNotApplicable}" ToolTip.Tip="No checksum in this transport" />
+                  </StackPanel>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+          </DataGrid.Columns>
+        </DataGrid>
+      </Border>
+      <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                 Opacity="0.55" FontSize="14" IsHitTestVisible="False"
+                 IsVisible="{Binding FrameLogger.Frames.Count, Converter={StaticResource CountToBoolConverter}, ConverterParameter=zero}">
+        No frames captured yet. Frames appear here while a connection is active, or use Import Pcap.
+      </TextBlock>
+    </Grid>
   </Grid>
 </UserControl>

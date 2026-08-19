@@ -36,6 +36,18 @@ namespace ModbusForge.Avalonia
                     DataContext = Services.GetRequiredService<MainViewModel>()
                 };
 
+                // Last-resort exception handling: report, log, and keep the user's
+                // session when the fault is recoverable (see UnhandledExceptionReporter).
+                var exceptionReporter = Services.GetRequiredService<UnhandledExceptionReporter>();
+                exceptionReporter.Attach();
+                global::Avalonia.Threading.Dispatcher.UIThread.UnhandledException += (_, e) =>
+                {
+                    if (exceptionReporter.OnDispatcherException(e.Exception))
+                    {
+                        e.Handled = true;
+                    }
+                };
+
                 var settingsService = Services.GetRequiredService<ISettingsService>();
                 _apiServerService = Services.GetRequiredService<IApiServerService>();
 
@@ -52,6 +64,16 @@ namespace ModbusForge.Avalonia
                     }
                 }
 
+                // Resume the MQTT gateway if it was enabled in a previous session:
+                // without this the user would have to re-apply the MQTT settings
+                // after every restart for publishing to continue.
+                var mqttGateway = Services.GetRequiredService<MqttGatewayService>();
+                mqttGateway.ApplySettings(settingsService.MqttSettings);
+                if (settingsService.MqttSettings.Enabled)
+                {
+                    _ = mqttGateway.ConnectAsync();
+                }
+
                 desktop.ShutdownRequested += async (_, _) =>
                 {
                     if (_apiServerService?.IsRunning == true)
@@ -64,6 +86,23 @@ namespace ModbusForge.Avalonia
                         {
                             var logger = Services?.GetService<ILogger<App>>();
                             logger?.LogError(ex, "Failed to stop API server");
+                        }
+                    }
+
+                    // Stop the MQTT gateway so the broker receives a clean
+                    // DISCONNECT instead of waiting out the 60-second keepalive
+                    // for the process to die.
+                    var gateway = Services?.GetService<MqttGatewayService>();
+                    if (gateway?.IsRunning == true)
+                    {
+                        try
+                        {
+                            await gateway.DisconnectAsync();
+                        }
+                        catch (Exception ex) when (ex is not OutOfMemoryException)
+                        {
+                            Services?.GetService<ILogger<App>>()
+                                ?.LogError(ex, "Failed to stop MQTT gateway on shutdown");
                         }
                     }
                 };
@@ -110,9 +149,20 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<ICustomBulkAddDialogService, AvaloniaCustomBulkAddDialogService>();
             services.AddSingleton<IMessageBoxService, AvaloniaMessageBoxService>();
 
-            // Connection management
+            // Connection management. The frame logs created for each profile receive the
+            // UI dispatcher so frames captured on socket worker threads marshal their
+            // collection updates to the UI thread (Frame Inspector grid).
             services.AddSingleton<IValidationService, ValidationService>();
-            services.AddSingleton<IConnectionManager, ConnectionManager>();
+            services.AddSingleton<IConnectionManager>(sp => new ConnectionManager(
+                sp.GetRequiredService<ILogger<ConnectionManager>>(),
+                sp.GetRequiredService<ILoggerFactory>(),
+                sp.GetRequiredService<IValidationService>(),
+                null,
+                null,
+                sp.GetRequiredService<IDispatcher>()));
+
+            // Last-resort exception reporting
+            services.AddSingleton<UnhandledExceptionReporter>();
 
             // File system, file dialogs, and per-Unit ID workspace state
             services.AddSingleton<IFileSystem, FileSystem>();
@@ -144,6 +194,8 @@ namespace ModbusForge.Avalonia
             // Trend logging
             services.Configure<LoggingSettings>(_ => { });
             services.AddSingleton<ITrendLogger, TrendLoggingService>();
+            services.AddSingleton<ITrendSubscriptionService, TrendSubscriptionService>();
+            services.AddSingleton<ITrendAddDialogService, AvaloniaTrendAddDialogService>();
 
             // Frame inspector & pcap import
             services.AddSingleton<FrameInspectorViewModel>();
@@ -152,6 +204,7 @@ namespace ModbusForge.Avalonia
             // Scripting & signal generator
             services.AddSingleton<IScriptRunner, ScriptRunner>();
             services.AddSingleton<ScriptEditorViewModel>();
+            services.AddSingleton<ScriptRulesViewModel>();
             services.AddSingleton<SignalGeneratorViewModel>();
 
             // Visual simulation
@@ -170,7 +223,7 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<IApiApplicationService>(provider =>
                 new ApiApplicationService(
                     provider.GetRequiredService<IAppStateAccessor>(),
-                    provider.GetRequiredService<IModbusService>(),
+                    provider.GetRequiredService<IConnectionManager>(),
                     provider.GetRequiredService<IScriptRuleService>(),
                     provider.GetRequiredService<IConsoleLoggerService>(),
                     provider.GetRequiredService<ITrendLogger>(),

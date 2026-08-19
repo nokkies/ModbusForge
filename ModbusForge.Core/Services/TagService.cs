@@ -207,54 +207,143 @@ namespace ModbusForge.Services
         }
 
         /// <summary>
-        /// Update tag value (called by Modbus service when reading)
+        /// Update tag values for a freshly read register/coil (called by the view
+        /// models when reading). Several tags may map to the same address - e.g.
+        /// packed status words with one tag per bit - so every matching tag is
+        /// updated; bit tags receive the extracted bit, not the whole word.
         /// </summary>
         public void UpdateTagValue(PlcArea area, int address, object value)
         {
-            var tag = GetTagByAddress(area, address);
-            if (tag != null)
+            var tags = Tags.Where(t => t.Area == area && t.Address == address).ToList();
+            if (tags.Count == 0)
+                return;
+
+            foreach (var tag in tags)
+                UpdateTag(tag, value);
+        }
+
+        /// <summary>
+        /// Feeds a contiguous batch of register values read starting at
+        /// <paramref name="startAddress"/> (the polling loop and manual register
+        /// reads). Multi-word tags (Int32, UInt32, Float, String, Double) are
+        /// converted from all of their words at once; single-word and bit tags
+        /// are updated point by point. A multi-word tag whose words extend past
+        /// the end of the batch is left unchanged rather than being fed a
+        /// half-width payload.
+        /// </summary>
+        public void UpdateRegisterValues(PlcArea area, int startAddress, ushort[] values)
+        {
+            if (values is null)
+                return;
+
+            var tags = Tags.Where(t => t.Area == area).ToList();
+            if (tags.Count == 0)
+                return;
+
+            foreach (var tag in tags)
             {
-                tag.CurrentValue = value;
-                tag.LastUpdated = DateTime.Now;
+                var index = tag.Address - startAddress;
+                if (index < 0 || index >= values.Length)
+                    continue;
 
-                // Update watch entry if exists
-                var watchEntry = WatchEntries.FirstOrDefault(w => w.TagId == tag.Id);
-                if (watchEntry != null)
-                {
-                    watchEntry.CurrentValue = value;
-                    watchEntry.FormattedValue = tag.FormattedValue;
-                    watchEntry.LastUpdated = DateTime.Now;
-                    watchEntry.IsStale = false;
+                var wordCount = Helpers.DataTypeConverter.GetRegisterCount(tag.DataType);
+                if (wordCount > 1 && index + wordCount > values.Length)
+                    continue; // not all of this tag's words are in the batch
 
-                    // Check alarms
-                    if (tag.IsAlarmEnabled && tag.ScaledValue.HasValue)
-                    {
-                        var scaled = tag.ScaledValue.Value;
-                        if (tag.AlarmHigh.HasValue && scaled > tag.AlarmHigh.Value)
-                        {
-                            watchEntry.HasAlarm = true;
-                            watchEntry.AlarmMessage = $"HIGH ALARM: {scaled:F2} > {tag.AlarmHigh.Value:F2}";
-                        }
-                        else if (tag.AlarmLow.HasValue && scaled < tag.AlarmLow.Value)
-                        {
-                            watchEntry.HasAlarm = true;
-                            watchEntry.AlarmMessage = $"LOW ALARM: {scaled:F2} < {tag.AlarmLow.Value:F2}";
-                        }
-                        else
-                        {
-                            watchEntry.HasAlarm = false;
-                            watchEntry.AlarmMessage = "";
-                        }
-                    }
-                }
+                var value = wordCount > 1
+                    ? Helpers.DataTypeConverter.ConvertRegisters(tag.DataType, values[index..(index + wordCount)])
+                    : (object)values[index];
+
+                UpdateTag(tag, value);
             }
         }
 
         /// <summary>
-        /// Create a new tag group
+        /// Applies a freshly read value to a single tag: bit extraction, current
+        /// value, freshness, the tag's watch entry and its alarm state.
+        /// </summary>
+        private void UpdateTag(Tag tag, object value)
+        {
+            var tagValue = tag.Bit is int bitIndex && TryConvertToUInt16(value, out var raw)
+                ? (((raw >> bitIndex) & 1) == 1)
+                : value;
+
+            var now = DateTime.Now;
+            tag.CurrentValue = tagValue;
+            tag.LastUpdated = now;
+
+            // Update watch entry if exists
+            var watchEntry = WatchEntries.FirstOrDefault(w => w.TagId == tag.Id);
+            if (watchEntry == null)
+                return;
+
+            watchEntry.CurrentValue = tagValue;
+            watchEntry.FormattedValue = tag.FormattedValue;
+            watchEntry.LastUpdated = now;
+            watchEntry.IsStale = false;
+
+            // Check alarms
+            if (tag.IsAlarmEnabled && tag.ScaledValue.HasValue)
+            {
+                var scaled = tag.ScaledValue.Value;
+                if (tag.AlarmHigh.HasValue && scaled > tag.AlarmHigh.Value)
+                {
+                    watchEntry.HasAlarm = true;
+                    watchEntry.AlarmMessage = $"HIGH ALARM: {scaled:F2} > {tag.AlarmHigh.Value:F2}";
+                }
+                else if (tag.AlarmLow.HasValue && scaled < tag.AlarmLow.Value)
+                {
+                    watchEntry.HasAlarm = true;
+                    watchEntry.AlarmMessage = $"LOW ALARM: {scaled:F2} < {tag.AlarmLow.Value:F2}";
+                }
+                else
+                {
+                    watchEntry.HasAlarm = false;
+                    watchEntry.AlarmMessage = "";
+                }
+            }
+        }
+
+        /// <summary>Converts a raw read value to an unsigned word for bit extraction.</summary>
+        private static bool TryConvertToUInt16(object value, out ushort result)
+        {
+            if (value is ushort u)
+            {
+                result = u;
+                return true;
+            }
+
+            if (value is bool b)
+            {
+                result = (ushort)(b ? 1 : 0);
+                return true;
+            }
+
+            try
+            {
+                var converted = Convert.ToInt32(value);
+                result = (ushort)converted;
+                return true;
+            }
+            catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)
+            {
+                result = 0;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Create a new tag group. Group names are unique across the whole
+        /// hierarchy (lookups are by name), so a duplicate is rejected.
         /// </summary>
         public async Task<TagGroup> CreateGroup(string name, string? parentGroup = null)
         {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Group name is required.", nameof(name));
+
+            if (FindGroupByName(name) != null)
+                throw new ArgumentException($"A group named '{name}' already exists.", nameof(name));
+
             var group = new TagGroup
             {
                 Name = name,
@@ -264,15 +353,17 @@ namespace ModbusForge.Services
             if (!string.IsNullOrEmpty(parentGroup))
             {
                 var parent = FindGroupByName(parentGroup);
-                if (parent != null)
+                if (parent == null)
                 {
-                    group.ParentGroupId = parent.Id;
-                    parent.SubGroups.Add(group);
+                    // A programmatic caller may reference a parent that does not
+                    // exist yet; create it rather than dropping the hierarchy
+                    // intent (same policy as the v1 migration fallbacks).
+                    parent = new TagGroup { Name = parentGroup };
+                    Groups.Add(parent);
                 }
-                else
-                {
-                    Groups.Add(group);
-                }
+
+                group.ParentGroupId = parent.Id;
+                parent.SubGroups.Add(group);
             }
             else
             {
@@ -721,6 +812,15 @@ namespace ModbusForge.Services
             var groupSubsSnapshot = GetAllGroupsFlat()
                 .ToDictionary(g => g.Id, g => g.SubGroups.ToList());
 
+            // Reference-field snapshots: move modes rewrite GroupId/ParentGroupId
+            // on live objects, and collections alone cannot undo that.
+            var tagGroupRefs = affectedTags
+                .ToDictionary(t => t.Id, t => (GroupId: t.GroupId, GroupName: t.Group));
+            var subParentRefs = group.SubGroups.ToList()
+                .ToDictionary(g => g.Id, g => (ParentId: g.ParentGroupId, ParentName: g.ParentGroup));
+            var watchGroupNames = affectedWatchEntries
+                .ToDictionary(w => w.Id, w => w.TagGroup);
+
             // ---- Apply mutation ----
             try
             {
@@ -769,18 +869,9 @@ namespace ModbusForge.Services
                         destinationGroup.SubGroups.Add(sub);
                     }
 
-                    // For tags in deeper descendants: reparent them to the destination group as well
-                    var deepTags = affectedTags
-                        .Where(t => t.GroupId != groupId)
-                        .ToList();
-                    foreach (var tag in deepTags)
-                    {
-                        var oldGroup = FindGroupById(tag.GroupId!);
-                        // These tags stay in their own subgroup (which moved up) – no relocation needed
-                        // unless MoveToDefault flattens all levels.
-                        // Under MoveToParent the descendants also moved up so tags remain correct.
-                        movedTagCount++;
-                    }
+                    // Tags in deeper descendants need no relocation: they stay in
+                    // their own subgroup, which moved up with its siblings.
+                    // (They must not be counted as moved - nothing changed for them.)
 
                     // Update watch entries to reflect new group name (TagGroup field is display only)
                     foreach (var we in affectedWatchEntries)
@@ -823,7 +914,8 @@ namespace ModbusForge.Services
                 // ---- Rollback ----
                 _tagLogger.LogError(ex, "DeleteGroupAsync failed for '{GroupId}'; rolling back.", groupId);
                 RollbackDeletion(snapshotTags, snapshotGroups, snapshotWatchEntries,
-                                 groupTagsSnapshot, groupSubsSnapshot);
+                                 groupTagsSnapshot, groupSubsSnapshot,
+                                 tagGroupRefs, subParentRefs, watchGroupNames);
                 return Fail($"Deletion failed and was rolled back: {ex.Message}");
             }
         }
@@ -879,22 +971,42 @@ namespace ModbusForge.Services
         }
 
         /// <summary>
-        /// Restores all in-memory collections to their pre-deletion snapshots.
+        /// Restores all in-memory state to its pre-deletion snapshots, including
+        /// the reference fields that move modes rewrite on live objects.
         /// </summary>
         private void RollbackDeletion(
             List<Tag> snapshotTags,
             List<TagGroup> snapshotGroups,
             List<WatchEntry> snapshotWatchEntries,
             Dictionary<string, List<Tag>> groupTagsSnapshot,
-            Dictionary<string, List<TagGroup>> groupSubsSnapshot)
+            Dictionary<string, List<TagGroup>> groupSubsSnapshot,
+            Dictionary<string, (string? GroupId, string GroupName)> tagGroupRefs,
+            Dictionary<string, (string? ParentId, string ParentName)> subParentRefs,
+            Dictionary<string, string> watchGroupNames)
         {
             // Restore flat tags list
             Tags.Clear();
             foreach (var t in snapshotTags) Tags.Add(t);
 
+            // Restore the group references that move modes rewrote on tags
+            foreach (var tag in snapshotTags)
+            {
+                if (tagGroupRefs.TryGetValue(tag.Id, out var refs))
+                {
+                    tag.GroupId = refs.GroupId;
+                    tag.Group = refs.GroupName;
+                }
+            }
+
             // Restore watch entries
             WatchEntries.Clear();
             foreach (var w in snapshotWatchEntries) WatchEntries.Add(w);
+
+            foreach (var w in snapshotWatchEntries)
+            {
+                if (watchGroupNames.TryGetValue(w.Id, out var groupName))
+                    w.TagGroup = groupName;
+            }
 
             // Restore group SubGroups and Tags collections from snapshots
             foreach (var group in snapshotGroups)
@@ -908,6 +1020,11 @@ namespace ModbusForge.Services
                 {
                     group.SubGroups.Clear();
                     foreach (var s in subs) group.SubGroups.Add(s);
+                }
+                if (subParentRefs.TryGetValue(group.Id, out var parentRefs))
+                {
+                    group.ParentGroupId = parentRefs.ParentId;
+                    group.ParentGroup = parentRefs.ParentName;
                 }
             }
 

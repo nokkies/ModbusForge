@@ -38,6 +38,14 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public ObservableCollection<string> OutputLog { get; } = new();
 
+        /// <summary>
+        /// Every <see cref="ScriptCommandType"/>, for the grid's Type combo box.
+        /// Free-text enum editing let users type plausible-but-invalid names
+        /// (e.g. "WriteHoldingRegisters") that only failed at commit time; the
+        /// combo makes the valid set visible and eliminates that class of error.
+        /// </summary>
+        public Array CommandTypes { get; } = Enum.GetValues(typeof(ScriptCommandType));
+
         public bool CanRun => !IsRunning && Script.Commands.Count > 0;
         public bool CanRemoveSelected => SelectedCommand != null;
         public bool CanCloneSelected => SelectedCommand != null;
@@ -84,8 +92,10 @@ namespace ModbusForge.Avalonia.ViewModels
             _scriptRunner.LogMessage += OnLogMessage;
             _scriptRunner.ScriptStarted += OnScriptStarted;
             _scriptRunner.ScriptCompleted += OnScriptCompleted;
+            _scriptRunner.ScriptCancelled += OnScriptCancelled;
             _scriptRunner.CommandExecuted += OnCommandExecuted;
             _script.Commands.CollectionChanged += Commands_CollectionChanged;
+            OutputLog.CollectionChanged += (_, _) => ClearLogCommand.NotifyCanExecuteChanged();
         }
 
         partial void OnSelectedCommandChanged(ScriptCommand? value)
@@ -175,10 +185,13 @@ namespace ModbusForge.Avalonia.ViewModels
             }
 
             OutputLog.Clear();
-            IsRunning = true;
-            StatusText = "Running...";
 
             var unitId = (byte)(_connectionManager.ActiveProfile?.UnitId ?? 1);
+
+            // IsRunning is set by the runner's ScriptStarted event, not here: if
+            // the runner is busy with another script (e.g. started via the REST
+            // API), this call is rejected without raising any events, and a
+            // preemptive IsRunning=true would leave the UI stuck on "Running...".
             await _scriptRunner.RunScriptAsync(Script, service, unitId, CancellationToken.None);
         }
 
@@ -265,6 +278,15 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 IsRunning = false;
                 StatusText = $"Script completed: {(e ? "SUCCESS" : "FAILED")}";
+            });
+        }
+
+        private void OnScriptCancelled(object? sender, EventArgs e)
+        {
+            _dispatcher.Invoke(() =>
+            {
+                IsRunning = false;
+                StatusText = "Script stopped by user";
             });
         }
 

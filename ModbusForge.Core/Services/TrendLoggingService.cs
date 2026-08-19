@@ -9,9 +9,8 @@ namespace ModbusForge.Services
     {
         private readonly object _sync = new();
         private int _retentionMinutes;
-        private int _sampleRateMs;
         private string _exportFolder;
-        private volatile bool _isRunning;
+        private bool _isRunning;
         private readonly Dictionary<string, string> _keys = new(); // key -> displayName
 
         public TrendLoggingService(IOptions<LoggingSettings> options)
@@ -19,49 +18,51 @@ namespace ModbusForge.Services
             var s = options?.Value ?? new LoggingSettings();
             s.Clamp();
             _retentionMinutes = s.RetentionMinutes;
-            _sampleRateMs = s.SampleRateMs;
             _exportFolder = string.IsNullOrWhiteSpace(s.ExportFolder) ? "Exports" : s.ExportFolder;
         }
 
         public int RetentionMinutes { get { lock (_sync) return _retentionMinutes; } }
-        public int SampleRateMs { get { lock (_sync) return _sampleRateMs; } }
         public string ExportFolder { get { lock (_sync) return _exportFolder; } }
         public bool IsRunning { get { lock (_sync) return _isRunning; } }
 
-        public void UpdateSettings(int retentionMinutes, int sampleRateMs, string? exportFolder = null)
+        public void UpdateSettings(int retentionMinutes, string? exportFolder = null)
         {
             lock (_sync)
             {
                 if (retentionMinutes < 1) retentionMinutes = 1;
                 if (retentionMinutes > 60) retentionMinutes = 60;
-                if (sampleRateMs < 50) sampleRateMs = 50;
-                if (sampleRateMs > 60000) sampleRateMs = 60000;
                 _retentionMinutes = retentionMinutes;
-                _sampleRateMs = sampleRateMs;
                 if (!string.IsNullOrWhiteSpace(exportFolder)) _exportFolder = exportFolder!;
             }
         }
 
         public void Start()
         {
+            bool changed;
             lock (_sync)
             {
+                changed = !_isRunning;
                 _isRunning = true;
             }
             // Sampling is driven externally via Publish; no internal timer here.
+            if (changed) StateChanged?.Invoke(true);
         }
 
         public void Stop()
         {
+            bool changed;
             lock (_sync)
             {
+                changed = _isRunning;
                 _isRunning = false;
             }
+            if (changed) StateChanged?.Invoke(false);
         }
 
         public event Action<string, string>? Added;
         public event Action<string>? Removed;
         public event Action<string, double, DateTime>? Sampled;
+        public event Action<bool>? StateChanged;
 
         public void Add(string key, string displayName)
         {
@@ -84,6 +85,17 @@ namespace ModbusForge.Services
                 existed = _keys.Remove(key);
             }
             if (existed) Removed?.Invoke(key);
+        }
+
+        public void SetDisplayName(string key, string displayName)
+        {
+            if (string.IsNullOrWhiteSpace(key)) return;
+            if (string.IsNullOrWhiteSpace(displayName)) return;
+            lock (_sync)
+            {
+                if (!_keys.TryGetValue(key, out var current) || current == displayName) return;
+                _keys[key] = displayName;
+            }
         }
 
         public void Publish(string key, double value, DateTime timestampUtc)

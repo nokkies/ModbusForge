@@ -11,12 +11,12 @@ namespace ModbusForge.Tests.Simulation
         {
             var block = new AndBlock();
             var context = new TestExecutionContext();
-            context.SetInput("Input1", SimulationValue.Bool(true));
-            context.SetInput("Input2", SimulationValue.Bool(true));
+            context.SetInput(PortNames.GateInput1, SimulationValue.Bool(true));
+            context.SetInput(PortNames.GateInput2, SimulationValue.Bool(true));
 
             block.Execute(context);
 
-            Assert.True(context.GetOutput("Output")!.AsBool());
+            Assert.True(context.GetOutput(PortNames.BoolOutput)!.AsBool());
         }
 
         [Fact]
@@ -24,12 +24,12 @@ namespace ModbusForge.Tests.Simulation
         {
             var block = new AndBlock();
             var context = new TestExecutionContext();
-            context.SetInput("Input1", SimulationValue.Bool(true));
-            context.SetInput("Input2", SimulationValue.Bool(false));
+            context.SetInput(PortNames.GateInput1, SimulationValue.Bool(true));
+            context.SetInput(PortNames.GateInput2, SimulationValue.Bool(false));
 
             block.Execute(context);
 
-            Assert.False(context.GetOutput("Output")!.AsBool());
+            Assert.False(context.GetOutput(PortNames.BoolOutput)!.AsBool());
         }
 
         [Fact]
@@ -37,12 +37,12 @@ namespace ModbusForge.Tests.Simulation
         {
             var block = new MathBlock(MathOperation.Add);
             var context = new TestExecutionContext();
-            context.SetInput("Input1", SimulationValue.Int32(10));
-            context.SetInput("Input2", SimulationValue.Int32(3));
+            context.SetInput(PortNames.OperandA, SimulationValue.Int32(10));
+            context.SetInput(PortNames.OperandB, SimulationValue.Int32(3));
 
             block.Execute(context);
 
-            Assert.Equal(13, context.GetOutput("Output")!.AsInt32());
+            Assert.Equal(13, context.GetOutput(PortNames.BoolOutput)!.AsInt32());
         }
 
         [Fact]
@@ -50,12 +50,12 @@ namespace ModbusForge.Tests.Simulation
         {
             var block = new MathBlock(MathOperation.Divide);
             var context = new TestExecutionContext();
-            context.SetInput("Input1", SimulationValue.Int32(10));
-            context.SetInput("Input2", SimulationValue.Int32(0));
+            context.SetInput(PortNames.OperandA, SimulationValue.Int32(10));
+            context.SetInput(PortNames.OperandB, SimulationValue.Int32(0));
 
             block.Execute(context);
 
-            Assert.Equal(0, context.GetOutput("Output")!.AsInt32());
+            Assert.Equal(0, context.GetOutput(PortNames.BoolOutput)!.AsInt32());
         }
 
         [Fact]
@@ -63,12 +63,12 @@ namespace ModbusForge.Tests.Simulation
         {
             var block = new CompareBlock(ComparisonOperation.GreaterThan);
             var context = new TestExecutionContext();
-            context.SetInput("Input1", SimulationValue.Int32(7));
-            context.SetInput("Input2", SimulationValue.Int32(2));
+            context.SetInput(PortNames.OperandA, SimulationValue.Int32(7));
+            context.SetInput(PortNames.OperandB, SimulationValue.Int32(2));
 
             block.Execute(context);
 
-            Assert.True(context.GetOutput("Output")!.AsBool());
+            Assert.True(context.GetOutput(PortNames.BoolOutput)!.AsBool());
         }
 
         [Fact]
@@ -76,12 +76,12 @@ namespace ModbusForge.Tests.Simulation
         {
             var block = new CompareBlock(ComparisonOperation.Equal);
             var context = new TestExecutionContext();
-            context.SetInput("Input1", SimulationValue.Int32(5));
+            context.SetInput(PortNames.OperandA, SimulationValue.Int32(5));
             context.Parameters["CompareValue"] = 5;
 
             block.Execute(context);
 
-            Assert.True(context.GetOutput("Output")!.AsBool());
+            Assert.True(context.GetOutput(PortNames.BoolOutput)!.AsBool());
         }
 
         [Fact]
@@ -92,22 +92,22 @@ namespace ModbusForge.Tests.Simulation
             context.Parameters["ValveTravelTimeMs"] = 500;
 
             // Start transition with OpenCmd.
-            context.SetInput("OpenCmd", SimulationValue.Bool(true));
-            context.SetInput("CloseCmd", SimulationValue.Bool(false));
+            context.SetInput(PortNames.OpenCmd, SimulationValue.Bool(true));
+            context.SetInput(PortNames.CloseCmd, SimulationValue.Bool(false));
 
             // First scan starts the transition.
             block.Execute(context);
-            Assert.False(context.GetOutput("Output")!.AsBool());
+            Assert.False(context.GetOutput(PortNames.ValveOpen)!.AsBool());
 
             // Elapse half the travel time — still not open.
             context.OverrideElapsed(TimeSpan.FromMilliseconds(250));
             block.Execute(context);
-            Assert.False(context.GetOutput("Output")!.AsBool());
+            Assert.False(context.GetOutput(PortNames.ValveOpen)!.AsBool());
 
             // Elapse full travel time — now open.
             context.OverrideElapsed(TimeSpan.FromMilliseconds(500));
             block.Execute(context);
-            Assert.True(context.GetOutput("Output")!.AsBool());
+            Assert.True(context.GetOutput(PortNames.ValveOpen)!.AsBool());
         }
 
         [Fact]
@@ -115,13 +115,13 @@ namespace ModbusForge.Tests.Simulation
         {
             var block = new ValveBlock();
             var context = new TestExecutionContext();
-            context.SetInput("OpenCmd", SimulationValue.Bool(true));
-            context.SetInput("CloseCmd", SimulationValue.Bool(true));
+            context.SetInput(PortNames.OpenCmd, SimulationValue.Bool(true));
+            context.SetInput(PortNames.CloseCmd, SimulationValue.Bool(true));
 
             block.Execute(context);
 
-            Assert.False(context.GetOutput("Output")!.AsBool());
-            Assert.True(context.GetOutput("Fault")!.AsBool());
+            Assert.False(context.GetOutput(PortNames.ValveOpen)!.AsBool());
+            Assert.True(context.GetOutput(PortNames.Fault)!.AsBool());
         }
 
         [Fact]
@@ -131,23 +131,23 @@ namespace ModbusForge.Tests.Simulation
             var context = new TestExecutionContext();
             context.Parameters["MotorDolRunDelayMs"] = 100;
 
-            context.SetInput("Start", SimulationValue.Bool(true));
-            context.SetInput("Stop", SimulationValue.Bool(false));
+            context.SetInput(PortNames.Start, SimulationValue.Bool(true));
+            context.SetInput(PortNames.Stop, SimulationValue.Bool(false));
 
             // First scan starts the pickup delay.
             context.OverrideElapsed(TimeSpan.FromMilliseconds(10));
             block.Execute(context);
-            Assert.False(context.GetOutput("Output")!.AsBool());
+            Assert.False(context.GetOutput(PortNames.MotorRun)!.AsBool());
 
             // Still before run delay.
             context.OverrideElapsed(TimeSpan.FromMilliseconds(50));
             block.Execute(context);
-            Assert.False(context.GetOutput("Output")!.AsBool());
+            Assert.False(context.GetOutput(PortNames.MotorRun)!.AsBool());
 
             // Run delay elapsed.
             context.OverrideElapsed(TimeSpan.FromMilliseconds(50));
             block.Execute(context);
-            Assert.True(context.GetOutput("Output")!.AsBool());
+            Assert.True(context.GetOutput(PortNames.MotorRun)!.AsBool());
         }
 
         [Fact]
@@ -160,28 +160,28 @@ namespace ModbusForge.Tests.Simulation
             context.Parameters["VsdRampDownMs"] = 1000;
             context.Parameters["VsdAtSpeedTolerance"] = 2.0;
 
-            context.SetInput("Run", SimulationValue.Bool(true));
-            context.SetInput("SpeedReference", SimulationValue.Real(50.0));
+            context.SetInput(PortNames.Run, SimulationValue.Bool(true));
+            context.SetInput(PortNames.SpeedReference, SimulationValue.Real(50.0));
 
             // Initial scan starts ramp.
             context.OverrideElapsed(TimeSpan.FromMilliseconds(10));
             block.Execute(context);
-            Assert.True(context.GetOutput("Output")!.AsBool());
-            var speed = context.GetOutput("SpeedFeedback")!.AsReal();
+            Assert.True(context.GetOutput(PortNames.VsdRunning)!.AsBool());
+            var speed = context.GetOutput(PortNames.SpeedFeedback)!.AsReal();
             Assert.Equal(1.0, speed, precision: 1);
-            Assert.False(context.GetOutput("AtSpeed")!.AsBool());
+            Assert.False(context.GetOutput(PortNames.AtSpeed)!.AsBool());
 
             // A quarter of the ramp time should reach ~25 (half the 50 reference).
             context.OverrideElapsed(TimeSpan.FromMilliseconds(250));
             block.Execute(context);
-            var feedback = context.GetOutput("SpeedFeedback")!.AsReal();
+            var feedback = context.GetOutput(PortNames.SpeedFeedback)!.AsReal();
             Assert.True(feedback > 20 && feedback < 30);
 
             // Full ramp time should reach the 50 target.
             context.OverrideElapsed(TimeSpan.FromMilliseconds(1000));
             block.Execute(context);
-            Assert.Equal(50.0, context.GetOutput("SpeedFeedback")!.AsReal(), precision: 1);
-            Assert.True(context.GetOutput("AtSpeed")!.AsBool());
+            Assert.Equal(50.0, context.GetOutput(PortNames.SpeedFeedback)!.AsReal(), precision: 1);
+            Assert.True(context.GetOutput(PortNames.AtSpeed)!.AsBool());
         }
 
         [Fact]
@@ -194,19 +194,19 @@ namespace ModbusForge.Tests.Simulation
             context.Parameters["VsdRampDownMs"] = 1000;
             context.Parameters["VsdAtSpeedTolerance"] = 2.0;
 
-            context.SetInput("Run", SimulationValue.Bool(true));
-            context.SetInput("SpeedReference", SimulationValue.Real(100.0));
+            context.SetInput(PortNames.Run, SimulationValue.Bool(true));
+            context.SetInput(PortNames.SpeedReference, SimulationValue.Real(100.0));
 
             context.OverrideElapsed(TimeSpan.FromMilliseconds(0));
             block.Execute(context);
-            Assert.Equal(100.0, context.GetOutput("SpeedFeedback")!.AsReal(), precision: 0);
+            Assert.Equal(100.0, context.GetOutput(PortNames.SpeedFeedback)!.AsReal(), precision: 0);
 
-            context.SetInput("Run", SimulationValue.Bool(false));
+            context.SetInput(PortNames.Run, SimulationValue.Bool(false));
             context.OverrideElapsed(TimeSpan.FromMilliseconds(1000));
             block.Execute(context);
 
-            Assert.False(context.GetOutput("Output")!.AsBool());
-            Assert.Equal(0.0, context.GetOutput("SpeedFeedback")!.AsReal(), precision: 1);
+            Assert.False(context.GetOutput(PortNames.VsdRunning)!.AsBool());
+            Assert.Equal(0.0, context.GetOutput(PortNames.SpeedFeedback)!.AsReal(), precision: 1);
         }
 
         [Fact]
@@ -219,52 +219,335 @@ namespace ModbusForge.Tests.Simulation
             context.Parameters["VsdRampDownMs"] = 0;
             context.Parameters["VsdAtSpeedTolerance"] = 2.0;
 
-            context.SetInput("Run", SimulationValue.Bool(true));
-            context.SetInput("SpeedReference", SimulationValue.Real(50.0));
+            context.SetInput(PortNames.Run, SimulationValue.Bool(true));
+            context.SetInput(PortNames.SpeedReference, SimulationValue.Real(50.0));
 
             block.Execute(context);
 
-            Assert.Equal(50.0, context.GetOutput("SpeedFeedback")!.AsReal(), precision: 0);
-            Assert.True(context.GetOutput("AtSpeed")!.AsBool());
+            Assert.Equal(50.0, context.GetOutput(PortNames.SpeedFeedback)!.AsReal(), precision: 0);
+            Assert.True(context.GetOutput(PortNames.AtSpeed)!.AsBool());
         }
 
         [Fact]
-        public void MotorDolBlock_StopActive_DropsRunningAndSetsFault()
+        public void MotorDolBlock_StopActive_DropsRunning_WithoutFault()
         {
+            // Stop is a normal stop command: it de-energises the starter and
+            // de-asserts Running without tripping any fault output.
             var block = new MotorDolBlock();
             var context = new TestExecutionContext();
             context.Parameters["MotorDolRunDelayMs"] = 0;
 
-            context.SetInput("Start", SimulationValue.Bool(true));
-            context.SetInput("Stop", SimulationValue.Bool(false));
+            context.SetInput(PortNames.Start, SimulationValue.Bool(true));
+            context.SetInput(PortNames.Stop, SimulationValue.Bool(false));
 
             block.Execute(context);
-            Assert.True(context.GetOutput("Output")!.AsBool());
-            Assert.False(context.GetOutput("Fault")!.AsBool());
+            Assert.True(context.GetOutput(PortNames.MotorRun)!.AsBool());
 
-            context.SetInput("Stop", SimulationValue.Bool(true));
+            context.SetInput(PortNames.Stop, SimulationValue.Bool(true));
 
             block.Execute(context);
-            Assert.False(context.GetOutput("Output")!.AsBool());
-            Assert.True(context.GetOutput("Fault")!.AsBool());
+            Assert.False(context.GetOutput(PortNames.MotorRun)!.AsBool());
         }
 
         [Fact]
-        public void ValveBlock_NormallyOpen_RestPositionIsOpen()
+        public void ValveBlock_NormallyOpen_SpringReturn_RestPositionIsOpen()
         {
+            // Non-latching (spring-return) normally-open valve returns to its
+            // rest (open) position when no command is active.
             var block = new ValveBlock();
             var context = new TestExecutionContext();
             context.Parameters["ValveTravelTimeMs"] = 0;
             context.Parameters["ValveNormallyOpen"] = true;
+            context.Parameters["ValveLatching"] = false;
 
             // No commands active.
-            context.SetInput("OpenCmd", SimulationValue.Bool(false));
-            context.SetInput("CloseCmd", SimulationValue.Bool(false));
+            context.SetInput(PortNames.OpenCmd, SimulationValue.Bool(false));
+            context.SetInput(PortNames.CloseCmd, SimulationValue.Bool(false));
 
             block.Execute(context);
 
-            Assert.True(context.GetOutput("Output")!.AsBool());
-            Assert.False(context.GetOutput("Fault")!.AsBool());
+            Assert.True(context.GetOutput(PortNames.ValveOpen)!.AsBool());
+            Assert.False(context.GetOutput(PortNames.Fault)!.AsBool());
+        }
+
+        [Fact]
+        public void ValveBlock_Latching_NoCommand_HoldsLastPosition()
+        {
+            // Latching (default) valve holds its last commanded position when
+            // both commands are de-asserted — it does not spring back.
+            var block = new ValveBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["ValveTravelTimeMs"] = 0;
+            context.Parameters["ValveNormallyOpen"] = false;
+            context.Parameters["ValveLatching"] = true;
+
+            // Command the valve open.
+            context.SetInput(PortNames.OpenCmd, SimulationValue.Bool(true));
+            context.SetInput(PortNames.CloseCmd, SimulationValue.Bool(false));
+            block.Execute(context);
+            Assert.True(context.GetOutput(PortNames.ValveOpen)!.AsBool());
+
+            // De-assert the command: a latching valve stays open.
+            context.SetInput(PortNames.OpenCmd, SimulationValue.Bool(false));
+            block.Execute(context);
+            Assert.True(context.GetOutput(PortNames.ValveOpen)!.AsBool());
+            Assert.False(context.GetOutput(PortNames.Fault)!.AsBool());
+        }
+
+        [Fact]
+        public void ScaleBlock_MapsRawValueIntoTargetRange()
+        {
+            var block = new ScaleBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["ScaleFromMin"] = 0.0;
+            context.Parameters["ScaleFromMax"] = 100.0;
+            context.Parameters["ScaleToMin"] = 0.0;
+            context.Parameters["ScaleToMax"] = 120.0;
+            context.SetInput(PortNames.Value, SimulationValue.Real(50));
+
+            block.Execute(context);
+
+            Assert.Equal(60.0, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+        }
+
+        [Fact]
+        public void ScaleBlock_AcceptsIntegerInput_FromRegisterSource()
+        {
+            var block = new ScaleBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["ScaleFromMin"] = 0.0;
+            context.Parameters["ScaleFromMax"] = 200.0;
+            context.Parameters["ScaleToMin"] = 0.0;
+            context.Parameters["ScaleToMax"] = 1.0;
+            context.SetInput(PortNames.Value, SimulationValue.Int32(40));
+
+            block.Execute(context);
+
+            Assert.Equal(0.2, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+        }
+
+        [Fact]
+        public void ScaleBlock_InvertedTargetRange_MapsInversely()
+        {
+            var block = new ScaleBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["ScaleFromMin"] = 0.0;
+            context.Parameters["ScaleFromMax"] = 100.0;
+            context.Parameters["ScaleToMin"] = 100.0;
+            context.Parameters["ScaleToMax"] = 0.0;
+
+            context.SetInput(PortNames.Value, SimulationValue.Real(0));
+            block.Execute(context);
+            Assert.Equal(100.0, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+
+            context.SetInput(PortNames.Value, SimulationValue.Real(100));
+            block.Execute(context);
+            Assert.Equal(0.0, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+        }
+
+        [Fact]
+        public void ScaleBlock_DegenerateSourceSpan_YieldsTargetMin_WithoutNaN()
+        {
+            var block = new ScaleBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["ScaleFromMin"] = 5.0;
+            context.Parameters["ScaleFromMax"] = 5.0;
+            context.Parameters["ScaleToMin"] = 42.0;
+            context.Parameters["ScaleToMax"] = 42.0;
+            context.SetInput(PortNames.Value, SimulationValue.Real(99));
+
+            block.Execute(context);
+
+            var output = context.GetOutput(PortNames.BoolOutput)!.AsReal();
+            Assert.True(double.IsFinite(output));
+            Assert.Equal(42.0, output, precision: 10);
+        }
+
+        [Fact]
+        public void ScaleBlock_ClampsOutOfRangeRaw_WhenClampEnabled()
+        {
+            var block = new ScaleBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["ScaleFromMin"] = 0.0;
+            context.Parameters["ScaleFromMax"] = 100.0;
+            context.Parameters["ScaleToMin"] = 0.0;
+            context.Parameters["ScaleToMax"] = 120.0;
+            context.Parameters["ScaleClamp"] = true;
+
+            context.SetInput(PortNames.Value, SimulationValue.Real(150));
+            block.Execute(context);
+            Assert.Equal(120.0, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+
+            context.SetInput(PortNames.Value, SimulationValue.Real(-10));
+            block.Execute(context);
+            Assert.Equal(0.0, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+        }
+
+        [Fact]
+        public void ScaleBlock_KeepsOutOfRangeResult_WhenClampDisabled()
+        {
+            var block = new ScaleBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["ScaleFromMin"] = 0.0;
+            context.Parameters["ScaleFromMax"] = 100.0;
+            context.Parameters["ScaleToMin"] = 0.0;
+            context.Parameters["ScaleToMax"] = 120.0;
+            context.Parameters["ScaleClamp"] = false;
+
+            context.SetInput(PortNames.Value, SimulationValue.Real(150));
+            block.Execute(context);
+
+            Assert.Equal(180.0, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+        }
+
+        [Fact]
+        public void ScaleBlock_NonFiniteInput_YieldsTargetMin()
+        {
+            var block = new ScaleBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["ScaleToMax"] = 100.0;
+            context.SetInput(PortNames.Value, SimulationValue.Real(double.NaN));
+
+            block.Execute(context);
+
+            var output = context.GetOutput(PortNames.BoolOutput)!.AsReal();
+            Assert.True(double.IsFinite(output));
+            Assert.Equal(0.0, output, precision: 10);
+        }
+
+        [Fact]
+        public void EdgeDetectBlock_RisingEdge_PulsesForOneCycleOnly()
+        {
+            var block = new EdgeDetectBlock();
+            var context = new TestExecutionContext();
+
+            // First scan with the input already high: records the level, no pulse.
+            context.SetInput(PortNames.TimerInput, SimulationValue.Bool(true));
+            block.Execute(context);
+            Assert.False(context.GetOutput(PortNames.BoolOutput)!.AsBool());
+
+            // Still high: no pulse.
+            block.Execute(context);
+            Assert.False(context.GetOutput(PortNames.BoolOutput)!.AsBool());
+
+            // Going low: no pulse (rising detector).
+            context.SetInput(PortNames.TimerInput, SimulationValue.Bool(false));
+            block.Execute(context);
+            Assert.False(context.GetOutput(PortNames.BoolOutput)!.AsBool());
+
+            // The real rising edge: one-cycle pulse.
+            context.SetInput(PortNames.TimerInput, SimulationValue.Bool(true));
+            block.Execute(context);
+            Assert.True(context.GetOutput(PortNames.BoolOutput)!.AsBool());
+
+            // Next cycle the pulse is gone even though the input is still high.
+            block.Execute(context);
+            Assert.False(context.GetOutput(PortNames.BoolOutput)!.AsBool());
+        }
+
+        [Fact]
+        public void EdgeDetectBlock_FallingDirection_PulsesOnFallingTransition()
+        {
+            var block = new EdgeDetectBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["EdgeDetectDirection"] = EdgeDetectBlock.Falling;
+
+            // First scan (low): no pulse.
+            context.SetInput(PortNames.TimerInput, SimulationValue.Bool(false));
+            block.Execute(context);
+            Assert.False(context.GetOutput(PortNames.BoolOutput)!.AsBool());
+
+            // Rising: no pulse for a falling detector.
+            context.SetInput(PortNames.TimerInput, SimulationValue.Bool(true));
+            block.Execute(context);
+            Assert.False(context.GetOutput(PortNames.BoolOutput)!.AsBool());
+
+            // Falling edge: pulse.
+            context.SetInput(PortNames.TimerInput, SimulationValue.Bool(false));
+            block.Execute(context);
+            Assert.True(context.GetOutput(PortNames.BoolOutput)!.AsBool());
+
+            // Still low: no further pulse.
+            block.Execute(context);
+            Assert.False(context.GetOutput(PortNames.BoolOutput)!.AsBool());
+        }
+
+        [Fact]
+        public void MovingAverageBlock_FillsTheWindowGradually()
+        {
+            var block = new MovingAverageBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["MaWindowSize"] = 3;
+
+            context.SetInput(PortNames.Value, SimulationValue.Real(1));
+            block.Execute(context);
+            Assert.Equal(1.0, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+
+            context.SetInput(PortNames.Value, SimulationValue.Real(2));
+            block.Execute(context);
+            Assert.Equal(1.5, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+
+            context.SetInput(PortNames.Value, SimulationValue.Real(3));
+            block.Execute(context);
+            Assert.Equal(2.0, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+        }
+
+        [Fact]
+        public void MovingAverageBlock_FullWindow_AveragesTheLastNSamples()
+        {
+            var block = new MovingAverageBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["MaWindowSize"] = 2;
+
+            foreach (var sample in new[] { 10.0, 10.0, 20.0, 30.0 })
+            {
+                context.SetInput(PortNames.Value, SimulationValue.Real(sample));
+                block.Execute(context);
+            }
+
+            // Window of the last two samples: (20 + 30) / 2.
+            Assert.Equal(25.0, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+        }
+
+        [Fact]
+        public void MovingAverageBlock_WindowChange_StartsFresh()
+        {
+            var block = new MovingAverageBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["MaWindowSize"] = 2;
+
+            context.SetInput(PortNames.Value, SimulationValue.Real(10));
+            block.Execute(context);
+            context.SetInput(PortNames.Value, SimulationValue.Real(20));
+            block.Execute(context);
+            Assert.Equal(15.0, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+
+            context.Parameters["MaWindowSize"] = 3;
+            context.SetInput(PortNames.Value, SimulationValue.Real(30));
+            block.Execute(context);
+            // The old two-sample buffer must not leak into the new window.
+            Assert.Equal(30.0, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+        }
+
+        [Fact]
+        public void MovingAverageBlock_SkipsNonFiniteSamples()
+        {
+            var block = new MovingAverageBlock();
+            var context = new TestExecutionContext();
+            context.Parameters["MaWindowSize"] = 2;
+
+            context.SetInput(PortNames.Value, SimulationValue.Real(10));
+            block.Execute(context);
+            Assert.Equal(10.0, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+
+            // A glitched register: skipped, the previous average holds.
+            context.SetInput(PortNames.Value, SimulationValue.Real(double.PositiveInfinity));
+            block.Execute(context);
+            Assert.Equal(10.0, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
+
+            context.SetInput(PortNames.Value, SimulationValue.Real(20));
+            block.Execute(context);
+            Assert.Equal(15.0, context.GetOutput(PortNames.BoolOutput)!.AsReal(), precision: 10);
         }
 
         private sealed class TestExecutionContext : IExecutionContext

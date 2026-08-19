@@ -54,6 +54,13 @@ namespace ModbusForge.Services
         string BoundEndpoint { get; }
 
         /// <summary>
+        /// Raised when a previously established connection is detected as lost
+        /// (e.g. the peer closed the socket or a request failed because the
+        /// transport is dead). Raised from a worker thread.
+        /// </summary>
+        event EventHandler? ConnectionLost;
+
+        /// <summary>
         /// Captured Modbus frame log for this connection.
         /// </summary>
         ModbusFrameLogger FrameLogger { get; }

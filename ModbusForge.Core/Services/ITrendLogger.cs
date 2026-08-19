@@ -5,17 +5,25 @@ namespace ModbusForge.Services
     public interface ITrendLogger
     {
         int RetentionMinutes { get; }
-        int SampleRateMs { get; }
         string ExportFolder { get; }
         bool IsRunning { get; }
 
-        void UpdateSettings(int retentionMinutes, int sampleRateMs, string? exportFolder = null);
+        // Sampling is driven externally (each monitored entry is published at
+        // its own read period), so there is no sample rate to configure here.
+        void UpdateSettings(int retentionMinutes, string? exportFolder = null);
         void Start();
         void Stop();
 
         // Series management for UI
         void Add(string key, string displayName);
         void Remove(string key);
+
+        /// <summary>
+        /// Updates the display name of an active series (a pen rename). The
+        /// key - and therefore the accumulated samples - is untouched.
+        /// No-op for unknown keys and blank names.
+        /// </summary>
+        void SetDisplayName(string key, string displayName);
 
         // Push a sample for an existing key
         void Publish(string key, double value, DateTime timestampUtc);
@@ -24,6 +32,13 @@ namespace ModbusForge.Services
         event Action<string, string>? Added;          // key, displayName
         event Action<string>? Removed;                // key
         event Action<string, double, DateTime>? Sampled; // key, value, timestampUtc
+
+        /// <summary>
+        /// Raised on the calling thread whenever the running state changes.
+        /// Both controllers of the running flag (connection lifecycle and the
+        /// Trend view's Start/Stop) stay in sync through this event.
+        /// </summary>
+        event Action<bool>? StateChanged;
 
         System.Collections.Generic.IReadOnlyDictionary<string, string> ActiveKeys { get; }
     }

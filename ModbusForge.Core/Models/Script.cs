@@ -24,7 +24,10 @@ public partial class Script : ObservableObject
     [ObservableProperty]
     private int _delayBetweenCommandsMs = 100;
 
-    public ObservableCollection<ScriptCommand> Commands { get; } = new();
+    // The setter is required for System.Text.Json round-trips: get-only
+    // collection properties are silently skipped on deserialization, which
+    // previously caused loaded scripts to lose every command.
+    public ObservableCollection<ScriptCommand> Commands { get; set; } = new();
 
     public Script() { }
 

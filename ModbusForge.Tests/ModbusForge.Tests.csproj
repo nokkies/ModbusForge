@@ -30,6 +30,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ModbusForge\ModbusForge.csproj" />
     <ProjectReference Include="..\ModbusForge.Core\ModbusForge.Core.csproj" />
+    <ProjectReference Include="..\ModbusForge.Headless\ModbusForge.Headless.csproj" />
   </ItemGroup>
 
 </Project>

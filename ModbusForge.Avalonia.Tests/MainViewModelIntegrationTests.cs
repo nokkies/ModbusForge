@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModbusForge.Avalonia.ViewModels;
 using ModbusForge.Models;
@@ -53,6 +54,65 @@ namespace ModbusForge.Avalonia.Tests
             await vm.DisconnectCommand.ExecuteAsync(null);
             vm.Dispose();
             server.Stop();
+        }
+
+        [Fact]
+        public async Task Poll_UpdatesSymbolicTagsForTheReadRange()
+        {
+            using var server = CreateTestServer();
+            var port = ((IPEndPoint?)server.LocalEndpoint)?.Port
+                ?? throw new InvalidOperationException("Server not bound");
+
+            var connectionManager = new ConnectionManager(
+                NullLogger<ConnectionManager>.Instance,
+                NullLoggerFactory.Instance,
+                null);
+            var profile = new ConnectionProfile("Test", "127.0.0.1", port, 1) { Mode = "Client" };
+            connectionManager.AddProfile(profile);
+            connectionManager.SetActiveProfile(profile);
+
+            var tagService = new TagService();
+            // The area start clamps to 1, so the monitored range is 1..5; the
+            // built-in server seeds address 1 with 10 (i*10 for register i).
+            var tag = new Tag
+            {
+                Name = "HR1",
+                Area = PlcArea.HoldingRegister,
+                Address = 1,
+                DataType = TagDataType.UInt16,
+            };
+            tagService.Tags.Add(tag);
+
+            var vm = new MainViewModel(
+                connectionManager,
+                NullLogger<MainViewModel>.Instance,
+                new SyncDispatcher(),
+                tagService: tagService);
+
+            vm.StartAddress = 1;
+            vm.RegisterCount = 5;
+
+            await vm.ConnectCommand.ExecuteAsync(null);
+            try
+            {
+                var deadline = DateTime.UtcNow.AddSeconds(5);
+                while (tag.CurrentValue is not ushort && DateTime.UtcNow < deadline)
+                {
+                    await Task.Delay(100);
+                }
+
+                Assert.True(tag.CurrentValue is not null,
+                    $"tag not refreshed: grid count={vm.Registers.Count}, status='{vm.StatusMessage}', " +
+                    $"connected={vm.ActiveProfile?.IsConnected}");
+                Assert.Equal((ushort)10, Assert.IsType<ushort>(tag.CurrentValue));
+                Assert.True(tag.LastUpdated > DateTime.MinValue);
+            }
+            finally
+            {
+                await vm.DisconnectCommand.ExecuteAsync(null);
+                vm.Dispose();
+                server.Stop();
+            }
         }
 
         private static ModbusMultiUnitServer CreateTestServer()

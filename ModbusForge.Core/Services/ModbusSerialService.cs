@@ -86,6 +86,8 @@ namespace ModbusForge.Services
             throw new NotSupportedException("Serial connections require a ConnectionProfile. Use ConnectAsync(ConnectionProfile).");
         }
 
+        public event EventHandler? ConnectionLost;
+
         public virtual async Task<bool> ConnectAsync(ConnectionProfile profile, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(profile);
@@ -106,15 +108,15 @@ namespace ModbusForge.Services
 
                 _connectionProfile = profile;
 
-                _serialPort = new SerialPort(profile.ComPort, profile.BaudRate, profile.Parity, profile.DataBits, profile.StopBits)
-                {
-                    RtsEnable = profile.RtsEnable,
-                    ReadTimeout = 5000,
-                    WriteTimeout = 5000
-                };
-
                 try
                 {
+                    _serialPort = new SerialPort(profile.ComPort, profile.BaudRate, profile.Parity, profile.DataBits, profile.StopBits)
+                    {
+                        RtsEnable = profile.RtsEnable,
+                        ReadTimeout = 5000,
+                        WriteTimeout = 5000
+                    };
+
                     _serialPort.Open();
 
                     var adapter = ModbusStreamAdapterFactory.CreateSerialAdapter(_serialPort);
@@ -149,9 +151,28 @@ namespace ModbusForge.Services
             }
         }
 
+        private static readonly TimeSpan DisconnectLockTimeout = TimeSpan.FromSeconds(10);
+
         public virtual async Task DisconnectAsync()
         {
-            await _ioLock.WaitAsync().ConfigureAwait(false);
+            // Bound the wait: a request stuck on a dead port must not block the
+            // disconnect forever. If we time out, close the transport anyway so
+            // the in-flight request fails and releases the lock on its own.
+            var acquired = await _ioLock.WaitAsync(DisconnectLockTimeout).ConfigureAwait(false);
+            if (!acquired)
+            {
+                _logger.LogWarning("Timed out waiting for an in-flight request before disconnect; closing the transport anyway.");
+                try
+                {
+                    DisconnectCore();
+                }
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                {
+                    _logger.LogError(ex, "Error closing the transport after a disconnect timeout.");
+                }
+                return;
+            }
+
             try
             {
                 if (IsConnected)
@@ -430,6 +451,13 @@ namespace ModbusForge.Services
                         if (_client != null)
                             ApplySerialTiming(() => writeAction(_client, protocolAddress));
                     }
+                    catch (NModbus.SlaveException ex)
+                    {
+                        // A slave exception response is a valid Modbus answer (e.g. the
+                        // device rejected the address), not a dead line - keep the
+                        // connection, as ExecuteMasterAsync and the chunked executor do.
+                        _logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
+                    }
                     catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                     {
                         _logger.LogError(ex, errorLogContext);
@@ -550,7 +578,13 @@ namespace ModbusForge.Services
         private void HandleConnectionLoss()
         {
             _logger.LogInformation("Serial client is disconnected. Cleaning up connection.");
+            bool wasConnected = _client != null;
             DisconnectCore();
+
+            if (wasConnected)
+            {
+                ConnectionLost?.Invoke(this, EventArgs.Empty);
+            }
         }
 
         private void DisconnectCore()

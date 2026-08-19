@@ -95,6 +95,7 @@ namespace ModbusForge.Models
             Group = Group,
             Area = RegisterType,
             Address = Address,
+            Bit = Bit,
             DataType = Bit.HasValue ? TagDataType.Bool : DataType,
             Scale = Scale,
             Offset = Offset,

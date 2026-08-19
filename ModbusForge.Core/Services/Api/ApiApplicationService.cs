@@ -21,7 +21,7 @@ public sealed class ApiApplicationService : IApiApplicationService
     private const int ConnectionStateTimeoutMs = 30_000;
 
     private readonly IAppStateAccessor _appState;
-    private readonly IModbusService _modbusService;
+    private readonly IConnectionManager _connectionManager;
     private readonly IScriptRuleService _scriptRuleService;
     private readonly IConsoleLoggerService _consoleLoggerService;
     private readonly ITrendLogger _trendLogger;
@@ -33,7 +33,7 @@ public sealed class ApiApplicationService : IApiApplicationService
 
     public ApiApplicationService(
         IAppStateAccessor appState,
-        IModbusService modbusService,
+        IConnectionManager connectionManager,
         IScriptRuleService scriptRuleService,
         IConsoleLoggerService consoleLoggerService,
         ITrendLogger trendLogger,
@@ -41,7 +41,7 @@ public sealed class ApiApplicationService : IApiApplicationService
         ILogger<ApiApplicationService> logger)
     {
         _appState = appState ?? throw new ArgumentNullException(nameof(appState));
-        _modbusService = modbusService ?? throw new ArgumentNullException(nameof(modbusService));
+        _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
         _scriptRuleService = scriptRuleService ?? throw new ArgumentNullException(nameof(scriptRuleService));
         _consoleLoggerService = consoleLoggerService ?? throw new ArgumentNullException(nameof(consoleLoggerService));
         _trendLogger = trendLogger ?? throw new ArgumentNullException(nameof(trendLogger));
@@ -49,19 +49,20 @@ public sealed class ApiApplicationService : IApiApplicationService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <summary>
+    /// The service backing the currently active connection profile. Resolved per
+    /// call so API operations always follow the UI's connection (including
+    /// profile switches and reconnections).
+    /// </summary>
+    private IModbusService? ActiveModbusService => _connectionManager.ActiveService;
+
     // ──────────────────────────────────────────────────────────────────────────
     // Status
     // ──────────────────────────────────────────────────────────────────────────
 
-    public ApiStatus GetStatus()
-    {
-        // Marshal the read through the dispatcher for consistency with the
-        // write-side calls, so UI-owned state is never read from the API thread.
-        return _dispatcher
-            .InvokeAsync(() => new ApiStatus(_appState.IsConnected, _appState.Mode))
-            .GetAwaiter()
-            .GetResult();
-    }
+    public Task<ApiStatus> GetStatusAsync(CancellationToken token)
+        => _dispatcher.InvokeAsync(
+            () => new ApiStatus(_appState.IsConnected, _appState.Mode));
 
     // ──────────────────────────────────────────────────────────────────────────
     // Connect / Disconnect
@@ -86,25 +87,56 @@ public sealed class ApiApplicationService : IApiApplicationService
             if (!initiated)
                 return OperationResult.Fail("Already connected or cannot connect.");
 
-            if (_appState.IsConnected)
-                return OperationResult.Ok();
-
-            // Event-driven wait instead of polling.
+            // Event-driven wait instead of polling. The wait resolves on the
+            // OUTCOME of the attempt — success OR a recorded connection error —
+            // so a failed connect is reported with its real reason instead of
+            // hanging for the full timeout.
             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            string? failureMessage = null;
             PropertyChangedEventHandler? handler = null;
             handler = (_, e) =>
             {
                 if (e.PropertyName == nameof(IAppStateAccessor.IsConnected) && _appState.IsConnected)
                     tcs.TrySetResult(true);
+                else if (e.PropertyName == nameof(IAppStateAccessor.HasConnectionError) && _appState.HasConnectionError)
+                {
+                    failureMessage = _appState.StatusMessage;
+                    tcs.TrySetResult(false);
+                }
             };
             _appState.PropertyChanged += handler;
+
+            // Re-check the state on the dispatcher: a fast failure can fire
+            // between Execute and the subscription. null means still pending.
+            var immediate = await _dispatcher.InvokeAsync<bool?>(() =>
+            {
+                if (_appState.IsConnected) return true;
+                if (_appState.HasConnectionError)
+                {
+                    failureMessage = _appState.StatusMessage;
+                    return false;
+                }
+                return null;
+            });
+
+            if (immediate is not null)
+            {
+                // The attempt already finished (fast success or fast failure);
+                // the subscription is no longer needed.
+                _appState.PropertyChanged -= handler;
+                return immediate.Value
+                    ? OperationResult.Ok()
+                    : OperationResult.Fail(failureMessage ?? "Connection failed.");
+            }
 
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(token);
             timeoutCts.CancelAfter(ConnectionStateTimeoutMs);
             try
             {
-                await tcs.Task.WaitAsync(timeoutCts.Token);
-                return OperationResult.Ok();
+                bool connected = await tcs.Task.WaitAsync(timeoutCts.Token);
+                return connected
+                    ? OperationResult.Ok()
+                    : OperationResult.Fail(failureMessage ?? "Connection failed.");
             }
             catch (OperationCanceledException)
             {
@@ -143,7 +175,10 @@ public sealed class ApiApplicationService : IApiApplicationService
             if (!initiated)
                 return OperationResult.Fail("Already disconnected or cannot disconnect.");
 
-            if (!_appState.IsConnected)
+            // Read the outcome state on the dispatcher (never from the API
+            // thread): a fast disconnect may have completed before we could
+            // subscribe to the notification.
+            if (!await _dispatcher.InvokeAsync(() => _appState.IsConnected))
                 return OperationResult.Ok();
 
             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -185,10 +220,10 @@ public sealed class ApiApplicationService : IApiApplicationService
     // ──────────────────────────────────────────────────────────────────────────
 
     public Task<ushort[]?> ReadHoldingRegistersAsync(byte unitId, ushort address, ushort count, CancellationToken token)
-        => _modbusService.ReadHoldingRegistersAsync(unitId, address, count);
+        => ActiveModbusService?.ReadHoldingRegistersAsync(unitId, address, count) ?? Task.FromResult<ushort[]?>(null);
 
     public Task<bool[]?> ReadCoilsAsync(byte unitId, ushort address, ushort count, CancellationToken token)
-        => _modbusService.ReadCoilsAsync(unitId, address, count);
+        => ActiveModbusService?.ReadCoilsAsync(unitId, address, count) ?? Task.FromResult<bool[]?>(null);
 
     // ──────────────────────────────────────────────────────────────────────────
     // Custom tags
@@ -282,4 +317,44 @@ public sealed class ApiApplicationService : IApiApplicationService
     public Task AddTrendAsync(string key, string displayName, CancellationToken token)
         => _dispatcher.InvokeAsync(() =>
             _trendLogger.Add(key, string.IsNullOrEmpty(displayName) ? key : displayName));
+
+    public Task<IReadOnlyList<TrendPen>> GetTrendPensAsync(CancellationToken token)
+        => _dispatcher.InvokeAsync<IReadOnlyList<TrendPen>>(
+            () => _appState.TrendPens.ToList());
+
+    public async Task<TrendPen> AddTrendPenAsync(TrendPen pen, CancellationToken token)
+    {
+        if (pen is null) throw new ArgumentNullException(nameof(pen));
+        if (string.IsNullOrWhiteSpace(pen.Name)) throw new ArgumentException("A pen name is required.", nameof(pen));
+        if (pen.Address < 0) throw new ArgumentOutOfRangeException(nameof(pen), "Address cannot be negative.");
+
+        return await _dispatcher.InvokeAsync(() =>
+        {
+            var pens = _appState.TrendPens;
+
+            var existing = pens.FirstOrDefault(p =>
+                p.Address == pen.Address &&
+                string.Equals(p.Area, pen.Area ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+            {
+                if (pen.ReadPeriodMs > 0) existing.ReadPeriodMs = pen.ReadPeriodMs;
+                return existing;
+            }
+
+            var name = UnitIdConfiguration.MakeUniquePenName(pens, pen.Name);
+            var created = new TrendPen
+            {
+                // Same rule as the desktop flow: the key is born with the
+                // unique name and stays stable while the name is renamable.
+                Key = name,
+                Name = name,
+                Area = pen.Area ?? "HoldingRegister",
+                Address = pen.Address,
+                Type = string.IsNullOrWhiteSpace(pen.Type) ? "int" : pen.Type,
+                ReadPeriodMs = pen.ReadPeriodMs <= 0 ? 1000 : pen.ReadPeriodMs
+            };
+            pens.Add(created);
+            return created;
+        });
+    }
 }

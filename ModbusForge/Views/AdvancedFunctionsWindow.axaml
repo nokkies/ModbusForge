@@ -65,13 +65,16 @@
             <DataGrid ItemsSource="{Binding DeviceIdentificationItems}"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
+                      CanUserResizeColumns="True"
                       HeadersVisibility="Column"
                       GridLinesVisibility="Horizontal"
                       Height="190">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="ID" Binding="{Binding ObjectId}" Width="60" />
                 <DataGridTextColumn Header="Object" Binding="{Binding Name}" Width="170" />
-                <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*" />
+                <!-- Fixed width: a star-width column would disable column resizing
+                     for the whole grid (Avalonia 11.2.x). -->
+                <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="240" />
               </DataGrid.Columns>
             </DataGrid>
           </StackPanel>

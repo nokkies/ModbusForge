@@ -16,9 +16,20 @@ public interface IAppStateAccessor : INotifyPropertyChanged
     bool IsConnected { get; }
     string Mode { get; }
 
+    /// <summary>
+    /// True when the most recent connection attempt failed. The view model
+    /// clears it at the start of every new attempt, so while a connect is in
+    /// flight the flag only ever reflects that attempt.
+    /// </summary>
+    bool HasConnectionError { get; }
+
+    /// <summary>Last status text (carries the failure reason when <see cref="HasConnectionError"/> is set).</summary>
+    string StatusMessage { get; }
+
     ICommand ConnectCommand { get; }
     ICommand DisconnectCommand { get; }
 
     ObservableCollection<CustomEntry> CustomEntries { get; }
+    ObservableCollection<TrendPen> TrendPens { get; }
     ObservableCollection<VisualNode> SimulationNodes { get; }
 }

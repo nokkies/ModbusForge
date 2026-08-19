@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+              xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core"
              x:Class="ModbusForge.Avalonia.Views.ScriptEditorView"
              x:DataType="vm:ScriptEditorViewModel">
 
@@ -8,49 +9,140 @@
     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
       <TextBlock Text="Name:" VerticalAlignment="Center" />
       <TextBox Text="{Binding Script.Name, UpdateSourceTrigger=PropertyChanged}" Width="200" />
-      <TextBlock Text="Repeat:" VerticalAlignment="Center" Margin="16,0,0,0" />
+      <TextBlock Text="Repeat:" VerticalAlignment="Center" Margin="16,0,0,0" ToolTip.Tip="How many times the whole command list is looped" />
       <NumericUpDown Value="{Binding Script.RepeatCount}" Minimum="1" Maximum="10000" Width="80" />
-      <TextBlock Text="Delay (ms):" VerticalAlignment="Center" Margin="16,0,0,0" />
+      <TextBlock Text="Delay (ms):" VerticalAlignment="Center" Margin="16,0,0,0" ToolTip.Tip="Delay inserted between consecutive commands" />
       <NumericUpDown Value="{Binding Script.DelayBetweenCommandsMs}" Minimum="0" Maximum="60000" Width="100" />
-      <CheckBox Content="Stop on Error" IsChecked="{Binding Script.StopOnError}" Margin="16,0,0,0" />
+      <CheckBox Content="Stop on Error" IsChecked="{Binding Script.StopOnError}" Margin="16,0,0,0" ToolTip.Tip="Abort the script as soon as a command fails" />
     </StackPanel>
 
+    <!-- Button enabled-state is driven by each command's CanExecute (the view model
+         raises CanExecuteChanged), not by extra IsEnabled bindings: the Can* flags
+         are computed properties that never raise PropertyChanged, so binding to
+         them left the buttons permanently disabled after the first collection
+         change. -->
     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
       <Button Content="Add" Command="{Binding AddCommand}" />
-      <Button Content="Remove" Command="{Binding RemoveCommand}" IsEnabled="{Binding CanRemoveSelected}" />
-      <Button Content="Move Up" Command="{Binding MoveUpCommand}" IsEnabled="{Binding CanMoveUp}" />
-      <Button Content="Move Down" Command="{Binding MoveDownCommand}" IsEnabled="{Binding CanMoveDown}" />
-      <Button Content="Clone" Command="{Binding CloneCommand}" IsEnabled="{Binding CanCloneSelected}" />
+      <Button Content="Remove" Command="{Binding RemoveCommand}" />
+      <Button Content="Move Up" Command="{Binding MoveUpCommand}" />
+      <Button Content="Move Down" Command="{Binding MoveDownCommand}" />
+      <Button Content="Clone" Command="{Binding CloneCommand}" />
     </StackPanel>
 
     <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,8">
-      <DataGrid ItemsSource="{Binding Script.Commands}"
+      <!-- Tag carries the command-type list to the Type column's in-cell
+           ComboBoxes: cell templates live in their own name scope, so the
+           binding reaches it via the visual tree ($parent[DataGrid].Tag). -->
+      <DataGrid x:Name="CommandsGrid"
+                ItemsSource="{Binding Script.Commands}"
                 SelectedItem="{Binding SelectedCommand}"
+                Tag="{Binding CommandTypes}"
                 AutoGenerateColumns="False"
+                CanUserResizeColumns="True"
                 GridLinesVisibility="All">
         <DataGrid.Columns>
-          <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding IsEnabled}" Width="70" />
-          <DataGridTextColumn Header="Type" Binding="{Binding CommandType}" Width="180" />
-          <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" />
-          <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="70" />
-          <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="80" />
-          <DataGridCheckBoxColumn Header="Bool" Binding="{Binding BoolValue}" Width="60" />
-          <DataGridTextColumn Header="AND" Binding="{Binding AndMask}" Width="70" />
-          <DataGridTextColumn Header="OR" Binding="{Binding OrMask}" Width="70" />
-          <DataGridTextColumn Header="Wr Addr" Binding="{Binding WriteStartAddress}" Width="80" />
-          <DataGridTextColumn Header="Wr Values" Binding="{Binding WriteValuesText}" Width="120" />
-          <DataGridTextColumn Header="Object Id" Binding="{Binding ObjectId}" Width="80" />
-          <DataGridTextColumn Header="Delay ms" Binding="{Binding DelayMs}" Width="80" />
-          <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="120" />
-          <DataGridTextColumn Header="Description" Binding="{Binding DisplayText}" Width="*" MinWidth="200" IsReadOnly="True" />
-          <DataGridTextColumn Header="Last Result" Binding="{Binding LastResult}" Width="120" IsReadOnly="True" />
+          <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding IsEnabled}" Width="70">
+            <DataGridCheckBoxColumn.Header>
+              <TextBlock Text="Enabled" ToolTip.Tip="Include this command when the script runs" />
+            </DataGridCheckBoxColumn.Header>
+          </DataGridCheckBoxColumn>
+          <!-- Combo instead of free text: the command type is a closed enum,
+               and typing invalid names (e.g. "WriteHoldingRegisters") used to
+               fail only at commit with a validation marker. Avalonia has no
+               DataGridComboBoxColumn, so this is a template column whose cell
+               is an interactive ComboBox bound to the row. -->
+          <DataGridTemplateColumn Header="Type" Width="180">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="models:ScriptCommand">
+                <ComboBox HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                          ItemsSource="{Binding $parent[DataGrid].Tag}"
+                          SelectedItem="{Binding CommandType}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTextColumn Binding="{Binding Address}" Width="80">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Address" ToolTip.Tip="Target register or coil address" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding Count}" Width="70">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Count" ToolTip.Tip="Number of points to read" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding LoopCount}" Width="60">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Loops" ToolTip.Tip="For a Loop command: how many times the rest of the script repeats" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding Value}" Width="80">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Value" ToolTip.Tip="Value for single-write and masked-write commands" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridCheckBoxColumn Binding="{Binding BoolValue}" Width="60">
+            <DataGridCheckBoxColumn.Header>
+              <TextBlock Text="Bool" ToolTip.Tip="Value for coil and discrete-input commands" />
+            </DataGridCheckBoxColumn.Header>
+          </DataGridCheckBoxColumn>
+          <DataGridTextColumn Binding="{Binding AndMask}" Width="70">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="AND" ToolTip.Tip="Masked write — bits set in this mask are kept, bits set to 0 are cleared" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding OrMask}" Width="70">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="OR" ToolTip.Tip="OR mask for masked writes; bits set here are forced on" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding WriteStartAddress}" Width="80">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Wr Addr" ToolTip.Tip="Start address for bulk writes" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding WriteValuesText}" Width="120">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Wr Values" ToolTip.Tip="Comma-separated values for bulk writes" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding ObjectId}" Width="80">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Object Id" ToolTip.Tip="Target object ID for object commands" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding DelayMs}" Width="80">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Delay ms" ToolTip.Tip="Extra delay after this command, in milliseconds" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding Message}" Width="120">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Message" ToolTip.Tip="Text for log and message commands" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <!-- Every column uses a fixed width on purpose: with any star-width
+               column present, Avalonia's DataGrid (11.2.x) disables header
+               resizing for the whole grid, which left users unable to widen
+               the cramped headers. Fixed widths keep every column
+               user-resizable; the grid scrolls horizontally when the window
+               is too narrow. -->
+          <DataGridTextColumn Binding="{Binding DisplayText}" Width="220" IsReadOnly="True">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Description" ToolTip.Tip="Plain-language summary of the command and its parameters" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
+          <DataGridTextColumn Binding="{Binding LastResult}" Width="120" IsReadOnly="True">
+            <DataGridTextColumn.Header>
+              <TextBlock Text="Last Result" ToolTip.Tip="Outcome of the most recent run of this command" />
+            </DataGridTextColumn.Header>
+          </DataGridTextColumn>
         </DataGrid.Columns>
       </DataGrid>
     </Border>
 
     <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-      <Button Content="Run Script" Command="{Binding RunScriptCommand}" IsEnabled="{Binding CanRun}" />
-      <Button Content="Stop" Command="{Binding StopScriptCommand}" IsEnabled="{Binding IsRunning}" />
+      <Button Content="Run Script" Command="{Binding RunScriptCommand}" />
+      <Button Content="Stop" Command="{Binding StopScriptCommand}" />
       <Button Content="Save" Command="{Binding SaveScriptCommand}" />
       <Button Content="Load" Command="{Binding LoadScriptCommand}" />
       <Button Content="Clear Log" Command="{Binding ClearLogCommand}" />

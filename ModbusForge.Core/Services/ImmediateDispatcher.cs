@@ -9,6 +9,8 @@ namespace ModbusForge.Services
     /// </summary>
     public class ImmediateDispatcher : IDispatcher
     {
+        public bool CheckAccess => true;
+
         public void Invoke(Action action) => action();
 
         public T Invoke<T>(Func<T> func) => func();
@@ -18,6 +20,8 @@ namespace ModbusForge.Services
             action();
             return Task.CompletedTask;
         }
+
+        public void Post(Action action) => action();
 
         public Task<T> InvokeAsync<T>(Func<T> func) => Task.FromResult(func());
     }

@@ -149,8 +149,7 @@ namespace ModbusForge.Avalonia.Views
                 Continuous = false,
                 PeriodMs = 1000,
                 Monitor = false,
-                ReadPeriodMs = 1000,
-                Trend = false
+                ReadPeriodMs = 1000
             });
 
             vm.StatusMessage = $"Added {area} {entry.Address} to watch list.";
@@ -182,8 +181,7 @@ namespace ModbusForge.Avalonia.Views
                 Continuous = false,
                 PeriodMs = 1000,
                 Monitor = false,
-                ReadPeriodMs = 1000,
-                Trend = false
+                ReadPeriodMs = 1000
             });
 
             vm.StatusMessage = $"Added {area} {entry.Address} to watch list.";
@@ -194,47 +192,7 @@ namespace ModbusForge.Avalonia.Views
             var vm = ViewModel;
             if (vm == null) return;
 
-            CustomEntry? trendEntry = null;
-            foreach (var existing in vm.CustomEntries)
-            {
-                if (existing.Address == entry.Address && existing.Area == area)
-                {
-                    trendEntry = existing;
-                    break;
-                }
-            }
-
-            if (trendEntry == null)
-            {
-                var initialValue = string.IsNullOrEmpty(entry.ValueText) ? entry.Value.ToString(CultureInfo.InvariantCulture) : entry.ValueText;
-                trendEntry = new CustomEntry
-                {
-                    Name = $"{area[0]}R Trend {entry.Address}",
-                    Address = entry.Address,
-                    Area = area,
-                    Type = entry.Type ?? "int",
-                    Value = initialValue,
-                    WriteValue = initialValue,
-                    Continuous = false,
-                    PeriodMs = 1000,
-                    Monitor = true,
-                    ReadPeriodMs = 1000,
-                    Trend = true
-                };
-                vm.CustomEntries.Add(trendEntry);
-            }
-            else
-            {
-                trendEntry.Trend = true;
-                trendEntry.Monitor = true;
-            }
-
-            if (area == "HoldingRegister")
-                vm.HoldingMonitorEnabled = true;
-            else if (area == "InputRegister")
-                vm.InputRegistersMonitorEnabled = true;
-
-            vm.StatusMessage = $"Added {area} {entry.Address} to trend logger.";
+            vm.AddRegisterToTrend(entry.Address, area, entry.Type);
         }
 
         private void AddCoilToTrend(CoilEntry entry, string area)
@@ -242,47 +200,7 @@ namespace ModbusForge.Avalonia.Views
             var vm = ViewModel;
             if (vm == null) return;
 
-            CustomEntry? trendEntry = null;
-            foreach (var existing in vm.CustomEntries)
-            {
-                if (existing.Address == entry.Address && existing.Area == area)
-                {
-                    trendEntry = existing;
-                    break;
-                }
-            }
-
-            var value = entry.State ? "1" : "0";
-            if (trendEntry == null)
-            {
-                trendEntry = new CustomEntry
-                {
-                    Name = $"{area} Trend {entry.Address}",
-                    Address = entry.Address,
-                    Area = area,
-                    Type = "uint",
-                    Value = value,
-                    WriteValue = value,
-                    Continuous = false,
-                    PeriodMs = 1000,
-                    Monitor = true,
-                    ReadPeriodMs = 1000,
-                    Trend = true
-                };
-                vm.CustomEntries.Add(trendEntry);
-            }
-            else
-            {
-                trendEntry.Trend = true;
-                trendEntry.Monitor = true;
-            }
-
-            if (area == "Coil")
-                vm.CoilsMonitorEnabled = true;
-            else if (area == "DiscreteInput")
-                vm.DiscreteInputsMonitorEnabled = true;
-
-            vm.StatusMessage = $"Added {area} {entry.Address} to trend logger.";
+            vm.AddRegisterToTrend(entry.Address, area, "uint");
         }
 
         #region Holding Registers Context Menu

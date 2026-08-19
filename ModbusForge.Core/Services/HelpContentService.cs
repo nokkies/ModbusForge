@@ -55,6 +55,7 @@ namespace ModbusForge.Services
                 ["visual-editor"] = GetVisualEditorContent(),
                 ["preferences"] = GetPreferencesContent(),
                 ["mcp-server"] = GetMcpServerContent(),
+                ["mqtt"] = GetMqttContent(),
                 ["keyboard-shortcuts"] = GetKeyboardShortcutsContent(),
                 ["partial-reads"] = GetPartialReadsContent(),
                 ["troubleshooting"] = GetTroubleshootingContent()
@@ -98,6 +99,7 @@ Once connected:
 - Enter the starting address and count
 - Click ""Read"" to fetch data
 - Enable ""Continuous Read"" for automatic polling
+- Drag the edge of any column header to resize that column
 
 ## Next Steps
 - Explore the Connection Manager to save connection profiles
@@ -217,6 +219,7 @@ Go to **Options → Script Editor**
 ### Control Commands
 - **Delay**: Wait for specified milliseconds
 - **Log**: Add a message to the output log
+- **Loop**: Repeat the rest of the script (every command after the Loop row) the number of times in the **Loops** column. The Loop consumes the rest of the script, so those commands only run inside the loop. Nested loops are not supported.
 
 ## Script Settings
 
@@ -228,6 +231,10 @@ Milliseconds to wait between each command execution.
 
 ### Stop on Error
 If enabled, the script stops when an error occurs.
+
+## Command Grid
+
+Each command row has one column per property; most commands only use a few of them. **Hover a column header** to see what that column controls, and **drag the edge of a header** to resize the column so the labels fit.
 
 ## Example Script
 ```
@@ -276,7 +283,7 @@ The Custom Data tab allows you to define custom register/coil configurations for
 - **Read Now**: Read the entry once
 - **Write Now**: Write a value to the entry
 - **Continuous Write**: Continuously write a value
-- **Add to Trend**: Add entry to trend chart
+- **Add to Trend**: Add a trend pen that polls the entry's address
 
 ### Continuous Read
 When ""Global Continuous Read"" is enabled, all custom entries are read automatically at the configured interval.
@@ -295,47 +302,62 @@ When ""Global Continuous Read"" is enabled, all custom entries are read automati
         {
             return @"# Trend & Logging
 
-The Trend feature provides real-time data visualization for Modbus registers and custom entries.
+The Trends tab plots live data as named **pens**. Each pen polls one register (or coil) address - or mirrors an existing tag - at its own read period while a connection is active. Pens are stored per unit and persist with the project; they are independent of Custom Watch entries.
 
 ## Access
-Click the ""Trends"" button in the toolbar or go to the Trend tab.
+Go to the **Trends** tab (or press Ctrl+T).
 
-## Adding Trend Lines
+## Adding Pens
 
-### From Registers
-1. Read registers to populate the data grid
-2. Right-click a register row
+### From the Add dialog
+1. Click **Add** in the pen list
+2. Choose the source: **Register** (area + address) or **Tag**
+3. Optionally set a name and read period, then click OK
+
+### From a register or custom entry
+1. Read registers to populate the data grid, or go to the Custom Data tab
+2. Right-click a register row or a custom entry
 3. Select ""Add to Trend""
 
-### From Custom Entries
-1. Go to Custom Data tab
-2. Right-click a custom entry
-3. Select ""Add to Trend""
+A pen appears in the pen list immediately; its line draws as soon as the first samples are read.
+
+## Pen List
+
+The pen list on the right shows every pen:
+
+- **Rename** inline - updates the chart legend and is saved with the unit configuration. The pen keeps its series history: only the label changes, the data line is untouched
+- **Click the swatch** to cycle the pen's color
+- **Eye** toggles the pen's line on the chart
+- **Red dot** - the pen's reads are failing; hover the dot for the last error. Failing pens keep retrying every cycle and recover on their own when reads succeed again
+- **✕** removes the pen (the trend data is dropped; Custom Watch entries are untouched)
+
+**Clear** in the Data group removes all pens at once.
 
 ## Trend Features
 
 ### Real-Time Visualization
-- Data updates automatically when continuous read is enabled
-- Multiple trend lines can be displayed simultaneously
-- Each line has a unique color
+- Pens are polled automatically while a connection is active - no continuous read setting required
+- Multiple pens can be displayed simultaneously
+- Each pen has a unique color
 
 ### Zoom and Pan
 - **Scroll Wheel**: Zoom in/out
 - **Click and Drag**: Pan the chart
-- **Double-Click**: Reset zoom to fit all data
+- **Reset** button: Reset zoom to fit all data
 
 ### Data Retention
 Configure how long data is kept:
 - Range: 1 to 60 minutes
 - Older data is automatically discarded
 
-### Export
-- **Export to CSV**: Export trend data to CSV file
-- **Export to PNG**: Save the current chart as an image
+### Import and Export
+- **Export CSV**: Export the selected pen, or all pens if none is selected
+- **Import CSV**: Plot a previously exported capture (e.g. historical data)
+- **Export PNG**: Save the current chart as an image
 
 ## Tips
-- Use descriptive names for trend lines
-- Limit the number of trend lines for better performance
+- Use descriptive pen names - they are the series keys in exports
+- Limit the number of pens for better performance
 - Adjust retention based on your monitoring needs";
         }
 
@@ -363,6 +385,7 @@ Contains available nodes organized by category:
 - **Sources**: Signal generators, constants
 - **Math**: Mathematical operations
 - **Logic**: Boolean operations
+- **Signal Conditioning**: scale, edge detect, moving average
 - **Transform**: Data conversions
 
 ### Canvas (Center)
@@ -370,6 +393,16 @@ Drag nodes from the palette to the canvas. Connect nodes by dragging from output
 
 ### Properties Panel (Right)
 Configure selected node parameters.
+
+## Block Problems
+While the simulation runs, a block that cannot produce fresh output is marked with a
+red border and a red dot in its top-right corner; hover the dot for the reason:
+- **Evaluation failed** — the block threw while computing (for example, a Boolean
+  input bound to a register that holds a non-boolean value). The block keeps its
+  last outputs and retries every cycle; the marker clears as soon as it runs cleanly.
+- **Locked in a loop** — blocks that form a cycle are excluded from the execution
+  order entirely and are marked this way. Break the loop to make them run again.
+When the simulation stops, all markers are cleared.
 
 ## Keyboard Shortcuts
 
@@ -405,6 +438,11 @@ Fixed values for testing.
 
 ### Math Nodes
 Perform mathematical operations on signals.
+
+### Signal Conditioning
+- **Scale (LIN)**: linearly maps an analog value from one range to another (e.g. a 0..100 raw register to 0..120 °C). Configure the From/To ranges; when Clamp is on, results stay inside the To range.
+- **Edge Detect**: emits a single-cycle pulse on the selected transition (Rising or Falling) of a Boolean input — useful for triggering timers or counters from noisy or held signals.
+- **Moving Average (MAVG)**: smooths an analog signal by averaging the last N samples (window 1..1024). The window fills gradually after startup.
 
 ## Tips
 - Use the search box in the palette to quickly find nodes
@@ -647,6 +685,35 @@ To connect an LLM or AI coding assistant using the Model Context Protocol (MCP):
 - Send a query to the status endpoint:
   `curl http://localhost:5000/api/status`
   It should return `{""status"":""Running""}`.";
+        }
+
+        private string GetMqttContent()
+        {
+            return @"# MQTT Gateway
+
+The MQTT tab publishes tag values to an MQTT broker, so SCADA systems, dashboards, and other MQTT-aware tools can consume live Modbus data.
+
+## Access
+Go to the **MQTT** tab and tick **Enabled**, then press **Apply & Connect**.
+
+## What Is Published
+Every **publish period** the gateway publishes a snapshot of the current tags:
+- All **Custom Watch** entries, tagged by entry name with the value in its declared type (integers and reals arrive as JSON numbers).
+- All **loaded register rows**: Holding Registers (`HR_<address>`), Input Registers (`IR_<address>`), Coils (`COIL_<address>`) and Discrete Inputs (`DI_<address>`).
+
+Rows still carrying a read error are skipped, and where a custom entry and a register row point at the same area + address the custom entry wins (it is your named tag).
+
+## Settings
+- **Broker Host / Port / Client ID / Username / Password**: standard MQTT connection settings.
+- **Topic Template**: placeholders {UnitId}, {Tag}, {Area}, {Address} - for example `modbusforge/{UnitId}/{Tag}`.
+- **QoS**: 0 (at most once), 1 (at least once), 2 (exactly once).
+- **Retain**: the broker keeps the last value on each topic for new subscribers.
+- **Publish Period**: how often the snapshot is published; 0 disables periodic publishing.
+
+## Behavior
+- If the broker is unreachable the gateway retries automatically with a backoff (1 s up to 30 s); the tab shows ""Retrying connection..."" while it is down.
+- An enabled gateway is resumed automatically when the application next starts.
+- The same gateway runs in `ModbusForge.Headless` via the `--mqtt-*` switches.";
         }
 
         private string GetPartialReadsContent()

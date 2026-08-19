@@ -66,7 +66,20 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void UpdateFrameLogger()
         {
-            FrameLogger = _connectionManager.ActiveService?.FrameLogger;
+            // The logger is a stable per-service instance: re-reading it on every
+            // connection event keeps the inspector pointed at the live log without
+            // ever clearing the ring buffer (a reconnect is not a user-initiated clear).
+            // When no service exists yet (nothing connected, nothing created) the
+            // inspector falls back to its own in-memory log so pcap imports still work.
+            var logger = _connectionManager.ActiveService?.FrameLogger;
+            if (logger == null && FrameLogger == null)
+            {
+                FrameLogger = new ModbusFrameLogger();
+            }
+            else if (!ReferenceEquals(FrameLogger, logger))
+            {
+                FrameLogger = logger;
+            }
         }
 
         private void Clear()

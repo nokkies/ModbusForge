@@ -1,10 +1,11 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+             xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.Avalonia;assembly=LiveChartsCore.SkiaSharpView.Avalonia"
              x:Class="ModbusForge.Avalonia.Views.SignalGeneratorView"
              x:DataType="vm:SignalGeneratorViewModel">
 
-  <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,8">
+  <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*" Margin="0,0,0,8">
     <TextBlock Text="Waveform:" Grid.Row="0" VerticalAlignment="Center" Margin="0,0,12,8" />
     <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Waveforms}" SelectedItem="{Binding Waveform}" Width="160" HorizontalAlignment="Left" Margin="0,0,0,8" />
 
@@ -29,5 +30,12 @@
 
     <TextBlock Grid.Row="7" Grid.Column="0" Text="Current Value:" VerticalAlignment="Center" Margin="0,0,12,0" />
     <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding CurrentValue, StringFormat='{}{0:F2}'}" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" />
+
+    <Border Grid.Row="8" Grid.ColumnSpan="2" BorderBrush="Gray" BorderThickness="1" Margin="0,12,0,0">
+      <lvc:CartesianChart Series="{Binding PreviewSeries}"
+                          XAxes="{Binding XAxes}"
+                          YAxes="{Binding YAxes}"
+                          LegendPosition="Hidden" />
+    </Border>
   </Grid>
 </UserControl>

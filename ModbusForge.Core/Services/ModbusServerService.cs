@@ -31,9 +31,15 @@ namespace ModbusForge.Services
         }
 
         public ModbusServerService(ILogger<ModbusServerService> logger, IConsoleLoggerService? consoleLoggerService)
+            : this(logger, consoleLoggerService, null)
+        {
+        }
+
+        public ModbusServerService(ILogger<ModbusServerService> logger, IConsoleLoggerService? consoleLoggerService, ModbusFrameLogger? frameLogger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _consoleLoggerService = consoleLoggerService;
+            _frameLogger = frameLogger ?? _frameLogger;
             _logger.LogInformation("Modbus TCP server created");
         }
 
@@ -44,6 +50,13 @@ namespace ModbusForge.Services
             ReadFromDataStoreAsync(unitId, startAddress, count, ds => ds.InputDiscretes, "discrete inputs");
 
         public virtual bool IsConnected => _isRunning;
+
+        // The server side has no peer connection to lose; the event is never raised.
+        public event EventHandler? ConnectionLost
+        {
+            add { }
+            remove { }
+        }
 
         public virtual async Task<bool> ConnectAsync(ConnectionProfile profile, CancellationToken cancellationToken = default)
         {
@@ -79,7 +92,11 @@ namespace ModbusForge.Services
                         if (ids.Count == 0) ids.Add(DefaultSlaveId);
                         _primaryUnitId = ids[0];
 
-                        _multiServer = new ModbusMultiUnitServer(_logger, _consoleLoggerService);
+                        // Reuse the existing dispatcher when we are restarting:
+                        // it owns the per-unit DataStores, and creating a fresh
+                        // one here would silently wipe every register, coil and
+                        // input the user (or an external client) had written.
+                        _multiServer ??= new ModbusMultiUnitServer(_logger, _consoleLoggerService, _frameLogger);
                         _multiServer.Start(endpoint, ids);
 
                         _isRunning = true;
@@ -109,7 +126,12 @@ namespace ModbusForge.Services
             }, cancellationToken).ConfigureAwait(false);
         }
 
-        private void CleanupResources()
+        /// <summary>
+        /// Stops the listener but keeps the dispatcher alive: the DataStores it
+        /// owns survive a stop/start cycle, so restarting the server does not
+        /// reset the simulated world.
+        /// </summary>
+        private void StopServer()
         {
             try
             {
@@ -117,8 +139,18 @@ namespace ModbusForge.Services
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
-                _logger.LogWarning(ex, "Error while stopping ModbusMultiUnitServer during cleanup");
+                _logger.LogWarning(ex, "Error while stopping ModbusMultiUnitServer");
             }
+        }
+
+        /// <summary>
+        /// Stops and disposes the dispatcher. Only the service's own disposal
+        /// should call this; DisconnectAsync must not, or the data store would
+        /// be destroyed along with the listener.
+        /// </summary>
+        private void CleanupResources()
+        {
+            StopServer();
 
             try
             {
@@ -191,7 +223,9 @@ namespace ModbusForge.Services
                 {
                     if (!_isRunning) return;
                     _isRunning = false;
-                    CleanupResources();
+                    // Stop only — the dispatcher (and its data stores) stays
+                    // alive so a restart continues with the same values.
+                    StopServer();
                     var stopMessage = "Modbus TCP server stopped";
                     _logger.LogInformation(stopMessage);
                     _consoleLoggerService?.Log(stopMessage);
@@ -395,6 +429,17 @@ namespace ModbusForge.Services
                 catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _logger.LogWarning(ex, "Error during DisposeAsync");
+                }
+                // DisconnectAsync only stops the dispatcher now, so the async
+                // disposal path still has to dispose it (Dispose(false) below
+                // skips the synchronous cleanup on purpose).
+                try
+                {
+                    CleanupResources();
+                }
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                {
+                    _logger.LogWarning(ex, "Error during DisposeAsync cleanup");
                 }
                 _disposed = true;
             }

@@ -19,19 +19,20 @@ namespace ModbusForge.Avalonia.Converters
             2,  // Frame Inspector
             3,  // MQTT
             4,  // Script Editor
-            5,  // Signal Generator
-            6,  // Simulation
-            7,  // Holding Registers
-            9,  // Input Registers
-            8,  // Coils
-            10, // Discrete Inputs
-            11, // Custom Watch
-            12, // Decode
-            13, // Console
-            14  // Debug
+            5,  // Rules
+            6,  // Signal Generator
+            7,  // Simulation
+            8,  // Holding Registers
+            10, // Input Registers
+            9,  // Coils
+            11, // Discrete Inputs
+            12, // Custom Watch
+            13, // Decode
+            14, // Console
+            15  // Debug
         };
 
-        private static readonly int[] TabToNavigation = new int[15];
+        private static readonly int[] TabToNavigation = new int[16];
 
         static NavigationIndexConverter()
         {

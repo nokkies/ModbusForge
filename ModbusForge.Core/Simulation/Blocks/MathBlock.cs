@@ -12,57 +12,88 @@ namespace ModbusForge.Core.Simulation.Blocks
         Divide
     }
 
+    /// <summary>
+    /// Binary math block. Integer variant (Int32 ports) and real variant (Real ports);
+    /// the unconnected second input falls back to the "Constant" parameter.
+    /// </summary>
     public sealed class MathBlock : IFunctionBlock
     {
-        public string TypeId { get; }
-        public string DisplayName { get; }
-        public string Category => "Math Operations";
-
-        public MathOperation Operation { get; }
-
-        public IReadOnlyList<IPort> Ports { get; } = new List<IPort>
+        private static readonly Dictionary<MathOperation, (string Int, string Real, string Name)> Operations = new()
         {
-            new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Int32),
-            new PortDefinition("Input2", PortDirection.Input, SimulationDataType.Int32),
-            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Int32)
+            [MathOperation.Add] = ("MATH_ADD", "MATH_ADD_REAL", "Add (+)"),
+            [MathOperation.Subtract] = ("MATH_SUB", "MATH_SUB_REAL", "Subtract (-)"),
+            [MathOperation.Multiply] = ("MATH_MUL", "MATH_MUL_REAL", "Multiply (*)"),
+            [MathOperation.Divide] = ("MATH_DIV", "MATH_DIV_REAL", "Divide (/)")
         };
 
-        public MathBlock(MathOperation operation)
+        public MathOperation Operation { get; }
+        public bool IsReal { get; }
+
+        public string TypeId { get; }
+        public string DisplayName { get; }
+        public string Category => IsReal ? "Math Operations (Real)" : "Math Operations";
+
+        public IReadOnlyList<IPort> Ports { get; }
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters { get; }
+
+        public MathBlock(MathOperation operation, bool isReal = false)
         {
             Operation = operation;
-            TypeId = operation switch
+            IsReal = isReal;
+
+            if (!Operations.TryGetValue(operation, out var op))
+                throw new ArgumentOutOfRangeException(nameof(operation));
+            var (intId, realId, name) = op;
+
+            TypeId = isReal ? realId : intId;
+            DisplayName = isReal ? $"{name} (Real)" : name;
+
+            var dataType = isReal ? SimulationDataType.Real : SimulationDataType.Int32;
+            Ports = new List<IPort>
             {
-                MathOperation.Add => "MATH_ADD",
-                MathOperation.Subtract => "MATH_SUB",
-                MathOperation.Multiply => "MATH_MUL",
-                MathOperation.Divide => "MATH_DIV",
-                _ => throw new ArgumentOutOfRangeException(nameof(operation))
+                new PortDefinition(PortNames.OperandA, PortDirection.Input, dataType),
+                new PortDefinition(PortNames.OperandB, PortDirection.Input, dataType),
+                new PortDefinition(PortNames.BoolOutput, PortDirection.Output, dataType)
             };
-            DisplayName = operation switch
+
+            Parameters = new[]
             {
-                MathOperation.Add => "Add (+)",
-                MathOperation.Subtract => "Subtract (-)",
-                MathOperation.Multiply => "Multiply (*)",
-                MathOperation.Divide => "Divide (/)",
-                _ => throw new ArgumentOutOfRangeException(nameof(operation))
+                new BlockParameterDescriptor
+                {
+                    // Distinct name for the real variant: the int and real constants live in
+                    // separate VisualNode properties (CompareValue vs CompareValueReal).
+                    Name = isReal ? "ConstantReal" : "Constant",
+                    DisplayName = "Constant",
+                    Kind = isReal ? BlockParameterKind.Real : BlockParameterKind.Int32,
+                    DefaultValue = isReal ? 0.0 : 0
+                }
             };
         }
 
         public void Execute(IExecutionContext context)
         {
-            var in1 = context.ReadInput("Input1")?.AsInt32() ?? 0;
-            var in2 = context.ReadInput("Input2")?.AsInt32() ?? context.ReadParameter("CompareValue", 0);
+            double in1 = context.ReadInput(PortNames.OperandA)?.AsReal() ?? 0.0;
+            double in2 = context.ReadInput(PortNames.OperandB) is not null
+                ? context.ReadInput(PortNames.OperandB)!.AsReal()
+                : IsReal
+                    ? context.ReadParameter("ConstantReal", 0.0)
+                    : context.ReadParameter("Constant", 0);
 
-            int result = Operation switch
+            double result = Operation switch
             {
                 MathOperation.Add => in1 + in2,
                 MathOperation.Subtract => in1 - in2,
                 MathOperation.Multiply => in1 * in2,
-                MathOperation.Divide => in2 != 0 ? in1 / in2 : 0,
-                _ => 0
+                MathOperation.Divide => in2 != 0 ? in1 / in2 : 0.0,
+                _ => 0.0
             };
 
-            context.WriteOutput("Output", SimulationValue.Int32(result));
+            var output = IsReal
+                ? SimulationValue.Real(result)
+                : SimulationValue.Int32((int)Math.Round(result));
+
+            context.WriteOutput(PortNames.BoolOutput, output);
         }
     }
 }

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -96,6 +97,7 @@ namespace ModbusForge.Services
                 return false;
             }
 
+            var tempPath = destinationPath + ".part";
             try
             {
                 var directory = Path.GetDirectoryName(destinationPath);
@@ -110,31 +112,45 @@ namespace ModbusForge.Services
 
                 var totalBytes = response.Content.Headers.ContentLength ?? -1L;
                 await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-                await using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None);
 
-                var buffer = new byte[8192];
-                long readBytes = 0;
-                int bytesRead;
-                while ((bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken).ConfigureAwait(false)) > 0)
+                // Download to a temporary file first so a failed or cancelled
+                // download never leaves a truncated file at the destination
+                // (which a later LaunchInstaller call would start).
+                await using (var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
-                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
-                    readBytes += bytesRead;
-
-                    if (totalBytes > 0 && progress != null)
+                    var buffer = new byte[8192];
+                    long readBytes = 0;
+                    int bytesRead;
+                    while ((bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken).ConfigureAwait(false)) > 0)
                     {
-                        progress.Report(readBytes / (double)totalBytes);
+                        await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+                        readBytes += bytesRead;
+
+                        if (totalBytes > 0 && progress != null)
+                        {
+                            progress.Report(readBytes / (double)totalBytes);
+                        }
                     }
                 }
+
+                if (File.Exists(destinationPath))
+                    File.Delete(destinationPath);
+                File.Move(tempPath, destinationPath);
 
                 _logger.LogInformation("Downloaded installer to {DestinationPath}", destinationPath);
                 return true;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                // Only rethrow when the CALLER cancelled; an HttpClient timeout
+                // also surfaces as OperationCanceledException and must fall
+                // through to the failure path instead of crashing the caller.
+                DeletePartialDownload(tempPath);
                 throw;
             }
             catch (Exception ex)
             {
+                DeletePartialDownload(tempPath);
                 _logger.LogWarning(ex, "Failed to download installer from {DownloadUrl}", downloadUrl);
                 return false;
             }
@@ -157,6 +173,19 @@ namespace ModbusForge.Services
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to launch installer {InstallerPath}", installerPath);
+            }
+        }
+
+        private static void DeletePartialDownload(string tempPath)
+        {
+            try
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                // Best effort: a leftover .part file is inert (never launched).
             }
         }
 
@@ -208,7 +237,7 @@ namespace ModbusForge.Services
         {
             if (string.IsNullOrWhiteSpace(tag)) return null;
 
-            // Tags are CalVer-style, e.g. 'v2026.8.27' or '2026.8.27.0'
+            // Tags are typically 'v5.8.12' or '5.8.12.0'
             var versionString = tag.Trim().ToLowerInvariant();
             if (versionString.StartsWith("v", StringComparison.Ordinal))
             {
@@ -272,10 +301,14 @@ namespace ModbusForge.Services
                             if (firstInstallerUrl is null)
                                 firstInstallerUrl = url;
 
-                            // Prefer an asset whose filename contains the release version to avoid
-                            // stale installers (e.g. an old installer .exe attached to a newer release).
+                            // Prefer an asset whose filename contains the release version, matched
+                            // at a version boundary to avoid stale installers (e.g. an old
+                            // ModbusForge-2.0.2-setup.exe attached to v6.0.8). The boundary check
+                            // also prevents a shorter version from matching a more specific one -
+                            // with CalVer tags every release in the same month shares the
+                            // "YYYY.M" prefix, so "2026.8" must not match "...-2026.8.27-setup.exe".
                             if (version is not null &&
-                                name.Contains(version.ToString(), StringComparison.OrdinalIgnoreCase))
+                                Regex.IsMatch(name, @"(?<![\d.])" + Regex.Escape(version.ToString()) + @"(?![\d.])", RegexOptions.IgnoreCase))
                             {
                                 return url;
                             }

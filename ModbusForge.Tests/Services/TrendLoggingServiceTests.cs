@@ -25,7 +25,6 @@ namespace ModbusForge.Tests.Services
         {
             // Arrange
             _settings.RetentionMinutes = 10;
-            _settings.SampleRateMs = 500;
             _settings.ExportFolder = "Exports";
 
             // Act
@@ -33,7 +32,6 @@ namespace ModbusForge.Tests.Services
 
             // Assert
             Assert.Equal(10, service.RetentionMinutes);
-            Assert.Equal(500, service.SampleRateMs);
             Assert.Equal("Exports", service.ExportFolder);
             Assert.False(service.IsRunning);
         }
@@ -43,14 +41,12 @@ namespace ModbusForge.Tests.Services
         {
             // Arrange
             _settings.RetentionMinutes = 100; // Should be clamped to 60
-            _settings.SampleRateMs = 10;      // Should be clamped to 50
 
             // Act
             var service = new TrendLoggingService(_mockOptions.Object);
 
             // Assert
             Assert.Equal(60, service.RetentionMinutes);
-            Assert.Equal(50, service.SampleRateMs);
         }
 
         [Fact]
@@ -60,11 +56,10 @@ namespace ModbusForge.Tests.Services
             var service = new TrendLoggingService(_mockOptions.Object);
 
             // Act
-            service.UpdateSettings(100, 10, "NewFolder");
+            service.UpdateSettings(100, "NewFolder");
 
             // Assert
             Assert.Equal(60, service.RetentionMinutes); // Clamped
-            Assert.Equal(50, service.SampleRateMs);     // Clamped
             Assert.Equal("NewFolder", service.ExportFolder);
         }
 
@@ -76,13 +71,13 @@ namespace ModbusForge.Tests.Services
             var service = new TrendLoggingService(_mockOptions.Object);
 
             // Act
-            service.UpdateSettings(10, 500, null);
+            service.UpdateSettings(10, null);
 
             // Assert
             Assert.Equal("InitialFolder", service.ExportFolder);
 
-            // Act
-            service.UpdateSettings(10, 500, "");
+             // Act
+            service.UpdateSettings(10, "");
 
             // Assert
             Assert.Equal("InitialFolder", service.ExportFolder);
@@ -152,7 +147,7 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public void Add_ShouldNotRaiseEventIfKeyAlreadyExists()
         {
-            // Arrange
+             // Arrange
             var service = new TrendLoggingService(_mockOptions.Object);
             int callCount = 0;
             service.Added += (k, n) => callCount++;
@@ -168,7 +163,7 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public void Add_ShouldIgnoreEmptyKey()
         {
-            // Arrange
+             // Arrange
             var service = new TrendLoggingService(_mockOptions.Object);
             int callCount = 0;
             service.Added += (k, n) => callCount++;
@@ -178,6 +173,42 @@ namespace ModbusForge.Tests.Services
 
             // Assert
             Assert.Equal(0, callCount);
+        }
+
+        [Fact]
+        public void SetDisplayName_UpdatesTheActiveKeyWithoutTouchingSamples()
+        {
+            // Arrange
+            var service = new TrendLoggingService(_mockOptions.Object);
+            service.Add("pen-key", "Original name");
+            service.Start();
+            service.Publish("pen-key", 42.0, DateTime.UtcNow);
+
+            // Act - a pen rename: display label changes, key (and samples) do not.
+            service.SetDisplayName("pen-key", "Renamed pen");
+
+            // Assert
+            Assert.Equal("Renamed pen", service.ActiveKeys["pen-key"]);
+            // The key still resolves, so the chart keeps feeding the same series.
+            Assert.Contains("pen-key", service.ActiveKeys.Keys);
+        }
+
+        [Fact]
+        public void SetDisplayName_UnknownKeyOrBlankName_IsANoop()
+        {
+            // Arrange
+            var service = new TrendLoggingService(_mockOptions.Object);
+            service.Add("pen-key", "Original name");
+
+            // Act
+            service.SetDisplayName("missing-key", "Whatever");
+            service.SetDisplayName("pen-key", "   ");
+            service.SetDisplayName("", "Whatever");
+
+            // Assert - a blank display name falls back to the key, which is
+            // the current value, so nothing changes.
+            Assert.Equal("Original name", service.ActiveKeys["pen-key"]);
+            Assert.Single(service.ActiveKeys);
         }
 
         [Fact]
@@ -260,7 +291,7 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public void Publish_ShouldIgnoreEmptyKey()
         {
-            // Arrange
+             // Arrange
             var service = new TrendLoggingService(_mockOptions.Object);
             service.Start();
             int callCount = 0;
@@ -271,6 +302,21 @@ namespace ModbusForge.Tests.Services
 
             // Assert
             Assert.Equal(0, callCount);
+        }
+
+        [Fact]
+        public void StateChanged_FiresOnlyOnActualChanges()
+        {
+            var service = new TrendLoggingService(_mockOptions.Object);
+            var transitions = new List<bool>();
+            service.StateChanged += running => transitions.Add(running);
+
+            service.Start();
+            service.Start(); // no change -> no event
+            service.Stop();
+            service.Stop(); // no change -> no event
+
+            Assert.Equal(new List<bool> { true, false }, transitions);
         }
     }
 }

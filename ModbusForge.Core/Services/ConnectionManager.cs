@@ -6,6 +6,7 @@ using System.IO;
 using System.IO.Ports;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using ModbusForge.Models;
@@ -14,12 +15,11 @@ namespace ModbusForge.Services;
 
 public class ConnectionManager : IConnectionManager
 {
-    private static readonly string DefaultProfilesFilePath = Path.Combine(
+    private static readonly string ProfilesFilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "ModbusForge",
         "connection-profiles.json");
 
-    private readonly string _profilesFilePath;
     private readonly ILogger<ConnectionManager> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IValidationService? _validationService;
@@ -27,6 +27,7 @@ public class ConnectionManager : IConnectionManager
     private readonly IModbusAddressValidator _addressValidator;
     private readonly ConcurrentDictionary<string, IModbusService> _services = new();
     private ConnectionProfile? _activeProfile;
+    private readonly IDispatcher? _uiDispatcher;
 
     public ObservableCollection<ConnectionProfile> Profiles { get; } = new();
 
@@ -38,19 +39,27 @@ public class ConnectionManager : IConnectionManager
     public event EventHandler<ConnectionProfile>? ProfileConnected;
     public event EventHandler<ConnectionProfile>? ProfileDisconnected;
 
-    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService = null, string? profilesFilePath = null)
-        : this(logger, loggerFactory, validationService, null, null, profilesFilePath)
+    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService = null)
+        : this(logger, loggerFactory, validationService, null, null, null)
     {
     }
 
-    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService, ICorrelationContext? correlationContext, IModbusAddressValidator? addressValidator, string? profilesFilePath = null)
+    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService, ICorrelationContext? correlationContext, IModbusAddressValidator? addressValidator)
+        : this(logger, loggerFactory, validationService, correlationContext, addressValidator, null)
     {
-        _profilesFilePath = profilesFilePath ?? DefaultProfilesFilePath;
+    }
+
+    public ConnectionManager(ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory, IValidationService? validationService, ICorrelationContext? correlationContext, IModbusAddressValidator? addressValidator, IDispatcher? uiDispatcher)
+    {
         _logger = logger;
         _loggerFactory = loggerFactory;
         _validationService = validationService;
         _correlationContext = correlationContext ?? new CorrelationContext();
         _addressValidator = addressValidator ?? new ModbusAddressValidator();
+        // Frames are captured on socket worker threads; when a UI dispatcher is available,
+        // each profile's frame log marshals its collection mutations onto the UI thread
+        // so the Frame Inspector grid updates reliably.
+        _uiDispatcher = uiDispatcher;
         LoadProfiles();
 
         // Add default profile if none exist
@@ -73,22 +82,69 @@ public class ConnectionManager : IConnectionManager
 
     public void RemoveProfile(ConnectionProfile profile)
     {
-        if (profile.IsConnected)
+        // Take the service out of the table before tearing it down: nothing
+        // else can resolve it anymore, and the async teardown below can run
+        // on it without a concurrent Dispose racing the Disconnect.
+        IModbusService? service = null;
+        if (_services.TryRemove(profile.Id, out var removed))
         {
-            _ = DisconnectProfileAsync(profile);
-        }
-
-        if (_services.TryRemove(profile.Id, out var service))
-        {
-            service.Dispose();
+            service = removed;
         }
 
         Profiles.Remove(profile);
         _logger.LogInformation("Removed connection profile: {Name}", profile.Name);
 
+        if (service != null)
+        {
+            if (profile.IsConnected)
+            {
+                service.ConnectionLost -= OnServiceConnectionLost;
+                _ = TearDownServiceAsync(service, profile);
+            }
+            else
+            {
+                service.Dispose();
+            }
+        }
+
         if (_activeProfile == profile)
         {
             SetActiveProfile(Profiles.Count > 0 ? Profiles[0] : null!);
+        }
+    }
+
+    /// <summary>
+    /// Completes the teardown of a removed profile's service: disconnect, then
+    /// dispose, then report the profile as disconnected. Runs asynchronously
+    /// because <see cref="IModbusService.DisconnectAsync"/> can wait on an
+    /// in-flight request; the caller has already detached the service from all
+    /// lookups, so it is safe to let this finish in the background.
+    /// </summary>
+    private async Task TearDownServiceAsync(IModbusService service, ConnectionProfile profile)
+    {
+        try
+        {
+            await service.DisconnectAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+        {
+            _logger.LogError(ex, "Error disconnecting profile during removal: {Name}", profile.Name);
+        }
+        finally
+        {
+            try
+            {
+                service.Dispose();
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogError(ex, "Error disposing service during removal: {Name}", profile.Name);
+            }
+
+            profile.IsConnected = false;
+            profile.Status = "Disconnected";
+            _logger.LogInformation("Disconnected profile: {Name}", profile.Name);
+            ProfileDisconnected?.Invoke(this, profile);
         }
     }
 
@@ -135,6 +191,7 @@ public class ConnectionManager : IConnectionManager
 
             if (success)
             {
+                AttachConnectionLostHandler(service, profile);
                 profile.IsConnected = true;
                 profile.Status = "Connected";
                 ProfileConnected?.Invoke(this, profile);
@@ -164,6 +221,7 @@ public class ConnectionManager : IConnectionManager
         {
             if (_services.TryGetValue(profile.Id, out var service))
             {
+                service.ConnectionLost -= OnServiceConnectionLost;
                 await service.DisconnectAsync();
             }
 
@@ -196,7 +254,7 @@ public class ConnectionManager : IConnectionManager
 
         if (_services.TryGetValue(profile.Id, out var existing))
         {
-            if (MatchesTransport(existing, transport))
+            if (MatchesService(existing, profile))
             {
                 return existing;
             }
@@ -207,11 +265,16 @@ public class ConnectionManager : IConnectionManager
 
         IModbusService service;
 
+        // Every profile gets its own frame log (so the inspector keeps history per profile);
+        // all logs share the UI dispatcher so grid updates are marshalled correctly.
+        var frameLogger = new ModbusFrameLogger(ModbusFrameLogger.DefaultCapacity, _uiDispatcher);
+
         if (profile.IsServerMode && transport == TransportType.Tcp)
         {
             service = new ModbusServerService(
                 _loggerFactory.CreateLogger<ModbusServerService>(),
-                null);
+                null,
+                frameLogger);
         }
         else
         {
@@ -221,10 +284,10 @@ public class ConnectionManager : IConnectionManager
                     _loggerFactory.CreateLogger<ModbusSerialService>(),
                     null,
                     _validationService,
-                    null,
+                    frameLogger,
                     _addressValidator,
                     transport),
-                _ => new ModbusTcpService(_loggerFactory.CreateLogger<ModbusTcpService>(), null, null, _addressValidator)
+                _ => new ModbusTcpService(_loggerFactory.CreateLogger<ModbusTcpService>(), null, frameLogger, _addressValidator)
             };
         }
 
@@ -238,19 +301,82 @@ public class ConnectionManager : IConnectionManager
         })!;
     }
 
-    private static bool MatchesTransport(IModbusService service, TransportType transport)
+    /// <summary>
+    /// Whether an existing service instance still fits the profile, i.e. is the
+    /// same kind of service this profile would create. Must stay in lockstep
+    /// with the creation branches below: a server-mode TCP profile runs a
+    /// <see cref="ModbusServerService"/> (which owns the register data store),
+    /// so treating it as a mismatch would dispose the live server and wipe the
+    /// store on every reconnect.
+    /// </summary>
+    private static bool MatchesService(IModbusService service, ConnectionProfile profile)
     {
-        if (transport == TransportType.Tcp)
+        if (profile.IsServerMode && profile.Transport == TransportType.Tcp)
+            return service is ModbusServerService;
+
+        if (profile.Transport == TransportType.Tcp)
             return service is ModbusTcpService;
 
-        return service is ModbusSerialService serial && serial.Transport == transport;
+        return service is ModbusSerialService serial && serial.Transport == profile.Transport;
+    }
+
+    private void AttachConnectionLostHandler(IModbusService service, ConnectionProfile profile)
+    {
+        service.ConnectionLost -= OnServiceConnectionLost;
+        service.ConnectionLost += OnServiceConnectionLost;
+    }
+
+    private void OnServiceConnectionLost(object? sender, EventArgs e)
+    {
+        // Raised from a worker thread by the service when its transport dies.
+        if (sender is not IModbusService lostService)
+        {
+            return;
+        }
+
+        // The profile list and profile state are owned by the UI thread:
+        // enumerating Profiles off-thread races with add/remove on the UI
+        // thread, and setting an observable property (IsConnected, Status)
+        // off-thread raises PropertyChanged on the wrong thread for the
+        // bindings. Run the lookup and state update on the dispatcher
+        // thread; without a dispatcher (headless, tests) run inline.
+        if (_uiDispatcher is { } dispatcher && !dispatcher.CheckAccess)
+        {
+            dispatcher.Post(() => HandleServiceConnectionLost(lostService));
+            return;
+        }
+
+        HandleServiceConnectionLost(lostService);
+    }
+
+    private void HandleServiceConnectionLost(IModbusService lostService)
+    {
+        ConnectionProfile? profile = null;
+        foreach (var candidate in Profiles)
+        {
+            if (_services.TryGetValue(candidate.Id, out var stored) && ReferenceEquals(stored, lostService))
+            {
+                profile = candidate;
+                break;
+            }
+        }
+
+        if (profile == null || !profile.IsConnected)
+        {
+            return;
+        }
+
+        _logger.LogWarning("Connection lost for profile {Name}", profile.Name);
+        profile.IsConnected = false;
+        profile.Status = "Connection lost";
+        ProfileDisconnected?.Invoke(this, profile);
     }
 
     public void SaveProfiles()
     {
         try
         {
-            var directory = Path.GetDirectoryName(_profilesFilePath);
+            var directory = Path.GetDirectoryName(ProfilesFilePath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
@@ -279,7 +405,7 @@ public class ConnectionManager : IConnectionManager
             };
 
             var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_profilesFilePath, json);
+            WriteAllTextAtomic(ProfilesFilePath, json);
             _logger.LogInformation("Saved {Count} connection profiles", Profiles.Count);
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
@@ -288,17 +414,38 @@ public class ConnectionManager : IConnectionManager
         }
     }
 
+    /// <summary>
+    /// Writes the text to a temp file in the same directory and renames it over
+    /// the destination, so a crash mid-write leaves the previous profiles file
+    /// intact instead of a truncated one that would lose every saved connection.
+    /// </summary>
+    private static void WriteAllTextAtomic(string path, string contents)
+    {
+        var tmpPath = path + ".tmp";
+        File.WriteAllText(tmpPath, contents);
+        File.Move(tmpPath, path, overwrite: true);
+    }
+
+    private static readonly JsonSerializerOptions _profileJsonOptions = new()
+    {
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true,
+        // Accept enum values written as strings (hand-edited files) as well as
+        // the numeric form produced by the default serialization.
+        Converters = { new JsonStringEnumConverter() }
+    };
+
     public void LoadProfiles()
     {
         try
         {
-            if (!File.Exists(_profilesFilePath))
+            if (!File.Exists(ProfilesFilePath))
             {
                 return;
             }
 
-            var json = File.ReadAllText(_profilesFilePath);
-            var data = JsonSerializer.Deserialize<ProfilesData>(json);
+            var json = File.ReadAllText(ProfilesFilePath);
+            var data = JsonSerializer.Deserialize<ProfilesData>(json, _profileJsonOptions);
 
             if (data?.Profiles != null)
             {
@@ -329,6 +476,17 @@ public class ConnectionManager : IConnectionManager
                         SetActiveProfile(profile);
                     }
                 }
+
+                // The saved active profile may be gone (profile removed and the
+                // file left consistent-but-stale, or hand-edited). Without a
+                // fallback the app would start with profiles present but no
+                // active one — every read/write target would be empty.
+                if (_activeProfile == null && Profiles.Count > 0)
+                {
+                    SetActiveProfile(Profiles[0]);
+                    _logger.LogInformation("Saved active profile not found; falling back to {Name}", Profiles[0].Name);
+                }
+
                 _logger.LogInformation("Loaded {Count} connection profiles", Profiles.Count);
             }
         }

@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
+using ModbusForge.Avalonia.Services;
 using ModbusForge.Avalonia.ViewModels;
 using ModbusForge.Models;
 using ModbusForge.Services;
@@ -148,8 +149,13 @@ namespace ModbusForge.Avalonia.Tests
             Assert.False(vm.HoldingMonitorEnabled);
             Assert.Equal(1, vm.HoldingMonitorFailureCount);
             Assert.True(vm.IsConnected);
-            Assert.Equal(1, messageBox.CallCount);
-            Assert.Contains("paused", messageBox.LastMessage, StringComparison.OrdinalIgnoreCase);
+
+            // A failed *monitoring* read is reported in the status bar, not with a modal
+            // dialog: several armed areas failing at once (e.g. a dropped connection)
+            // would otherwise stack one dialog per area.
+            Assert.Equal(0, messageBox.CallCount);
+            Assert.Contains("Failed to read", vm.StatusMessage, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("paused", vm.StatusMessage, StringComparison.OrdinalIgnoreCase);
 
             vm.Dispose();
         }
@@ -468,6 +474,137 @@ namespace ModbusForge.Avalonia.Tests
             vm.Dispose();
         }
 
+        [Fact]
+        public void Dashboard_profile_list_flags_follow_the_profile_collection()
+        {
+            var manager = new FakeConnectionManager();
+            using var vm = new MainViewModel(
+                manager,
+                NullLogger<MainViewModel>.Instance,
+                new SyncDispatcher());
+
+            // No profiles yet: the empty-state placeholder is visible.
+            Assert.False(vm.HasConnectionProfiles);
+            Assert.True(vm.ShowNoProfilesPlaceholder);
+
+            var profile = new ConnectionProfile("PLC", "127.0.0.1", 502, 1);
+            manager.AddProfile(profile);
+
+            Assert.True(vm.HasConnectionProfiles);
+            Assert.False(vm.ShowNoProfilesPlaceholder);
+
+            manager.RemoveProfile(profile);
+
+            Assert.False(vm.HasConnectionProfiles);
+            Assert.True(vm.ShowNoProfilesPlaceholder);
+        }
+
+        [Fact]
+        public void Selecting_a_dashboard_profile_makes_it_active()
+        {
+            var first = new ConnectionProfile("First", "127.0.0.1", 502, 1);
+            var second = new ConnectionProfile("Second", "127.0.0.1", 503, 2);
+            var manager = new FakeConnectionManager(profile: first);
+            using var vm = new MainViewModel(
+                manager,
+                NullLogger<MainViewModel>.Instance,
+                new SyncDispatcher());
+
+            vm.DashboardSelectedProfile = second;
+
+            Assert.Same(second, manager.ActiveProfile);
+            Assert.Same(second, vm.ActiveProfile);
+        }
+
+        [Fact]
+        public void Trend_pens_alone_start_the_watch_monitoring_loop()
+        {
+            // Regression: pens used to ride on watch entries, so adding a pen
+            // always created a monitored entry that kept the loop alive. With
+            // first-class pens the loop must be started by the pens alone -
+            // a unit can have pens and no watch entries at all.
+            var manager = new FakeConnectionManager();
+            using var vm = new MainViewModel(
+                manager,
+                NullLogger<MainViewModel>.Instance,
+                new SyncDispatcher());
+
+            Assert.False(vm.IsCustomWatchMonitoring);
+
+            vm.CurrentConfig.TrendPens.Add(new TrendPen { Name = "HR Trend 1", Address = 1 });
+            Assert.True(vm.IsCustomWatchMonitoring);
+
+            vm.CurrentConfig.TrendPens.Clear();
+            Assert.False(vm.IsCustomWatchMonitoring);
+        }
+
+        [Fact]
+        public void AddRegisterToTrend_CreatesAPen_WithoutTouchingWatchEntries()
+        {
+            var manager = new FakeConnectionManager();
+            var store = new UnitConfigurationStore(new SyncDispatcher());
+            var subscriptions = new TrendSubscriptionService(store);
+            using var vm = new MainViewModel(
+                manager,
+                NullLogger<MainViewModel>.Instance,
+                new SyncDispatcher(),
+                unitConfigurationStore: store,
+                trendSubscriptionService: subscriptions);
+
+            vm.AddRegisterToTrend(5, "HoldingRegister", "int");
+
+            var pen = Assert.Single(store.CurrentConfig.TrendPens);
+            Assert.Equal("HR Trend 5", pen.Name);
+            Assert.Equal(5, pen.Address);
+            Assert.Empty(store.CurrentConfig.CustomEntries);
+            Assert.True(vm.IsCustomWatchMonitoring);
+        }
+
+        [Fact]
+        public async Task Failing_pen_read_MarksPenFailing_AndDisconnectionClearsTheState()
+        {
+            // The watch loop must surface pen failures (red dot source) once
+            // per episode and clear the stale state when polling stops, so
+            // the pen list never shows a failure for a pen nobody polls.
+            var profile = new ConnectionProfile("Test", "127.0.0.1", 502, 1)
+            {
+                IsConnected = true,
+                Status = "Connected"
+            };
+            var manager = new FakeConnectionManager(new ThrowingModbusService(), profile);
+            using var vm = new MainViewModel(
+                manager,
+                NullLogger<MainViewModel>.Instance,
+                new SyncDispatcher());
+
+            vm.HoldingMonitorEnabled = false;
+            manager.RaiseConnected(profile);
+
+            var pen = new TrendPen { Name = "HR Trend 1", Address = 1 };
+            vm.CurrentConfig.TrendPens.Add(pen); // starts the loop (pens count as a monitored source)
+
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (!pen.IsFailing && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(10);
+            }
+
+            Assert.True(pen.IsFailing, "pen should be marked failing after the loop's read fails");
+            Assert.Contains("simulated", pen.LastError, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("failed to read", vm.StatusMessage, StringComparison.OrdinalIgnoreCase);
+
+            // Disconnect: polling stops, the stale failing state must clear.
+            await manager.DisconnectProfileAsync(profile);
+            deadline = DateTime.UtcNow.AddSeconds(5);
+            while (pen.IsFailing && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(10);
+            }
+
+            Assert.False(pen.IsFailing, "failing state should be cleared when the loop stops");
+            Assert.Null(pen.LastError);
+        }
+
         private static int GetFreePort()
         {
             using var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -483,6 +620,7 @@ namespace ModbusForge.Avalonia.Tests
             public bool IsConnected => true;
             public string BoundEndpoint => "test";
             public ModbusFrameLogger FrameLogger { get; } = new();
+            public event EventHandler? ConnectionLost { add { } remove { } }
 
             public Task<bool> ConnectAsync(string ipAddress, int port, string unitIds = "1", CancellationToken cancellationToken = default) => Task.FromResult(true);
             public Task DisconnectAsync() => Task.CompletedTask;

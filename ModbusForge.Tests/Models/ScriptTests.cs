@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ModbusForge.Models;
 using Xunit;
 
@@ -5,6 +6,53 @@ namespace ModbusForge.Tests.Models;
 
 public class ScriptTests
 {
+    [Fact]
+    public void JsonRoundTrip_ShouldPreserveAllCommands()
+    {
+        // Regression: System.Text.Json silently skips get-only collection
+        // properties on deserialization, so a Script with a get-only Commands
+        // property came back with zero commands after a load.
+        var original = new Script("Round Trip")
+        {
+            Description = "preserved through serialize + deserialize",
+            StopOnError = false,
+            RepeatCount = 4,
+            DelayBetweenCommandsMs = 250
+        };
+        original.Commands.Add(new ScriptCommand
+        {
+            CommandType = ScriptCommandType.Loop,
+            LoopCount = 3
+        });
+        original.Commands.Add(new ScriptCommand
+        {
+            CommandType = ScriptCommandType.ReadHoldingRegisters,
+            Address = 1,
+            Count = 2
+        });
+        original.Commands.Add(new ScriptCommand
+        {
+            CommandType = ScriptCommandType.Log,
+            Message = "loop body"
+        });
+
+        var json = JsonSerializer.Serialize(original);
+        var loaded = JsonSerializer.Deserialize<Script>(json);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(3, loaded!.Commands.Count);
+        Assert.Equal(ScriptCommandType.Loop, loaded.Commands[0].CommandType);
+        Assert.Equal(3, loaded.Commands[0].LoopCount);
+        Assert.Equal(ScriptCommandType.ReadHoldingRegisters, loaded.Commands[1].CommandType);
+        Assert.Equal(1, loaded.Commands[1].Address);
+        Assert.Equal(2, loaded.Commands[1].Count);
+        Assert.Equal(ScriptCommandType.Log, loaded.Commands[2].CommandType);
+        Assert.Equal("loop body", loaded.Commands[2].Message);
+        Assert.Equal("Round Trip", loaded.Name);
+        Assert.Equal(4, loaded.RepeatCount);
+        Assert.Equal(250, loaded.DelayBetweenCommandsMs);
+        Assert.False(loaded.StopOnError);
+    }
     [Fact]
     public void Clone_ShouldCopyPrimitiveProperties()
     {

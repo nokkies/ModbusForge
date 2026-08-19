@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Ports;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -93,6 +94,63 @@ public class ConnectionManagerTests : IDisposable
         Assert.Equal("127.0.0.1", defaultProfile.IpAddress);
         Assert.Equal(502, defaultProfile.Port);
         Assert.Equal(1, defaultProfile.UnitId);
+    }
+
+    [Fact]
+    public void LoadProfiles_WhenEnumValuesAreStrings_LoadsProfiles()
+    {
+        // Regression: a profiles file whose enums are written as strings
+        // (e.g. hand-edited) must load; previously the whole file was
+        // silently dropped and the code-default profile was used instead.
+        var profilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "ModbusForge",
+            "connection-profiles.json");
+
+        var json = """
+        {
+          "ActiveProfileId": "str-enum-test",
+          "Profiles": [
+            {
+              "Id": "str-enum-test",
+              "Name": "String Enums",
+              "IpAddress": "127.0.0.1",
+              "Port": 1502,
+              "UnitId": 2,
+              "Mode": "Client",
+              "ServerUnitIds": "1",
+              "Transport": "Tcp",
+              "ComPort": "COM3",
+              "BaudRate": 19200,
+              "Parity": "Even",
+              "DataBits": 7,
+              "StopBits": "Two",
+              "RtsEnable": false
+            }
+          ]
+        }
+        """;
+        File.WriteAllText(profilePath, json);
+
+        try
+        {
+            // Act: a fresh manager loads the file created above.
+            var manager = new ConnectionManager(_mockLogger.Object, _mockLoggerFactory.Object);
+
+            // Assert
+            var profile = Assert.Single(manager.Profiles);
+            Assert.Equal("String Enums", profile.Name);
+            Assert.Equal(1502, profile.Port);
+            Assert.Equal("Client", profile.Mode);
+            Assert.Equal(TransportType.Tcp, profile.Transport);
+            Assert.Equal(Parity.Even, profile.Parity);
+            Assert.Equal(StopBits.Two, profile.StopBits);
+            Assert.Same(profile, manager.ActiveProfile);
+        }
+        finally
+        {
+            File.Delete(profilePath);
+        }
     }
 
     [Fact]
@@ -243,6 +301,55 @@ public class ConnectionManagerTests : IDisposable
             Assert.True(profile.IsConnected);
             Assert.Equal("Connected", profile.Status);
             Assert.Equal(profile, connectedProfile);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task ConnectProfileAsync_WhenPeerClosesSocket_MarksProfileDisconnected()
+    {
+        // Arrange
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+        try
+        {
+            var profile = new ConnectionProfile("Loss Test", "127.0.0.1", port, 1);
+            _manager.AddProfile(profile);
+
+            var disconnectedProfiles = new List<ConnectionProfile>();
+            _manager.ProfileDisconnected += (s, p) => disconnectedProfiles.Add(p);
+
+            // Connect (the listener completes the TCP handshake automatically).
+            var connected = await _manager.ConnectProfileAsync(profile);
+            Assert.True(connected);
+
+            // Retrieve the peer side and close it to simulate the device
+            // dropping the connection out from under the client.
+            var peer = await Task.Run(() => listener.AcceptTcpClientAsync());
+            peer.Close();
+
+            // Act: the service detects the loss on its next request. The in-flight
+            // request itself fails because the peer vanished â€” that is expected.
+            try
+            {
+                await _manager.ActiveService!.ReadHoldingRegistersAsync(1, 0, 10);
+            }
+            catch
+            {
+                // Expected: the request fails on the dead transport.
+            }
+
+            // Assert: the profile is flipped to disconnected and the event fired,
+            // even though nobody explicitly disconnected.
+            await Task.Delay(250);
+            Assert.False(profile.IsConnected);
+            Assert.Equal("Connection lost", profile.Status);
+            Assert.Contains(profile, disconnectedProfiles);
         }
         finally
         {
@@ -436,6 +543,127 @@ public class ConnectionManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task ConnectionLost_UpdatesProfileStateAndFiresEvent()
+    {
+        // Arrange: a loopback server that accepts the connection and then
+        // resets it, so the next I/O through the service detects the dead socket.
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+        try
+        {
+            _ = Task.Run(async () =>
+            {
+                var client = await listener.AcceptTcpClientAsync();
+                // Linger 0 -> close() sends an RST instead of a FIN, so the
+                // client's next read fails immediately with a reset.
+                client.LingerState = new System.Net.Sockets.LingerOption(true, 0);
+                client.Close();
+            });
+
+            var profile = new ConnectionProfile("Test", "127.0.0.1", port, 1);
+            _manager.AddProfile(profile);
+            Assert.True(await _manager.ConnectProfileAsync(profile));
+
+            ConnectionProfile? disconnectedProfile = null;
+            _manager.ProfileDisconnected += (s, p) => disconnectedProfile = p;
+
+            // Act: the next read hits the dead socket. The service swallows the
+            // I/O error into a default return and raises ConnectionLost.
+            var service = _manager.GetServiceForProfile(profile);
+            Assert.NotNull(service);
+            await service!.ReadHoldingRegistersAsync(1, 0, 1);
+
+            // Assert
+            Assert.False(profile.IsConnected);
+            Assert.Equal("Connection lost", profile.Status);
+            Assert.Equal(profile, disconnectedProfile);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task ConnectionLost_FromWorkerThread_MarshalsStateUpdateToDispatcher()
+    {
+        // Arrange: a manager whose dispatcher queues work instead of running it.
+        // If the connection-loss handling is marshalled (as it must be - the
+        // profile list and observable profile state are UI-thread-owned), the
+        // profile is still "connected" when the failing read returns, and only
+        // becomes disconnected once the queued work runs.
+        var dispatcher = new QueuedDispatcher();
+        var manager = new ConnectionManager(
+            _mockLogger.Object, _mockLoggerFactory.Object, null, null, null, dispatcher);
+
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+        try
+        {
+            _ = Task.Run(async () =>
+            {
+                var client = await listener.AcceptTcpClientAsync();
+                client.LingerState = new System.Net.Sockets.LingerOption(true, 0);
+                client.Close();
+            });
+
+            var profile = new ConnectionProfile("Test", "127.0.0.1", port, 1);
+            manager.AddProfile(profile);
+            Assert.True(await manager.ConnectProfileAsync(profile));
+
+            ConnectionProfile? disconnectedProfile = null;
+            manager.ProfileDisconnected += (s, p) => disconnectedProfile = p;
+
+            // Act: the next read hits the dead socket and queues the
+            // connection-loss handling on the dispatcher.
+            var service = manager.GetServiceForProfile(profile);
+            Assert.NotNull(service);
+            await service!.ReadHoldingRegistersAsync(1, 0, 1);
+
+            // The handling must not have run inline on the socket worker.
+            Assert.True(profile.IsConnected, "profile was updated before the dispatcher ran its queued work");
+
+            // Assert: once the dispatcher runs the queued work, the profile is
+            // updated and the event fires.
+            await dispatcher.WaitUntilPostedAsync();
+            dispatcher.Drain();
+
+            Assert.False(profile.IsConnected);
+            Assert.Equal("Connection lost", profile.Status);
+            Assert.Equal(profile, disconnectedProfile);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    [Fact]
+    public void SaveProfiles_WritesProfilesAndLeavesNoTempFile()
+    {
+        // Arrange
+        _manager.AddProfile(new ConnectionProfile("Custom Profile", "192.168.1.100", 5020, 2));
+
+        // Act
+        _manager.SaveProfiles();
+
+        // Assert
+        var profilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "ModbusForge",
+            "connection-profiles.json");
+
+        Assert.True(File.Exists(profilePath));
+        var json = File.ReadAllText(profilePath);
+        Assert.Contains("Custom Profile", json);
+        Assert.False(File.Exists(profilePath + ".tmp"));
+    }
+
+    [Fact]
     public async Task GetServiceForProfile_ReturnsService_IfProfileHasBeenUsed()
     {
         // Arrange
@@ -498,6 +726,176 @@ public class ConnectionManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task ServerProfile_Reconnect_KeepsServiceInstanceAndDataStore()
+    {
+        // Regression: the transport match did not recognize a ModbusServerService
+        // as fitting its server-mode profile, so every reconnect disposed the
+        // running server and created a fresh one â€” wiping the register data
+        // store between a stop/start cycle.
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop(); // free the port for the server to bind
+
+        var serverProfile = new ConnectionProfile("Server", "127.0.0.1", port, 1)
+        {
+            Mode = "Server",
+            ServerUnitIds = "1"
+        };
+        _manager.AddProfile(serverProfile);
+
+        var started = await _manager.ConnectProfileAsync(serverProfile);
+        Assert.True(started);
+
+        var firstService = _manager.GetServiceForProfile(serverProfile);
+        Assert.NotNull(firstService);
+        Assert.IsAssignableFrom<ModbusServerService>(firstService);
+
+        await firstService!.WriteSingleRegisterAsync(1, 1, 99);
+        await _manager.DisconnectProfileAsync(serverProfile);
+
+        // Act: reconnect.
+        var restarted = await _manager.ConnectProfileAsync(serverProfile);
+        Assert.True(restarted);
+
+        var secondService = _manager.GetServiceForProfile(serverProfile);
+
+        // Assert: same instance, and the written value survived the restart.
+        Assert.Same(firstService, secondService);
+        var values = await secondService!.ReadHoldingRegistersAsync(1, 1, 1);
+        Assert.NotNull(values);
+        Assert.Equal(99, values![0]);
+
+        await _manager.DisconnectProfileAsync(serverProfile);
+    }
+
+    [Fact]
+    public void LoadProfiles_WhenSavedActiveProfileIdIsStale_FallsBackToFirstProfile()
+    {
+        // Regression: a profiles file whose ActiveProfileId no longer exists
+        // (profile removed, file hand-edited) left the app with profiles but
+        // no active one, so every connection target resolved to null.
+        var profilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "ModbusForge",
+            "connection-profiles.json");
+
+        var json = """
+        {
+          "ActiveProfileId": "ghost-profile-id",
+          "Profiles": [
+            {
+              "Id": "real-profile",
+              "Name": "Still Here",
+              "IpAddress": "127.0.0.1",
+              "Port": 1503,
+              "UnitId": 1,
+              "Mode": "Client",
+              "ServerUnitIds": "1",
+              "Transport": "Tcp",
+              "ComPort": "COM1",
+              "BaudRate": 9600,
+              "Parity": "None",
+              "DataBits": 8,
+              "StopBits": "One",
+              "RtsEnable": false
+            }
+          ]
+        }
+        """;
+        var directory = Path.GetDirectoryName(profilePath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        File.WriteAllText(profilePath, json);
+
+        try
+        {
+            var manager = new ConnectionManager(_mockLogger.Object, _mockLoggerFactory.Object);
+
+            var profile = Assert.Single(manager.Profiles);
+            Assert.Same(profile, manager.ActiveProfile);
+            Assert.True(profile.IsActive);
+        }
+        finally
+        {
+            File.Delete(profilePath);
+        }
+    }
+
+    [Fact]
+    public async Task RemoveProfile_ConnectedServer_TearsDownAndReleasesPort()
+    {
+        // Regression: RemoveProfile fired a fire-and-forget disconnect and
+        // immediately disposed the same service, racing the in-flight
+        // DisconnectAsync. Removal of a connected server must complete the
+        // teardown (disconnect, then dispose) and actually free the port.
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop(); // free the port for the server to bind
+
+        var keepProfile = new ConnectionProfile("Keep", "127.0.0.1", 1, 1);
+        var serverProfile = new ConnectionProfile("Server", "127.0.0.1", port, 1)
+        {
+            Mode = "Server",
+            ServerUnitIds = "1"
+        };
+        _manager.AddProfile(keepProfile);
+        _manager.AddProfile(serverProfile);
+        _manager.SetActiveProfile(serverProfile);
+
+        var started = await _manager.ConnectProfileAsync(serverProfile);
+        Assert.True(started);
+        Assert.Same(serverProfile, _manager.ActiveProfile);
+
+        var disconnected = new List<ConnectionProfile>();
+        _manager.ProfileDisconnected += (s, p) => disconnected.Add(p);
+
+        // Act
+        _manager.RemoveProfile(serverProfile);
+
+        // Assert: gone from the list, active profile moved...
+        Assert.DoesNotContain(serverProfile, _manager.Profiles);
+        Assert.Same(keepProfile, _manager.ActiveProfile);
+
+        // ...and the teardown finished: the port is bindable again.
+        Assert.True(await WaitForPortToFreeAsync(port, TimeSpan.FromSeconds(5)),
+            "Server port was still held after RemoveProfile â€” teardown did not complete.");
+
+        // The disconnected event fires when the async teardown actually finishes.
+        var eventWait = System.Diagnostics.Stopwatch.StartNew();
+        while (!disconnected.Contains(serverProfile) && eventWait.Elapsed < TimeSpan.FromSeconds(2))
+        {
+            await Task.Delay(50);
+        }
+        Assert.Contains(serverProfile, disconnected);
+        Assert.False(serverProfile.IsConnected);
+    }
+
+    private static async Task<bool> WaitForPortToFreeAsync(int port, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var test = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, port);
+            try
+            {
+                test.Start();
+                test.Stop();
+                return true;
+            }
+            catch (System.Net.Sockets.SocketException)
+            {
+                await Task.Delay(100);
+            }
+        }
+        return false;
+    }
+
+    [Fact]
     public async Task ServerProfile_CanStartServerAndClientCanReadAndWrite()
     {
         // Arrange
@@ -540,4 +938,44 @@ public class ConnectionManagerTests : IDisposable
         await _manager.DisconnectProfileAsync(clientProfile);
         await _manager.DisconnectProfileAsync(serverProfile);
     }
+
+    /// <summary>
+    /// A dispatcher that claims the caller is always off its thread and queues
+    /// posted work instead of running it, so tests can observe whether the
+    /// manager marshalled the work rather than running it inline.
+    /// </summary>
+    private sealed class QueuedDispatcher : IDispatcher
+    {
+        private readonly Queue<Action> _queue = new();
+        private readonly TaskCompletionSource _firstPost = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool CheckAccess => false;
+
+        public void Invoke(Action action) => action();
+
+        public T Invoke<T>(Func<T> func) => func();
+
+        public Task InvokeAsync(Action action)
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        public Task<T> InvokeAsync<T>(Func<T> func) => Task.FromResult(func());
+
+        public void Post(Action action)
+        {
+            _queue.Enqueue(action);
+            _firstPost.TrySetResult();
+        }
+
+        public Task WaitUntilPostedAsync() => _firstPost.Task;
+
+        public void Drain()
+        {
+            while (_queue.Count > 0)
+                _queue.Dequeue()();
+        }
+    }
 }
+

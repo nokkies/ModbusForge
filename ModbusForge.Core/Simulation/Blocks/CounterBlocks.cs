@@ -5,19 +5,34 @@ namespace ModbusForge.Core.Simulation.Blocks
 {
     public sealed class CtuBlock : IFunctionBlock
     {
+        public static readonly BlockParameterDescriptor[] CounterParameters =
+        {
+            new()
+            {
+                Name = "CounterPreset",
+                DisplayName = "Preset",
+                Kind = BlockParameterKind.Int32,
+                DefaultValue = 10,
+                Minimum = 0,
+                Maximum = 100000
+            }
+        };
+
         public string TypeId => "CTU";
         public string DisplayName => "CTU Counter";
         public string Category => "Counters";
 
         public IReadOnlyList<IPort> Ports { get; } = new List<IPort>
         {
-            new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
+            new PortDefinition(PortNames.CountUp, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.BoolOutput, PortDirection.Output, SimulationDataType.Bool)
         };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => CounterParameters;
 
         public void Execute(IExecutionContext context)
         {
-            var input = context.ReadInput("Input1")?.AsBool() ?? false;
+            var input = context.ReadInput(PortNames.CountUp)?.AsBool() ?? false;
             var preset = context.ReadParameter("CounterPreset", 10);
             var state = context.State.GetOrCreate<CounterState>("CounterState");
 
@@ -27,7 +42,7 @@ namespace ModbusForge.Core.Simulation.Blocks
             }
 
             state.LastInput = input;
-            context.WriteOutput("Output", SimulationValue.Bool(state.Value >= preset));
+            context.WriteOutput(PortNames.BoolOutput, SimulationValue.Bool(state.Value >= preset));
         }
     }
 
@@ -39,13 +54,15 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public IReadOnlyList<IPort> Ports { get; } = new List<IPort>
         {
-            new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
+            new PortDefinition(PortNames.CountDown, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.BoolOutput, PortDirection.Output, SimulationDataType.Bool)
         };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => CtuBlock.CounterParameters;
 
         public void Execute(IExecutionContext context)
         {
-            var input = context.ReadInput("Input1")?.AsBool() ?? false;
+            var input = context.ReadInput(PortNames.CountDown)?.AsBool() ?? false;
             var preset = context.ReadParameter("CounterPreset", 10);
             var state = context.State.GetOrCreate<CounterState>("CounterState");
 
@@ -55,7 +72,7 @@ namespace ModbusForge.Core.Simulation.Blocks
             }
 
             state.LastInput = input;
-            context.WriteOutput("Output", SimulationValue.Bool(state.Value <= 0));
+            context.WriteOutput(PortNames.BoolOutput, SimulationValue.Bool(state.Value <= 0));
         }
     }
 
@@ -67,15 +84,17 @@ namespace ModbusForge.Core.Simulation.Blocks
 
         public IReadOnlyList<IPort> Ports { get; } = new List<IPort>
         {
-            new PortDefinition("Input1", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Input2", PortDirection.Input, SimulationDataType.Bool),
-            new PortDefinition("Output", PortDirection.Output, SimulationDataType.Bool)
+            new PortDefinition(PortNames.CountUp, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.CountDown, PortDirection.Input, SimulationDataType.Bool),
+            new PortDefinition(PortNames.BoolOutput, PortDirection.Output, SimulationDataType.Bool)
         };
+
+        public IReadOnlyList<BlockParameterDescriptor> Parameters => CtuBlock.CounterParameters;
 
         public void Execute(IExecutionContext context)
         {
-            var input = context.ReadInput("Input1")?.AsBool() ?? false;
-            var direction = context.ReadInput("Input2")?.AsBool() ?? false;
+            var input = context.ReadInput(PortNames.CountUp)?.AsBool() ?? false;
+            var direction = context.ReadInput(PortNames.CountDown)?.AsBool() ?? false;
             var preset = context.ReadParameter("CounterPreset", 10);
             var state = context.State.GetOrCreate<CounterState>("CounterState");
 
@@ -88,7 +107,7 @@ namespace ModbusForge.Core.Simulation.Blocks
             }
 
             state.LastInput = input;
-            context.WriteOutput("Output", SimulationValue.Bool(state.Value >= preset));
+            context.WriteOutput(PortNames.BoolOutput, SimulationValue.Bool(state.Value >= preset));
         }
     }
 

@@ -22,11 +22,16 @@ internal sealed class MainViewModelAppStateAccessor : IAppStateAccessor
 
     public bool IsConnected => _vm.IsConnected;
     public string Mode => _vm.Mode;
+    public bool HasConnectionError => _vm.HasConnectionError;
+    public string StatusMessage => _vm.StatusMessage;
 
     public ICommand ConnectCommand => _vm.ConnectCommand;
     public ICommand DisconnectCommand => _vm.DisconnectCommand;
 
     public ObservableCollection<CustomEntry> CustomEntries => _vm.CustomEntries;
+
+    public ObservableCollection<TrendPen> TrendPens
+        => _vm.CurrentConfig.TrendPens;
 
     public ObservableCollection<VisualNode> SimulationNodes
         => _vm.CurrentConfig.SimulationSettings.VisualNodes;

@@ -36,6 +36,27 @@ namespace ModbusForge.Services
         void UpdateNodeValues();
 
         /// <summary>
+        /// Current simulation scan period in milliseconds.
+        /// </summary>
+        int ScanIntervalMs { get; }
+
+        /// <summary>
+        /// Sets the simulation scan period (clamped to the supported range), effective immediately.
+        /// </summary>
+        void SetScanIntervalMs(int ms);
+
+        /// <summary>
+        /// "device" when bound addresses read/write the connected server's data store,
+        /// "local" when they use the private offline store.
+        /// </summary>
+        string StoreMode { get; }
+
+        /// <summary>
+        /// Raised after a graph rebuild when the set of cycle-locked (non-evaluated) node ids changes.
+        /// </summary>
+        event Action<IReadOnlyList<string>> CyclesChanged;
+
+        /// <summary>
         /// Returns the cached boolean value of the specified node.
         /// </summary>
         bool GetNodeValue(string nodeId);

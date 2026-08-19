@@ -88,14 +88,13 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 StartPoint = points[0],
                 IsClosed = false,
-                IsFilled = false,
-                Segments = new PathSegments()
+                IsFilled = false
             };
 
             if (points.Count == 2)
             {
                 var (c1, c2) = ComputeBezierControlPoints(points[0], points[1]);
-                figure.Segments.Add(new BezierSegment
+                figure.Segments!.Add(new BezierSegment
                 {
                     Point1 = c1,
                     Point2 = c2,
@@ -110,11 +109,11 @@ namespace ModbusForge.Avalonia.ViewModels
                     segment.Points.Add(points[i]);
                 }
 
-                figure.Segments.Add(segment);
+                figure.Segments!.Add(segment);
             }
 
-            var geometry = new PathGeometry { Figures = new PathFigures() };
-            geometry.Figures.Add(figure);
+            var geometry = new PathGeometry();
+            geometry.Figures!.Add(figure);
             PathData = geometry;
         }
 
@@ -167,16 +166,72 @@ namespace ModbusForge.Avalonia.ViewModels
         private const double LayoutHorizontalGap = 80.0;
         private const double LayoutVerticalGap = 40.0;
 
+        /// <summary>
+        /// The error text stamped on blocks the engine has locked out of the execution
+        /// order because they sit in a cycle. Compared (not assumed) when unmarking so a
+        /// genuine per-tick failure on the same node is never clobbered.
+        /// </summary>
+        public const string CycleLockErrorText = "Locked in a loop — this block is not evaluated.";
+
         private readonly IVisualSimulationService _visualSimulation;
         private readonly IFileDialogService? _fileDialogService;
         private readonly IMessageBoxService? _messageBoxService;
         private readonly ITagWindowService? _tagWindowService;
         private readonly ILogger<VisualNodeEditorViewModel> _logger;
 
+        /// <summary>
+        /// Node ids currently marked with <see cref="CycleLockErrorText"/>; cleared
+        /// (and the marks removed) when a graph edit dissolves the loop or the
+        /// simulation stops.
+        /// </summary>
+        private readonly HashSet<string> _cycleMarkedNodeIds = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The loop warning raised by the most recent graph rebuild, kept so
+        /// <see cref="StartSimulation"/> does not overwrite it with the generic
+        /// "running" status.
+        /// </summary>
+        private string? _lastCycleWarning;
+
         private ObservableCollection<VisualNode>? _observedNodes;
         private ObservableCollection<NodeConnection>? _observedConnections;
         private readonly HashSet<VisualNode> _attachedNodes = new();
         private ProgramModel? _activeProgram;
+
+        /// <summary>
+        /// The in-flight coalesced node-edit series: every editable-property change on one
+        /// node (a parameter drag, a rename, an enable toggle) merges into a single undo
+        /// step until the series is finalized by the next structural edit, undo/redo, or a
+        /// different node.
+        /// </summary>
+        private VisualNode? _nodeEditNode;
+        private Dictionary<string, object?>? _nodeEditBefore;
+        private Dictionary<string, object?>? _nodeEditAfter;
+
+        /// <summary>
+        /// Last known value of every undoable property on every attached node.
+        /// PropertyChanged does not carry the previous value, so the baselines are kept
+        /// here to build the "before" half of the undo series.
+        /// </summary>
+        private readonly Dictionary<(VisualNode Node, string Property), object?> _nodeEditLastKnown = new();
+
+        /// <summary>Set while applying an undo/redo so the resulting writes are not re-recorded.</summary>
+        private bool _suppressingNodeEdits;
+
+        /// <summary>
+        /// Node properties holding a <see cref="PlcAddressReference"/> whose edits
+        /// participate in undo. Editors mutate the reference in place, so these are
+        /// observed on the reference objects themselves and snapshotted by clone.
+        /// </summary>
+        private static readonly HashSet<string> UndoableAddressProperties = new(StringComparer.Ordinal)
+        {
+            nameof(VisualNode.Input1Address),
+            nameof(VisualNode.Input2Address),
+            nameof(VisualNode.OutputAddress),
+        };
+
+        /// <summary>Maps every observed address reference to its owning node and property.</summary>
+        private readonly List<(VisualNode Node, string Property, PlcAddressReference Reference)> _addressReferenceOwners = new();
         private bool _isSwitchingProgram;
         private bool _isUpdatingSelection;
         private bool _isDisposed;
@@ -230,6 +285,15 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public static IReadOnlyList<string> WaveformOptions { get; } =
             new[] { "Ramp", "Sine", "Triangle", "Square" };
+
+        [ObservableProperty]
+        private string _simulationStoreMode = string.Empty;
+
+        [ObservableProperty]
+        private double _scaledCanvasWidth = 1200;
+
+        [ObservableProperty]
+        private double _scaledCanvasHeight = 800;
 
         [ObservableProperty]
         private bool _isConnectMode;
@@ -292,7 +356,11 @@ namespace ModbusForge.Avalonia.ViewModels
         public ObservableCollection<NodeConnection> Connections => Config.Connections;
         public ObservableCollection<ConnectorConfiguration> ConnectorConfigs => Config.ConnectorConfigs;
 
-        public bool CanUndo => UndoRedo.CanUndo;
+        /// <summary>
+        /// True when there is a pushed edit OR an in-flight node-edit series: the series
+        /// can always be undone immediately (undo finalizes it first).
+        /// </summary>
+        public bool CanUndo => UndoRedo.CanUndo || _nodeEditNode != null;
         public bool CanRedo => UndoRedo.CanRedo;
         public bool HasMultipleSelection => SelectedNodes.Count > 1;
         public int SelectedNodeCount => SelectedNodes.Count;
@@ -344,8 +412,20 @@ namespace ModbusForge.Avalonia.ViewModels
                 Config.ZoomLevel = normalized;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(ZoomText));
+                UpdateScaledCanvasSize();
                 UpdateConnectionLines();
             }
+        }
+
+        /// <summary>
+        /// Keeps the canvas layout size in step with the zoom level so the ScrollViewer
+        /// extents follow the zoom (no dead space zoomed out, no clipping zoomed in).
+        /// </summary>
+        private void UpdateScaledCanvasSize()
+        {
+            var zoom = ZoomLevel;
+            ScaledCanvasWidth = Config.CanvasWidth * zoom;
+            ScaledCanvasHeight = Config.CanvasHeight * zoom;
         }
 
         public bool ShowGrid
@@ -360,6 +440,11 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
+        /// <summary>
+        /// Single source of truth for "is the simulation running": the Run/Stop buttons and
+        /// the Live checkbox all flip this. Start/stop is handled in one place
+        /// (<see cref="OnConfigPropertyChanged"/>) so the states can never diverge.
+        /// </summary>
         public bool ShowLiveValues
         {
             get => Config.ShowLiveValues;
@@ -367,22 +452,20 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 if (Config.ShowLiveValues == value) return;
                 Config.ShowLiveValues = value;
-                foreach (var node in Config.Nodes)
-                {
-                    node.ShowLiveValues = value;
-                }
+                OnPropertyChanged();
+            }
+        }
 
-                if (value)
-                {
-                    _visualSimulation.Start(Config);
-                    IsRunning = true;
-                }
-                else
-                {
-                    _visualSimulation.Stop();
-                    IsRunning = false;
-                }
-
+        /// <summary>
+        /// Simulation scan period in milliseconds (clamped by the service to its supported range).
+        /// </summary>
+        public int ScanIntervalMs
+        {
+            get => Config.ScanIntervalMs;
+            set
+            {
+                if (Config.ScanIntervalMs == value) return;
+                Config.ScanIntervalMs = value;
                 OnPropertyChanged();
             }
         }
@@ -413,8 +496,8 @@ namespace ModbusForge.Avalonia.ViewModels
             StopCommand = new RelayCommand(Stop, () => IsRunning);
             SaveCommand = new AsyncRelayCommand(SaveAsync);
             LoadCommand = new AsyncRelayCommand(LoadAsync);
-            LoadDemoCommand = new RelayCommand(LoadDemo);
-            UndoCommand = new RelayCommand(Undo, () => UndoRedo.CanUndo);
+            LoadDemoCommand = new AsyncRelayCommand(LoadDemoAsync);
+            UndoCommand = new RelayCommand(Undo, () => UndoRedo.CanUndo || _nodeEditNode != null);
             RedoCommand = new RelayCommand(Redo, () => UndoRedo.CanRedo);
             ZoomInCommand = new RelayCommand(ZoomIn);
             ZoomOutCommand = new RelayCommand(ZoomOut);
@@ -426,8 +509,8 @@ namespace ModbusForge.Avalonia.ViewModels
             AlignLeftCommand = new RelayCommand(AlignLeft, () => SelectedNodes.Count >= 2);
             AlignTopCommand = new RelayCommand(AlignTop, () => SelectedNodes.Count >= 2);
             DistributeHorizontallyCommand = new RelayCommand(DistributeHorizontally, () => SelectedNodes.Count >= 3);
-            ClearAllCommand = new RelayCommand(ClearAll);
-            ApplyWaveformCommand = new RelayCommand(ApplyWaveform, () => SelectedNode != null);
+            ClearAllCommand = new AsyncRelayCommand(ClearAllAsync);
+            ApplyWaveformCommand = new RelayCommand(ApplyWaveformToSelectedNode, () => SelectedNode != null);
             EnableNodeCommand = new RelayCommand(EnableNode, () => SelectedNode != null && !SelectedNode.IsEnabled);
             DisableNodeCommand = new RelayCommand(DisableNode, () => SelectedNode != null && SelectedNode.IsEnabled);
             ResetValuesCommand = new RelayCommand(ResetValues, () => Config.Nodes.Count > 0);
@@ -441,16 +524,125 @@ namespace ModbusForge.Avalonia.ViewModels
             SelectedProgram = defaultProgram;
             SelectedTreeItem = defaultProgram;
 
+            Config.PropertyChanged += OnConfigPropertyChanged;
+
             AttachConfigHandlers();
             NormalizeViewSettings();
+            UpdateScaledCanvasSize();
             RefreshConnectionLines();
             RefreshGridLines();
 
+            _visualSimulation.CyclesChanged += OnSimulationCyclesChanged;
+
             if (Config.ShowLiveValues)
             {
-                _visualSimulation.Start(Config);
-                IsRunning = true;
+                StartSimulation();
             }
+        }
+
+        /// <summary>
+        /// Responds to property changes on the active <see cref="VisualNodeEditorConfig"/>:
+        /// starts/stops the simulation when the master Live flag flips and applies scan
+        /// period changes while running.
+        /// </summary>
+        private void OnConfigPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(VisualNodeEditorConfig.ShowLiveValues))
+            {
+                if (Config.ShowLiveValues && !IsRunning)
+                {
+                    StartSimulation();
+                }
+                else if (!Config.ShowLiveValues && IsRunning)
+                {
+                    StopSimulation();
+                }
+            }
+            else if (e.PropertyName == nameof(VisualNodeEditorConfig.ScanIntervalMs) && IsRunning)
+            {
+                _visualSimulation.SetScanIntervalMs(Config.ScanIntervalMs);
+            }
+
+            foreach (var node in Config.Nodes)
+            {
+                node.ShowLiveValues = Config.ShowLiveValues;
+            }
+        }
+
+        private void OnSimulationCyclesChanged(IReadOnlyList<string> cycleNodeIds)
+        {
+            var currentIds = new HashSet<string>(cycleNodeIds, StringComparer.Ordinal);
+
+            // Unmark nodes that are no longer locked. Only remove our own marker: a
+            // block that left the loop may carry a genuine per-tick error, which the
+            // simulation service owns.
+            foreach (var id in _cycleMarkedNodeIds.Where(id => !currentIds.Contains(id)).ToList())
+            {
+                var node = Config.Nodes.FirstOrDefault(n => n.Id == id);
+                if (node is not null && string.Equals(node.ErrorText, CycleLockErrorText, StringComparison.Ordinal))
+                {
+                    node.SetErrorText(null);
+                }
+                _cycleMarkedNodeIds.Remove(id);
+            }
+
+            // Mark newly locked nodes.
+            foreach (var id in currentIds)
+            {
+                if (!_cycleMarkedNodeIds.Add(id)) continue;
+                Config.Nodes.FirstOrDefault(n => n.Id == id)?.SetErrorText(CycleLockErrorText);
+            }
+
+            _lastCycleWarning = currentIds.Count > 0
+                ? BuildCycleWarning(cycleNodeIds)
+                : null;
+
+            if (_lastCycleWarning is not null)
+            {
+                StatusText = _lastCycleWarning;
+            }
+        }
+
+        private string BuildCycleWarning(IReadOnlyList<string> cycleNodeIds)
+        {
+            var names = cycleNodeIds
+                .Select(id => Config.Nodes.FirstOrDefault(n => n.Id == id)?.Name ?? id)
+                .ToList();
+            return $"Warning: {names.Count} node(s) form a loop and will not run: {string.Join(", ", names)}";
+        }
+
+        private void StartSimulation()
+        {
+            foreach (var node in Config.Nodes)
+            {
+                node.ShowLiveValues = Config.ShowLiveValues;
+            }
+
+            _visualSimulation.SetScanIntervalMs(Config.ScanIntervalMs);
+            _visualSimulation.Start(Config);
+            IsRunning = true;
+            SimulationStoreMode = _visualSimulation.StoreMode == "local"
+                ? "local store (offline)"
+                : "device store";
+            // A loop warning raised during Start (the graph rebuild fires
+            // CyclesChanged synchronously) must survive the status update, or
+            // the only visible sign that blocks are locked out vanishes.
+            StatusText = _lastCycleWarning ?? $"Simulation running — {SimulationStoreMode}";
+        }
+
+        private void StopSimulation()
+        {
+            _visualSimulation.Stop();
+            foreach (var node in Config.Nodes)
+            {
+                node.ShowLiveValues = Config.ShowLiveValues;
+            }
+
+            IsRunning = false;
+            SimulationStoreMode = string.Empty;
+            _cycleMarkedNodeIds.Clear();
+            _lastCycleWarning = null;
+            StatusText = "Simulation stopped";
         }
 
         partial void OnConfigChanged(VisualNodeEditorConfig value)
@@ -467,6 +659,7 @@ namespace ModbusForge.Avalonia.ViewModels
             OnPropertyChanged(nameof(ZoomText));
             OnPropertyChanged(nameof(ShowGrid));
             OnPropertyChanged(nameof(ShowLiveValues));
+            UpdateScaledCanvasSize();
             ClearSelection();
             CancelConnection(false);
             RefreshConnectionLines();
@@ -477,18 +670,37 @@ namespace ModbusForge.Avalonia.ViewModels
                 node.ShowLiveValues = Config.ShowLiveValues;
             }
 
-            if (Config.ShowLiveValues && !IsRunning)
+            if (IsRunning && Config.ShowLiveValues)
             {
-                _visualSimulation.Start(Config);
-                IsRunning = true;
+                // The service is still bound to the previous graph; re-attach it so the
+                // newly selected program actually runs.
+                _visualSimulation.Stop();
+                StartSimulation();
+            }
+            else if (Config.ShowLiveValues && !IsRunning)
+            {
+                StartSimulation();
             }
             else if (!Config.ShowLiveValues && IsRunning)
             {
-                _visualSimulation.Stop();
-                IsRunning = false;
+                StopSimulation();
             }
 
+            RefreshAllParameterFields();
+
             ((IRelayCommand)AutoLayoutCommand).NotifyCanExecuteChanged();
+        }
+
+        private void RefreshAllParameterFields()
+        {
+            // Rebuild every node's parameter editor fields and pin labels so the right
+            // panel, the node footers, and the canvas pins track the active blocks'
+            // declarations (after a program load, demo, or clear the node set has changed).
+            foreach (var node in Config.Nodes)
+            {
+                BuildParameterFields(node);
+                BuildPortLabels(node);
+            }
         }
 
         partial void OnSelectedNodeChanged(VisualNode? value)
@@ -560,6 +772,10 @@ namespace ModbusForge.Avalonia.ViewModels
         partial void OnSelectedProgramChanged(ProgramModel? value)
         {
             if (_isSwitchingProgram || ReferenceEquals(value, _activeProgram)) return;
+
+            // Program switching clears the undo stack; a half-recorded node-edit series
+            // would otherwise resurface after the switch.
+            DiscardPendingNodeEdit();
 
             _isSwitchingProgram = true;
             try
@@ -733,6 +949,128 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 node.PropertyChanged += OnNodePropertyChanged;
             }
+
+            if (node.ParameterFields == null)
+            {
+                BuildParameterFields(node);
+            }
+
+            if (node.PortLabels == null)
+            {
+                BuildPortLabels(node);
+            }
+
+            // Keep the node's output port names in sync with the catalog: loaded nodes may
+            // carry names from an older version, and per-port bindings must follow them.
+            UpdateOutputPortNames(node);
+
+            InitializeNodeEditBaselines(node);
+            AttachAddressReferenceHandlers(node);
+        }
+
+        private void AttachAddressReferenceHandlers(VisualNode node)
+        {
+            foreach (var property in UndoableAddressProperties)
+            {
+                AttachAddressReferenceHandler(node, property);
+            }
+        }
+
+        private void AttachAddressReferenceHandler(VisualNode node, string property)
+        {
+            PlcAddressReference? reference;
+            switch (property)
+            {
+                case nameof(VisualNode.Input1Address):
+                    reference = node.Input1Address;
+                    break;
+                case nameof(VisualNode.Input2Address):
+                    reference = node.Input2Address;
+                    break;
+                default:
+                    reference = node.OutputAddress;
+                    break;
+            }
+
+            if (reference == null) return;
+            reference.PropertyChanged += OnAddressReferencePropertyChanged;
+            _addressReferenceOwners.Add((node, property, reference));
+        }
+
+        /// <summary>
+        /// Swaps the observed reference instance for one property (used when the node's
+        /// address reference object is replaced, e.g. when a tag is bound to the node).
+        /// </summary>
+        private void ReattachAddressReferenceHandlers(VisualNode node, string property)
+        {
+            var previous = _addressReferenceOwners
+                .Where(owner => ReferenceEquals(owner.Node, node) && owner.Property == property)
+                .ToList();
+
+            foreach (var (_, _, reference) in previous)
+            {
+                reference.PropertyChanged -= OnAddressReferencePropertyChanged;
+            }
+
+            _addressReferenceOwners.RemoveAll(owner => ReferenceEquals(owner.Node, node) && owner.Property == property);
+            AttachAddressReferenceHandler(node, property);
+        }
+
+        private void OnAddressReferencePropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (_suppressingNodeEdits || sender is not PlcAddressReference) return;
+
+            foreach (var (node, property, reference) in _addressReferenceOwners)
+            {
+                if (ReferenceEquals(reference, sender))
+                {
+                    RecordNodeEdit(node, property);
+                    break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Builds the node's data-driven parameter editor fields from the function block's
+        /// declarative <c>Parameters</c> list (via <see cref="ParameterAccess"/>), so the UI
+        /// and the simulation engine share one source of truth.
+        /// </summary>
+        private void BuildParameterFields(VisualNode node)
+        {
+            var prototype = _visualSimulation.Catalog.Create(node.ElementType.ToString());
+
+            var fields = new List<ParameterField>();
+            foreach (var spec in prototype.Parameters)
+            {
+                if (ParameterAccess.TryGet(spec.Name) is { } access)
+                    fields.Add(new ParameterField(node, spec, access.Getter, access.Setter));
+            }
+
+            node.ParameterFields = fields;
+        }
+
+        /// <summary>
+        /// Resolves the node's pin labels from the function block's declared ports
+        /// (via the catalog), so the canvas shows the block's real port names
+        /// ("IN"/"Q", "S"/"R"/"Q", "A"/"B"/"Q", ...) instead of the generic
+        /// "Input 1"/"Input 2"/"Output" slot names.
+        /// </summary>
+        private void BuildPortLabels(VisualNode node)
+        {
+            var descriptor = _visualSimulation?.Catalog.GetDescriptor(node.ElementType.ToString());
+            if (descriptor == null)
+            {
+                node.PortLabels = null;
+                return;
+            }
+
+            var inputs = BlockPorts.Inputs(descriptor.Ports);
+            node.PortLabels = new NodePortLabels
+            {
+                Input1 = inputs.ElementAtOrDefault(0)?.Name,
+                Input2 = inputs.ElementAtOrDefault(1)?.Name,
+                Output = BlockPorts.PrimaryOutput(descriptor.Ports)
+            };
         }
 
         private void DetachNode(VisualNode node)
@@ -743,6 +1081,24 @@ namespace ModbusForge.Avalonia.ViewModels
             }
 
             node.ValueChangedCallback = null;
+
+            if (ReferenceEquals(_nodeEditNode, node))
+            {
+                // The node the series belongs to is gone; the edit can no longer be undone.
+                DiscardPendingNodeEdit();
+            }
+
+            foreach (var key in _nodeEditLastKnown.Keys.Where(k => ReferenceEquals(k.Node, node)).ToList())
+            {
+                _nodeEditLastKnown.Remove(key);
+            }
+
+            var owners = _addressReferenceOwners.Where(owner => ReferenceEquals(owner.Node, node)).ToList();
+            foreach (var (_, _, reference) in owners)
+            {
+                reference.PropertyChanged -= OnAddressReferencePropertyChanged;
+            }
+            _addressReferenceOwners.RemoveAll(owner => ReferenceEquals(owner.Node, node));
         }
 
         private void OnNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -760,6 +1116,237 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 OnPropertyChanged(nameof(ConnectionSourceText));
             }
+
+            if (e.PropertyName == nameof(VisualNode.ElementType))
+            {
+                // The block type changed: rebuild the data-driven parameter fields and
+                // the pin labels from the new block's declaration.
+                if (sender is VisualNode node)
+                {
+                    BuildParameterFields(node);
+                    BuildPortLabels(node);
+                }
+            }
+
+            if (!_suppressingNodeEdits
+                && sender is VisualNode editableNode
+                && e.PropertyName != null
+                && UndoableNodeProperties.Contains(e.PropertyName))
+            {
+                RecordNodeEdit(editableNode, e.PropertyName);
+            }
+
+            if (sender is VisualNode addressNode
+                && e.PropertyName != null
+                && UndoableAddressProperties.Contains(e.PropertyName))
+            {
+                // The reference property changed: either the object was replaced (e.g.
+                // binding a tag) or re-set. Re-observe the current instance and record
+                // the change in the node-edit series so it undoes.
+                ReattachAddressReferenceHandlers(addressNode, e.PropertyName);
+                if (!_suppressingNodeEdits)
+                {
+                    RecordNodeEdit(addressNode, e.PropertyName);
+                }
+            }
+        }
+
+        /// <summary>
+        /// The <see cref="VisualNode"/> properties that participate in undo: name, enabled
+        /// state, and every configurable function-block parameter (see
+        /// <see cref="ParameterAccess"/> — parameter names double as property names).
+        /// </summary>
+        private static readonly HashSet<string> UndoableNodeProperties = new(StringComparer.Ordinal)
+        {
+            nameof(VisualNode.Name),
+            nameof(VisualNode.IsEnabled),
+            nameof(VisualNode.TimerPresetMs),
+            nameof(VisualNode.CounterPreset),
+            nameof(VisualNode.CompareValue),
+            nameof(VisualNode.CompareValueReal),
+            nameof(VisualNode.SetDominant),
+            nameof(VisualNode.Waveform),
+            nameof(VisualNode.PeriodMs),
+            nameof(VisualNode.Amplitude),
+            nameof(VisualNode.Offset),
+            nameof(VisualNode.ValveTravelTimeMs),
+            nameof(VisualNode.ValveNormallyOpen),
+            nameof(VisualNode.ValveLatching),
+            nameof(VisualNode.MotorDolRunDelayMs),
+            nameof(VisualNode.VsdMaxSpeed),
+            nameof(VisualNode.VsdRampUpMs),
+            nameof(VisualNode.VsdRampDownMs),
+            nameof(VisualNode.VsdAtSpeedTolerance),
+        };
+
+        private static IEnumerable<string> AllUndoableNodeProperties()
+            => UndoableNodeProperties.Union(UndoableAddressProperties);
+
+        private static object? ReadUndoableNodeProperty(VisualNode node, string property)
+        {
+            switch (property)
+            {
+                case nameof(VisualNode.Name):
+                    return node.Name;
+                case nameof(VisualNode.IsEnabled):
+                    return node.IsEnabled;
+                case nameof(VisualNode.Input1Address):
+                    return node.Input1Address?.Clone();
+                case nameof(VisualNode.Input2Address):
+                    return node.Input2Address?.Clone();
+                case nameof(VisualNode.OutputAddress):
+                    return node.OutputAddress?.Clone();
+                default:
+                    return ParameterAccess.TryGet(property)?.Getter(node);
+            }
+        }
+
+        private void InitializeNodeEditBaselines(VisualNode node)
+        {
+            foreach (var property in AllUndoableNodeProperties())
+            {
+                var value = ReadUndoableNodeProperty(node, property);
+                if (value != null)
+                    _nodeEditLastKnown[(node, property)] = value;
+            }
+        }
+
+        /// <summary>
+        /// Records one node-property change, coalescing it into the node's current undo
+        /// series. The "before" value comes from <see cref="_nodeEditLastKnown"/> because
+        /// PropertyChanged already fired with the new value in place.
+        /// </summary>
+        private void RecordNodeEdit(VisualNode node, string property)
+        {
+            if (_isSwitchingProgram) return;
+
+            var after = ReadUndoableNodeProperty(node, property);
+
+            if (_nodeEditNode is not null && !ReferenceEquals(_nodeEditNode, node))
+            {
+                FinalizeNodeEditSeries();
+            }
+
+            var afterValues = _nodeEditAfter;
+            if (afterValues == null)
+            {
+                // The baselines hold the pre-edit values: PropertyChanged already fired
+                // with the new value in place, so the node itself can no longer be read
+                // for the property that started this series.
+                var before = new Dictionary<string, object?>(StringComparer.Ordinal);
+                foreach (var name in AllUndoableNodeProperties())
+                {
+                    before[name] = _nodeEditLastKnown.GetValueOrDefault((node, name)) ?? ReadUndoableNodeProperty(node, name);
+                }
+
+                _nodeEditNode = node;
+                _nodeEditBefore = before;
+                _nodeEditAfter = afterValues = new Dictionary<string, object?>(StringComparer.Ordinal);
+
+                // The Undo button is enabled as soon as a series starts.
+                NotifyUndoRedoCommands();
+            }
+
+            afterValues[property] = after;
+            if (after != null)
+                _nodeEditLastKnown[(node, property)] = after;
+        }
+
+        /// <summary>
+        /// Pushes the in-flight node-edit series onto the undo stack as one command
+        /// (no-op when nothing was recorded).
+        /// </summary>
+        private void FinalizeNodeEditSeries()
+        {
+            if (_nodeEditNode is not { } node)
+            {
+                return;
+            }
+
+            if (_nodeEditBefore is { } before && _nodeEditAfter is { Count: > 0 } after)
+            {
+                UndoRedo.Push(new EditorCommand(
+                    () => ApplyNodeEditValues(node, after),
+                    () => ApplyNodeEditValues(node, before)));
+                NotifyUndoRedoCommands();
+            }
+
+            _nodeEditNode = null;
+            _nodeEditBefore = null;
+            _nodeEditAfter = null;
+        }
+
+        private void DiscardPendingNodeEdit()
+        {
+            var hadPending = _nodeEditNode != null;
+            _nodeEditNode = null;
+            _nodeEditBefore = null;
+            _nodeEditAfter = null;
+
+            if (hadPending)
+            {
+                NotifyUndoRedoCommands();
+            }
+        }
+
+        private void ApplyNodeEditValues(VisualNode node, IReadOnlyDictionary<string, object?> values)
+        {
+            _suppressingNodeEdits = true;
+            try
+            {
+                foreach (var (property, value) in values)
+                {
+                    switch (property)
+                    {
+                        case nameof(VisualNode.Name):
+                            node.Name = value as string ?? node.Name;
+                            break;
+                        case nameof(VisualNode.IsEnabled):
+                            node.IsEnabled = value is bool b && b;
+                            break;
+                        case nameof(VisualNode.Input1Address) when value is PlcAddressReference stored1:
+                            ApplyAddressReference(node.Input1Address, stored1);
+                            break;
+                        case nameof(VisualNode.Input2Address) when value is PlcAddressReference stored2:
+                            ApplyAddressReference(node.Input2Address, stored2);
+                            break;
+                        case nameof(VisualNode.OutputAddress) when value is PlcAddressReference stored3:
+                            ApplyAddressReference(node.OutputAddress, stored3);
+                            break;
+                        default:
+                            if (ParameterAccess.TryGet(property) is { } access)
+                                access.Setter(node, value);
+                            break;
+                    }
+                }
+            }
+            finally
+            {
+                _suppressingNodeEdits = false;
+            }
+
+            // Re-sync the parameter editor fields and the undo baselines with the
+            // restored values.
+            if (node.ParameterFields != null)
+            {
+                foreach (var field in node.ParameterFields)
+                    field.LoadFromNode();
+            }
+
+            InitializeNodeEditBaselines(node);
+        }
+
+        /// <summary>
+        /// Copies a snapshotted address reference onto the live one in place, so the
+        /// editor controls (bound to the reference object) keep working.
+        /// </summary>
+        private static void ApplyAddressReference(PlcAddressReference target, PlcAddressReference source)
+        {
+            if (target == null) return;
+            target.Area = source.Area;
+            target.Address = source.Address;
+            target.Not = source.Not;
+            target.SymbolicName = source.SymbolicName;
         }
 
         private void OnNodeValueEditedByUser(VisualNode node, double value)
@@ -771,7 +1358,7 @@ namespace ModbusForge.Avalonia.ViewModels
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Live value write failed for node {NodeId} with value {Value}", node.Id, value);
-                StatusText = ex.ToString();
+                StatusText = $"Live value write failed: {ex.Message}";
             }
         }
 
@@ -1022,6 +1609,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
             if (moved.Count == 0) return;
 
+            FinalizeNodeEditSeries();
+
             var command = new EditorCommand(
                 () =>
                 {
@@ -1133,6 +1722,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public VisualNode? AddNodeAt(PaletteItem paletteItem, double x, double y)
         {
+            FinalizeNodeEditSeries();
             if (paletteItem == null || !double.IsFinite(x) || !double.IsFinite(y)) return null;
 
             var descriptor = NodeDescriptors.Get(paletteItem.ElementType);
@@ -1232,6 +1822,10 @@ namespace ModbusForge.Avalonia.ViewModels
                 case PlcElementType.MATH_SUB:
                 case PlcElementType.MATH_MUL:
                 case PlcElementType.MATH_DIV:
+                case PlcElementType.MATH_ADD_REAL:
+                case PlcElementType.MATH_SUB_REAL:
+                case PlcElementType.MATH_MUL_REAL:
+                case PlcElementType.MATH_DIV_REAL:
                     node.Input2Address = new PlcAddressReference { Area = IntIoArea, Address = -1 };
                     node.OutputAddress = new PlcAddressReference
                     {
@@ -1245,6 +1839,12 @@ namespace ModbusForge.Avalonia.ViewModels
                 case PlcElementType.COMPARE_LT:
                 case PlcElementType.COMPARE_GE:
                 case PlcElementType.COMPARE_LE:
+                case PlcElementType.COMPARE_EQ_REAL:
+                case PlcElementType.COMPARE_NE_REAL:
+                case PlcElementType.COMPARE_GT_REAL:
+                case PlcElementType.COMPARE_LT_REAL:
+                case PlcElementType.COMPARE_GE_REAL:
+                case PlcElementType.COMPARE_LE_REAL:
                     node.Input2Address = new PlcAddressReference { Area = IntIoArea, Address = -1 };
                     break;
                 case PlcElementType.Valve:
@@ -1259,7 +1859,6 @@ namespace ModbusForge.Avalonia.ViewModels
                     node.Input1Address = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
                     node.Input2Address = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
                     node.OutputAddress = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
-                    node.OutputPortBindings["Fault"] = new PlcAddressReference { Area = BoolIoArea, Address = -1 };
                     node.MotorDolRunDelayMs = 100;
                     break;
                 case PlcElementType.Vsd:
@@ -1287,8 +1886,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 return;
             }
 
-            var names = descriptor.Ports
-                .Where(p => p.Direction == PortDirection.Output)
+            var names = BlockPorts.Outputs(descriptor.Ports)
                 .Select(p => p.Name)
                 .ToList();
 
@@ -1297,11 +1895,14 @@ namespace ModbusForge.Avalonia.ViewModels
             foreach (var stale in node.OutputPortBindings.Keys.Where(k => !names.Contains(k, StringComparer.Ordinal)).ToList())
                 node.OutputPortBindings.Remove(stale);
 
-            node.OutputPortBindings.Remove("Output");
+            // The primary output ("Output" when present, else the first output, e.g. the
+            // VSD's "Running") is addressed via the node's main OutputAddress, so it gets
+            // no per-port binding.
+            var primary = BlockPorts.PrimaryOutput(descriptor.Ports);
 
             foreach (var name in names)
             {
-                if (name == "Output") continue;
+                if (name == primary) continue;
                 if (!node.OutputPortBindings.ContainsKey(name))
                     node.OutputPortBindings[name] = new PlcAddressReference { Area = PlcArea.Coil, Address = -1 };
             }
@@ -1327,6 +1928,8 @@ namespace ModbusForge.Avalonia.ViewModels
         private void RemoveNode()
         {
             if (SelectedNode == null) return;
+
+            FinalizeNodeEditSeries();
 
             var node = SelectedNode;
             var removedConnections = Config.Connections
@@ -1438,6 +2041,7 @@ namespace ModbusForge.Avalonia.ViewModels
         public bool TryConnectNodes(VisualNode source, VisualNode target, string? targetConnector = null, string? sourceConnector = null)
         {
             if (!Config.Nodes.Contains(source) || !Config.Nodes.Contains(target)) return false;
+            FinalizeNodeEditSeries();
             if (ReferenceEquals(source, target))
             {
                 StatusText = "A node cannot connect to itself.";
@@ -1459,19 +2063,20 @@ namespace ModbusForge.Avalonia.ViewModels
             }
 
             var sourcePort = string.IsNullOrWhiteSpace(sourceConnector) ? "Output" : sourceConnector;
-            if (!source.OutputPortNames.Contains(sourcePort))
+            if (!source.HasOutputConnector(sourcePort))
             {
                 StatusText = $"{source.Name} has no {sourcePort} output port.";
                 return false;
             }
 
-            if (Config.Connections.Any(connection =>
-                    connection.SourceNodeId == source.Id
-                    && connection.SourceConnector == sourcePort
-                    && connection.TargetNodeId == target.Id
-                    && connection.TargetConnector == connector))
+            var existingDriver = Config.Connections.FirstOrDefault(connection =>
+                    connection.TargetNodeId == target.Id
+                    && connection.TargetConnector == connector);
+            if (existingDriver != null)
             {
-                StatusText = $"{target.Name} {connector} is already connected.";
+                var driverName = Config.Nodes.FirstOrDefault(n => n.Id == existingDriver.SourceNodeId)?.Name
+                                  ?? existingDriver.SourceNodeId;
+                StatusText = $"{target.Name} {connector} already has a driver ({driverName}); remove it first.";
                 return false;
             }
 
@@ -1504,6 +2109,8 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             if (SelectedConnection == null) return;
 
+            FinalizeNodeEditSeries();
+
             var connection = SelectedConnection;
             var command = new EditorCommand(
                 () =>
@@ -1525,30 +2132,37 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void Run()
         {
-            foreach (var node in Config.Nodes)
+            if (IsRunning) return;
+            if (!Config.ShowLiveValues)
             {
-                node.ShowLiveValues = Config.ShowLiveValues;
+                Config.ShowLiveValues = true; // routes through OnConfigPropertyChanged
+                return;
             }
 
-            _visualSimulation.Start(Config);
-            IsRunning = true;
-            StatusText = "Simulation running";
+            StartSimulation();
         }
 
         private void Stop()
         {
-            _visualSimulation.Stop();
-            foreach (var node in Config.Nodes)
+            if (!IsRunning) return;
+            if (Config.ShowLiveValues)
             {
-                node.ShowLiveValues = Config.ShowLiveValues;
+                Config.ShowLiveValues = false; // routes through OnConfigPropertyChanged
+                return;
             }
 
-            IsRunning = false;
-            StatusText = "Simulation stopped";
+            StopSimulation();
         }
 
         private void Undo()
         {
+            // Flush any in-flight node-edit series so undo acts in chronological order.
+            FinalizeNodeEditSeries();
+            if (!UndoRedo.CanUndo)
+            {
+                return;
+            }
+
             UndoRedo.Undo();
             NotifyUndoRedoCommands();
             RefreshConnectionLines();
@@ -1557,32 +2171,35 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void Redo()
         {
+            // Flush any in-flight node-edit series so redo acts in chronological order.
+            FinalizeNodeEditSeries();
+            if (!UndoRedo.CanRedo)
+            {
+                return;
+            }
+
             UndoRedo.Redo();
             NotifyUndoRedoCommands();
             RefreshConnectionLines();
             StatusText = "Redid last edit";
         }
 
-        private void ApplyWaveform()
+        private void ApplyWaveformToSelectedNode()
         {
             if (SelectedNode == null) return;
 
-            var command = new EditorCommand(
-                () =>
-                {
-                    SelectedNode.Waveform = SelectedWaveform;
-                    SelectedNode.PeriodMs = WaveformPeriodMs;
-                    SelectedNode.Amplitude = WaveformAmplitude;
-                    SelectedNode.Offset = WaveformOffset;
-                },
-                () =>
-                {
-                    // No-op undo for now; properties are mutable.
-                });
+            var node = SelectedNode;
 
-            command.Execute();
-            UndoRedo.Push(command);
-            StatusText = $"Applied {SelectedWaveform} waveform to {SelectedNode.Name}";
+            // The node-edit series records the before/after snapshot for these
+            // properties, so both undo and redo work (the previous dedicated command
+            // had a no-op unexecute).
+            node.Waveform = SelectedWaveform;
+            node.PeriodMs = WaveformPeriodMs;
+            node.Amplitude = WaveformAmplitude;
+            node.Offset = WaveformOffset;
+
+            FinalizeNodeEditSeries();
+            StatusText = $"Applied {SelectedWaveform} waveform to {node.Name}";
         }
 
         private void EnableNode()
@@ -1601,10 +2218,19 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             foreach (var node in Config.Nodes)
             {
-                node.CurrentValueDouble = 0;
+                // Display-only: do not write back into bound Modbus addresses.
+                node.SuppressWriteBack = true;
+                try
+                {
+                    node.CurrentValueDouble = 0;
+                }
+                finally
+                {
+                    node.SuppressWriteBack = false;
+                }
             }
 
-            StatusText = "All live values reset";
+            StatusText = "Display values reset (block state and bound addresses unchanged)";
         }
 
         private void RandomizeValues()
@@ -1612,10 +2238,19 @@ namespace ModbusForge.Avalonia.ViewModels
             var random = new Random();
             foreach (var node in Config.Nodes)
             {
-                node.CurrentValueDouble = random.NextDouble() * 100;
+                // Display-only: do not write back into bound Modbus addresses.
+                node.SuppressWriteBack = true;
+                try
+                {
+                    node.CurrentValueDouble = random.NextDouble() * 100;
+                }
+                finally
+                {
+                    node.SuppressWriteBack = false;
+                }
             }
 
-            StatusText = "All live values randomized";
+            StatusText = "Display values randomized (block state and bound addresses unchanged)";
         }
 
         private async Task ExportConfigAsync()
@@ -1691,8 +2326,30 @@ namespace ModbusForge.Avalonia.ViewModels
             StatusText = "Distributed horizontally.";
         }
 
-        private void ClearAll()
+        /// <summary>
+        /// Asks the user to confirm a destructive action. Proceeds without prompting when
+        /// no message box service is available (headless / automated scenarios).
+        /// </summary>
+        private async Task<bool> ConfirmAsync(string message, string title)
         {
+            if (_messageBoxService == null) return true;
+
+            var result = await _messageBoxService.ShowAsync(message, title, DialogButton.YesNo, DialogIcon.Question);
+            return result == DialogResult.Yes;
+        }
+
+        private async Task ClearAllAsync()
+        {
+            if (Config.Nodes.Count == 0 && Config.Connections.Count == 0) return;
+
+            if (!await ConfirmAsync(
+                    "Clear all nodes and connections from the current program?",
+                    "Clear Program"))
+            {
+                return;
+            }
+
+            DiscardPendingNodeEdit();
             Config.Nodes.Clear();
             Config.Connections.Clear();
             Config.ConnectorConfigs.Clear();
@@ -1700,10 +2357,17 @@ namespace ModbusForge.Avalonia.ViewModels
             StatusText = "Cleared all nodes and connections.";
         }
 
+        private void ClearAll()
+        {
+            _ = ClearAllAsync(); // fire-and-forge; kept for old XAML command binding fallback
+        }
+
         private void AutoLayout()
         {
             var nodes = Config.Nodes.ToList();
             if (nodes.Count == 0) return;
+
+            FinalizeNodeEditSeries();
 
             var indexById = nodes
                 .Select((node, index) => (node.Id, index))
@@ -1864,6 +2528,17 @@ namespace ModbusForge.Avalonia.ViewModels
 
             try
             {
+                if (Config.Nodes.Count > 0 &&
+                    !await ConfirmAsync(
+                        $"Replace the current program with the contents of {Path.GetFileName(path)}?",
+                        "Load Simulation"))
+                {
+                    return;
+                }
+
+                // Preserve the session's running state across the load: a simulation that
+                // was running keeps running on the loaded program.
+                var wasLive = Config.ShowLiveValues;
                 Stop();
                 var json = await File.ReadAllTextAsync(path);
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -1879,9 +2554,19 @@ namespace ModbusForge.Avalonia.ViewModels
                 var activeProgramId = root["ActiveProgramId"]?.GetValue<string>();
 
                 ApplyLoadedProgramState(loaded, loadedTree, activeProgramId);
+                DiscardPendingNodeEdit();
                 UndoRedo.Clear();
                 NotifyUndoRedoCommands();
                 SelectedConnection = null;
+
+                if (wasLive)
+                {
+                    if (Config.ShowLiveValues)
+                        StartSimulation();
+                    else
+                        Config.ShowLiveValues = true; // routes through OnConfigPropertyChanged
+                }
+
                 StatusText = $"Loaded {Path.GetFileName(path)}";
             }
             catch (Exception ex)
@@ -1890,8 +2575,19 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
-        private void LoadDemo()
+        private async Task LoadDemoAsync()
         {
+            if (Config.Nodes.Count > 0 &&
+                !await ConfirmAsync(
+                    "Replace the current program with the demo?",
+                    "Load Demo"))
+            {
+                return;
+            }
+
+            // The demo is a live showcase: preserve the session's running state across
+            // the load so a running simulation keeps running on the demo program.
+            var wasLive = Config.ShowLiveValues;
             Stop();
             Config.Nodes.Clear();
             Config.Connections.Clear();
@@ -1900,10 +2596,12 @@ namespace ModbusForge.Avalonia.ViewModels
             SelectedNode = null;
             SelectedConnection = null;
 
+            // 100px gaps between nodes: the canvas pin labels extend ~75px past each
+            // edge, so touching nodes would render their labels on top of each other.
             var input1 = AddNodeAt(PlcElementType.InputBool, 80, 80);
             var input2 = AddNodeAt(PlcElementType.InputBool, 80, 240);
-            var and = AddNodeAt(PlcElementType.AND, 320, 160);
-            var output = AddNodeAt(PlcElementType.OutputBool, 560, 160);
+            var and = AddNodeAt(PlcElementType.AND, 420, 160);
+            var output = AddNodeAt(PlcElementType.OutputBool, 760, 160);
 
             if (input1 != null && input2 != null && and != null && output != null)
             {
@@ -1914,7 +2612,18 @@ namespace ModbusForge.Avalonia.ViewModels
 
             RefreshConnectionLines();
             NotifyUndoRedoCommands();
+
+            if (wasLive)
+            {
+                Config.ShowLiveValues = true; // Stop() cleared it; routes through OnConfigPropertyChanged
+            }
+
             StatusText = "Demo loaded";
+        }
+
+        private void LoadDemo()
+        {
+            _ = LoadDemoAsync(); // fire-and-forge; kept for old XAML command binding fallback
         }
 
         private static IEnumerable<ProgramModel> EnumeratePrograms(ProgramFolder folder)
@@ -2025,6 +2734,22 @@ namespace ModbusForge.Avalonia.ViewModels
                 SetDominant = source.SetDominant,
                 CounterPreset = source.CounterPreset,
                 CompareValue = source.CompareValue,
+                CompareValueReal = source.CompareValueReal,
+                ValveTravelTimeMs = source.ValveTravelTimeMs,
+                ValveNormallyOpen = source.ValveNormallyOpen,
+                ValveLatching = source.ValveLatching,
+                MotorDolRunDelayMs = source.MotorDolRunDelayMs,
+                VsdMaxSpeed = source.VsdMaxSpeed,
+                VsdRampUpMs = source.VsdRampUpMs,
+                VsdRampDownMs = source.VsdRampDownMs,
+                VsdAtSpeedTolerance = source.VsdAtSpeedTolerance,
+                ScaleFromMin = source.ScaleFromMin,
+                ScaleFromMax = source.ScaleFromMax,
+                ScaleToMin = source.ScaleToMin,
+                ScaleToMax = source.ScaleToMax,
+                ScaleClamp = source.ScaleClamp,
+                EdgeDetectDirection = source.EdgeDetectDirection,
+                MaWindowSize = source.MaWindowSize,
                 Input1Address = source.Input1Address?.Clone() ?? new PlcAddressReference(),
                 Input2Address = source.Input2Address?.Clone() ?? new PlcAddressReference(),
                 OutputAddress = source.OutputAddress?.Clone() ?? new PlcAddressReference(),
@@ -2051,11 +2776,19 @@ namespace ModbusForge.Avalonia.ViewModels
             Config.Connections = program.Connections ?? new ObservableCollection<NodeConnection>();
             Config.ConnectorConfigs = program.ConnectorConfigs ?? new ObservableCollection<ConnectorConfiguration>();
             AttachConfigHandlers();
+            DiscardPendingNodeEdit();
             UndoRedo.Clear();
             NotifyUndoRedoCommands();
             SelectedNode = null;
             SelectedConnection = null;
             RefreshConnectionLines();
+
+            // The collections were swapped to the program's instances; the canvas binds
+            // to the property getters, so re-notify or it keeps showing the previous
+            // program's content.
+            OnPropertyChanged(nameof(Nodes));
+            OnPropertyChanged(nameof(Connections));
+            OnPropertyChanged(nameof(ConnectorConfigs));
         }
 
         private void NotifySelectionCommands()

@@ -48,12 +48,34 @@ namespace ModbusForge.Headless
             _mqttSettings = HeadlessProfileFactory.CreateMqttSettings(configuration);
         }
 
+        /// <summary>
+        /// The connection is treated as lost after this many consecutive ticks
+        /// in which every attempted read went unanswered.
+        /// </summary>
+        private const int MaxFailedReadTicks = 3;
+
+        private const int MinTickMs = 10;
+
+        private int _connectionLost;
+        private int _failedReadTicks;
+
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            if (_tickMs < MinTickMs)
+            {
+                // A misconfiguration never heals itself - fail fast and stop.
+                _logger.LogError("Invalid custom watch configuration: tick must be at least {MinTickMs}ms, got {TickMs}", MinTickMs, _tickMs);
+                _lifetime.StopApplication();
+                return;
+            }
+
             var entries = await LoadCustomEntriesAsync(_customFile, stoppingToken);
             if (entries is null || entries.Count == 0)
             {
+                // Nothing to run: stopping the host surfaces the missing/broken
+                // file instead of idling forever.
                 _logger.LogError("No custom entries found in {File}", _customFile);
+                _lifetime.StopApplication();
                 return;
             }
 
@@ -68,22 +90,49 @@ namespace ModbusForge.Headless
                     _profile.ComPort, _profile.BaudRate, _profile.UnitId, _profile.Transport);
             }
 
-            var connected = await _modbusService.ConnectAsync(_profile, stoppingToken);
+            // Unattended hosts start before (or with) the device they talk to:
+            // retry with backoff instead of exiting on the first failure.
+            var connected = await HeadlessConnection.EnsureConnectedAsync(
+                _modbusService, _profile, _logger, stoppingToken);
             if (!connected)
-            {
-                _logger.LogError("Failed to connect to the Modbus device.");
-                _lifetime.StopApplication();
-                return;
-            }
+                return; // cancelled
 
-            _mqttService?.ApplySettings(_mqttSettings);
-            await (_mqttService?.ConnectAsync(stoppingToken) ?? Task.CompletedTask);
+            // The service instance is long-lived (the socket reconnects
+            // underneath it), so the handler stays subscribed for the whole
+            // lifetime of this service.
+            _modbusService.ConnectionLost += OnConnectionLost;
+
+            if (_mqttService is not null)
+            {
+                _mqttService.ApplySettings(_mqttSettings);
+                try
+                {
+                    await _mqttService.ConnectAsync(stoppingToken);
+                }
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                {
+                    // The gateway keeps retrying its broker in the background;
+                    // a down broker must not take the custom watch down with it.
+                    _logger.LogWarning(ex, "MQTT gateway failed to start; watch continues without publishing");
+                }
+            }
 
             _logger.LogInformation("Connected. Running custom watch on {Count} entries.", entries.Count);
 
             while (!stoppingToken.IsCancellationRequested)
             {
+                if (Volatile.Read(ref _connectionLost) != 0)
+                {
+                    Volatile.Write(ref _connectionLost, 0);
+                    Volatile.Write(ref _failedReadTicks, 0);
+                    await ReconnectAsync(stoppingToken, "Connection lost");
+                    if (stoppingToken.IsCancellationRequested)
+                        break;
+                }
+
                 var now = DateTime.UtcNow;
+                var readsThisTick = 0;
+                var readFailuresThisTick = 0;
 
                 foreach (var entry in entries)
                 {
@@ -93,7 +142,11 @@ namespace ModbusForge.Headless
                     {
                         if (entry.Monitor && (now - entry.LastReadUtc).TotalMilliseconds >= entry.ReadPeriodMs)
                         {
-                            var value = await ReadCustomValueAsync(entry, stoppingToken);
+                            readsThisTick++;
+                            var (value, readOk) = await ReadCustomValueAsync(entry, stoppingToken);
+                            if (!readOk)
+                                readFailuresThisTick++;
+
                             entry.Value = value;
                             entry.LastReadUtc = now;
                             _logger.LogInformation("[{Name}] {Area}:{Address} = {Value}", entry.Name, entry.Area, entry.Address, value);
@@ -115,6 +168,24 @@ namespace ModbusForge.Headless
                     }
                 }
 
+                // A device that answers no read at all (alive socket, dead
+                // device) never raises ConnectionLost - the failed-tick count
+                // is the fallback. Ticks with no reads at all (write-only
+                // watches, or periods not yet due) do not count.
+                if (readsThisTick > 0)
+                {
+                    Volatile.Write(ref _failedReadTicks,
+                        readFailuresThisTick == readsThisTick ? Volatile.Read(ref _failedReadTicks) + 1 : 0);
+                }
+
+                if (Volatile.Read(ref _failedReadTicks) >= MaxFailedReadTicks)
+                {
+                    Volatile.Write(ref _failedReadTicks, 0);
+                    await ReconnectAsync(stoppingToken, $"{MaxFailedReadTicks} consecutive ticks without a single answered read");
+                    if (stoppingToken.IsCancellationRequested)
+                        break;
+                }
+
                 try
                 {
                     await Task.Delay(_tickMs, stoppingToken);
@@ -128,6 +199,32 @@ namespace ModbusForge.Headless
             await (_mqttService?.DisconnectAsync() ?? Task.CompletedTask);
             await _modbusService.DisconnectAsync();
             _lifetime.StopApplication();
+        }
+
+        private async Task ReconnectAsync(CancellationToken token, string reason)
+        {
+            _logger.LogWarning("{Reason} - reconnecting...", reason);
+
+            try
+            {
+                await _modbusService.DisconnectAsync();
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogDebug(ex, "Error while disconnecting before reconnect");
+            }
+
+            var connected = await HeadlessConnection.EnsureConnectedAsync(
+                _modbusService, _profile, _logger, token);
+            if (!connected)
+                return; // cancelled
+
+            _logger.LogInformation("Reconnected.");
+        }
+
+        private void OnConnectionLost(object? sender, EventArgs e)
+        {
+            Volatile.Write(ref _connectionLost, 1);
         }
 
         private static async Task<List<CustomEntry>?> LoadCustomEntriesAsync(string path, CancellationToken token)
@@ -153,7 +250,11 @@ namespace ModbusForge.Headless
             return null;
         }
 
-        private async Task<string> ReadCustomValueAsync(CustomEntry entry, CancellationToken token)
+        /// <summary>
+        /// Reads an entry. <c>Ok</c> is false when the device did not answer -
+        /// the caller uses that to detect a silent death of the connection.
+        /// </summary>
+        private async Task<(string Value, bool Ok)> ReadCustomValueAsync(CustomEntry entry, CancellationToken token)
         {
             var area = (entry.Area ?? "HoldingRegister").ToLowerInvariant();
             var type = (entry.Type ?? "int").ToLowerInvariant();
@@ -167,26 +268,26 @@ namespace ModbusForge.Headless
                         ? await _modbusService.ReadHoldingRegistersAsync(_profile.UnitId, entry.Address, count)
                         : await _modbusService.ReadInputRegistersAsync(_profile.UnitId, entry.Address, count);
 
-                    if (values == null || values.Length == 0) return "No response";
+                    if (values == null || values.Length == 0) return ("No response", false);
 
-                    return type switch
+                    return (type switch
                     {
                         "int" => unchecked((short)values[0]).ToString(CultureInfo.InvariantCulture),
                         "real" when values.Length >= 2 => DataTypeConverter.ToSingle(values[0], values[1], false, false).ToString(CultureInfo.InvariantCulture),
                         "string" => DataTypeConverter.ToString(values[0]),
                         _ => values[0].ToString(CultureInfo.InvariantCulture)
-                    };
+                    }, true);
 
                 case "coil":
                 case "discreteinput":
                     var coilValues = area == "coil"
                         ? await _modbusService.ReadCoilsAsync(_profile.UnitId, entry.Address, 1)
                         : await _modbusService.ReadDiscreteInputsAsync(_profile.UnitId, entry.Address, 1);
-                    if (coilValues == null || coilValues.Length == 0) return "No response";
-                    return coilValues[0] ? "1" : "0";
+                    if (coilValues == null || coilValues.Length == 0) return ("No response", false);
+                    return (coilValues[0] ? "1" : "0", true);
 
                 default:
-                    return $"Unknown area: {entry.Area}";
+                    return ($"Unknown area: {entry.Area}", false);
             }
         }
 

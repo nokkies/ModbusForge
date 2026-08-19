@@ -16,7 +16,8 @@ namespace ModbusForge.Avalonia.ViewModels
 {
     public sealed partial class DecodeViewModel : ObservableObject, IDisposable
     {
-        private const int DecodeRegisterCount = 2;
+        public const int MaxDecodeRegisters = 2;
+        private const int MinimumDecodeRegisters = 1;
         private const int MaximumAddress = 0xFFFF;
 
         private readonly IConnectionManager _connectionManager;
@@ -35,7 +36,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private string _addressInput = "1";
 
         [ObservableProperty]
-        private bool _useTwoRegisters = true;
+        private int _readCount = MaxDecodeRegisters;
 
         [ObservableProperty]
         private bool _swapBytes;
@@ -118,6 +119,9 @@ namespace ModbusForge.Avalonia.ViewModels
             "Coil",
             "DiscreteInput"
         };
+
+        public IReadOnlyList<int> ReadCountOptions { get; } =
+            new[] { MinimumDecodeRegisters, MaxDecodeRegisters };
 
         public string ReadButtonText => IsBusy ? "Reading..." : "Read";
 
@@ -204,9 +208,11 @@ namespace ModbusForge.Avalonia.ViewModels
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
+                // No modal here: a read that keeps failing (device down, timeout) is
+                // reported in the status bar, like the register tabs. A dialog on every
+                // failed attempt would block the user while they reconnect and retry.
                 _logger.LogError(ex, "Decode read failed");
                 Status = $"Error: {ex.Message}";
-                await ShowMessageAsync(Status, "Decode read failed", DialogIcon.Error);
             }
             finally
             {
@@ -221,8 +227,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
             return area.ToLowerInvariant() switch
             {
-                "holdingregister" => await service.ReadHoldingRegistersAsync(unitId, Address, DecodeRegisterCount),
-                "inputregister" => await service.ReadInputRegistersAsync(unitId, Address, DecodeRegisterCount),
+                "holdingregister" => await service.ReadHoldingRegistersAsync(unitId, Address, ReadCount),
+                "inputregister" => await service.ReadInputRegistersAsync(unitId, Address, ReadCount),
                 "coil" => await ReadCoilsAsRegistersAsync(service, unitId),
                 "discreteinput" => await ReadDiscreteInputsAsRegistersAsync(service, unitId),
                 _ => throw new InvalidOperationException($"Unsupported area: {Area}")
@@ -231,7 +237,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private async Task<ushort[]> ReadCoilsAsRegistersAsync(IModbusService service, byte unitId)
         {
-            var coils = await service.ReadCoilsAsync(unitId, Address, DecodeRegisterCount);
+            var coils = await service.ReadCoilsAsync(unitId, Address, ReadCount);
             return coils == null
                 ? Array.Empty<ushort>()
                 : coils.Select(value => (ushort)(value ? 1 : 0)).ToArray();
@@ -239,7 +245,7 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private async Task<ushort[]> ReadDiscreteInputsAsRegistersAsync(IModbusService service, byte unitId)
         {
-            var inputs = await service.ReadDiscreteInputsAsync(unitId, Address, DecodeRegisterCount);
+            var inputs = await service.ReadDiscreteInputsAsync(unitId, Address, ReadCount);
             return inputs == null
                 ? Array.Empty<ushort>()
                 : inputs.Select(value => (ushort)(value ? 1 : 0)).ToArray();
@@ -375,8 +381,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 _ => Area
             };
 
-            var count = UseTwoRegisters ? DecodeRegisterCount : 1;
-            return $"Read {count} {areaCode} from {Address}";
+            return $"Read {ReadCount} {areaCode} from {Address}";
         }
 
         private static string BytesToAscii(params byte[] bytes)

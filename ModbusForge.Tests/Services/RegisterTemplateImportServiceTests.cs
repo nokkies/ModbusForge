@@ -378,6 +378,24 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
+        public void ImportJson_MalformedElement_DiagnosticSurvivesWhenOtherRecordsParse()
+        {
+            // Regression: per-record diagnostics collected before the row pass
+            // were discarded whenever at least one record survived (a fresh
+            // result object replaced the caller's), so this error was invisible.
+            var json = @"[
+  { ""Name"": ""Good_Tag"", ""Address"": ""1"" },
+  42
+]";
+
+            var result = new RegisterTemplateImportService().ImportJson(json);
+
+            Assert.Contains(result.Errors, e => e.Message.Contains("must contain objects"));
+            var entry = Assert.Single(result.Entries);
+            Assert.Equal("Good_Tag", entry.TagName);
+        }
+
+        [Fact]
         public void ImportYaml_ParsesArrayOfTagMappings()
         {
             var yaml = @"
@@ -447,6 +465,91 @@ namespace ModbusForge.Tests.Services
             Assert.Equal(6, result.Entries[3].Address);
             Assert.Equal("Arr[2]", result.Entries[4].TagName);
             Assert.Equal(8, result.Entries[4].Address);
+        }
+
+        [Fact]
+        public void ImportL5X_Unmappable64BitLInt_IsReported_NotMisMapped()
+        {
+            // Regression: LINT (64-bit) used to be imported as Int32 with a
+            // 4-register footprint, so the value was silently mis-decoded.
+            // It must now be reported as unsupported and occupy no address.
+            var l5x = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<RSLogix5000Content SchemaRevision=""2.0"">
+  <Controller>
+    <Tags>
+      <Tag Name=""Before"" DataType=""REAL"" Dimensions=""0"" />
+      <Tag Name=""Big"" DataType=""LINT"" Dimensions=""0"" />
+      <Tag Name=""After"" DataType=""INT"" Dimensions=""0"" />
+    </Tags>
+  </Controller>
+</RSLogix5000Content>";
+
+            var result = new RegisterTemplateImportService().ImportL5X(l5x, AddressingConvention.ZeroBased);
+
+            Assert.Contains(result.Errors, e => e.Column == "DataType"
+                && e.Message.Contains("LINT")
+                && e.Message.Contains("not supported"));
+            Assert.Equal(2, result.Entries.Count);
+            Assert.Equal("Before", result.Entries[0].TagName);
+            Assert.Equal(0, result.Entries[0].Address);
+            Assert.Equal("After", result.Entries[1].TagName);
+            // The unmapped LINT consumed no registers: the next tag follows immediately.
+            Assert.Equal(2, result.Entries[1].Address);
+        }
+
+        [Fact]
+        public void ImportL5X_NonNumericUnsupportedTypes_SkipSilently()
+        {
+            // Struct/string tags have no Modbus mapping and are expected in
+            // vendor files; they are skipped without issues (numeric types are
+            // reported, these are not).
+            var l5x = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<RSLogix5000Content SchemaRevision=""2.0"">
+  <Controller>
+    <Tags>
+      <Tag Name=""MyStruct"" DataType=""STRUCT"" Dimensions=""0"" />
+      <Tag Name=""Note"" DataType=""STRING"" Dimensions=""0"" />
+      <Tag Name=""Value"" DataType=""INT"" Dimensions=""0"" />
+    </Tags>
+  </Controller>
+</RSLogix5000Content>";
+
+            var result = new RegisterTemplateImportService().ImportL5X(l5x, AddressingConvention.ZeroBased);
+
+            Assert.Empty(result.Errors);
+            var entry = Assert.Single(result.Entries);
+            Assert.Equal("Value", entry.TagName);
+            Assert.Equal(0, entry.Address);
+        }
+
+        [Theory]
+        [InlineData("-5..10", -5, 10)]
+        [InlineData("0..-10", 0, -10)]
+        [InlineData("0-100", 0, 100)]
+        [InlineData("0..100", 0, 100)]
+        [InlineData("0 to 100", 0, 100)]
+        [InlineData("0:100", 0, 100)]
+        [InlineData("-5 to -1", -5, -1)]
+        public void ImportCsv_RangeColumn_ParsesSeparatorsIncludingNegativeBounds(string rangeText, double expectedMin, double expectedMax)
+        {
+            var result = ImportCsv($"TagName,Address,Range\nT1,10,{rangeText}\n");
+
+            Assert.Empty(result.Errors);
+            Assert.Empty(result.Warnings);
+            var entry = Assert.Single(result.Entries);
+            Assert.Equal(expectedMin, entry.RangeMin);
+            Assert.Equal(expectedMax, entry.RangeMax);
+        }
+
+        [Fact]
+        public void ImportCsv_UnparseableRange_WarnsAndKeepsMinMaxColumns()
+        {
+            var result = ImportCsv("TagName,Address,Min,Max,Range\nT1,10,1,9,garbage\n");
+
+            var entry = Assert.Single(result.Entries);
+            Assert.Equal(1, entry.RangeMin);
+            Assert.Equal(9, entry.RangeMax);
+            Assert.Contains(result.Warnings, w => w.Column == "Range");
         }
 
         [Fact]

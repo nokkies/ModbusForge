@@ -1,13 +1,12 @@
 using ModbusForge.Models;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using ModbusForge.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ModbusForge.Services
@@ -18,26 +17,34 @@ namespace ModbusForge.Services
     public class ScriptRuleService : IScriptRuleService, IDisposable
     {
         private readonly ILogger<ScriptRuleService> _logger;
-        private readonly IModbusService _modbusService;
+        private readonly IConnectionManager _connectionManager;
         private readonly IConsoleLoggerService _consoleLoggerService;
-        private readonly IOptions<ServerSettings> _serverSettings;
         private readonly Timer _evaluationTimer;
+
+        // Guards against overlapping evaluation passes: a Modbus read can take
+        // longer than the 250 ms tick interval, and a second pass running
+        // concurrently would re-trigger rules and double-fire actions.
+        private int _evaluationInFlight;
 
         public ObservableCollection<ScriptRule> Rules { get; } = new();
 
+        /// <summary>
+        /// Default interval between rule evaluation passes.
+        /// </summary>
+        public static TimeSpan DefaultEvaluationInterval { get; } = TimeSpan.FromMilliseconds(250);
+
         public ScriptRuleService(
             ILogger<ScriptRuleService> logger,
-            IModbusService modbusService,
+            IConnectionManager connectionManager,
             IConsoleLoggerService consoleLoggerService,
-            IOptions<ServerSettings> serverSettings)
+            TimeSpan? evaluationInterval = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _modbusService = modbusService ?? throw new ArgumentNullException(nameof(modbusService));
+            _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _consoleLoggerService = consoleLoggerService ?? throw new ArgumentNullException(nameof(consoleLoggerService));
-            _serverSettings = serverSettings ?? throw new ArgumentNullException(nameof(serverSettings));
 
-            // Initialize evaluation timer (runs every 250ms)
-            _evaluationTimer = new Timer(EvaluateRulesCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(250));
+            var interval = evaluationInterval ?? DefaultEvaluationInterval;
+            _evaluationTimer = new Timer(EvaluateRulesCallback, null, interval, interval);
         }
 
         public void AddRule(ScriptRule rule)
@@ -76,31 +83,46 @@ namespace ModbusForge.Services
 
         public async Task EvaluateRulesAsync()
         {
-            if (!_modbusService.IsConnected) return;
+            // Skip this pass when a previous one is still running (a slow
+            // Modbus read can outlast the 250 ms tick); the next tick retries.
+            if (Interlocked.Exchange(ref _evaluationInFlight, 1) == 1) return;
 
-            foreach (var rule in Rules.Where(r => r.Enabled && !r.Triggered))
+            try
             {
-                try
+                var (service, unitId) = ResolveActiveTarget();
+                if (service == null) return;
+
+                foreach (var rule in Rules.Where(r => r.Enabled && !r.Triggered))
                 {
-                    bool conditionMet = await EvaluateConditionAsync(rule);
-                    if (conditionMet)
+                    try
                     {
-                        await ExecuteActionAsync(rule);
-
-                        if (rule.OneTime)
+                        bool conditionMet = await EvaluateConditionAsync(service, unitId, rule);
+                        if (conditionMet)
                         {
-                            rule.Triggered = true;
-                        }
+                            // Record when the rule fired (before the action's
+                            // delay/write completes) so views can show it.
+                            rule.LastTriggeredAt = DateTime.Now;
+                            await ExecuteActionAsync(service, unitId, rule);
 
-                        _logger.LogInformation("Script rule triggered: {RuleName}", rule.Name);
-                        _consoleLoggerService.Log($"Rule triggered: {rule.GetDescription()}");
+                            if (rule.OneTime)
+                            {
+                                rule.Triggered = true;
+                            }
+
+                            _logger.LogInformation("Script rule triggered: {RuleName}", rule.Name);
+                            _consoleLoggerService.Log($"Rule triggered: {rule.GetDescription()}");
+                        }
+                    }
+                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                    {
+                        _logger.LogError(ex, "Error evaluating script rule: {RuleName}", rule.Name);
+                        _consoleLoggerService.Log($"Rule error: {rule.Name} - {ex.Message}");
                     }
                 }
-                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-                {
-                    _logger.LogError(ex, "Error evaluating script rule: {RuleName}", rule.Name);
-                    _consoleLoggerService.Log($"Rule error: {rule.Name} - {ex.Message}");
-                }
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _evaluationInFlight, 0);
             }
         }
 
@@ -118,13 +140,11 @@ namespace ModbusForge.Services
         {
             Rules.Clear();
             _logger.LogInformation("Cleared all script rules");
-            _consoleLoggerService.Log("All script rules cleared");
+            _consoleLoggerService.Log("All rules cleared");
         }
 
         private async void EvaluateRulesCallback(object? state)
         {
-            if (!_modbusService.IsConnected) return;
-
             try
             {
                 await EvaluateRulesAsync();
@@ -146,24 +166,27 @@ namespace ModbusForge.Services
 
         public async Task<object?> GetRegisterValueAsync(string area, int address)
         {
+            var (service, unitId) = ResolveActiveTarget();
+            if (service == null) return null;
+
             try
             {
                 switch (area.ToLowerInvariant())
                 {
                     case "holdingregister":
-                        var hr = await _modbusService.ReadHoldingRegistersAsync(_serverSettings.Value.DefaultUnitId, address, 1);
+                        var hr = await service.ReadHoldingRegistersAsync(unitId, address, 1);
                         return hr?.FirstOrDefault();
 
                     case "inputregister":
-                        var ir = await _modbusService.ReadInputRegistersAsync(_serverSettings.Value.DefaultUnitId, address, 1);
+                        var ir = await service.ReadInputRegistersAsync(unitId, address, 1);
                         return ir?.FirstOrDefault();
 
                     case "coil":
-                        var coils = await _modbusService.ReadCoilsAsync(_serverSettings.Value.DefaultUnitId, address, 1);
+                        var coils = await service.ReadCoilsAsync(unitId, address, 1);
                         return coils?.FirstOrDefault();
 
                     case "discreteinput":
-                        var di = await _modbusService.ReadDiscreteInputsAsync(_serverSettings.Value.DefaultUnitId, address, 1);
+                        var di = await service.ReadDiscreteInputsAsync(unitId, address, 1);
                         return di?.FirstOrDefault();
 
                     default:
@@ -177,7 +200,25 @@ namespace ModbusForge.Services
             }
         }
 
-        private async Task<bool> EvaluateConditionAsync(ScriptRule rule)
+        /// <summary>
+        /// Resolves the Modbus service and unit id that rules should act on:
+        /// the currently active connection profile (the same target the
+        /// script editor uses). Returns a null service when nothing is
+        /// connected, in which case rule evaluation is skipped entirely.
+        /// </summary>
+        private (IModbusService? Service, byte UnitId) ResolveActiveTarget()
+        {
+            var service = _connectionManager.ActiveService;
+            if (service == null || !service.IsConnected)
+            {
+                return (null, 1);
+            }
+
+            var unitId = _connectionManager.ActiveProfile?.UnitId ?? 1;
+            return (service, unitId);
+        }
+
+        private async Task<bool> EvaluateConditionAsync(IModbusService service, byte unitId, ScriptRule rule)
         {
             var currentValue = await GetRegisterValueAsync(rule.TriggerArea, rule.TriggerAddress);
             if (currentValue == null) return false;
@@ -207,8 +248,8 @@ namespace ModbusForge.Services
             // Compare based on operator
             return rule.TriggerOperator switch
             {
-                "Equals" => CompareValues(currentValue, triggerValueObj ?? new object(), (a, b) => a.Equals(b)),
-                "NotEquals" => CompareValues(currentValue, triggerValueObj ?? new object(), (a, b) => !a.Equals(b)),
+                "Equals" => ValuesEqual(currentValue, triggerValueObj),
+                "NotEquals" => !ValuesEqual(currentValue, triggerValueObj),
                 "GreaterThan" => CompareNumericValues(currentValue, triggerValueObj ?? new object(), (a, b) => a > b),
                 "LessThan" => CompareNumericValues(currentValue, triggerValueObj ?? new object(), (a, b) => a < b),
                 "GreaterThanOrEqual" => CompareNumericValues(currentValue, triggerValueObj ?? new object(), (a, b) => a >= b),
@@ -217,14 +258,51 @@ namespace ModbusForge.Services
             };
         }
 
-        private bool CompareValues(object currentValue, object triggerValue, Func<object, object, bool> comparison)
+        /// <summary>
+        /// Equality for rule conditions. Both sides are compared as numbers
+        /// whenever that is possible (register values arrive as ushort while
+        /// numeric trigger values are parsed as double, so a plain
+        /// Object.Equals would never match); booleans compare by value.
+        /// </summary>
+        private static bool ValuesEqual(object? a, object? b)
         {
+            if (a == null || b == null)
+            {
+                return ReferenceEquals(a, b);
+            }
+
+            if (TryToDouble(a, out var an) && TryToDouble(b, out var bn))
+            {
+                return an == bn;
+            }
+
             try
             {
-                return comparison(currentValue, triggerValue);
+                return a.Equals(b);
             }
             catch
             {
+                return false;
+            }
+        }
+
+        private static bool TryToDouble(object value, out double number)
+        {
+            // Treat booleans as non-numeric so bool-vs-bool compares by value.
+            if (value is bool)
+            {
+                number = 0;
+                return false;
+            }
+
+            try
+            {
+                number = Convert.ToDouble(value, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)
+            {
+                number = 0;
                 return false;
             }
         }
@@ -260,7 +338,7 @@ namespace ModbusForge.Services
             }
         }
 
-        private async Task ExecuteActionAsync(ScriptRule rule)
+        private async Task ExecuteActionAsync(IModbusService service, byte unitId, ScriptRule rule)
         {
             // Apply delay if specified
             if (rule.DelayMs > 0)
@@ -271,11 +349,11 @@ namespace ModbusForge.Services
             switch (rule.ActionType)
             {
                 case "SetRegister":
-                    await SetRegisterAsync(rule.ActionArea, rule.ActionAddress, rule.ActionValue);
+                    await SetRegisterAsync(service, unitId, rule.ActionArea, rule.ActionAddress, rule.ActionValue);
                     break;
 
                 case "SetCoil":
-                    await SetCoilAsync(rule.ActionAddress, rule.ActionValue);
+                    await SetCoilAsync(service, unitId, rule.ActionAddress, rule.ActionValue);
                     break;
 
                 case "LogMessage":
@@ -288,13 +366,13 @@ namespace ModbusForge.Services
             }
         }
 
-        private async Task SetRegisterAsync(string area, int address, string value)
+        private async Task SetRegisterAsync(IModbusService service, byte unitId, string area, int address, string value)
         {
             try
             {
                 if (ushort.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out ushort ushortValue))
                 {
-                    await _modbusService.WriteSingleRegisterAsync(_serverSettings.Value.DefaultUnitId, address, ushortValue);
+                    await service.WriteSingleRegisterAsync(unitId, address, ushortValue);
                     _logger.LogInformation("Rule set register {Area}[{Address}] = {Value}", area, address, value);
                 }
             }
@@ -304,19 +382,19 @@ namespace ModbusForge.Services
             }
         }
 
-        private async Task SetCoilAsync(int address, string value)
+        private async Task SetCoilAsync(IModbusService service, byte unitId, int address, string value)
         {
             try
             {
                 if (bool.TryParse(value, out bool boolValue))
                 {
-                    await _modbusService.WriteSingleCoilAsync(_serverSettings.Value.DefaultUnitId, address, boolValue);
+                    await service.WriteSingleCoilAsync(unitId, address, boolValue);
                     _logger.LogInformation("Rule set coil[{Address}] = {Value}", address, boolValue);
                 }
                 else if (int.TryParse(value, out int intValue) && (intValue == 0 || intValue == 1))
                 {
                     bool coilState = intValue == 1;
-                    await _modbusService.WriteSingleCoilAsync(_serverSettings.Value.DefaultUnitId, address, coilState);
+                    await service.WriteSingleCoilAsync(unitId, address, coilState);
                     _logger.LogInformation("Rule set coil[{Address}] = {Value}", address, coilState);
                 }
             }

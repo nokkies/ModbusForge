@@ -9,6 +9,8 @@ namespace ModbusForge.Avalonia.Tests
     /// </summary>
     public sealed class SyncDispatcher : IDispatcher
     {
+        public bool CheckAccess => true;
+
         public void Invoke(Action action) => action();
 
         public T Invoke<T>(Func<T> func) => func();
@@ -23,5 +25,7 @@ namespace ModbusForge.Avalonia.Tests
         {
             return Task.FromResult(func());
         }
+
+        public void Post(Action action) => action();
     }
 }

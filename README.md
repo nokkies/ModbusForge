@@ -78,6 +78,19 @@ Choose between **Client** or **Server** mode in `appsettings.json`:
 
 ## What's New
 
+### 2026.8.29 - Visual Simulation: Data-Driven Parameters, Full Undo & a Calmer Panel
+
+- **Data-driven function-block parameters**: every block declares its parameters (`BlockParameterDescriptor`), and the node editor builds its parameter UI from the same descriptors the engine consumes, so the two can never drift. New **Real** variants (Signal Generator Real, Real math, Real compare).
+- **Device blocks finalized**: the valve gains a **Latching** option (default) with spring-return rest position, the DOL motor stops cleanly without a Fault port, and the VSD exposes `Running`/`SpeedFeedback`/`AtSpeed` outputs.
+- **Correct port and address binding**: the editor's generic connectors map onto named block ports positionally (e.g. `Input1` → `Start`/`Run`, `Output` → primary output), and address binding is gated by descriptor flags so default (unedited) addresses on wire-driven nodes stay inert.
+- **Stable block state**: graph rebuilds reuse the per-node engine instances, so timers, counters, and valve positions survive in-place edits while the simulation is running.
+- **Complete undo/redo in the editor**: parameter edits (coalesced per node), renames, enable/disable toggles, Modbus address bindings, and waveform application are all undoable — and the Undo button responds immediately after an edit.
+- **Calmer right panel**: the two node lists merged into a single **Nodes** panel (name, address, enable checkbox, editable live value); the duplicated simulation controls were removed; the Selected Node panel stays reachable at the top.
+- **Demo and program loads preserve the running state**: a running simulation keeps running on the newly loaded program.
+- Configurable scan interval (10–10000 ms) in the toolbar, a visible local/device store indicator, loop warnings in the status bar, and single-driver validation per input connector.
+- **Tests**: engine port-mapping and state-preservation cases plus a new headless view-model suite (undo coalescing, demo load, connection validation).
+- **Version bumped to `2026.8.29`** in all projects.
+
 ### 2026.8.27 - Server IP in Active Profile Display
 
 - **Active profile now shows the real server IP**: when running in Server mode the top toolbar and dashboard display the actual bound IP and port (e.g. `192.168.1.100:502`) instead of the loopback address, while the Interface text box still holds `127.0.0.1` or `0.0.0.0` for binding.
@@ -670,6 +683,28 @@ Example `appsettings.json`:
 
 Set `Logging:Console:UseJson` to `true` for JSON output to the console and to the log file.
 
+### Running a Simulation
+
+A simulation graph saved from the visual node editor (`.mfsim` or `.json`) can be executed headlessly, which is useful for CI checks of simulation logic without the GUI:
+
+```
+ModbusForge.Headless --simulate path/to/program.mfsim
+```
+
+The graph runs on its saved scan period against the private offline data store (no device connection required). Add `--simulate-steps <n>` to stop automatically after `n` ticks, and `--simulate-interval <ms>` to override the scan period from the file. On shutdown the headless runtime dumps the final node values and every non-default register/bit to the log:
+
+```
+[12:00:03 INF] === Simulation final state ===
+[12:00:03 INF]   IN (in1): true, 42
+[12:00:03 INF]   Scale (scale1): true, 420
+[12:00:03 INF]   HR* non-default:
+HR[1] = 42
+HR[2] = 420
+[12:00:03 INF]   IR*: all default
+```
+
+`--simulate` replaces the normal polling/custom-watch service: the host runs the simulation instead of polling, on its own offline data store.
+
 Run `ModbusForge.Headless --help` for a complete list of command-line switches.
 
 ### Linux systemd service
@@ -719,7 +754,7 @@ sudo systemctl enable --now modbusforge-headless
 **A:** Application settings are saved to `%AppData%\ModbusForge\settings.json`. Connection profiles are saved to `%AppData%\ModbusForge\connection-profiles.json`.
 
 ### Q: How do I export trend data?
-**A:** Open the Trend tab and use the **Trend** menu to export to CSV or PNG.
+**A:** Open the Trends tab and use the **Export CSV** or **Export PNG** buttons in the Data group. Select a pen in the pen list to export just that series, or leave none selected to export everything.
 
 ### Q: What file format does the Script Editor use?
 **A:** Scripts are saved as `.mbscript` files in JSON format.

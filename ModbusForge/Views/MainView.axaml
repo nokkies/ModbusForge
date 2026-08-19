@@ -11,6 +11,7 @@
   <UserControl.Resources>
     <converters:NavigationIndexConverter x:Key="NavigationIndexConverter" />
     <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" />
+    <converters:CountToBoolConverter x:Key="CountToBoolConverter" />
     <x:Int32 x:Key="CountFallback">1</x:Int32>
   </UserControl.Resources>
 
@@ -79,6 +80,7 @@
               <ListBoxItem Content="Frame Inspector" />
               <ListBoxItem Content="MQTT" />
               <ListBoxItem Content="Script Editor" />
+              <ListBoxItem Content="Rules" />
               <ListBoxItem Content="Signal Generator" />
               <ListBoxItem Content="Simulation" />
               <ListBoxItem Content="Registers" Margin="0,16,0,0" />
@@ -102,7 +104,7 @@
         </TabControl.Styles>
       <TabItem x:Name="DashboardTab" Header="Dashboard">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-          <Grid Margin="8" RowDefinitions="Auto,Auto,Auto,*">
+          <Grid Margin="8" RowDefinitions="Auto,Auto,Auto,Auto">
             <TextBlock Grid.Row="0" Text="Dashboard" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,16" />
 
             <Border Grid.Row="1" Background="#12000000" CornerRadius="6" Padding="16" Margin="0,0,0,16">
@@ -132,15 +134,45 @@
             </Border>
 
             <Border Grid.Row="3" Background="#12000000" CornerRadius="6" Padding="16">
-              <Grid RowDefinitions="Auto,*">
-                <TextBlock Grid.Row="0" Text="Recent connection profiles" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8" />
-                <ListBox Grid.Row="1" ItemsSource="{Binding ConnectionProfiles}" SelectedItem="{Binding DashboardSelectedProfile, Mode=TwoWay}" BorderBrush="#40000000" BorderThickness="1">
+              <Grid RowDefinitions="Auto,Auto">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                  <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <TextBlock Text="Connection profiles" FontSize="18" FontWeight="SemiBold" />
+                    <TextBlock Text="Select a profile to make it active" Opacity="0.55" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <Button Grid.Column="1" Content="Manage…" VerticalAlignment="Center"
+                          ToolTip.Tip="Open the Connection Manager to edit, add or remove profiles"
+                          Command="{Binding OpenConnectionManagerCommand}" />
+                </Grid>
+                <ListBox Grid.Row="1"
+                         ItemsSource="{Binding ConnectionProfiles}"
+                         SelectedItem="{Binding DashboardSelectedProfile, Mode=TwoWay}"
+                         IsVisible="{Binding HasConnectionProfiles}"
+                         MaxHeight="280"
+                         BorderBrush="#40000000" BorderThickness="1">
                   <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="models:ConnectionProfile">
-                      <TextBlock Text="{Binding DisplayName}" Margin="8,4" />
+                      <StackPanel Orientation="Horizontal" Spacing="10" Margin="8,6">
+                        <TextBlock Text="●" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="#2E8B57" IsVisible="{Binding IsConnected}"
+                                   ToolTip.Tip="Connected" />
+                        <TextBlock Text="●" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="#C62828" IsVisible="{Binding HasConnectionLost}"
+                                   ToolTip.Tip="Connection lost" />
+                        <TextBlock Text="○" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="#777777" IsVisible="{Binding IsIdle}"
+                                   ToolTip.Tip="Not connected" />
+                        <StackPanel Spacing="1">
+                          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding EndpointDescription}" Opacity="0.6" FontSize="12" />
+                        </StackPanel>
+                      </StackPanel>
                     </DataTemplate>
                   </ListBox.ItemTemplate>
                 </ListBox>
+                <TextBlock Grid.Row="1" Text="No connection profiles yet. Use Manage to create one."
+                           Opacity="0.6" Margin="4"
+                           IsVisible="{Binding ShowNoProfilesPlaceholder}" />
               </Grid>
             </Border>
           </Grid>
@@ -161,6 +193,10 @@
 
       <TabItem x:Name="ScriptEditorTab" Header="Script Editor">
         <views:ScriptEditorView DataContext="{Binding ScriptEditorViewModel}" />
+      </TabItem>
+
+      <TabItem x:Name="RulesTab" Header="Rules">
+        <views:ScriptRulesView DataContext="{Binding RulesViewModel}" />
       </TabItem>
 
       <TabItem x:Name="SignalGeneratorTab" Header="Signal Generator">
@@ -188,11 +224,13 @@
             <NumericUpDown Value="{Binding HoldingMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
-          <DataGrid x:Name="HoldingRegistersGrid" Grid.Row="1"
+          <Grid Grid.Row="1">
+          <DataGrid x:Name="HoldingRegistersGrid"
                     ItemsSource="{Binding HoldingRegisters}"
                     AutomationProperties.Name="Holding Registers Grid"
                     AutoGenerateColumns="False"
                     IsReadOnly="False"
+                    CanUserResizeColumns="True"
                     GridLinesVisibility="All"
                     VerticalAlignment="Stretch"
                     HorizontalAlignment="Stretch"
@@ -210,7 +248,7 @@
               </ContextMenu>
             </DataGrid.ContextMenu>
             <DataGrid.Columns>
-              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" IsReadOnly="True" />
+              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="100" IsReadOnly="True" />
               <DataGridTemplateColumn Header="Value" Width="120">
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate x:DataType="models:RegisterEntry">
@@ -237,10 +275,16 @@
                   </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
-              <DataGridCheckBoxColumn Header="Swap Bytes" Binding="{Binding SwapBytes}" Width="100" IsReadOnly="True" />
-              <DataGridCheckBoxColumn Header="Swap Words" Binding="{Binding SwapWords}" Width="100" IsReadOnly="True" />
+              <DataGridCheckBoxColumn Header="Swap Bytes" Binding="{Binding SwapBytes}" Width="115" IsReadOnly="True" />
+              <DataGridCheckBoxColumn Header="Swap Words" Binding="{Binding SwapWords}" Width="115" IsReadOnly="True" />
             </DataGrid.Columns>
           </DataGrid>
+          <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                     Opacity="0.55" FontSize="14" IsHitTestVisible="False"
+                     IsVisible="{Binding HoldingRegisters.Count, Converter={StaticResource CountToBoolConverter}, ConverterParameter=zero}">
+            No holding registers loaded. Set Start/Count and press Read.
+          </TextBlock>
+          </Grid>
         </Grid>
       </TabItem>
 
@@ -257,11 +301,13 @@
             <NumericUpDown Value="{Binding CoilsMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
-          <DataGrid x:Name="CoilsGrid" Grid.Row="1"
+          <Grid Grid.Row="1">
+          <DataGrid x:Name="CoilsGrid"
                     ItemsSource="{Binding Coils}"
                     AutomationProperties.Name="Coils Grid"
                     AutoGenerateColumns="False"
                     IsReadOnly="False"
+                    CanUserResizeColumns="True"
                     GridLinesVisibility="All"
                     VerticalAlignment="Stretch"
                     HorizontalAlignment="Stretch"
@@ -278,10 +324,16 @@
               </ContextMenu>
             </DataGrid.ContextMenu>
             <DataGrid.Columns>
-              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" IsReadOnly="True" />
+              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="100" IsReadOnly="True" />
               <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="80" />
             </DataGrid.Columns>
           </DataGrid>
+          <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                     Opacity="0.55" FontSize="14" IsHitTestVisible="False"
+                     IsVisible="{Binding Coils.Count, Converter={StaticResource CountToBoolConverter}, ConverterParameter=zero}">
+            No coils loaded. Set Start/Count and press Read.
+          </TextBlock>
+          </Grid>
         </Grid>
       </TabItem>
 
@@ -302,11 +354,13 @@
             <NumericUpDown Value="{Binding InputRegistersMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
-          <DataGrid x:Name="InputRegistersGrid" Grid.Row="1"
+          <Grid Grid.Row="1">
+          <DataGrid x:Name="InputRegistersGrid"
                     ItemsSource="{Binding InputRegisters}"
                     AutomationProperties.Name="Input Registers Grid"
                     AutoGenerateColumns="False"
                     IsReadOnly="True"
+                    CanUserResizeColumns="True"
                     GridLinesVisibility="All"
                     VerticalAlignment="Stretch"
                     HorizontalAlignment="Stretch">
@@ -320,7 +374,7 @@
               </ContextMenu>
             </DataGrid.ContextMenu>
             <DataGrid.Columns>
-              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" IsReadOnly="True" />
+              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="100" IsReadOnly="True" />
               <DataGridTemplateColumn Header="Value" Width="120" IsReadOnly="True">
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate x:DataType="models:RegisterEntry">
@@ -342,10 +396,16 @@
                   </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
-              <DataGridCheckBoxColumn Header="Swap Bytes" Binding="{Binding SwapBytes}" Width="100" IsReadOnly="True" />
-              <DataGridCheckBoxColumn Header="Swap Words" Binding="{Binding SwapWords}" Width="100" IsReadOnly="True" />
+              <DataGridCheckBoxColumn Header="Swap Bytes" Binding="{Binding SwapBytes}" Width="115" IsReadOnly="True" />
+              <DataGridCheckBoxColumn Header="Swap Words" Binding="{Binding SwapWords}" Width="115" IsReadOnly="True" />
             </DataGrid.Columns>
           </DataGrid>
+          <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                     Opacity="0.55" FontSize="14" IsHitTestVisible="False"
+                     IsVisible="{Binding InputRegisters.Count, Converter={StaticResource CountToBoolConverter}, ConverterParameter=zero}">
+            No input registers loaded. Set Start/Count and press Read.
+          </TextBlock>
+          </Grid>
         </Grid>
       </TabItem>
 
@@ -362,11 +422,13 @@
             <NumericUpDown Value="{Binding DiscreteInputsMonitorPeriodMs}" Minimum="50" Maximum="60000" Width="100" />
           </StackPanel>
 
-          <DataGrid x:Name="DiscreteInputsGrid" Grid.Row="1"
+          <Grid Grid.Row="1">
+          <DataGrid x:Name="DiscreteInputsGrid"
                     ItemsSource="{Binding DiscreteInputs}"
                     AutomationProperties.Name="Discrete Inputs Grid"
                     AutoGenerateColumns="False"
                     IsReadOnly="True"
+                    CanUserResizeColumns="True"
                     GridLinesVisibility="All"
                     VerticalAlignment="Stretch"
                     HorizontalAlignment="Stretch">
@@ -380,10 +442,16 @@
               </ContextMenu>
             </DataGrid.ContextMenu>
             <DataGrid.Columns>
-              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80" IsReadOnly="True" />
+              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="100" IsReadOnly="True" />
               <DataGridCheckBoxColumn Header="State" Binding="{Binding State}" Width="80" IsReadOnly="True" />
             </DataGrid.Columns>
           </DataGrid>
+          <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                     Opacity="0.55" FontSize="14" IsHitTestVisible="False"
+                     IsVisible="{Binding DiscreteInputs.Count, Converter={StaticResource CountToBoolConverter}, ConverterParameter=zero}">
+            No discrete inputs loaded. Set Start/Count and press Read.
+          </TextBlock>
+          </Grid>
         </Grid>
       </TabItem>
 
@@ -401,14 +469,16 @@
             <CheckBox Content="Monitor" IsChecked="{Binding IsCustomWatchMonitoring}" VerticalAlignment="Center" />
           </StackPanel>
 
-          <DataGrid Grid.Row="1" ItemsSource="{Binding CustomEntries}"
+          <Grid Grid.Row="1">
+          <DataGrid ItemsSource="{Binding CustomEntries}"
                     SelectedItem="{Binding SelectedCustomEntry}"
                     AutoGenerateColumns="False"
                     IsReadOnly="False"
+                    CanUserResizeColumns="True"
                     GridLinesVisibility="All">
             <DataGrid.Columns>
               <DataGridTextColumn Header="Name" Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="120" />
-              <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+              <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="100" />
               <DataGridTemplateColumn Header="Area" Width="120">
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate x:DataType="models:CustomEntry">
@@ -443,11 +513,10 @@
               </DataGridTemplateColumn>
               <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="120" IsReadOnly="True" />
               <DataGridTextColumn Header="Write Value" Binding="{Binding WriteValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="120" />
-              <DataGridCheckBoxColumn Header="Continuous Write" Binding="{Binding Continuous, Mode=TwoWay}" Width="110" />
-              <DataGridTextColumn Header="Write Period (ms)" Binding="{Binding PeriodMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="110" />
+              <DataGridCheckBoxColumn Header="Continuous Write" Binding="{Binding Continuous, Mode=TwoWay}" Width="130" />
+              <DataGridTextColumn Header="Write Period (ms)" Binding="{Binding PeriodMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="135" />
               <DataGridCheckBoxColumn Header="Read" Binding="{Binding Monitor, Mode=TwoWay}" Width="70" />
-              <DataGridTextColumn Header="Read Period (ms)" Binding="{Binding ReadPeriodMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="110" />
-              <DataGridCheckBoxColumn Header="Trend" Binding="{Binding Trend, Mode=TwoWay}" Width="70" />
+              <DataGridTextColumn Header="Read Period (ms)" Binding="{Binding ReadPeriodMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="125" />
               <DataGridTemplateColumn Header="Actions" Width="Auto">
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate x:DataType="models:CustomEntry">
@@ -467,6 +536,12 @@
               </DataGridTemplateColumn>
             </DataGrid.Columns>
           </DataGrid>
+          <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                     Opacity="0.55" FontSize="14" IsHitTestVisible="False"
+                     IsVisible="{Binding CustomEntries.Count, Converter={StaticResource CountToBoolConverter}, ConverterParameter=zero}">
+            No watch entries yet. Use Add or Add Bulk to build a watch list for this unit.
+          </TextBlock>
+          </Grid>
         </Grid>
       </TabItem>
 

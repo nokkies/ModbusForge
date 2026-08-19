@@ -394,7 +394,9 @@ namespace ModbusForge.Services
                         int totalElements = dimensionSizes.Aggregate(1, (a, b) => a * b);
                         for (int i = 0; i < totalElements; i++)
                         {
-                            var indexedName = dimensionSizes.Count == 1 ? $"{name}[{i}]" : $"{name}[{i}]";
+                            // Multi-dimensional arrays are flattened in row-major
+                            // order with a single flat index.
+                            var indexedName = $"{name}[{i}]";
                             records.Add(CreateL5XRecord(indexedName, description, nextAddress, tagDataType, typeLength));
                             nextAddress += typeLength;
                         }
@@ -417,9 +419,11 @@ namespace ModbusForge.Services
             }
         }
 
+        /// <summary>The numeric L5X type family; members of this family that the
+        /// mapper does not support are reported instead of skipped silently.</summary>
         private static bool IsUnsupportedNumericL5X(string dataType) =>
             !string.IsNullOrWhiteSpace(dataType) &&
-            dataType is "SINT" or "INT" or "DINT" or "LINT" or "REAL" or "LREAL" or "BOOL" or "SINT" or "DINT" or "REAL";
+            dataType is "SINT" or "INT" or "DINT" or "LINT" or "REAL" or "LREAL" or "BOOL";
 
         private static bool TryGetL5XLength(string dataType, out int length, out TagDataType tagDataType)
         {
@@ -439,10 +443,9 @@ namespace ModbusForge.Services
                     length = 2;
                     return true;
 
-                case "LINT":
-                    tagDataType = TagDataType.Int32; // L5X LINT maps to 4-register 64-bit
-                    length = 4;
-                    return true;
+                // L5X LINT is 64-bit; the tag model has no 64-bit integer type,
+                // so it is deliberately NOT mapped (a 4-register footprint
+                // declared as Int32 would silently mis-decode the value).
 
                 case "REAL":
                     tagDataType = TagDataType.Float;
@@ -561,12 +564,17 @@ namespace ModbusForge.Services
                 rows.Add(row);
             }
 
-            return BuildResult(rows, addressing);
+            // Reuse the caller's result: per-record diagnostics collected before
+            // this point (unsupported types, malformed elements) must survive.
+            return BuildResult(rows, addressing, result);
         }
 
-        private RegisterTemplateImportResult BuildResult(IReadOnlyList<List<string>> rows, AddressingConvention addressing)
+        private RegisterTemplateImportResult BuildResult(
+            IReadOnlyList<List<string>> rows,
+            AddressingConvention addressing,
+            RegisterTemplateImportResult? existing = null)
         {
-            var result = new RegisterTemplateImportResult();
+            var result = existing ?? new RegisterTemplateImportResult();
             result.Template.Addressing = addressing;
 
             var headerIndex = rows.ToList().FindIndex(r => r.Any(c => !string.IsNullOrWhiteSpace(c)));
@@ -815,17 +823,16 @@ namespace ModbusForge.Services
                 return false;
             }
 
+            if (prefix is not (0 or 1 or 3 or 4) || offset == 0)
+                return false;
+
             area = prefix switch
             {
                 0 => PlcArea.Coil,
                 1 => PlcArea.DiscreteInput,
                 3 => PlcArea.InputRegister,
-                4 => PlcArea.HoldingRegister,
-                _ => PlcArea.HoldingRegister,
+                _ => PlcArea.HoldingRegister, // 4: the only remaining case
             };
-
-            if (prefix is not (0 or 1 or 3 or 4) || offset == 0)
-                return false;
 
             address = offset - 1;
             return true;
@@ -922,12 +929,27 @@ namespace ModbusForge.Services
             if (string.IsNullOrWhiteSpace(text))
                 return (min, max);
 
-            var parts = text.Split(new[] { "..", "...", ":", " to ", "-" }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 2
-                && double.TryParse(parts[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var low)
-                && double.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var high))
+            // Multi-character separators first: a bare '-' split would destroy
+            // negative bounds ("-5..10" must not be cut at the minus sign).
+            string[] separators = { "...", "..", " to ", " TO ", ":" };
+            foreach (var separator in separators)
             {
-                return (low, high);
+                var parts = text.Split(new[] { separator }, StringSplitOptions.TrimEntries);
+                if (parts.Length == 2
+                    && double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var low)
+                    && double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var high))
+                {
+                    return (low, high);
+                }
+            }
+
+            // Last resort: a bare '-' separator (no negative bounds survive this).
+            var dashParts = text.Split(new[] { "-" }, StringSplitOptions.TrimEntries);
+            if (dashParts.Length == 2
+                && double.TryParse(dashParts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var dashLow)
+                && double.TryParse(dashParts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var dashHigh))
+            {
+                return (dashLow, dashHigh);
             }
 
             result.Warnings.Add(new RegisterMapImportIssue
