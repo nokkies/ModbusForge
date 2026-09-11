@@ -9,39 +9,32 @@ namespace ModbusForge.Services
     /// <summary>
     /// In-memory ring buffer that captures Modbus request/response frames for the inspector.
     /// </summary>
-    /// <remarks>
-    /// Frames are captured on worker threads (the socket read/write loops), but the inspector's
-    /// grid binds to <see cref="Frames"/> on the UI thread. An optional
-    /// <see cref="IDispatcher"/> is used to marshal collection mutations onto the UI thread so
-    /// the grid reliably updates; without a dispatcher (headless, tests) mutations happen inline.
-    /// </remarks>
     public class ModbusFrameLogger
     {
         private readonly object _sync = new();
         private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
         private long _lastTimestampTicks;
-        private readonly IDispatcher? _uiDispatcher;
 
         public const int DefaultCapacity = 1000;
+
+        /// <summary>
+        /// Raised on the thread that logged the frame (a Modbus I/O thread), after the frame
+        /// has been added to <see cref="Frames"/>. UI subscribers must marshal to their own
+        /// thread before touching Avalonia state.
+        /// </summary>
+        public event Action<ModbusFrameLog>? FrameLogged;
 
         public ObservableCollection<ModbusFrameLog> Frames { get; } = new();
 
         public int Capacity { get; }
 
-        public ModbusFrameLogger()
-            : this(DefaultCapacity, null)
+        public ModbusFrameLogger() : this(DefaultCapacity)
         {
         }
 
         public ModbusFrameLogger(int capacity)
-            : this(capacity, null)
-        {
-        }
-
-        public ModbusFrameLogger(int capacity, IDispatcher? uiDispatcher)
         {
             Capacity = Math.Max(1, capacity);
-            _uiDispatcher = uiDispatcher;
         }
 
         public void Log(FrameDirection direction, byte[] rawBytes, bool? isValidCrc = null, byte unitId = 0, byte functionCode = 0)
@@ -50,22 +43,9 @@ namespace ModbusForge.Services
                 return;
 
             var now = _stopwatch.Elapsed;
-
-            long last;
-            lock (_sync)
-            {
-                last = _lastTimestampTicks;
-                _lastTimestampTicks = now.Ticks;
-            }
-
-            var delta = last == 0
-                ? 0.0
-                : (now.Ticks - last) * 1000.0 / Stopwatch.Frequency;
-
             var log = new ModbusFrameLog
             {
                 Timestamp = DateTime.Now,
-                DeltaMs = delta,
                 Direction = direction,
                 RawBytes = rawBytes,
                 IsValidCrc = isValidCrc,
@@ -84,27 +64,42 @@ namespace ModbusForge.Services
             Append(log);
         }
 
+        /// <summary>
+        /// Adds a frame to the ring buffer. The delta timestamp and the buffer update happen
+        /// under a single lock (the previous code used two separate lock sections, so a
+        /// concurrent log could interleave and corrupt both deltas).
+        /// </summary>
         private void Append(ModbusFrameLog log)
-        {
-            if (_uiDispatcher is null)
-            {
-                AppendInline(log);
-                return;
-            }
-
-            // Mutate the observable collection on the UI thread so bound views update;
-            // posting (not invoking) keeps the capturing socket loop non-blocking.
-            _uiDispatcher.Post(() => AppendInline(log));
-        }
-
-        private void AppendInline(ModbusFrameLog log)
         {
             lock (_sync)
             {
+                var nowTicks = _stopwatch.Elapsed.Ticks;
+                var last = _lastTimestampTicks;
+                _lastTimestampTicks = nowTicks;
+
+                log.DeltaMs = last == 0
+                    ? 0.0
+                    : (nowTicks - last) * 1000.0 / Stopwatch.Frequency;
+
                 Frames.Add(log);
 
                 while (Frames.Count > Capacity)
                     Frames.RemoveAt(0);
+            }
+
+            // Outside the lock: subscribers (e.g. the frame inspector) may marshal to the UI.
+            FrameLogged?.Invoke(log);
+        }
+
+        /// <summary>
+        /// Thread-safe snapshot of the current ring buffer contents, for UI consumers
+        /// that need the history without enumerating the live (cross-thread) collection.
+        /// </summary>
+        public ModbusFrameLog[] Snapshot()
+        {
+            lock (_sync)
+            {
+                return Frames.ToArray();
             }
         }
 

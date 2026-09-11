@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -27,25 +26,21 @@ namespace ModbusForge.Tests.Services
             try
             {
                 // Act
-                var sw = Stopwatch.StartNew();
-
                 // DisposeAsync should return a task that is not completed because it's waiting for the lock
                 var disposeTask = service.DisposeAsync().AsTask();
 
-                // Verify it hasn't finished yet (it's waiting for the lock)
-                // We use a small delay to ensure the task had a chance to run up to the await
-                await Task.Delay(100);
-                Assert.False(disposeTask.IsCompleted);
+                // Verify it hasn't finished yet (it's waiting for the lock): give it a
+                // bounded chance to run up to the lock wait; it must still be incomplete.
+                using var probeCts = new System.Threading.CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+                await Task.Delay(100, probeCts.Token);
+                Assert.False(disposeTask.IsCompleted,
+                    "DisposeAsync must not complete while another operation holds the I/O lock");
 
                 // Release the lock
                 ioLock.Release();
 
-                // Now it should complete
+                // Now it should complete.
                 await disposeTask;
-                sw.Stop();
-
-                // Assert
-                Assert.True(sw.ElapsedMilliseconds >= 50, "DisposeAsync should have waited for the lock release");
             }
             finally
             {

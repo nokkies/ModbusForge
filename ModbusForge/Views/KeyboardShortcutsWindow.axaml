@@ -1,7 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="ModbusForge.Avalonia.Views.KeyboardShortcutsWindow"
-        x:CompileBindings="False"
         Title="Keyboard Shortcuts"
         Width="420"
         Height="420"

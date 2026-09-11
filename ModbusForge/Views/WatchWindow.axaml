@@ -3,7 +3,6 @@
         xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
         x:Class="ModbusForge.Avalonia.Views.WatchWindow"
         x:DataType="vm:WatchViewModel"
-        x:CompileBindings="False"
         Title="Watch Window - Real-time Monitoring"
         Width="820"
         Height="520"

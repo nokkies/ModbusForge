@@ -26,6 +26,9 @@ public sealed class SerialSettingsDetector
         9600, 19200, 38400, 57600, 115200, 4800, 2400, 1200, 14400
     };
 
+    /// <summary>Short I/O timeout for each probe attempt (ms) - a wrong setting must fail fast.</summary>
+    private const int ProbeTimeoutMs = 500;
+
     // Prioritized parity/data/stop combinations.
     private static readonly (Parity Parity, int DataBits, StopBits StopBits)[] CommonFrameConfigs =
     {
@@ -88,12 +91,12 @@ public sealed class SerialSettingsDetector
 
             var adapter = ModbusStreamAdapterFactory.CreateSerialAdapter(serialPort);
             var transport = profile.Transport == TransportType.Rtu
-                ? (IModbusSerialTransport)factory.CreateRtuTransport(new LoggingStreamResource(adapter, frameLogger))
-                : (IModbusSerialTransport)factory.CreateAsciiTransport(new LoggingStreamResource(adapter, frameLogger));
+                ? (IModbusSerialTransport)factory.CreateRtuTransport(new LoggingStreamResource(adapter, frameLogger, profile.Transport))
+                : (IModbusSerialTransport)factory.CreateAsciiTransport(new LoggingStreamResource(adapter, frameLogger, profile.Transport));
 
             using var master = factory.CreateMaster(transport);
-            master.Transport.ReadTimeout = 500;
-            master.Transport.WriteTimeout = 500;
+            master.Transport.ReadTimeout = ProbeTimeoutMs;
+            master.Transport.WriteTimeout = ProbeTimeoutMs;
 
             string attemptResult;
             try

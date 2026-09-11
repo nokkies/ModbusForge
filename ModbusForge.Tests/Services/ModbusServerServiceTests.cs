@@ -97,5 +97,85 @@ namespace ModbusForge.Tests.Services
             await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
                 _serverService.WriteSingleRegisterAsync(1, -1, 42));
         }
+
+        // The data store is 1-based (index 0 is an unused placeholder). Address 0 must be
+        // rejected with a clear validation error instead of either writing into the
+        // placeholder or blowing up deep inside the collection.
+        [Fact]
+        public async Task WriteSingleRegisterAsync_ZeroAddress_ThrowsWithClearMessage()
+        {
+            await _serverService.ConnectAsync("127.0.0.1", _testPort, "1");
+
+            var ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+                _serverService.WriteSingleRegisterAsync(1, 0, 42));
+            Assert.Contains("Invalid holding register address 0", ex.Message);
+        }
+
+        [Fact]
+        public async Task WriteSingleCoilAsync_ZeroAddress_ThrowsWithClearMessage()
+        {
+            await _serverService.ConnectAsync("127.0.0.1", _testPort, "1");
+
+            var ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+                _serverService.WriteSingleCoilAsync(1, 0, true));
+            Assert.Contains("Invalid coil address 0", ex.Message);
+        }
+
+        [Fact]
+        public async Task WriteCoilsAsync_RangeStartingAtZero_Throws()
+        {
+            await _serverService.ConnectAsync("127.0.0.1", _testPort, "1");
+
+            var ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+                _serverService.WriteCoilsAsync(1, 0, new[] { true, false }));
+            Assert.Contains("Invalid coil range 0..1", ex.Message);
+        }
+
+        // Address 0 is readable (the store's index-0 placeholder returns its default
+        // value) - the same convention the UI uses, where client-mode addresses 0 and 1
+        // alias the first register. The parity test exercises this through MainViewModel.
+        [Fact]
+        public async Task ReadHoldingRegistersAsync_ZeroAddress_ReturnsPlaceholderDefaults()
+        {
+            await _serverService.ConnectAsync("127.0.0.1", _testPort, "1");
+
+            var values = await _serverService.ReadHoldingRegistersAsync(1, 0, 2);
+
+            Assert.NotNull(values);
+            Assert.Equal(new ushort[] { 0, 10 }, values); // index 0 placeholder, index 1 = 1*10 seed
+        }
+
+        [Fact]
+        public async Task ReadHoldingRegistersAsync_ValidOneBasedRange_ReturnsValues()
+        {
+            await _serverService.ConnectAsync("127.0.0.1", _testPort, "1");
+
+            await _serverService.WriteSingleRegisterAsync(1, 5, 77);
+
+            var values = await _serverService.ReadHoldingRegistersAsync(1, 5, 2);
+
+            Assert.NotNull(values);
+            Assert.Equal(new ushort[] { 77, 60 }, values); // index 6 = 6*10 seed
+        }
+
+        [Fact]
+        public async Task WriteSingleRegisterAsync_UnknownUnitId_ThrowsInsteadOfReturningPrimaryUnitStore()
+        {
+            await _serverService.ConnectAsync("127.0.0.1", _testPort, "1");
+
+            var ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+                _serverService.WriteSingleRegisterAsync(99, 5, 1));
+            Assert.Contains("Data store not initialized for unit 99", ex.Message);
+        }
+
+        [Fact]
+        public async Task ReadHoldingRegistersAsync_UnknownUnitId_ThrowsInsteadOfReturningPrimaryUnitStore()
+        {
+            await _serverService.ConnectAsync("127.0.0.1", _testPort, "1");
+
+            var ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+                _serverService.ReadHoldingRegistersAsync(99, 5, 1));
+            Assert.Contains("Data store not initialized for unit 99", ex.Message);
+        }
     }
 }

@@ -207,143 +207,54 @@ namespace ModbusForge.Services
         }
 
         /// <summary>
-        /// Update tag values for a freshly read register/coil (called by the view
-        /// models when reading). Several tags may map to the same address - e.g.
-        /// packed status words with one tag per bit - so every matching tag is
-        /// updated; bit tags receive the extracted bit, not the whole word.
+        /// Update tag value (called by Modbus service when reading)
         /// </summary>
         public void UpdateTagValue(PlcArea area, int address, object value)
         {
-            var tags = Tags.Where(t => t.Area == area && t.Address == address).ToList();
-            if (tags.Count == 0)
-                return;
-
-            foreach (var tag in tags)
-                UpdateTag(tag, value);
-        }
-
-        /// <summary>
-        /// Feeds a contiguous batch of register values read starting at
-        /// <paramref name="startAddress"/> (the polling loop and manual register
-        /// reads). Multi-word tags (Int32, UInt32, Float, String, Double) are
-        /// converted from all of their words at once; single-word and bit tags
-        /// are updated point by point. A multi-word tag whose words extend past
-        /// the end of the batch is left unchanged rather than being fed a
-        /// half-width payload.
-        /// </summary>
-        public void UpdateRegisterValues(PlcArea area, int startAddress, ushort[] values)
-        {
-            if (values is null)
-                return;
-
-            var tags = Tags.Where(t => t.Area == area).ToList();
-            if (tags.Count == 0)
-                return;
-
-            foreach (var tag in tags)
+            var tag = GetTagByAddress(area, address);
+            if (tag != null)
             {
-                var index = tag.Address - startAddress;
-                if (index < 0 || index >= values.Length)
-                    continue;
+                tag.CurrentValue = value;
+                tag.LastUpdated = DateTime.Now;
 
-                var wordCount = Helpers.DataTypeConverter.GetRegisterCount(tag.DataType);
-                if (wordCount > 1 && index + wordCount > values.Length)
-                    continue; // not all of this tag's words are in the batch
-
-                var value = wordCount > 1
-                    ? Helpers.DataTypeConverter.ConvertRegisters(tag.DataType, values[index..(index + wordCount)])
-                    : (object)values[index];
-
-                UpdateTag(tag, value);
-            }
-        }
-
-        /// <summary>
-        /// Applies a freshly read value to a single tag: bit extraction, current
-        /// value, freshness, the tag's watch entry and its alarm state.
-        /// </summary>
-        private void UpdateTag(Tag tag, object value)
-        {
-            var tagValue = tag.Bit is int bitIndex && TryConvertToUInt16(value, out var raw)
-                ? (((raw >> bitIndex) & 1) == 1)
-                : value;
-
-            var now = DateTime.Now;
-            tag.CurrentValue = tagValue;
-            tag.LastUpdated = now;
-
-            // Update watch entry if exists
-            var watchEntry = WatchEntries.FirstOrDefault(w => w.TagId == tag.Id);
-            if (watchEntry == null)
-                return;
-
-            watchEntry.CurrentValue = tagValue;
-            watchEntry.FormattedValue = tag.FormattedValue;
-            watchEntry.LastUpdated = now;
-            watchEntry.IsStale = false;
-
-            // Check alarms
-            if (tag.IsAlarmEnabled && tag.ScaledValue.HasValue)
-            {
-                var scaled = tag.ScaledValue.Value;
-                if (tag.AlarmHigh.HasValue && scaled > tag.AlarmHigh.Value)
+                // Update watch entry if exists
+                var watchEntry = WatchEntries.FirstOrDefault(w => w.TagId == tag.Id);
+                if (watchEntry != null)
                 {
-                    watchEntry.HasAlarm = true;
-                    watchEntry.AlarmMessage = $"HIGH ALARM: {scaled:F2} > {tag.AlarmHigh.Value:F2}";
-                }
-                else if (tag.AlarmLow.HasValue && scaled < tag.AlarmLow.Value)
-                {
-                    watchEntry.HasAlarm = true;
-                    watchEntry.AlarmMessage = $"LOW ALARM: {scaled:F2} < {tag.AlarmLow.Value:F2}";
-                }
-                else
-                {
-                    watchEntry.HasAlarm = false;
-                    watchEntry.AlarmMessage = "";
+                    watchEntry.CurrentValue = value;
+                    watchEntry.FormattedValue = tag.FormattedValue;
+                    watchEntry.LastUpdated = DateTime.Now;
+                    watchEntry.IsStale = false;
+
+                    // Check alarms
+                    if (tag.IsAlarmEnabled && tag.ScaledValue.HasValue)
+                    {
+                        var scaled = tag.ScaledValue.Value;
+                        if (tag.AlarmHigh.HasValue && scaled > tag.AlarmHigh.Value)
+                        {
+                            watchEntry.HasAlarm = true;
+                            watchEntry.AlarmMessage = $"HIGH ALARM: {scaled:F2} > {tag.AlarmHigh.Value:F2}";
+                        }
+                        else if (tag.AlarmLow.HasValue && scaled < tag.AlarmLow.Value)
+                        {
+                            watchEntry.HasAlarm = true;
+                            watchEntry.AlarmMessage = $"LOW ALARM: {scaled:F2} < {tag.AlarmLow.Value:F2}";
+                        }
+                        else
+                        {
+                            watchEntry.HasAlarm = false;
+                            watchEntry.AlarmMessage = "";
+                        }
+                    }
                 }
             }
         }
 
-        /// <summary>Converts a raw read value to an unsigned word for bit extraction.</summary>
-        private static bool TryConvertToUInt16(object value, out ushort result)
-        {
-            if (value is ushort u)
-            {
-                result = u;
-                return true;
-            }
-
-            if (value is bool b)
-            {
-                result = (ushort)(b ? 1 : 0);
-                return true;
-            }
-
-            try
-            {
-                var converted = Convert.ToInt32(value);
-                result = (ushort)converted;
-                return true;
-            }
-            catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)
-            {
-                result = 0;
-                return false;
-            }
-        }
-
         /// <summary>
-        /// Create a new tag group. Group names are unique across the whole
-        /// hierarchy (lookups are by name), so a duplicate is rejected.
+        /// Create a new tag group
         /// </summary>
         public async Task<TagGroup> CreateGroup(string name, string? parentGroup = null)
         {
-            if (string.IsNullOrWhiteSpace(name))
-                throw new ArgumentException("Group name is required.", nameof(name));
-
-            if (FindGroupByName(name) != null)
-                throw new ArgumentException($"A group named '{name}' already exists.", nameof(name));
-
             var group = new TagGroup
             {
                 Name = name,
@@ -353,17 +264,15 @@ namespace ModbusForge.Services
             if (!string.IsNullOrEmpty(parentGroup))
             {
                 var parent = FindGroupByName(parentGroup);
-                if (parent == null)
+                if (parent != null)
                 {
-                    // A programmatic caller may reference a parent that does not
-                    // exist yet; create it rather than dropping the hierarchy
-                    // intent (same policy as the v1 migration fallbacks).
-                    parent = new TagGroup { Name = parentGroup };
-                    Groups.Add(parent);
+                    group.ParentGroupId = parent.Id;
+                    parent.SubGroups.Add(group);
                 }
-
-                group.ParentGroupId = parent.Id;
-                parent.SubGroups.Add(group);
+                else
+                {
+                    Groups.Add(group);
+                }
             }
             else
             {
@@ -694,11 +603,11 @@ namespace ModbusForge.Services
                 .Where(g => !string.IsNullOrEmpty(g.ParentGroupId) && IsDescendantOf(g, groupId))
                 .ToList();
 
-            int directSubCount = group.SubGroups.Count;
+            int directSubCount  = group.SubGroups.Count;
             int recursiveSubCount = allDescendants.Count;
 
             // Tags: count by GroupId references
-            int directTagCount = Tags.Count(t => t.GroupId == groupId);
+            int directTagCount    = Tags.Count(t => t.GroupId == groupId);
             int recursiveTagCount = allDescendants.Sum(sub => Tags.Count(t => t.GroupId == sub.Id))
                                     + directTagCount;
 
@@ -724,17 +633,17 @@ namespace ModbusForge.Services
 
             return new GroupDeletionPreview
             {
-                GroupId = group.Id,
-                GroupName = group.Name,
-                FullPath = group.FullPath,
-                DirectSubgroupCount = directSubCount,
+                GroupId                = group.Id,
+                GroupName              = group.Name,
+                FullPath               = group.FullPath,
+                DirectSubgroupCount    = directSubCount,
                 RecursiveSubgroupCount = recursiveSubCount,
-                DirectTagCount = directTagCount,
-                RecursiveTagCount = recursiveTagCount,
-                WatchEntriesToRemove = watchToRemove,
-                DestinationGroupId = destinationGroup?.Id ?? string.Empty,
-                DestinationGroupName = destinationGroup?.Name ?? "Default",
-                IsProtected = isDefault
+                DirectTagCount         = directTagCount,
+                RecursiveTagCount      = recursiveTagCount,
+                WatchEntriesToRemove   = watchToRemove,
+                DestinationGroupId     = destinationGroup?.Id   ?? string.Empty,
+                DestinationGroupName   = destinationGroup?.Name ?? "Default",
+                IsProtected            = isDefault
             };
         }
 
@@ -776,9 +685,9 @@ namespace ModbusForge.Services
             // Destination for move modes
             TagGroup? destinationGroup = mode switch
             {
-                GroupDeletionMode.MoveToParent => parentGroup,
+                GroupDeletionMode.MoveToParent  => parentGroup,
                 GroupDeletionMode.MoveToDefault => defaultGroup,
-                _ => null   // CascadeDelete – no destination
+                _                               => null   // CascadeDelete – no destination
             };
 
             // Collect all descendant groups (bottom-up to remove children first when cascading)
@@ -802,9 +711,15 @@ namespace ModbusForge.Services
 
             // ---- Snapshot for rollback ----
             // Snapshots: parent's SubGroups list, tags collection, watch entries, group Tags
-            var snapshotTags = Tags.ToList();
-            var snapshotGroups = GetAllGroupsFlat().ToList();
+            var snapshotTags        = Tags.ToList();
+            var snapshotGroups      = GetAllGroupsFlat().ToList();
             var snapshotWatchEntries = WatchEntries.ToList();
+
+            // Root groups captured BEFORE any mutation: the rollback must not re-derive
+            // rootness from the (already re-parented) current state.
+            var snapshotRootGroups = GetAllGroupsFlat()
+                .Where(g => string.IsNullOrEmpty(g.ParentGroupId))
+                .ToList();
 
             // Per-group Tags-collection snapshots (needed to restore group.Tags on rollback)
             var groupTagsSnapshot = GetAllGroupsFlat()
@@ -812,14 +727,22 @@ namespace ModbusForge.Services
             var groupSubsSnapshot = GetAllGroupsFlat()
                 .ToDictionary(g => g.Id, g => g.SubGroups.ToList());
 
-            // Reference-field snapshots: move modes rewrite GroupId/ParentGroupId
-            // on live objects, and collections alone cannot undo that.
-            var tagGroupRefs = affectedTags
-                .ToDictionary(t => t.Id, t => (GroupId: t.GroupId, GroupName: t.Group));
-            var subParentRefs = group.SubGroups.ToList()
-                .ToDictionary(g => g.Id, g => (ParentId: g.ParentGroupId, ParentName: g.ParentGroup));
-            var watchGroupNames = affectedWatchEntries
-                .ToDictionary(w => w.Id, w => w.TagGroup);
+            // Move mode mutates tag / sub-group / watch-entry objects IN PLACE. The list
+            // snapshots above hold references to those same objects, so restoring the
+            // lists alone would leave the re-parented field values behind. Capture the
+            // original values so the rollback can undo the mutations too.
+            var tagOriginals = new Dictionary<string, (string? GroupId, string Group)>();
+            var subOriginals = new Dictionary<string, (string? ParentGroupId, string ParentGroup)>();
+            var watchOriginals = new Dictionary<string, string>();
+            if (mode != GroupDeletionMode.CascadeDelete)
+            {
+                foreach (var t in affectedTags)
+                    tagOriginals[t.Id] = (t.GroupId, t.Group);
+                foreach (var s in group.SubGroups)
+                    subOriginals[s.Id] = (s.ParentGroupId, s.ParentGroup);
+                foreach (var w in affectedWatchEntries)
+                    watchOriginals[w.Id] = w.TagGroup;
+            }
 
             // ---- Apply mutation ----
             try
@@ -827,7 +750,7 @@ namespace ModbusForge.Services
                 if (cancellationToken.IsCancellationRequested)
                     return Fail("Operation was cancelled.");
 
-                int movedTagCount = 0;
+                int movedTagCount   = 0;
                 int deletedTagCount = 0;
                 int removedWatchCount = 0;
 
@@ -841,7 +764,7 @@ namespace ModbusForge.Services
                     foreach (var we in affectedWatchEntries)
                         WatchEntries.Remove(we);
 
-                    deletedTagCount = affectedTags.Count;
+                    deletedTagCount  = affectedTags.Count;
                     removedWatchCount = affectedWatchEntries.Count;
                 }
                 else
@@ -854,7 +777,7 @@ namespace ModbusForge.Services
                     foreach (var tag in affectedTags.Where(t => t.GroupId == groupId).ToList())
                     {
                         tag.GroupId = destinationGroup.Id;
-                        tag.Group = destinationGroup.Name;
+                        tag.Group   = destinationGroup.Name;
                         group.Tags.Remove(tag);
                         destinationGroup.Tags.Add(tag);
                         movedTagCount++;
@@ -864,14 +787,14 @@ namespace ModbusForge.Services
                     foreach (var sub in group.SubGroups.ToList())
                     {
                         sub.ParentGroupId = destinationGroup.Id;
-                        sub.ParentGroup = destinationGroup.Name;
+                        sub.ParentGroup   = destinationGroup.Name;
                         group.SubGroups.Remove(sub);
                         destinationGroup.SubGroups.Add(sub);
                     }
 
-                    // Tags in deeper descendants need no relocation: they stay in
-                    // their own subgroup, which moved up with its siblings.
-                    // (They must not be counted as moved - nothing changed for them.)
+                    // Tags in deeper descendants are NOT relocated: their subgroup moved
+                    // up as a unit, so the tags keep their own group. They are deliberately
+                    // not counted in movedTagCount (only the direct tags above were re-parented).
 
                     // Update watch entries to reflect new group name (TagGroup field is display only)
                     foreach (var we in affectedWatchEntries)
@@ -901,11 +824,11 @@ namespace ModbusForge.Services
 
                 return new GroupDeletionResult
                 {
-                    Success = true,
-                    Message = $"Group '{group.Name}' deleted successfully.",
-                    DeletedGroupCount = 1 + allDescendants.Count,
-                    MovedTagCount = movedTagCount,
-                    DeletedTagCount = deletedTagCount,
+                    Success               = true,
+                    Message               = $"Group '{group.Name}' deleted successfully.",
+                    DeletedGroupCount     = 1 + allDescendants.Count,
+                    MovedTagCount         = movedTagCount,
+                    DeletedTagCount       = deletedTagCount,
                     RemovedWatchEntryCount = removedWatchCount
                 };
             }
@@ -914,8 +837,8 @@ namespace ModbusForge.Services
                 // ---- Rollback ----
                 _tagLogger.LogError(ex, "DeleteGroupAsync failed for '{GroupId}'; rolling back.", groupId);
                 RollbackDeletion(snapshotTags, snapshotGroups, snapshotWatchEntries,
-                                 groupTagsSnapshot, groupSubsSnapshot,
-                                 tagGroupRefs, subParentRefs, watchGroupNames);
+                                 groupTagsSnapshot, groupSubsSnapshot, snapshotRootGroups,
+                                 tagOriginals, subOriginals, watchOriginals);
                 return Fail($"Deletion failed and was rolled back: {ex.Message}");
             }
         }
@@ -971,8 +894,8 @@ namespace ModbusForge.Services
         }
 
         /// <summary>
-        /// Restores all in-memory state to its pre-deletion snapshots, including
-        /// the reference fields that move modes rewrite on live objects.
+        /// Restores all in-memory collections to their pre-deletion snapshots, and undoes
+        /// the in-place field mutations that move mode performed on shared objects.
         /// </summary>
         private void RollbackDeletion(
             List<Tag> snapshotTags,
@@ -980,33 +903,18 @@ namespace ModbusForge.Services
             List<WatchEntry> snapshotWatchEntries,
             Dictionary<string, List<Tag>> groupTagsSnapshot,
             Dictionary<string, List<TagGroup>> groupSubsSnapshot,
-            Dictionary<string, (string? GroupId, string GroupName)> tagGroupRefs,
-            Dictionary<string, (string? ParentId, string ParentName)> subParentRefs,
-            Dictionary<string, string> watchGroupNames)
+            List<TagGroup> snapshotRootGroups,
+            Dictionary<string, (string? GroupId, string Group)> tagOriginals,
+            Dictionary<string, (string? ParentGroupId, string ParentGroup)> subOriginals,
+            Dictionary<string, string> watchOriginals)
         {
             // Restore flat tags list
             Tags.Clear();
             foreach (var t in snapshotTags) Tags.Add(t);
 
-            // Restore the group references that move modes rewrote on tags
-            foreach (var tag in snapshotTags)
-            {
-                if (tagGroupRefs.TryGetValue(tag.Id, out var refs))
-                {
-                    tag.GroupId = refs.GroupId;
-                    tag.Group = refs.GroupName;
-                }
-            }
-
             // Restore watch entries
             WatchEntries.Clear();
             foreach (var w in snapshotWatchEntries) WatchEntries.Add(w);
-
-            foreach (var w in snapshotWatchEntries)
-            {
-                if (watchGroupNames.TryGetValue(w.Id, out var groupName))
-                    w.TagGroup = groupName;
-            }
 
             // Restore group SubGroups and Tags collections from snapshots
             foreach (var group in snapshotGroups)
@@ -1021,36 +929,40 @@ namespace ModbusForge.Services
                     group.SubGroups.Clear();
                     foreach (var s in subs) group.SubGroups.Add(s);
                 }
-                if (subParentRefs.TryGetValue(group.Id, out var parentRefs))
-                {
-                    group.ParentGroupId = parentRefs.ParentId;
-                    group.ParentGroup = parentRefs.ParentName;
-                }
             }
 
-            // Restore root Groups collection (rebuild from snapshot root-level groups)
-            var snapshotRoots = snapshotGroups
-                .Where(g => string.IsNullOrEmpty(g.ParentGroupId))
-                .ToList();
-            Groups.Clear();
-            foreach (var g in snapshotRoots) Groups.Add(g);
-        }
-
-        // ----------------------------------------------------------------
-        //  Preview helper (declared here, shared with GroupDeletionPreview)
-        // ----------------------------------------------------------------
-
-        /// <summary>
-        /// Workaround property accessor for GroupDeletionPreview.Message —
-        /// available only on the preview object, declared here as a private static extension point.
-        /// </summary>
-        private static GroupDeletionPreview ErrorPreview(string groupId, string message) =>
-            new()
+            // Restore in-place field mutations (the list snapshots share object references,
+            // so the re-parented values must be undone explicitly).
+            foreach (var (id, original) in tagOriginals)
             {
-                GroupId = groupId,
-                IsProtected = true,
-                Message = message
-            };
+                var tag = snapshotTags.FirstOrDefault(t => t.Id == id);
+                if (tag != null)
+                {
+                    tag.GroupId = original.GroupId;
+                    tag.Group = original.Group;
+                }
+            }
+            foreach (var (id, original) in subOriginals)
+            {
+                var sub = snapshotGroups.FirstOrDefault(g => g.Id == id);
+                if (sub != null)
+                {
+                    sub.ParentGroupId = original.ParentGroupId;
+                    sub.ParentGroup = original.ParentGroup;
+                }
+            }
+            foreach (var (id, originalTagGroup) in watchOriginals)
+            {
+                var watch = snapshotWatchEntries.FirstOrDefault(w => w.Id == id);
+                if (watch != null)
+                    watch.TagGroup = originalTagGroup;
+            }
+
+            // Restore root Groups collection from the pre-mutation snapshot (NOT by
+            // re-filtering the current state, which may already have been re-parented).
+            Groups.Clear();
+            foreach (var g in snapshotRootGroups) Groups.Add(g);
+        }
 
         /// <summary>
         /// Saves the tag database atomically (write to temp file, then replace).

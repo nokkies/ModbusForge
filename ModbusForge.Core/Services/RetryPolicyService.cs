@@ -27,7 +27,6 @@ namespace ModbusForge.Services
     public class RetryPolicyService : IRetryPolicyService
     {
         private readonly ILogger<RetryPolicyService> _logger;
-        private readonly Random _random = new Random();
 
         public RetryPolicyService(ILogger<RetryPolicyService> logger)
         {
@@ -54,27 +53,27 @@ namespace ModbusForge.Services
             {
                 try
                 {
-                    _logger.LogDebug("Attempting {OperationName} (attempt {Attempt}/{MaxRetries})",
+                    _logger.LogDebug("Attempting {OperationName} (attempt {Attempt}/{MaxRetries})", 
                         operationName, attempt + 1, maxRetries + 1);
 
                     var result = await operation();
-
+                    
                     if (attempt > 0)
                     {
-                        _logger.LogInformation("Operation {OperationName} succeeded after {Attempt} attempts",
+                        _logger.LogInformation("Operation {OperationName} succeeded after {Attempt} attempts", 
                             operationName, attempt + 1);
                     }
-
+                    
                     return result;
                 }
                 catch (Exception ex) when (IsRetryableException(ex) && attempt < maxRetries)
                 {
                     lastException = ex;
                     attempt++;
-
+                    
                     var delay = CalculateDelay(attempt, initialDelayMs, maxDelayMs);
-
-                    _logger.LogWarning(ex,
+                    
+                    _logger.LogWarning(ex, 
                         "Operation {OperationName} failed (attempt {Attempt}/{MaxRetries}). Retrying in {Delay}ms...",
                         operationName, attempt, maxRetries + 1, delay);
 
@@ -83,13 +82,13 @@ namespace ModbusForge.Services
                 catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     lastException = ex;
-                    _logger.LogError(ex, "Operation {OperationName} failed after {Attempt} attempts",
+                    _logger.LogError(ex, "Operation {OperationName} failed after {Attempt} attempts", 
                         operationName, attempt + 1);
                     throw;
                 }
             }
 
-            _logger.LogError("Operation {OperationName} failed after {MaxRetries} retries",
+            _logger.LogError("Operation {OperationName} failed after {MaxRetries} retries", 
                 operationName, maxRetries);
             throw new InvalidOperationException(
                 $"Operation '{operationName}' failed after {maxRetries} retries", lastException);
@@ -109,34 +108,30 @@ namespace ModbusForge.Services
             }, operationName, maxRetries, initialDelayMs, maxDelayMs);
         }
 
-        private bool IsRetryableException(Exception ex)
+        private static bool IsRetryableException(Exception ex)
         {
-            // Retry on network-related exceptions
-            if (ex is System.IO.IOException ||
-                ex is System.TimeoutException ||
-                ex is System.Net.Sockets.SocketException)
-            {
-                return true;
-            }
-
-            // Retry on connection-related exceptions
-            if (ex.Message.Contains("connection", StringComparison.OrdinalIgnoreCase) ||
-                ex.Message.Contains("network", StringComparison.OrdinalIgnoreCase) ||
-                ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            return false;
+            // Retry only on exception TYPES that indicate a transient network fault.
+            // (The previous version also retried whenever the message text contained
+            // words like "connection" or "timeout" - that re-ran non-transient failures
+            // whose messages merely mentioned those words.)
+            return ex is System.IO.IOException
+                || ex is System.TimeoutException
+                || ex is System.Net.Sockets.SocketException;
         }
 
-        private int CalculateDelay(int attempt, int initialDelayMs, int maxDelayMs)
+        private static int CalculateDelay(int attempt, int initialDelayMs, int maxDelayMs)
         {
-            // Exponential backoff with jitter
-            var exponentialDelay = initialDelayMs * (int)Math.Pow(2, attempt - 1);
-            var jitter = _random.Next(0, (int)(exponentialDelay * 0.1)); // 10% jitter
-            var delay = Math.Min(exponentialDelay + jitter, maxDelayMs);
-            return delay;
+            // Exponential backoff with 10% jitter. The doubling is done in long and capped
+            // early so a large attempt count can never overflow the int multiply, and the
+            // jitter range is clamped so Random.Shared.Next(0, 0) can never throw.
+            long exponentialDelay = Math.Max(0, initialDelayMs);
+            for (int i = 1; i < attempt && exponentialDelay < maxDelayMs; i++)
+                exponentialDelay = Math.Min(maxDelayMs, exponentialDelay * 2);
+
+            var jitterRange = (int)Math.Max(1, exponentialDelay / 10);
+            var jitter = Random.Shared.Next(0, jitterRange);
+
+            return (int)Math.Min(maxDelayMs, exponentialDelay + jitter);
         }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -6,17 +7,19 @@ using Microsoft.Extensions.Logging;
 using ModbusForge.Services;
 using Moq;
 using Xunit;
-using System.Linq;
-using System.Threading;
 
 namespace ModbusForge.Tests.Services
 {
     /// <summary>
-    /// Tests for ModbusServerService specifically testing the publishing port (0.0.0.0) functionality
-    /// to ensure the server binds to all interfaces rather than just localhost.
+    /// Tests for ModbusServerService. Data-path tests bind the server to 127.0.0.1 so a
+    /// writable Modbus TCP server is never exposed on the machine's network interfaces
+    /// during test runs (CI runners, developer LANs). Exactly one test exercises the
+    /// 0.0.0.0 "publishing port" bind, which is the feature under test there.
     /// </summary>
     public class ModbusServerPublishingPortTests : IDisposable
     {
+        private const string Loopback = "127.0.0.1";
+
         private readonly Mock<ILogger<ModbusServerService>> _loggerMock;
         private readonly ModbusServerService _serverService;
         private readonly int _testPort;
@@ -27,11 +30,11 @@ namespace ModbusForge.Tests.Services
             _loggerMock = new Mock<ILogger<ModbusServerService>>();
             _serverService = new ModbusServerService(_loggerMock.Object);
 
-            // Find a free port for testing
+            // Find a free port for testing (bind first, then read the assigned port).
             _testPort = GetFreePort();
         }
 
-        private int GetFreePort()
+        private static int GetFreePort()
         {
             using var listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
@@ -41,10 +44,10 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
-        public async Task ServerStarts_BindsToAllInterfaces_WhenUsingPublishingPort()
+        public async Task PublishingPort_BindsToAllInterfaces_AndResolvesToActualAddresses()
         {
-            // Arrange
-            string serverAddress = "0.0.0.0"; // Publishing port - bind to all interfaces
+            // Arrange - the one test that deliberately binds to 0.0.0.0 (publishing port).
+            string serverAddress = "0.0.0.0";
 
             // Act
             var connected = await _serverService.ConnectAsync(serverAddress, _testPort, _testUnitIds);
@@ -53,35 +56,35 @@ namespace ModbusForge.Tests.Services
             Assert.True(connected, "Server should connect successfully when binding to 0.0.0.0");
             Assert.True(_serverService.IsConnected, "Server should report as connected");
 
-            // Verify the bound endpoint shows actual interface addresses, not 0.0.0.0
+            // The bound endpoint must resolve 0.0.0.0 to the actual interface addresses.
             var boundEndpoint = _serverService.BoundEndpoint;
             Assert.False(string.IsNullOrEmpty(boundEndpoint), "Bound endpoint should not be empty");
             Assert.False(boundEndpoint.Contains("0.0.0.0"), "Bound endpoint should resolve 0.0.0.0 to actual interface IPs");
-
-            // Should contain actual IP addresses and port
             Assert.Contains(_testPort.ToString(), boundEndpoint);
+
+            // Every resolved address must be a valid IPv4 address.
+            var ipAddresses = boundEndpoint.Split(':').First().Split(',').Select(ip => ip.Trim());
+            foreach (var ip in ipAddresses)
+            {
+                Assert.True(IPAddress.TryParse(ip, out _), $"'{ip}' should be a valid IP address");
+                Assert.True(IPAddress.Parse(ip).AddressFamily == AddressFamily.InterNetwork,
+                    $"'{ip}' should be an IPv4 address");
+            }
         }
 
         [Fact]
         public async Task ClientCanConnect_WhenServerUsesPublishingPort()
         {
-            // Arrange
-            string serverAddress = "0.0.0.0";
-
-            // Start server on publishing port
-            var serverConnected = await _serverService.ConnectAsync(serverAddress, _testPort, _testUnitIds);
+            // Arrange - data path: server on loopback only.
+            var serverConnected = await _serverService.ConnectAsync(Loopback, _testPort, _testUnitIds);
             Assert.True(serverConnected, "Server should start successfully");
 
-            // Act - Create client and connect to actual bound address
+            // Act
             var clientService = new ModbusTcpService(new Mock<ILogger<ModbusTcpService>>().Object);
-            var boundEndpoint = _serverService.BoundEndpoint;
-            var ipPart = boundEndpoint.Split(':')[0]; // Get IP list part
-            var actualIp = ipPart.Split(',')[0].Trim(); // Get first IP
-
-            var clientConnected = await clientService.ConnectAsync(actualIp, _testPort, "1");
+            var clientConnected = await clientService.ConnectAsync(Loopback, _testPort, "1");
 
             // Assert
-            Assert.True(clientConnected, "Client should be able to connect to server bound to publishing port");
+            Assert.True(clientConnected, "Client should be able to connect to the server");
             Assert.True(clientService.IsConnected, "Client should report as connected");
 
             // Cleanup
@@ -93,23 +96,18 @@ namespace ModbusForge.Tests.Services
         public async Task MultipleClientsCanConnect_WhenServerUsesPublishingPort()
         {
             // Arrange
-            string serverAddress = "0.0.0.0";
             const int clientCount = 3;
 
-            // Start server on publishing port
-            var serverConnected = await _serverService.ConnectAsync(serverAddress, _testPort, _testUnitIds);
+            var serverConnected = await _serverService.ConnectAsync(Loopback, _testPort, _testUnitIds);
             Assert.True(serverConnected, "Server should start successfully");
 
-            var boundEndpoint = _serverService.BoundEndpoint;
-            var ipPart = boundEndpoint.Split(':')[0];
-            var actualIp = ipPart.Split(',')[0].Trim();
             var clients = new ModbusTcpService[clientCount];
 
             // Act - Connect multiple clients
             for (int i = 0; i < clientCount; i++)
             {
                 clients[i] = new ModbusTcpService(new Mock<ILogger<ModbusTcpService>>().Object);
-                var connected = await clients[i].ConnectAsync(actualIp, _testPort, (i + 1).ToString());
+                var connected = await clients[i].ConnectAsync(Loopback, _testPort, (i + 1).ToString());
                 Assert.True(connected, $"Client {i + 1} should connect successfully");
             }
 
@@ -131,11 +129,10 @@ namespace ModbusForge.Tests.Services
         public async Task ServerPublishesMultipleUnitIds_WhenUsingPublishingPort()
         {
             // Arrange
-            string serverAddress = "0.0.0.0";
             string unitIds = "1,5,10-15,20"; // Test range notation
 
             // Act
-            var connected = await _serverService.ConnectAsync(serverAddress, _testPort, unitIds);
+            var connected = await _serverService.ConnectAsync(Loopback, _testPort, unitIds);
 
             // Assert
             Assert.True(connected, "Server should connect successfully");
@@ -155,41 +152,10 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
-        public async Task BoundEndpointShowsActualInterfaces_WhenUsingPublishingPort()
-        {
-            // Arrange
-            string serverAddress = "0.0.0.0";
-
-            // Act
-            var connected = await _serverService.ConnectAsync(serverAddress, _testPort, _testUnitIds);
-            Assert.True(connected, "Server should connect successfully");
-
-            var boundEndpoint = _serverService.BoundEndpoint;
-
-            // Assert
-            Assert.False(string.IsNullOrEmpty(boundEndpoint), "Bound endpoint should not be empty");
-            Assert.Contains(_testPort.ToString(), boundEndpoint);
-
-            // Should resolve to actual interface addresses, not 0.0.0.0
-            Assert.DoesNotContain("0.0.0.0", boundEndpoint);
-
-            // Should contain valid IP addresses (IPv4 format)
-            var ipPortPart = boundEndpoint.Split(':').First();
-            var ipAddresses = ipPortPart.Split(',').Select(ip => ip.Trim());
-
-            foreach (var ip in ipAddresses)
-            {
-                Assert.True(IPAddress.TryParse(ip, out _), $"'{ip}' should be a valid IP address");
-                Assert.True(IPAddress.Parse(ip).AddressFamily == AddressFamily.InterNetwork,
-                    $"'{ip}' should be an IPv4 address");
-            }
-        }
-
-        [Fact]
         public async Task ServerWorksOnLocalhost_WhenNotUsingPublishingPort()
         {
             // Arrange - Use localhost instead of publishing port
-            string serverAddress = "127.0.0.1";
+            string serverAddress = Loopback;
 
             // Act
             var connected = await _serverService.ConnectAsync(serverAddress, _testPort, _testUnitIds);
@@ -200,7 +166,7 @@ namespace ModbusForge.Tests.Services
 
             // Client should be able to connect to localhost
             using var clientService = new ModbusTcpService(new Mock<ILogger<ModbusTcpService>>().Object);
-            var clientConnected = await clientService.ConnectAsync("127.0.0.1", _testPort, "1");
+            var clientConnected = await clientService.ConnectAsync(Loopback, _testPort, "1");
             Assert.True(clientConnected, "Client should be able to connect to server via localhost");
 
             var boundEndpoint = _serverService.BoundEndpoint;
@@ -214,7 +180,7 @@ namespace ModbusForge.Tests.Services
             var clientService = new ModbusTcpService(new Mock<ILogger<ModbusTcpService>>().Object);
 
             // Act & Assert
-            var connected = await clientService.ConnectAsync("127.0.0.1", _testPort, "1");
+            var connected = await clientService.ConnectAsync(Loopback, _testPort, "1");
             Assert.False(connected, "Client should fail to connect when server is not running");
             Assert.False(clientService.IsConnected, "Client should report as not connected");
 
@@ -226,11 +192,10 @@ namespace ModbusForge.Tests.Services
         public async Task ServerRejectsInvalidPort_WhenUsingPublishingPort()
         {
             // Arrange
-            string serverAddress = "0.0.0.0";
             int invalidPort = -1;
 
             // Act & Assert
-            var result = await _serverService.ConnectAsync(serverAddress, invalidPort, _testUnitIds);
+            var result = await _serverService.ConnectAsync(Loopback, invalidPort, _testUnitIds);
             Assert.False(result, "Server should fail to connect with invalid port");
         }
 

@@ -31,15 +31,9 @@ namespace ModbusForge.Services
         }
 
         public ModbusServerService(ILogger<ModbusServerService> logger, IConsoleLoggerService? consoleLoggerService)
-            : this(logger, consoleLoggerService, null)
-        {
-        }
-
-        public ModbusServerService(ILogger<ModbusServerService> logger, IConsoleLoggerService? consoleLoggerService, ModbusFrameLogger? frameLogger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _consoleLoggerService = consoleLoggerService;
-            _frameLogger = frameLogger ?? _frameLogger;
             _logger.LogInformation("Modbus TCP server created");
         }
 
@@ -50,13 +44,6 @@ namespace ModbusForge.Services
             ReadFromDataStoreAsync(unitId, startAddress, count, ds => ds.InputDiscretes, "discrete inputs");
 
         public virtual bool IsConnected => _isRunning;
-
-        // The server side has no peer connection to lose; the event is never raised.
-        public event EventHandler? ConnectionLost
-        {
-            add { }
-            remove { }
-        }
 
         public virtual async Task<bool> ConnectAsync(ConnectionProfile profile, CancellationToken cancellationToken = default)
         {
@@ -92,11 +79,7 @@ namespace ModbusForge.Services
                         if (ids.Count == 0) ids.Add(DefaultSlaveId);
                         _primaryUnitId = ids[0];
 
-                        // Reuse the existing dispatcher when we are restarting:
-                        // it owns the per-unit DataStores, and creating a fresh
-                        // one here would silently wipe every register, coil and
-                        // input the user (or an external client) had written.
-                        _multiServer ??= new ModbusMultiUnitServer(_logger, _consoleLoggerService, _frameLogger);
+                        _multiServer = new ModbusMultiUnitServer(_logger, _consoleLoggerService);
                         _multiServer.Start(endpoint, ids);
 
                         _isRunning = true;
@@ -126,12 +109,7 @@ namespace ModbusForge.Services
             }, cancellationToken).ConfigureAwait(false);
         }
 
-        /// <summary>
-        /// Stops the listener but keeps the dispatcher alive: the DataStores it
-        /// owns survive a stop/start cycle, so restarting the server does not
-        /// reset the simulated world.
-        /// </summary>
-        private void StopServer()
+        private void CleanupResources()
         {
             try
             {
@@ -139,18 +117,8 @@ namespace ModbusForge.Services
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
-                _logger.LogWarning(ex, "Error while stopping ModbusMultiUnitServer");
+                _logger.LogWarning(ex, "Error while stopping ModbusMultiUnitServer during cleanup");
             }
-        }
-
-        /// <summary>
-        /// Stops and disposes the dispatcher. Only the service's own disposal
-        /// should call this; DisconnectAsync must not, or the data store would
-        /// be destroyed along with the listener.
-        /// </summary>
-        private void CleanupResources()
-        {
-            StopServer();
 
             try
             {
@@ -223,9 +191,7 @@ namespace ModbusForge.Services
                 {
                     if (!_isRunning) return;
                     _isRunning = false;
-                    // Stop only — the dispatcher (and its data stores) stays
-                    // alive so a restart continues with the same values.
-                    StopServer();
+                    CleanupResources();
                     var stopMessage = "Modbus TCP server stopped";
                     _logger.LogInformation(stopMessage);
                     _consoleLoggerService?.Log(stopMessage);
@@ -242,8 +208,11 @@ namespace ModbusForge.Services
             await Task.Run(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null || registerAddress < 0 || registerAddress >= ds.HoldingRegisters.Count)
-                    throw new ArgumentOutOfRangeException(nameof(registerAddress));
+                if (ds == null)
+                    throw new ArgumentOutOfRangeException(nameof(unitId), $"Data store not initialized for unit {unitId}");
+                if (registerAddress < 1 || registerAddress >= ds.HoldingRegisters.Count)
+                    throw new ArgumentOutOfRangeException(nameof(registerAddress),
+                        $"Invalid holding register address {registerAddress} (valid: 1..{ds.HoldingRegisters.Count - 1})");
                 lock (ds)
                 {
                     ds.HoldingRegisters[(ushort)registerAddress] = value;
@@ -258,8 +227,11 @@ namespace ModbusForge.Services
             await Task.Run(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null || startAddress < 0 || startAddress + values.Length > ds.HoldingRegisters.Count)
-                    throw new ArgumentOutOfRangeException(nameof(startAddress));
+                if (ds == null)
+                    throw new ArgumentOutOfRangeException(nameof(unitId), $"Data store not initialized for unit {unitId}");
+                if (startAddress < 1 || startAddress + values.Length > ds.HoldingRegisters.Count)
+                    throw new ArgumentOutOfRangeException(nameof(startAddress),
+                        $"Invalid holding register range {startAddress}..{startAddress + values.Length - 1} (valid: 1..{ds.HoldingRegisters.Count - 1})");
 
                 lock (ds)
                 {
@@ -278,8 +250,11 @@ namespace ModbusForge.Services
             await Task.Run(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null || startAddress < 0 || startAddress + values.Length > ds.CoilDiscretes.Count)
-                    throw new ArgumentOutOfRangeException(nameof(startAddress));
+                if (ds == null)
+                    throw new ArgumentOutOfRangeException(nameof(unitId), $"Data store not initialized for unit {unitId}");
+                if (startAddress < 1 || startAddress + values.Length > ds.CoilDiscretes.Count)
+                    throw new ArgumentOutOfRangeException(nameof(startAddress),
+                        $"Invalid coil range {startAddress}..{startAddress + values.Length - 1} (valid: 1..{ds.CoilDiscretes.Count - 1})");
 
                 lock (ds)
                 {
@@ -303,11 +278,20 @@ namespace ModbusForge.Services
             if (!_isRunning) throw new InvalidOperationException("Modbus server is not running");
             return await Task.Run(() =>
             {
-                var ds = GetDataStore(unitId) ?? GetDataStore(_primaryUnitId);
-                if (ds == null) throw new InvalidOperationException("Data store not initialized");
+                // Do NOT fall back to the primary unit's store: silently returning another
+                // unit's data for an unconfigured unit ID is worse than a visible error
+                // (and the write path already rejects unknown units).
+                var ds = GetDataStore(unitId);
+                if (ds == null)
+                    throw new ArgumentOutOfRangeException(nameof(unitId), $"Data store not initialized for unit {unitId}");
                 var collection = collectionSelector(ds);
-                if (startAddress < 0 || count < 0 || startAddress + count > collection.Count)
-                    throw new ArgumentOutOfRangeException(nameof(startAddress), $"{resourceName} range out of bounds");
+                // Reads allow address 0: in server mode the UI treats the store's index-0
+                // placeholder as a readable (default-valued) point, mirroring client mode
+                // where UI addresses 0 and 1 alias the first protocol register. Writes,
+                // however, reject index 0 (the placeholder is not a settable point).
+                if (startAddress < 0 || count < 1 || startAddress + count > collection.Count)
+                    throw new ArgumentOutOfRangeException(nameof(startAddress),
+                        $"Invalid {resourceName} range {startAddress}..{startAddress + count - 1} (valid: 0..{collection.Count - 1})");
                 var result = new T[count];
                 lock (ds)
                 {
@@ -324,8 +308,11 @@ namespace ModbusForge.Services
             return Task.Run(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null || coilAddress < 0 || coilAddress >= ds.CoilDiscretes.Count)
-                    throw new ArgumentOutOfRangeException(nameof(coilAddress));
+                if (ds == null)
+                    throw new ArgumentOutOfRangeException(nameof(unitId), $"Data store not initialized for unit {unitId}");
+                if (coilAddress < 1 || coilAddress >= ds.CoilDiscretes.Count)
+                    throw new ArgumentOutOfRangeException(nameof(coilAddress),
+                        $"Invalid coil address {coilAddress} (valid: 1..{ds.CoilDiscretes.Count - 1})");
                 lock (ds)
                 {
                     ds.CoilDiscretes[(ushort)coilAddress] = value;
@@ -340,8 +327,11 @@ namespace ModbusForge.Services
             return await Task.Run<ushort?>(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null || registerAddress < 0 || registerAddress >= ds.HoldingRegisters.Count)
-                    throw new ArgumentOutOfRangeException(nameof(registerAddress));
+                if (ds == null)
+                    throw new ArgumentOutOfRangeException(nameof(unitId), $"Data store not initialized for unit {unitId}");
+                if (registerAddress < 1 || registerAddress >= ds.HoldingRegisters.Count)
+                    throw new ArgumentOutOfRangeException(nameof(registerAddress),
+                        $"Invalid holding register address {registerAddress} (valid: 1..{ds.HoldingRegisters.Count - 1})");
 
                 ushort result;
                 lock (ds)
@@ -363,11 +353,17 @@ namespace ModbusForge.Services
             return await Task.Run(() =>
             {
                 var ds = GetDataStore(unitId);
-                if (ds == null) throw new InvalidOperationException("Data store not initialized");
-                if (writeStartAddress < 0 || writeStartAddress + writeValues.Length - 1 >= ds.HoldingRegisters.Count)
-                    throw new ArgumentOutOfRangeException(nameof(writeStartAddress));
+                if (ds == null)
+                    throw new ArgumentOutOfRangeException(nameof(unitId), $"Data store not initialized for unit {unitId}");
+                if (writeValues.Length < 1 || writeValues.Length > ModbusAddressValidator.MaxReadWriteWriteCount)
+                    throw new ArgumentOutOfRangeException(nameof(writeValues),
+                        $"FC23 (read/write multiple registers) supports 1..{ModbusAddressValidator.MaxReadWriteWriteCount} write registers.");
+                if (writeStartAddress < 1 || writeStartAddress + writeValues.Length - 1 >= ds.HoldingRegisters.Count)
+                    throw new ArgumentOutOfRangeException(nameof(writeStartAddress),
+                        $"Invalid FC23 write range {writeStartAddress}..{writeStartAddress + writeValues.Length - 1} (valid: 1..{ds.HoldingRegisters.Count - 1})");
                 if (readStartAddress < 0 || readCount < 1 || readStartAddress + readCount - 1 >= ds.HoldingRegisters.Count)
-                    throw new ArgumentOutOfRangeException(nameof(readStartAddress));
+                    throw new ArgumentOutOfRangeException(nameof(readStartAddress),
+                        $"Invalid FC23 read range {readStartAddress}..{readStartAddress + readCount - 1} (valid: 0..{ds.HoldingRegisters.Count - 1})");
 
                 var result = new ushort[readCount];
                 lock (ds)
@@ -429,17 +425,6 @@ namespace ModbusForge.Services
                 catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
                 {
                     _logger.LogWarning(ex, "Error during DisposeAsync");
-                }
-                // DisconnectAsync only stops the dispatcher now, so the async
-                // disposal path still has to dispose it (Dispose(false) below
-                // skips the synchronous cleanup on purpose).
-                try
-                {
-                    CleanupResources();
-                }
-                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-                {
-                    _logger.LogWarning(ex, "Error during DisposeAsync cleanup");
                 }
                 _disposed = true;
             }
