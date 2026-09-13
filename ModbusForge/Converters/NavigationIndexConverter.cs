@@ -29,10 +29,11 @@ namespace ModbusForge.Avalonia.Converters
             12, // Custom Watch
             13, // Decode
             14, // Console
-            15  // Debug
+            15, // Debug
+            16  // PLC
         };
 
-        private static readonly int[] TabToNavigation = new int[16];
+        private static readonly int[] TabToNavigation = new int[17];
 
         static NavigationIndexConverter()
         {

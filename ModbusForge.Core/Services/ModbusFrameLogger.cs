@@ -37,6 +37,13 @@ namespace ModbusForge.Services
             Capacity = Math.Max(1, capacity);
         }
 
+        public ModbusFrameLogger(int capacity, IDispatcher? uiDispatcher)
+            : this(capacity)
+        {
+            // The dispatcher is accepted for API compatibility with the trends build.
+            // The current implementation raises FrameLogged on the logging thread.
+        }
+
         public void Log(FrameDirection direction, byte[] rawBytes, bool? isValidCrc = null, byte unitId = 0, byte functionCode = 0)
         {
             if (rawBytes is null)

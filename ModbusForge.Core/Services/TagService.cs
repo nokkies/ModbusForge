@@ -251,6 +251,104 @@ namespace ModbusForge.Services
         }
 
         /// <summary>
+        /// Updates all tags whose address falls inside the freshly read register
+        /// block. Handles multi-register data types and bit extraction.
+        /// </summary>
+        public void UpdateRegisterValues(PlcArea area, int startAddress, ushort[] values)
+        {
+            if (values is null)
+                return;
+
+            var tags = Tags.Where(t => t.Area == area).ToList();
+            if (tags.Count == 0)
+                return;
+
+            foreach (var tag in tags)
+            {
+                var index = tag.Address - startAddress;
+                if (index < 0 || index >= values.Length)
+                    continue;
+
+                var wordCount = Helpers.DataTypeConverter.GetRegisterCount(tag.DataType);
+                if (wordCount > 1 && index + wordCount > values.Length)
+                    continue;
+
+                var value = wordCount > 1
+                    ? Helpers.DataTypeConverter.ConvertRegisters(tag.DataType, values[index..(index + wordCount)])
+                    : (object)values[index];
+
+                UpdateTag(tag, value);
+            }
+        }
+
+        private void UpdateTag(Tag tag, object value)
+        {
+            var tagValue = tag.Bit is int bitIndex && TryConvertToUInt16(value, out var raw)
+                ? (((raw >> bitIndex) & 1) == 1)
+                : value;
+
+            var now = DateTime.Now;
+            tag.CurrentValue = tagValue;
+            tag.LastUpdated = now;
+
+            var watchEntry = WatchEntries.FirstOrDefault(w => w.TagId == tag.Id);
+            if (watchEntry == null)
+                return;
+
+            watchEntry.CurrentValue = tagValue;
+            watchEntry.FormattedValue = tag.FormattedValue;
+            watchEntry.LastUpdated = now;
+            watchEntry.IsStale = false;
+
+            if (tag.IsAlarmEnabled && tag.ScaledValue.HasValue)
+            {
+                var scaled = tag.ScaledValue.Value;
+                if (tag.AlarmHigh.HasValue && scaled > tag.AlarmHigh.Value)
+                {
+                    watchEntry.HasAlarm = true;
+                    watchEntry.AlarmMessage = $"HIGH ALARM: {scaled:F2} > {tag.AlarmHigh.Value:F2}";
+                }
+                else if (tag.AlarmLow.HasValue && scaled < tag.AlarmLow.Value)
+                {
+                    watchEntry.HasAlarm = true;
+                    watchEntry.AlarmMessage = $"LOW ALARM: {scaled:F2} < {tag.AlarmLow.Value:F2}";
+                }
+                else
+                {
+                    watchEntry.HasAlarm = false;
+                    watchEntry.AlarmMessage = "";
+                }
+            }
+        }
+
+        private static bool TryConvertToUInt16(object value, out ushort result)
+        {
+            if (value is ushort u)
+            {
+                result = u;
+                return true;
+            }
+
+            if (value is bool b)
+            {
+                result = (ushort)(b ? 1 : 0);
+                return true;
+            }
+
+            try
+            {
+                var converted = Convert.ToInt32(value);
+                result = (ushort)converted;
+                return true;
+            }
+            catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)
+            {
+                result = 0;
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Create a new tag group
         /// </summary>
         public async Task<TagGroup> CreateGroup(string name, string? parentGroup = null)

@@ -37,7 +37,11 @@ namespace ModbusForge.Services
         private const int MaxReconnectDelayMs = 30000;
         private const int DisposeWaitMs = 5000;
 
-        public bool IsConnected => _client?.IsConnected == true;
+        public virtual bool IsConnected => _client?.IsConnected == true;
+
+        public virtual bool IsRunning => _reconnectCts != null;
+
+        public event EventHandler? ConnectionStateChanged;
 
         /// <summary>
         /// Delegate that returns the current set of tag values to publish.
@@ -54,7 +58,7 @@ namespace ModbusForge.Services
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         }
 
-        public async Task ConnectAsync(CancellationToken cancellationToken = default)
+        public virtual async Task ConnectAsync(CancellationToken cancellationToken = default)
         {
             if (!_settings.Enabled)
                 return;
@@ -219,7 +223,7 @@ namespace ModbusForge.Services
             }
         }
 
-        public async Task DisconnectAsync()
+        public virtual async Task DisconnectAsync()
         {
             lock (_gate)
             {
@@ -282,7 +286,11 @@ namespace ModbusForge.Services
                 _publishTask = null;
                 _disconnecting = false;
             }
+
+            RaiseConnectionStateChanged();
         }
+
+        public virtual void RaiseConnectionStateChanged() => ConnectionStateChanged?.Invoke(this, EventArgs.Empty);
 
         public async Task PublishAsync(IEnumerable<MqttTagUpdate> updates, CancellationToken cancellationToken = default)
         {

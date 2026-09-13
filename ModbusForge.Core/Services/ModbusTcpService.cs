@@ -124,6 +124,8 @@ namespace ModbusForge.Services
 
         public virtual string BoundEndpoint => string.Empty;
 
+        public event EventHandler? ConnectionLost;
+
         public ModbusFrameLogger FrameLogger => _frameLogger;
 
         public virtual bool IsConnected

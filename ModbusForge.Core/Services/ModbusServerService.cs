@@ -37,6 +37,15 @@ namespace ModbusForge.Services
             _logger.LogInformation("Modbus TCP server created");
         }
 
+        public ModbusServerService(ILogger<ModbusServerService> logger, IConsoleLoggerService? consoleLoggerService, ModbusFrameLogger? frameLogger)
+            : this(logger, consoleLoggerService)
+        {
+            if (frameLogger != null)
+            {
+                _frameLogger = frameLogger;
+            }
+        }
+
         public virtual Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count) =>
             ReadFromDataStoreAsync(unitId, startAddress, count, ds => ds.InputRegisters, "input registers");
 
@@ -150,6 +159,8 @@ namespace ModbusForge.Services
                 }
             }
         }
+
+        public event EventHandler? ConnectionLost;
 
         private string GetLocalNetworkIp()
         {

@@ -426,6 +426,8 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public VisualNodeEditorViewModel? VisualNodeEditorViewModel { get; }
 
+        public PlcViewModel? PlcViewModel { get; }
+
         public DecodeViewModel? DecodeViewModel { get; }
 
         public MainViewModel(
@@ -451,6 +453,7 @@ namespace ModbusForge.Avalonia.ViewModels
             ScriptRulesViewModel? rulesViewModel = null,
             SignalGeneratorViewModel? signalGeneratorViewModel = null,
             VisualNodeEditorViewModel? visualNodeEditorViewModel = null,
+            PlcViewModel? plcViewModel = null,
             DecodeViewModel? decodeViewModel = null,
             IUnitConfigurationStore? unitConfigurationStore = null,
             IFileSystem? fileSystem = null,
@@ -488,6 +491,8 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 VisualNodeEditorViewModel.PropertyChanged += OnVisualNodeEditorViewModelPropertyChanged;
             }
+
+            PlcViewModel = plcViewModel;
 
             DecodeViewModel = decodeViewModel;
             if (DecodeViewModel != null)
@@ -542,6 +547,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 SelectedTabIndex = 2;
                 FrameInspectorViewModel?.ImportPcapCommand.Execute(null);
             });
+            OpenPlcXefCommand = new AsyncRelayCommand(OpenPlcXefAsync);
             OpenTagBrowserCommand = new RelayCommand(() => _dockingHost?.ShowTagBrowser());
             OpenWatchWindowCommand = new RelayCommand(() => _dockingHost?.ShowWatchWindow());
             OpenConnectionManagerCommand = new RelayCommand(() => _dockingHost?.ShowConnectionManager());
@@ -648,6 +654,7 @@ namespace ModbusForge.Avalonia.ViewModels
         public ICommand OpenTrendsCommand { get; }
         public ICommand OpenFrameInspectorCommand { get; }
         public ICommand OpenPcapCommand { get; }
+        public IAsyncRelayCommand OpenPlcXefCommand { get; }
         public ICommand OpenTagBrowserCommand { get; }
         public ICommand OpenWatchWindowCommand { get; }
         public ICommand OpenConnectionManagerCommand { get; }
@@ -710,6 +717,9 @@ namespace ModbusForge.Avalonia.ViewModels
 
         [ObservableProperty]
         private bool _isDebugTabVisible = true;
+
+        [ObservableProperty]
+        private bool _isPlcTabVisible = true;
 
         [ObservableProperty]
         private bool _hasConnectionError;
@@ -904,6 +914,7 @@ namespace ModbusForge.Avalonia.ViewModels
             IsTrendTabVisible = true;
             IsConsoleTabVisible = true;
             IsDebugTabVisible = true;
+            IsPlcTabVisible = true;
         }
 
         public void ResetTabs() => ShowAllTabs();
@@ -921,6 +932,7 @@ namespace ModbusForge.Avalonia.ViewModels
             if (IsTrendTabVisible) visibleTabs.Add("Trend");
             if (IsConsoleTabVisible) visibleTabs.Add("Console");
             if (IsDebugTabVisible) visibleTabs.Add("Debug");
+            if (IsPlcTabVisible) visibleTabs.Add("Plc");
             return visibleTabs;
         }
 
@@ -942,6 +954,8 @@ namespace ModbusForge.Avalonia.ViewModels
             IsTrendTabVisible = visibleTabs.Contains("Trend");
             IsConsoleTabVisible = visibleTabs.Contains("Console");
             IsDebugTabVisible = visibleTabs.Contains("Debug");
+            // The PLC tab is always offered; an old saved layout without "Plc" keeps it visible.
+            IsPlcTabVisible = visibleTabs.Contains("Plc") || !visibleTabs.Any();
         }
 
         private void EnsureSelectedTabIsVisible()
@@ -956,7 +970,7 @@ namespace ModbusForge.Avalonia.ViewModels
             // Tab order: Dashboard(0), Trends(1), Frame Inspector(2), MQTT(3),
             // Script Editor(4), Rules(5), Signal Generator(6), Simulation(7),
             // Holding(8), Coils(9), Input(10), Discrete(11), Custom Watch(12),
-            // Decode(13), Console(14), Debug(15).
+            // Decode(13), Console(14), Debug(15), PLC(16).
             return index switch
             {
                 0 => true,
@@ -970,6 +984,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 13 => IsDecodeTabVisible,
                 14 => IsConsoleTabVisible,
                 15 => IsDebugTabVisible,
+                16 => IsPlcTabVisible,
                 _ => true
             };
         }
@@ -3741,6 +3756,44 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 _logger.LogError(ex, "Error exporting Unit ID {UnitId}", SelectedUnitId);
                 StatusMessage = $"Unit ID export error: {ex.Message}";
+            }
+        }
+
+        /// <summary>
+        /// File menu → "Open PLC XEF…": picks a Schneider Unity/ControlExpert .XEF/.ZEF, loads it
+        /// into the PLC view, and switches to the PLC tab. Kept on the main File menu so the PLC
+        /// toolbar stays uncluttered.
+        /// </summary>
+        private async Task OpenPlcXefAsync()
+        {
+            if (_fileDialogService == null) return;
+
+            try
+            {
+                var path = await _fileDialogService.ShowOpenFileDialogAsync(
+                    "Open PLC XEF",
+                    "XEF files (*.xef)|*.xef|ZEF files (*.zef)|*.zef|All files (*.*)|*.*");
+
+                if (string.IsNullOrEmpty(path)) return;
+
+                // Make sure the PLC tab is present and selected before loading, so the result
+                // is immediately visible.
+                if (!IsPlcTabVisible)
+                {
+                    IsPlcTabVisible = true;
+                    OnPropertyChanged(nameof(IsPlcTabVisible));
+                }
+
+                SelectedTabIndex = 16; // PLC tab (see IsTabIndexVisible order).
+
+                if (PlcViewModel is { } plc)
+                {
+                    await plc.LoadFileAsync(path);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "OpenPlcXefAsync failed");
             }
         }
 

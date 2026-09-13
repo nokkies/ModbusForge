@@ -1,0 +1,390 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels"
+             xmlns:shapes="using:Avalonia.Controls.Shapes"
+             x:Class="ModbusForge.Avalonia.Views.PlcView"
+             x:DataType="vm:PlcViewModel">
+  <UserControl.Resources>
+    <!-- Subtle engineering grid for the FBD/LD canvases (mainstream PLC-editor look). -->
+    <DrawingBrush x:Key="FbdGridBrush" TileMode="Tile">
+      <DrawingBrush.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="#FFFFFF" Geometry="M 0,0 H 20 V 20 H 0 Z" />
+          <GeometryDrawing Brush="#E4E9F2" Geometry="M 0,0 L 20,0" />
+          <GeometryDrawing Brush="#E4E9F2" Geometry="M 0,0 L 0,20" />
+        </DrawingGroup>
+      </DrawingBrush.Drawing>
+    </DrawingBrush>
+  </UserControl.Resources>
+  <UserControl.Styles>
+    <Style Selector="Border.plcBlock">
+      <Setter Property="Background" Value="#2D2D30" />
+      <Setter Property="BorderBrush" Value="#555" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    <Style Selector="Border.plcBlockNoSim">
+      <Setter Property="BorderBrush" Value="#C0392B" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel>
+    <!-- Toolbar -->
+    <Border DockPanel.Dock="Top" Padding="8" BorderBrush="#444" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <Button Content="Open XEF…" Command="{Binding OpenXefCommand}" />
+        <TextBlock VerticalAlignment="Center" Text="{Binding ProjectName}" FontWeight="SemiBold" />
+        <TextBlock VerticalAlignment="Center" Text="{Binding FileName}" Opacity="0.5" />
+        <Separator Width="1" />
+        <CheckBox Content="Monitor I/O" IsChecked="{Binding MonitorEnabled}" VerticalAlignment="Center" />
+        <Button Content="Hide I/O" IsVisible="{Binding ShowIoMonitor}"
+                ToolTip.Tip="Hide the I/O monitor to free space for the diagram"
+                Command="{Binding ToggleIoMonitorCommand}" />
+        <Button Content="Show I/O" IsVisible="{Binding !ShowIoMonitor}"
+                ToolTip.Tip="Show the I/O monitor"
+                Command="{Binding ToggleIoMonitorCommand}" />
+        <TextBlock VerticalAlignment="Center" Text="Unit:" />
+        <NumericUpDown Value="{Binding UnitIdValue}" Minimum="1" Maximum="247" Width="60" />
+        <TextBlock VerticalAlignment="Center" Text="ms:" />
+        <NumericUpDown Value="{Binding MonitorPeriodMsValue}" Minimum="100" Maximum="10000" Width="80" />
+        <Separator Width="1" />
+        <Button Content="{Binding SimButtonContent, FallbackValue='Run simulation'}"
+                Command="{Binding ToggleSimulationCommand}"
+                IsVisible="{Binding IsLoaded}" />
+        <TextBlock VerticalAlignment="Center" Text="Scan ms:" IsVisible="{Binding IsLoaded}" />
+        <NumericUpDown Value="{Binding SimScanIntervalMs}" Minimum="10" Maximum="10000" Width="80"
+                       IsVisible="{Binding IsLoaded}" IsEnabled="{Binding !SimulationRunning}" />
+      </StackPanel>
+    </Border>
+
+    <!-- Status bar -->
+    <Border DockPanel.Dock="Bottom" Padding="8,4" BorderBrush="#444" BorderThickness="0,1,0,0">
+      <StackPanel Spacing="2">
+        <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" Opacity="0.8" />
+        <TextBlock Text="{Binding SimUnsupportedSummary}" Foreground="#E0A800" FontSize="11"
+                   TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+
+    <!-- Main content: only visible once loaded -->
+    <Grid IsVisible="{Binding IsLoaded}" ColumnDefinitions="220,*,300" RowDefinitions="*,Auto">
+      <!-- Left: program tree -->
+      <Border Grid.Column="0" BorderBrush="#444" BorderThickness="0,0,1,0" Padding="6">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Text="Programs" FontWeight="SemiBold" Margin="0,0,0,6" />
+          <TreeView ItemsSource="{Binding Programs}" SelectedItem="{Binding SelectedProgram}">
+            <TreeView.ItemTemplate>
+              <DataTemplate DataType="vm:PlcProgramItem">
+                <TextBlock Text="{Binding Display}" />
+              </DataTemplate>
+            </TreeView.ItemTemplate>
+          </TreeView>
+        </DockPanel>
+      </Border>
+
+      <!-- Centre: FBD graph OR ST source -->
+      <Border Grid.Column="1" Margin="6">
+        <DockPanel>
+          <!-- Header + FBD zoom toolbar (zoom is a mainstream PLC-editor feature). -->
+          <!-- Header: title, then the Fit control (left-aligned so it always has room). -->
+          <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6" LastChildFill="False">
+            <TextBlock DockPanel.Dock="Left" Text="Program logic" FontWeight="SemiBold"
+                       VerticalAlignment="Center" />
+            <!-- "Fit" re-fits the whole diagram to the viewport; the percentage shows the level. -->
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="6" Margin="12,0,0,0"
+                        IsVisible="{Binding IsFbd}" VerticalAlignment="Center">
+              <Button Content="Fit" FontSize="11" Padding="8,3,8,3"
+                      ToolTip.Tip="Fit the whole diagram into the view"
+                      Click="FbdFitButton_Click" />
+              <TextBlock Text="{Binding FbdZoom, StringFormat={}{0:P0}}" FontSize="10"
+                         VerticalAlignment="Center" />
+            </StackPanel>
+          </DockPanel>
+
+          <!-- ST source pane -->
+          <ScrollViewer IsVisible="{Binding ShowStSource}"
+                        VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+            <TextBox Text="{Binding StSource, Mode=OneWay}" IsReadOnly="True"
+                     FontFamily="Consolas" FontSize="13" AcceptsReturn="True"
+                     TextWrapping="NoWrap" Background="#1E1E1E" Foreground="#DCDCDC" />
+          </ScrollViewer>
+
+          <!-- FBD graph. IEC 61131-3 / CODESYS / Schneider mainstream look: light canvas,
+               pale-blue boxes with a thin dark border, type name centred in the top band,
+               instance name ABOVE function-block boxes, pin stubs on the edges with the
+               connected variable in a small white bordered field, IEC logic glyphs in the
+               body, and orthogonal black pin-to-pin wires. Data-driven (ItemsControl +
+               DataTemplate) so every block composites reliably. -->
+          <ScrollViewer IsVisible="{Binding IsFbd}" x:Name="FbdScroll"
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Auto" Background="White"
+                         PointerWheelChanged="FbdScroll_WheelZoom">
+            <Canvas x:Name="FbdCanvas" Background="{StaticResource FbdGridBrush}" RenderTransformOrigin="0,0"
+                     PointerPressed="FbdCanvas_PanStart" PointerMoved="FbdCanvas_PanMove"
+                     PointerReleased="FbdCanvas_PanEnd">
+              <Canvas.Width><Binding Path="FbdCanvasWidth" /></Canvas.Width>
+              <Canvas.Height><Binding Path="FbdCanvasHeight" /></Canvas.Height>
+              <Canvas.RenderTransform><ScaleTransform ScaleX="{Binding FbdZoom}" ScaleY="{Binding FbdZoom}" /></Canvas.RenderTransform>
+
+              <!-- Wires (under the blocks). Orthogonal polyline, thin black, pin-to-pin. -->
+              <ItemsControl ItemsSource="{Binding Links}" ZIndex="0">
+                  <ItemsControl.Width><Binding Path="FbdCanvasWidth" /></ItemsControl.Width>
+                  <ItemsControl.Height><Binding Path="FbdCanvasHeight" /></ItemsControl.Height>
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><Canvas /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:PlcLinkItem">
+                    <Canvas>
+                      <Polyline Stroke="#333333" StrokeThickness="1.2"
+                                Points="{Binding Points}" />
+                    </Canvas>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <!-- Blocks (over the wires). One IEC box per item. -->
+              <ItemsControl ItemsSource="{Binding Blocks}" ZIndex="1">
+                  <ItemsControl.Width><Binding Path="FbdCanvasWidth" /></ItemsControl.Width>
+                  <ItemsControl.Height><Binding Path="FbdCanvasHeight" /></ItemsControl.Height>
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><Canvas /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:PlcBlockItem">
+                    <!-- IEC block: instance name above (FBs); a 3-column row of
+                         [input stubs + fields | box | output stubs + fields]. -->
+                    <Grid RowDefinitions="Auto,Auto">
+                      <!-- Instance name, ABOVE the box (function blocks only). -->
+                      <TextBlock Grid.Row="0" Text="{Binding Name}" FontSize="10" FontWeight="SemiBold"
+                                 Foreground="#222222" HorizontalAlignment="Center"
+                                 Margin="0,0,0,2" IsVisible="{Binding InstanceNameAbove}"
+                                 TextTrimming="CharacterEllipsis">
+                        <TextBlock.Width><Binding Path="BoxWidth" /></TextBlock.Width>
+                      </TextBlock>
+
+                      <!-- Body row: inputs (90) | box (BoxWidth) | outputs (90). Fixed side
+                           column widths make the box position deterministic for wire anchoring. -->
+                      <Grid Grid.Row="1" ColumnDefinitions="90,*,90">
+                        <!-- Input pins (left): each = variable field + stub + pin name. -->
+                        <ItemsControl Grid.Column="0" ItemsSource="{Binding InputPins}"
+                                      VerticalAlignment="Center">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Vertical" Spacing="4" /></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:PlcPinItem">
+                              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Background="White" BorderBrush="#2B2B2B" BorderThickness="1"
+                                        VerticalAlignment="Center">
+                                  <TextBlock Text="{Binding DisplayTag}" FontSize="9" Foreground="#111111"
+                                             Padding="3,1,3,1" TextTrimming="CharacterEllipsis" />
+                                </Border>
+                                <Line Stroke="#2B2B2B" StrokeThickness="1"
+                                      StartPoint="2,6" EndPoint="14,6" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Name}" FontSize="8" Foreground="#444444"
+                                           VerticalAlignment="Center" Margin="2,0,0,0" />
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- The box. -->
+                        <Grid Grid.Column="1" Margin="4,0,4,0">
+                          <!-- Selection highlight (shown when the block is selected). -->
+                          <Border Background="Transparent" BorderBrush="#1F3A93" BorderThickness="2"
+                                  IsVisible="{Binding IsSelected}">
+                            <Border.Width><Binding Path="BoxWidth" /></Border.Width>
+                            <Border.MinHeight><Binding Path="BoxHeight" /></Border.MinHeight>
+                          </Border>
+                          <Border Background="#E6EAF5" BorderBrush="#2B2B2B"
+                                BorderThickness="1" PointerPressed="BlockBox_Click" Cursor="Hand">
+                          <Border.Width><Binding Path="BoxWidth" /></Border.Width>
+                          <Border.MinHeight><Binding Path="BoxHeight" /></Border.MinHeight>
+                          <StackPanel Margin="4,3,4,3" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding TypeName}" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="#111111" HorizontalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis">
+                              <TextBlock.Width><Binding Path="BoxWidth" /></TextBlock.Width>
+                            </TextBlock>
+                            <TextBlock Text="{Binding LogicGlyph}" FontSize="20"
+                                       Foreground="#1F3A93" HorizontalAlignment="Center"
+                                       FontFamily="Segoe UI Symbol" Margin="0,2,0,0" />
+                            <TextBlock Text="{Binding LiveValueText}" FontSize="9"
+                                       Foreground="#1F6B1F" FontFamily="Consolas"
+                                       HorizontalAlignment="Center" Margin="0,2,0,0"
+                                       TextTrimming="CharacterEllipsis">
+                              <TextBlock.Width><Binding Path="BoxWidth" /></TextBlock.Width>
+                            </TextBlock>
+                          </StackPanel>
+                        </Border>
+                        </Grid>
+
+                        <!-- Output pins (right): pin name + stub + variable field. -->
+                        <ItemsControl Grid.Column="2" ItemsSource="{Binding OutputPins}"
+                                      VerticalAlignment="Center">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Vertical" Spacing="4" /></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:PlcPinItem">
+                              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}" FontSize="8" Foreground="#444444"
+                                           VerticalAlignment="Center" Margin="0,0,2,0" />
+                                <Line Stroke="#2B2B2B" StrokeThickness="1"
+                                      StartPoint="0,6" EndPoint="12,6" VerticalAlignment="Center" />
+                                <Border Background="White" BorderBrush="#2B2B2B" BorderThickness="1"
+                                        VerticalAlignment="Center">
+                                  <TextBlock Text="{Binding DisplayTag}" FontSize="9" Foreground="#111111"
+                                             Padding="3,1,3,1" TextTrimming="CharacterEllipsis" />
+                                </Border>
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </Grid>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+
+                <!-- Position each block's ContentPresenter on the canvas. -->
+                <ItemsControl.Styles>
+                  <Style Selector="ContentPresenter" x:DataType="vm:PlcBlockItem">
+                    <Setter Property="Canvas.Left" Value="{Binding X}" />
+                    <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                  </Style>
+                </ItemsControl.Styles>
+              </ItemsControl>
+            </Canvas>
+          </ScrollViewer>
+          <!-- LD (Ladder Diagram) view. IEC 61131-3 symbols: NO/NC contacts (two bars, optional
+                slash/edge), coils (circle, optional S/R/negation), labels above, a left power
+                rail per rung, horizontal rung wire. Light canvas to match the FBD. -->
+           <ScrollViewer IsVisible="{Binding ShowLadder}"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                         Background="{StaticResource FbdGridBrush}">
+             <ItemsControl ItemsSource="{Binding LadderRungs}" Margin="8">
+               <ItemsControl.ItemsPanel>
+                 <ItemsPanelTemplate><StackPanel Orientation="Vertical" Spacing="6" /></ItemsPanelTemplate>
+               </ItemsControl.ItemsPanel>
+               <ItemsControl.ItemTemplate>
+                 <DataTemplate DataType="vm:PlcLadderRungItem">
+                   <Border Background="White" BorderBrush="#DDDDDD" BorderThickness="0,0,0,1" Padding="4">
+                     <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                       <!-- Network number (left gutter, red bg per CODESYS convention). -->
+                       <Border Grid.Column="0" Background="#F4CCCC" BorderBrush="#333" BorderThickness="1"
+                               MinWidth="26" Margin="0,0,10,0" VerticalAlignment="Stretch">
+                         <TextBlock Text="{Binding NetworkNo, StringFormat=NET {0}}" FontSize="9"
+                                    Foreground="#660000" FontWeight="SemiBold"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+                       </Border>
+
+                       <!-- Left power rail. -->
+                       <Rectangle Grid.Column="1" Width="2" Fill="#222" Margin="0,4" />
+
+                       <!-- The rung elements, left to right. -->
+                       <ItemsControl Grid.Column="2" ItemsSource="{Binding Elements}"
+                                     VerticalAlignment="Center">
+                         <ItemsControl.ItemsPanel>
+                           <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="0" /></ItemsPanelTemplate>
+                         </ItemsControl.ItemsPanel>
+                         <ItemsControl.ItemTemplate>
+                           <DataTemplate DataType="vm:PlcLadderElementItem">
+                             <StackPanel MinWidth="60">
+                               <!-- Label above the element (IEC convention). -->
+                               <TextBlock Text="{Binding Label}" FontSize="9" Foreground="#111"
+                                          HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                          MinHeight="14" />
+                               <Grid Height="26" Width="44">
+                                 <!-- Inline function block: a small FBD-style box. -->
+                                 <Border IsVisible="{Binding IsBlock}" Background="#E6EAF5"
+                                         BorderBrush="#2B2B2B" BorderThickness="1" Margin="0,2">
+                                   <StackPanel Margin="3,1">
+                                     <TextBlock Text="{Binding BlockType}" FontSize="8"
+                                                Foreground="#111" FontWeight="SemiBold"
+                                                HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                     <TextBlock Text="{Binding Tag}" FontSize="7" Foreground="#555"
+                                                HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                   </StackPanel>
+                                 </Border>
+
+                                 <!-- Contacts: two vertical bars (gap = NO, slash = NC, edge marker). -->
+                                 <Canvas IsVisible="{Binding IsContact}" Width="44" Height="26">
+                                   <Line StartPoint="0,13" EndPoint="14,13" Stroke="#222" StrokeThickness="1.5" />
+                                   <Line StartPoint="30,13" EndPoint="44,13" Stroke="#222" StrokeThickness="1.5" />
+                                   <Rectangle Canvas.Left="18" Canvas.Top="6" Width="2" Height="14" Fill="#222" />
+                                   <Rectangle Canvas.Left="24" Canvas.Top="6" Width="2" Height="14" Fill="#222" />
+                                   <Line StartPoint="16,20" EndPoint="28,4" Stroke="#222" StrokeThickness="1.5"
+                                         IsVisible="{Binding IsNegatedContact}" />
+                                   <TextBlock Canvas.Left="8" Canvas.Top="0" FontSize="10"
+                                              Foreground="#1F3A93" Text="{Binding Glyph}"
+                                              IsVisible="{Binding IsEdgeContact}" />
+                                 </Canvas>
+
+                                 <!-- Coils: a circle with S/R/negation. -->
+                                 <Canvas IsVisible="{Binding IsCoil}" Width="44" Height="26">
+                                   <Line StartPoint="0,13" EndPoint="14,13" Stroke="#222" StrokeThickness="1.5" />
+                                   <Line StartPoint="30,13" EndPoint="44,13" Stroke="#222" StrokeThickness="1.5" />
+                                   <Ellipse Canvas.Left="14" Canvas.Top="5" Width="16" Height="16"
+                                            Stroke="#222" StrokeThickness="1.5" Fill="White" />
+                                   <TextBlock Canvas.Left="16" Canvas.Top="6" FontSize="9"
+                                              Foreground="#111" Text="{Binding Glyph}" />
+                                 </Canvas>
+                               </Grid>
+                             </StackPanel>
+                           </DataTemplate>
+                         </ItemsControl.ItemTemplate>
+                       </ItemsControl>
+
+                       <!-- Right end of the rung. -->
+                       <Rectangle Grid.Column="3" Width="0" />
+                     </Grid>
+                   </Border>
+                 </DataTemplate>
+               </ItemsControl.ItemTemplate>
+             </ItemsControl>
+           </ScrollViewer>
+
+        </DockPanel>
+      </Border>
+
+      <!-- Right: selected block detail -->
+      <Border Grid.Column="2" BorderBrush="#444" BorderThickness="1,0,0,0" Padding="6">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Text="Selected block" FontWeight="SemiBold" Margin="0,0,0,6" />
+          <ScrollViewer>
+            <TextBlock Text="{Binding SelectedBlockDetail}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" />
+          </ScrollViewer>
+           
+        </DockPanel>
+      </Border>
+
+      <!-- Bottom: live I/O monitor table -->
+      <Border Grid.Row="1" Grid.ColumnSpan="3" Height="100" BorderBrush="#444" BorderThickness="0,1,0,0"
+              IsVisible="{Binding ShowIoMonitor}">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Text="Live I/O monitor (topological addresses)" FontWeight="SemiBold" Margin="6,4" />
+          <DataGrid ItemsSource="{Binding Variables}" AutoGenerateColumns="False" IsReadOnly="True"
+                    GridLinesVisibility="Horizontal" Margin="6,0,6,6">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" />
+              <DataGridTextColumn Header="Type" Binding="{Binding DataType}" Width="*"/>
+              <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
+              <DataGridTextColumn Header="Live value" Binding="{Binding LiveValue}" Width="*"/>
+              <DataGridTextColumn Header="Comment" Binding="{Binding Comment}" Width="2*"/>
+            </DataGrid.Columns>
+          </DataGrid>
+        </DockPanel>
+      </Border>
+    </Grid>
+
+    <!-- Empty state -->
+    <StackPanel IsVisible="{Binding !IsLoaded}" Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <TextBlock Text="No PLC program loaded" FontSize="20" FontWeight="SemiBold" Opacity="0.7" />
+      <TextBlock Text="Open a Schneider Unity/ControlExpert .XEF or .ZEF to view its programs, logic and live I/O."
+                 Opacity="0.6" />
+      <Button Content="Open XEF…" Command="{Binding OpenXefCommand}" HorizontalAlignment="Center" />
+    </StackPanel>
+  </DockPanel>
+</UserControl>

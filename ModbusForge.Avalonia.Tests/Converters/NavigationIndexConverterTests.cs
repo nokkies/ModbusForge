@@ -21,8 +21,8 @@ namespace ModbusForge.Avalonia.Tests.Converters
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
                 .GetValue(null) as int[] ?? throw new InvalidOperationException("TabToNavigation missing");
 
-            Assert.Equal(16, navToTab.Length);
-            Assert.Equal(16, tabToNav.Length);
+            Assert.Equal(17, navToTab.Length);
+            Assert.Equal(17, tabToNav.Length);
 
             for (var nav = 0; nav < navToTab.Length; nav++)
             {
@@ -32,7 +32,7 @@ namespace ModbusForge.Avalonia.Tests.Converters
             }
 
             // Every tab index must be reachable from exactly one navigation entry.
-            Assert.Equal(16, navToTab.Distinct().Count());
+            Assert.Equal(17, navToTab.Distinct().Count());
         }
 
         [Fact]
@@ -50,7 +50,8 @@ namespace ModbusForge.Avalonia.Tests.Converters
         [InlineData(1, 1)]   // Trends unchanged
         [InlineData(2, 2)]   // Frame Inspector unchanged
         [InlineData(4, 4)]   // Script Editor unchanged
-        [InlineData(15, 15)] // Debug shifted to the new last slot
+        [InlineData(15, 15)] // Debug unchanged
+        [InlineData(16, 16)] // PLC appended as the last nav/tab slot
         public void ConvertBack_MapsNavigationToTab(int nav, int expectedTab)
         {
             Assert.Equal(expectedTab, Converter.ConvertBack(nav, typeof(int), null, null!));

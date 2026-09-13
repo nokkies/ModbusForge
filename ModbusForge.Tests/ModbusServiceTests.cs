@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using ModbusForge.Services;
 using Moq;
+using NModbus;
 using Xunit;
 
 namespace ModbusForge.Tests

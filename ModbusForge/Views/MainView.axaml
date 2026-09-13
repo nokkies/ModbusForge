@@ -33,8 +33,8 @@
   </UserControl.Styles>
 
   <Grid Margin="16" RowDefinitions="Auto,*">
-    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
-      <TextBlock VerticalAlignment="Center" Text="Active profile:" />
+    <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,4">
+      <TextBlock VerticalAlignment="Center" Text="Active profile:" Margin="0,0,4,4" />
       <TextBlock VerticalAlignment="Center" Text="{Binding ActiveProfile.Name, FallbackValue='None'}" FontWeight="SemiBold" MaxWidth="150" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ActiveProfile.DisplayName, FallbackValue='None'}" />
       <ToggleButton x:Name="ServerIpsToggle"
                     VerticalAlignment="Center"
@@ -91,8 +91,8 @@
       <Button Content="{Binding ToggleConnectionButtonText, FallbackValue='Connect'}" Command="{Binding ToggleConnectionCommand}" Width="100" Height="24" MinHeight="0" Padding="8,0" FontSize="10" VerticalAlignment="Center" VerticalContentAlignment="Center" />
       <TextBlock Text="●" Foreground="#2E8B57" IsVisible="{Binding IsConnected}" VerticalAlignment="Center" FontSize="14" ToolTip.Tip="{Binding ConnectionStatusText}" />
       <TextBlock Text="●" Foreground="#C62828" IsVisible="{Binding IsConnectionErrorVisible}" VerticalAlignment="Center" FontSize="14" ToolTip.Tip="{Binding ConnectionStatusText}" />
-      <TextBlock Text="○" Foreground="#777777" IsVisible="{Binding IsDisconnected}" VerticalAlignment="Center" FontSize="14" ToolTip.Tip="{Binding ConnectionStatusText}" />
-    </StackPanel>
+      <TextBlock Text="○" Foreground="#777777" IsVisible="{Binding IsDisconnected}" VerticalAlignment="Center" FontSize="14" ToolTip.Tip="{Binding ConnectionStatusText}" Margin="4,0,0,4" />
+    </WrapPanel>
 
     <Grid Grid.Row="1" ColumnDefinitions="190,*">
       <Border Grid.Column="0" BorderBrush="#40000000" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,12,0">
@@ -126,6 +126,7 @@
               <ListBoxItem Content="Decode" />
               <ListBoxItem Content="Console" />
               <ListBoxItem Content="Debug" />
+               <ListBoxItem Content="PLC" />
             </ListBox>
           </StackPanel>
         </ScrollViewer>
@@ -606,6 +607,10 @@
             <ListBox Grid.Row="1" ItemsSource="{Binding DebugMessages}" />
           </Grid>
         </Grid>
+      </TabItem>
+
+      <TabItem x:Name="PlcTab" Header="PLC" IsVisible="{Binding IsPlcTabVisible}">
+        <views:PlcView DataContext="{Binding PlcViewModel}" />
       </TabItem>
     </TabControl>
   </Grid>

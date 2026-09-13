@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<FEFExchangeFile>
+	<fileHeader company="Schneider Automation" product="Unity Pro XL V7.0 (sample)" dateTime="date_and_time#2024-1-1-0:0:0" content="Sample ladder project for LD rendering" DTDVersion="41"></fileHeader>
+	<contentHeader name="SampleLadder" version="0.0.1" dateTime="date_and_time#2024-1-1-0:0:0"></contentHeader>
+	<commParameters>
+		<PLCAddress address="127.0.0.1" media="TCPIP" nbTries="1" timeout="1000" highSpeed="0"></PLCAddress>
+	</commParameters>
+	<FBSource>
+		<block name="TON" typeName="TON">
+			<inputVariableList>
+				<variables>
+					<variable name="IN" typeName="BOOL"></variable>
+					<variable name="PT" typeName="TIME"></variable>
+				</variables>
+			</inputVariableList>
+			<outputVariableList>
+				<variables>
+					<variable name="Q" typeName="BOOL"></variable>
+					<variable name="ET" typeName="TIME"></variable>
+				</variables>
+			</outputVariableList>
+		</block>
+	</FBSource>
+	<program>
+		<identProgram name="MotorControl" type="section" task="MAST"></identProgram>
+		<LADSource nbRows="40" nbColumns="16">
+			<networkLAD>
+				<!-- Network 1: Start/Stop motor with a NO start, NC stop, and a motor coil. -->
+				<contact variable="Motor.Start" negated="false" col="2" row="0"></contact>
+				<contact variable="Motor.Stop" negated="true" col="4" row="0"></contact>
+				<coil variable="Motor.Run" negated="false" col="7" row="0"></coil>
+			</networkLAD>
+			<networkLAD>
+				<!-- Network 2: Running motor + a TON timer, output to a status coil. -->
+				<contact variable="Motor.Run" negated="false" col="2" row="0"></contact>
+				<block typeName="TON" variable="tmrRun" col="4" row="0"></block>
+				<coil variable="Motor.Status" negated="false" col="8" row="0"></coil>
+			</networkLAD>
+			<networkLAD>
+				<!-- Network 3: Rising-edge of a sensor sets an alarm; a reset coil clears it. -->
+				<risecontact variable="Sensor.Presence" col="2" row="0"></risecontact>
+				<setcoil variable="Alarm.High" col="5" row="0"></setcoil>
+				<contact variable="Alarm.Ack" negated="true" col="2" row="2"></contact>
+				<resetcoil variable="Alarm.High" col="5" row="2"></resetcoil>
+			</networkLAD>
+			<networkLAD>
+				<!-- Network 4: Parallel branch — either LimitA or LimitB closes the output. -->
+				<contact variable="Limit.A" negated="false" col="2" row="0"></contact>
+				<contact variable="Limit.B" negated="false" col="2" row="2"></contact>
+				<coil variable="Valve.Open" negated="false" col="6" row="0"></coil>
+			</networkLAD>
+			<networkLAD>
+				<!-- Network 5: Falling-edge contact drives a negated coil. -->
+				<fallcontact variable="Pump.Flow" col="2" row="0"></fallcontact>
+				<coil variable="Pump.Fault" negated="true" col="6" row="0"></coil>
+			</networkLAD>
+		</LADSource>
+	</program>
+	<program>
+		<identProgram name="AuxStrobe" type="section" task="MAST"></identProgram>
+		<LADSource nbRows="20" nbColumns="16">
+			<networkLAD>
+				<contact variable="Aux.Enable" negated="false" col="2" row="0"></contact>
+				<contact variable="Aux.Pulse" negated="false" col="4" row="0"></contact>
+				<coil variable="Aux.Led" negated="false" col="7" row="0"></coil>
+			</networkLAD>
+		</LADSource>
+	</program>
+</FEFExchangeFile>

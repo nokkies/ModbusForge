@@ -8,6 +8,7 @@ namespace ModbusForge.Models
     /// <summary>
     /// Types of PLC simulation elements
     /// </summary>
+    [Flags]
     public enum PlcElementType
     {
         Input,   // Input block - reads from a Modbus address
@@ -62,7 +63,12 @@ namespace ModbusForge.Models
         // its numeric enum value, so existing members must keep their numbers)
         Scale,         // Linear scaling of an analog value (LIN)
         EdgeDetect,    // One-cycle pulse on the selected input transition
-        MovingAverage  // Windowed moving average (MOVAVG)
+        MovingAverage, // Windowed moving average (MOVAVG)
+        // XEF fallback marker: a loaded XEF function block whose typeName has no simulation
+        // equivalent. The translator emits these so the block stays visible on the canvas and
+        // can be badged "no simulation equivalent". It is intentionally NOT registered in the
+        // FunctionBlockCatalog, so the engine leaves such nodes inert. APPENDED, never reordered.
+        Unsupported
     }
 
     /// <summary>

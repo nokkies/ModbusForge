@@ -39,6 +39,15 @@ namespace ModbusForge.Models
         /// </summary>
         public bool? IsValidCrc { get; set; }
 
+        /// <summary>Convenience for XAML/DataTemplate binding.</summary>
+        public bool IsCrcValid => IsValidCrc == true;
+
+        /// <summary>Convenience for XAML/DataTemplate binding.</summary>
+        public bool IsCrcInvalid => IsValidCrc == false;
+
+        /// <summary>Convenience for XAML/DataTemplate binding.</summary>
+        public bool IsCrcNotApplicable => IsValidCrc is null;
+
         public byte UnitId { get; set; }
 
         public byte FunctionCode { get; set; }

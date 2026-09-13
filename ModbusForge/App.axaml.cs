@@ -3,6 +3,8 @@ using global::Avalonia;
 using global::Avalonia.Controls.ApplicationLifetimes;
 using global::Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
+using System.IO;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ModbusForge.Avalonia.Services;
@@ -20,6 +22,12 @@ namespace ModbusForge.Avalonia
         public IServiceProvider? Services { get; private set; }
         private IApiServerService? _apiServerService;
 
+        public App()
+        {
+            // (Renderer selection left to the platform default; forcing Skia here was a
+            // diagnostic for the FBD canvas and is no longer needed.)
+        }
+
         public override void Initialize()
         {
             global::Avalonia.Markup.Xaml.AvaloniaXamlLoader.Load(this);
@@ -31,10 +39,34 @@ namespace ModbusForge.Avalonia
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
+                var mainVm = Services.GetRequiredService<MainViewModel>();
                 desktop.MainWindow = new MainWindow
                 {
-                    DataContext = Services.GetRequiredService<MainViewModel>()
+                    DataContext = mainVm
                 };
+
+                // Optional startup switches: `--xef <path>` opens the PLC screen with that
+                // XEF/ZEF file already loaded, and `--program <name>` additionally selects a
+                // specific program for display (used to demo / script opening a project).
+                var xefPath = ExtractArgValue("--xef");
+                var programName = ExtractArgValue("--program");
+                if (!string.IsNullOrEmpty(xefPath))
+                {
+                    mainVm.SelectedTabIndex = 16; // PLC tab
+                    desktop.MainWindow.Opened += async (_, _) =>
+                    {
+                        try
+                        {
+                            var plcVm = Services.GetRequiredService<PlcViewModel>();
+                            await plcVm.LoadFileAsync(xefPath!, programName);
+                        }
+                        catch (Exception ex)
+                        {
+                            Services.GetService<ILogger<App>>()?.LogError(ex,
+                                "Failed to auto-load XEF {Path}", xefPath);
+                        }
+                    };
+                }
 
                 // Last-resort exception handling: report, log, and keep the user's
                 // session when the fault is recoverable (see UnhandledExceptionReporter).
@@ -109,6 +141,38 @@ namespace ModbusForge.Avalonia
             }
 
             base.OnFrameworkInitializationCompleted();
+        }
+
+        /// <summary>
+        /// Reads a `--&lt;name&gt; &lt;value&gt;` argument from the command line, returning the value
+        /// when present. For `--xef`, the value must point at an existing file. Null otherwise.
+        /// </summary>
+        private static string? ExtractArgValue(string switchName)
+        {
+            try
+            {
+                var args = global::System.Environment.GetCommandLineArgs();
+                for (int i = 0; i < args.Length - 1; i++)
+                {
+                    if (string.Equals(args[i], switchName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var value = args[i + 1];
+                        if (string.Equals(switchName, "--xef", StringComparison.OrdinalIgnoreCase)
+                            && !System.IO.File.Exists(value))
+                        {
+                            return null;
+                        }
+
+                        return value;
+                    }
+                }
+            }
+            catch
+            {
+                // Never let arg parsing crash startup.
+            }
+
+            return null;
         }
 
         private static IServiceProvider ConfigureServices()
@@ -210,6 +274,9 @@ namespace ModbusForge.Avalonia
             // Visual simulation
             services.AddSingleton<IVisualSimulationService, AvaloniaVisualSimulationService>();
             services.AddSingleton<VisualNodeEditorViewModel>();
+
+            // PLC screen (XEF viewer / live I/O monitor)
+            services.AddSingleton<PlcViewModel>();
 
             // ViewModels
             services.AddSingleton<TrendViewModel>();
