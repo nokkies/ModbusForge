@@ -174,8 +174,12 @@
           </ListBox.ItemTemplate>
         </ListBox>
 
-        <TextBlock Grid.Row="3" Text="Programs (POUs)" FontWeight="Bold" Margin="0,8,0,4"/>
-        <Grid Grid.Row="4" RowDefinitions="Auto,*">
+        <!-- In PLC-project mode the project navigator owns program selection, so the
+             duplicated POU management surface is hidden. -->
+        <TextBlock Grid.Row="3" Text="Programs (POUs)" FontWeight="Bold" Margin="0,8,0,4"
+                   IsVisible="{Binding !IsPlcProjectMode, FallbackValue=True}" />
+        <Grid Grid.Row="4" RowDefinitions="Auto,*"
+              IsVisible="{Binding !IsPlcProjectMode, FallbackValue=True}">
           <StackPanel Grid.Row="0" Spacing="4">
             <TextBox Text="{Binding NewProgramName, UpdateSourceTrigger=PropertyChanged}" Watermark="Program/Folder name"/>
             <StackPanel Orientation="Horizontal" Spacing="4">
@@ -245,7 +249,7 @@
             </ItemsControl.ItemTemplate>
           <ItemsControl.Styles><Style Selector="ContentPresenter" x:DataType="vm:GridLine"><Setter Property="Canvas.Left" Value="{Binding Left}"/><Setter Property="Canvas.Top" Value="{Binding Top}"/></Style></ItemsControl.Styles></ItemsControl>
 
-          <ItemsControl ItemsSource="{Binding Config.Nodes}" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}">
+          <ItemsControl ItemsSource="{Binding Nodes}" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
                 <Canvas/>

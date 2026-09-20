@@ -5,6 +5,7 @@ using global::Avalonia.Interactivity;
 using global::Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using ModbusForge.Avalonia.Converters;
 using ModbusForge.Avalonia.Services;
 using ModbusForge.Avalonia.ViewModels;
 using ModbusForge.Models;
@@ -27,6 +28,34 @@ namespace ModbusForge.Avalonia.Views
         public MainView()
         {
             InitializeComponent();
+
+            // The navigation list and the TabControl both bind through
+            // NavigationIndexConverter (TwoWay); no extra code-behind sync is
+            // needed — an earlier SelectionChanged mirror fought with those
+            // bindings and left stale tabs painting (e.g. Debug over PLC).
+
+            // Double-clicking an FBD program in the PLC navigator opens it in the
+            // editor with the duplicate-name fallback. A plain selection also
+            // switches the canvas (the VM event does the same, but binding
+            // SelectedItem TwoWay alone can lag Avalonia's tree virtualization),
+            // so we drive OpenPlcProgram straight from the control here.
+            if (this.FindControl<TreeView>("PlcProjectTree") is { } plcTree)
+            {
+                plcTree.DoubleTapped += (_, _) =>
+                {
+                    if (ViewModel != null && plcTree.SelectedItem is PlcTreeNodeViewModel node)
+                    {
+                        ViewModel.OpenPlcProgram(node);
+                    }
+                };
+                plcTree.SelectionChanged += (_, _) =>
+                {
+                    if (ViewModel != null && plcTree.SelectedItem is PlcTreeNodeViewModel node && node.IsFbdProgram)
+                    {
+                        ViewModel.OpenPlcProgram(node);
+                    }
+                };
+            }
         }
 
         private void InitializeComponent()
@@ -396,3 +425,5 @@ namespace ModbusForge.Avalonia.Views
         }
     }
 }
+
+

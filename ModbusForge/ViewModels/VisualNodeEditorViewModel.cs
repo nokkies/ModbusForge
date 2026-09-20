@@ -307,6 +307,13 @@ namespace ModbusForge.Avalonia.ViewModels
         [ObservableProperty]
         private bool _useOrthogonalRouting;
 
+        /// <summary>
+        /// Hides the POU-management panel (create/rename/duplicate/delete + the
+        /// program tree). The PLC navigator owns program selection there, so that
+        /// duplicate control surface is suppressed on the PLC page.
+        /// </summary>
+        public bool IsPlcProjectMode { get; set; }
+
         public ObservableCollection<PaletteItem> Palette { get; } = new();
 
         public ObservableCollection<PaletteItem> FilteredPalette { get; } = new();
@@ -405,16 +412,44 @@ namespace ModbusForge.Avalonia.ViewModels
                 : 1.0;
             set
             {
-                var normalized = double.IsFinite(value)
-                    ? Math.Clamp(value, MinimumZoom, MaximumZoom)
-                    : 1.0;
-                if (Math.Abs(Config.ZoomLevel - normalized) < double.Epsilon) return;
-                Config.ZoomLevel = normalized;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(ZoomText));
-                UpdateScaledCanvasSize();
-                UpdateConnectionLines();
+                ApplyZoom(value);
+                // Marking user control happens inside ApplyZoom for anything that
+                // actually changed the level (commands, wheel, toolbar) — a no-op
+                // write must not flag it.
             }
+        }
+
+        /// <summary>
+        /// Set once the zoom changes through the public surface (toolbar buttons,
+        /// wheel, zoom commands). Hosts that fit a program's own layout use
+        /// <see cref="SetZoom"/> instead, so a program selection always refits.
+        /// </summary>
+        public bool HasUserZoomed { get; private set; }
+
+        /// <summary>
+        /// Programmatic zoom (import fit): applies the zoom without flagging it
+        /// as a user choice.
+        /// </summary>
+        public void SetZoom(double value) => ApplyZoom(value, userDriven: false);
+
+        /// <summary>
+        /// The PLC page calls this when a different program is selected: the fit
+        /// belongs to the diagram, so the next selection always refits.
+        /// </summary>
+        public void ResetUserZoomFlag() => HasUserZoomed = false;
+
+        private void ApplyZoom(double value, bool userDriven = true)
+        {
+            var normalized = double.IsFinite(value)
+                ? Math.Clamp(value, MinimumZoom, MaximumZoom)
+                : 1.0;
+            if (Math.Abs(Config.ZoomLevel - normalized) < double.Epsilon) return;
+            Config.ZoomLevel = normalized;
+            if (userDriven) HasUserZoomed = true;
+            OnPropertyChanged(nameof(ZoomLevel));
+            OnPropertyChanged(nameof(ZoomText));
+            UpdateScaledCanvasSize();
+            UpdateConnectionLines();
         }
 
         /// <summary>
@@ -426,6 +461,19 @@ namespace ModbusForge.Avalonia.ViewModels
             var zoom = ZoomLevel;
             ScaledCanvasWidth = Config.CanvasWidth * zoom;
             ScaledCanvasHeight = Config.CanvasHeight * zoom;
+        }
+
+        /// <summary>
+        /// Re-issues the canvas size notifications. Needed when this VM is shown in
+        /// a second host (the PLC tab) after the size changed while it was detached:
+        /// Avalonia bindings don't re-read cached OneWay values on re-attach.
+        /// </summary>
+        public void RefitCanvasSize()
+        {
+            UpdateScaledCanvasSize();
+            OnPropertyChanged(nameof(ScaledCanvasWidth));
+            OnPropertyChanged(nameof(ScaledCanvasHeight));
+            RefreshConnectionLines();
         }
 
         public bool ShowGrid
@@ -2284,6 +2332,10 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void ZoomOut() => ZoomLevel -= ZoomStep;
 
+        /// <summary>
+        /// "100%" on the toolbar: back to 1:1, and the fit hands control of the
+        /// zoom to the user until the next program selection.
+        /// </summary>
         private void ResetZoom() => ZoomLevel = 1.0;
 
         private void AlignLeft()

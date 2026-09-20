@@ -31,6 +31,7 @@
         <MenuItem Header="_File">
           <MenuItem Header="_Save Project" Command="{Binding SaveProjectCommand}" InputGesture="Ctrl+S" />
           <MenuItem Header="_Load Project" Command="{Binding LoadProjectCommand}" />
+          <MenuItem Header="Load _PLC (Unity Pro XEF)..." Command="{Binding LoadPlcXmlCommand}" />
           <MenuItem Header="Open _Pcap..." Command="{Binding OpenPcapCommand}" />
           <Separator />
           <MenuItem Header="_Import Unit IDs..." Command="{Binding ImportUnitIdsCommand}" />
@@ -93,3 +94,4 @@
     </Border>
   </Grid>
 </Window>
+

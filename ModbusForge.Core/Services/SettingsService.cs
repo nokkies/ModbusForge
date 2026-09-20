@@ -167,7 +167,9 @@ public class SettingsService : ISettingsService
         public bool ConfirmOnExit { get; set; } = false;
         public bool EnableConsoleLogging { get; set; } = true;
         public int MaxConsoleMessages { get; set; } = 1000;
-        public bool EnableApi { get; set; } = false;
+        // The REST API doubles as the MCP endpoint and is the app's main integration
+        // surface, so it ships enabled; it only ever binds to 127.0.0.1.
+        public bool EnableApi { get; set; } = true;
         public int ApiPort { get; set; } = 5000;
         public bool EnableApiDocumentation { get; set; } = false;
         public bool EnableApiAuthentication { get; set; } = false;

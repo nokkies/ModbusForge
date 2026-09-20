@@ -19,6 +19,56 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
     public class VisualNodeEditorViewModelTests
     {
         [Fact]
+        public void PlcSelection_FitsHugeImportedLayout_AndUserZoomSticksPerProgram()
+        {
+            using var vm = CreateVm();
+
+            // One section spanning an ALARMS-sized Unity layout (> fit viewport),
+            // one tiny section that must stay at 100%.
+            var wide = new List<VisualNode>
+            {
+                vm.AddNodeAt(PlcElementType.AND, 0, 0)!,
+                vm.AddNodeAt(PlcElementType.AND, 7000, 4500)!,
+            };
+            var small = new List<VisualNode> { vm.AddNodeAt(PlcElementType.AND, 10, 10)! };
+            vm.LoadImportedPrograms(new (string, List<VisualNode>, List<NodeConnection>)[]
+            {
+                ("BIG", wide, new List<NodeConnection>()),
+                ("SMALL", small, new List<NodeConnection>()),
+            });
+
+            var project = new PlcProjectViewModel();
+            project.LoadImportedSectionsForTest(new Dictionary<string, PlcXmlSection>
+            {
+                ["BIG"] = Section(wide),
+                ["SMALL"] = Section(small),
+            });
+
+            Assert.True(project.ActivateEditorProgram(vm, "BIG"));
+            Assert.True(vm.ZoomLevel < 1.0, "huge layout must zoom out to fit");
+            Assert.False(vm.HasUserZoomed, "the fit itself is not a user zoom");
+
+            // User takes the zoom (toolbar reset to 100%).
+            vm.ZoomLevel = 1.0;
+            Assert.True(vm.HasUserZoomed);
+
+            // Re-selecting the same program keeps the user's zoom.
+            project.ActivateEditorProgram(vm, "BIG");
+            Assert.Equal(1.0, vm.ZoomLevel);
+
+            // Selecting a different program refits (and the tiny one never zooms in).
+            project.ActivateEditorProgram(vm, "SMALL");
+            Assert.Equal(1.0, vm.ZoomLevel);
+        }
+
+        private static PlcXmlSection Section(List<VisualNode> nodes)
+        {
+            var s = new PlcXmlSection { Name = "sec" };
+            foreach (var n in nodes) s.Nodes.Add(n);
+            return s;
+        }
+
+        [Fact]
         public void ParameterEdit_UndoRestoresValue_RedoReapplies()
         {
             using var vm = CreateVm();

@@ -66,10 +66,16 @@ namespace ModbusForge.Tests.Headless
                 // The shutdown dump (captured before Stop() resets node state) must
                 // report the node and both touched registers.
                 Assert.Contains(logger.Messages, m => m.Contains("=== Simulation final state ==="));
-                Assert.Contains(logger.Messages, m => m.Contains("scale1") && m.Contains("420"));
-                Assert.Contains(logger.Messages, m => m.Contains("HR[1] = 42"));
-                Assert.Contains(logger.Messages, m => m.Contains("HR[2] = 420"));
-                Assert.Contains(logger.Messages, m => m.Contains("COIL*: all default"));
+                var dump = logger.Messages.FirstOrDefault(m => m.Contains("=== Simulation final state ==="))
+                    ?? string.Join(" || ", logger.Messages);
+                Assert.True(logger.Messages.Any(m => m.Contains("scale1") && m.Contains("420")),
+                    $"dump missing scale1=420: {dump}");
+                Assert.True(logger.Messages.Any(m => m.Contains("HR[1] = 42")),
+                    $"dump missing HR[1]=42: {dump}");
+                Assert.True(logger.Messages.Any(m => m.Contains("HR[2] = 420")),
+                    $"dump missing HR[2]=420: {dump}");
+                Assert.True(logger.Messages.Any(m => m.Contains("COIL*: all default")),
+                    $"dump missing coil line: {dump}");
             }
             finally
             {

@@ -451,5 +451,105 @@ namespace ModbusForge.Avalonia.ViewModels
 
             targetList.Insert(targetIndex, item);
         }
+
+        /// <summary>
+        /// Replaces the whole program tree with one program per imported PLC section.
+        /// Used by the PLC (Unity Pro FEF) importer; the program-switch machinery
+        /// (snapshot save, config rebinding, connection-line rebuild) runs exactly as
+        /// it does for .mfp project loads so the canvas and simulation engine stay
+        /// consistent.
+        /// </summary>
+        public void LoadImportedPrograms(IReadOnlyList<(string Name, List<VisualNode> Nodes, List<NodeConnection> Connections)> programs)
+        {
+            Stop();
+
+            // Pre-fill the first program BEFORE the tree swap so Config's collection
+            // handlers are attached from the start and the canvas picks the nodes up.
+            var firstProgram = new ProgramModel { Name = "PLC Program" };
+            if (programs.Count > 0)
+            {
+                var (name, nodes, connections) = programs[0];
+                firstProgram.Name = string.IsNullOrWhiteSpace(name) ? "PLC Program" : name;
+                firstProgram.Description = "Imported PLC section";
+                foreach (var node in nodes) firstProgram.Nodes.Add(node);
+                foreach (var connection in connections) firstProgram.Connections.Add(connection);
+            }
+
+            _isSwitchingProgram = true;
+            try
+            {
+                var tree = new ProgramFolder { Name = "Programs" };
+                tree.Programs.Add(firstProgram);
+
+                for (var i = 1; i < programs.Count; i++)
+                {
+                    var (name, nodes, connections) = programs[i];
+                    var program = new ProgramModel
+                    {
+                        Name = string.IsNullOrWhiteSpace(name) ? "Program" : name,
+                        Description = "Imported PLC section",
+                        ExecutionOrder = i
+                    };
+
+                    foreach (var node in nodes) program.Nodes.Add(node);
+                    foreach (var connection in connections) program.Connections.Add(connection);
+
+                    tree.Programs.Add(program);
+                }
+
+                // Keep the active program's collections instance-stable: point Config
+                // at the first program's own collections, then swap the tree and mark
+                // this program active without a disruptive rebind.
+                Config.Nodes = firstProgram.Nodes;
+                Config.Connections = firstProgram.Connections;
+                Config.ConnectorConfigs = firstProgram.ConnectorConfigs;
+
+                // Grow the canvas to fit the imported layout so every node stays
+                // inside the scrollable surface (the default canvas is only 2000x2000).
+                double maxX = 2000, maxY = 2000;
+                foreach (var p in programs)
+                {
+                    foreach (var n in p.Nodes)
+                    {
+                        if (n.X + n.Width + 200 > maxX) maxX = n.X + n.Width + 200;
+                        if (n.Y + n.Height + 200 > maxY) maxY = n.Y + n.Height + 200;
+                    }
+                }
+                Config.CanvasWidth = maxX;
+                Config.CanvasHeight = maxY;
+                UpdateScaledCanvasSize();
+
+                ProgramTree = tree;
+                _activeProgram = firstProgram;
+                SelectedProgram = firstProgram;
+                SelectedTreeItem = firstProgram;
+            }
+            finally
+            {
+                _isSwitchingProgram = false;
+            }
+
+            RefreshConnectionLines();
+            OnPropertyChanged(nameof(Nodes));
+            OnPropertyChanged(nameof(Connections));
+            NotifyUndoRedoCommands();
+
+            StatusText = $"Loaded {programs.Count} imported program(s)";
+        }
+
+        /// <summary>
+        /// Switches the editor canvas to the program with the given name (the PLC
+        /// navigator uses this when an FBD program is selected). Returns false when
+        /// no program of that name exists.
+        /// </summary>
+        public bool ActivateProgramByName(string name)
+        {
+            var program = EnumeratePrograms(ProgramTree).FirstOrDefault(p =>
+                string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (program == null) return false;
+
+            SelectedTreeItem = program;
+            return true;
+        }
     }
 }
