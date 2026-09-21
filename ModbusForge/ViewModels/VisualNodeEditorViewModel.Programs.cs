@@ -478,7 +478,7 @@ namespace ModbusForge.Avalonia.ViewModels
             _isSwitchingProgram = true;
             try
             {
-                var tree = new ProgramFolder { Name = "Programs" };
+                var tree = new ProgramFolder { Name = "PLC Programs" };
                 tree.Programs.Add(firstProgram);
 
                 for (var i = 1; i < programs.Count; i++)
@@ -534,7 +534,7 @@ namespace ModbusForge.Avalonia.ViewModels
             OnPropertyChanged(nameof(Connections));
             NotifyUndoRedoCommands();
 
-            StatusText = $"Loaded {programs.Count} imported program(s)";
+            StatusText = $"Loaded {programs.Count} imported PLC program(s)";
         }
 
         /// <summary>
