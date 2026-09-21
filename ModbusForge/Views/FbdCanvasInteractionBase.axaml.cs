@@ -79,6 +79,15 @@ namespace ModbusForge.Avalonia.Views
             _nodeCanvas?.AddHandler(DragDrop.DragOverEvent, Canvas_DragOver, RoutingStrategies.Bubble);
             _nodeCanvas?.AddHandler(DragDrop.DropEvent, Canvas_Drop, RoutingStrategies.Bubble);
             _nodeCanvas?.AddHandler(PointerPressedEvent, NodeCanvas_PreviewPointerPressed, RoutingStrategies.Tunnel);
+            // Ctrl+wheel must zoom (not scroll) and Shift+wheel must pan. The
+            // ScrollViewer's own scroll class handler runs on the BUBBLE pass, so
+            // we intercept on the TUNNEL pass and mark Handled to suppress the
+            // scroll. The XAML PointerWheelChanged attribute is removed from the
+            // ScrollViewer element — all wheel handling lives here.
+            _canvasScrollViewer?.AddHandler(
+                InputElement.PointerWheelChangedEvent,
+                CanvasScrollViewer_PointerWheelChanged,
+                RoutingStrategies.Tunnel);
 
             if (_programTreeView != null)
             {
@@ -513,34 +522,44 @@ namespace ModbusForge.Avalonia.Views
                 return;
             }
 
+            // This handler is registered on the TUNNEL route (see OnViewContentLoaded),
+            // which fires BEFORE the ScrollViewer's own bubble-pass scroll class
+            // handler. Setting e.Handled here prevents the scroll for ctrl/shift
+            // wheels. Plain wheels fall through untouched so the ScrollViewer
+            // scrolls normally.
+
             if ((e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control)
             {
+                e.Handled = true; // consume even at the clamp: ctrl+wheel is never a scroll
+
                 var delta = e.Delta.Y > 0 ? 0.1 : -0.1;
                 var oldZoom = ViewModel.ZoomLevel;
-                var newZoom = Math.Clamp(Math.Round(oldZoom + delta, 2), 0.25, 4.0);
+                var newZoom = Math.Round(oldZoom + delta, 2);
 
                 if (Math.Abs(newZoom - oldZoom) > 0.001)
                 {
-                    var canvasPos = e.GetPosition(_nodeCanvas);
+                    // Zoom about the cursor: the node canvas is the scaled content,
+                    // so e.GetPosition(scrollViewer) is in viewport pixels.
                     var viewportPos = e.GetPosition(_canvasScrollViewer);
+                    var offset = _canvasScrollViewer.Offset;
+
+                    ViewModel.SetZoom(newZoom);
 
                     _canvasScrollViewer.Offset = new Vector(
-                        canvasPos.X - (viewportPos.X / newZoom),
-                        canvasPos.Y - (viewportPos.Y / newZoom));
-
-                    ViewModel.ZoomLevel = newZoom;
+                        offset.X + viewportPos.X * (newZoom / oldZoom - 1.0),
+                        offset.Y + viewportPos.Y * (newZoom / oldZoom - 1.0));
                 }
-
-                e.Handled = true;
             }
             else if ((e.KeyModifiers & KeyModifiers.Shift) == KeyModifiers.Shift)
             {
-                _canvasScrollViewer.Offset = new Vector(
-                    _canvasScrollViewer.Offset.X - e.Delta.Y,
-                    _canvasScrollViewer.Offset.Y);
                 e.Handled = true;
+                _canvasScrollViewer.Offset = new Vector(
+                    _canvasScrollViewer.Offset.X - e.Delta.Y * HorizontalWheelStep,
+                    _canvasScrollViewer.Offset.Y);
             }
         }
+
+        private const double HorizontalWheelStep = 50;
 
         protected void Canvas_DragOver(object? sender, DragEventArgs e)
         {
