@@ -574,9 +574,10 @@ namespace ModbusForge.Services
 
 
 
-            int xCursor = 40, yCursor = 40;
             double networkOrdinalOffset = 0;
-            var absoluteLayout = false;
+            // Legacy placement for blocks with no usable <objPosition>: a flowing
+            // 4-row grid advanced per placed node.
+            int legacyCursor = 0;
 
             foreach (var network in networks)
             {
@@ -623,28 +624,29 @@ namespace ModbusForge.Services
                     var nodeId = $"S{sectionOrdinal}_{uniqueInstance}";
                     instanceToNodeId[rawInstance] = nodeId;
 
-                    var node = CreateVisualNode(block, uniqueInstance, typeName, elementType, tags);
+                    var node = CreateVisualNode(block, nodeId, uniqueInstance, typeName, elementType, tags);
 
-                    // Unity Pro <objPosition> spaces differ by export: small values
-                    // are per-network cell indices (scale them to readable spacing);
-                    // large values are absolute canvas units (keep 1:1 — a post-pass
-                    // translates the section's bounding box to the canvas margin).
+                    // Unity Pro <objPosition> carries the Control Expert grid-cell
+                    // indices: X is in cells of 2 units (a 7-cell-wide TON sits at
+                    // 16 then 30, not 23), Y is in cells of 1 unit (5-cell-tall
+                    // blocks stack at 170, 175, 180...). Multiply by the cell size
+                    // so blocks render at their real relative rows/columns.
                     var (rawX, rawY) = ReadGridPosition(block);
+                    var (cellW, cellH) = ReadGridSize(block);
                     if (rawX <= 0 && rawY <= 0)
                     {
-                        node.X = xCursor + GridCellWidth * (section.Nodes.Count / 4);
-                        node.Y = networkOrdinalOffset + yCursor + GridCellHeight * (section.Nodes.Count % 4);
-                    }
-                    else if (rawX <= CellIndexUpperBound && rawY <= CellIndexUpperBound)
-                    {
-                        node.X = SectionMarginX + rawX * GridCellWidth;
-                        node.Y = SectionMarginY + networkOrdinalOffset + rawY * GridCellHeight;
+                        node.Width = cellW;
+                        node.Height = cellH;
+                        node.X = LegacyCursorColumn(legacyCursor);
+                        node.Y = networkOrdinalOffset + SectionMarginY + GridUnitHeight * LegacyCursorRow(legacyCursor);
+                        legacyCursor++;
                     }
                     else
                     {
-                        node.X = rawX;
-                        node.Y = rawY;
-                        absoluteLayout = true;
+                        node.Width = cellW;
+                        node.Height = cellH;
+                        node.X = SectionMarginX + rawX * GridUnitWidth;
+                        node.Y = SectionMarginY + networkOrdinalOffset + rawY * GridUnitHeight;
                     }
                     maxNodeY = Math.Max(maxNodeY, node.Y);
 
@@ -684,7 +686,7 @@ namespace ModbusForge.Services
                 networkOrdinalOffset = maxNodeY + 260;
             }
 
-            NormalizeSectionLayout(section, absoluteLayout);
+            NormalizeSectionLayout(section);
 
             if (section.Nodes.Count == 0)
                 result.AddWarning($"Section '{sectionName}' ({task}) produced no nodes.");
@@ -693,33 +695,17 @@ namespace ModbusForge.Services
         }
 
         /// <summary>
-        /// Makes the section's layout land inside the editor's canvas: absolute
-        /// Unity coordinates are translated so the bounding box starts at the
-        /// margin and compressed when the span exceeds <see cref="MaxSectionSpan"/>
-        /// (GGPLC007's ALARMS spans 95k px otherwise — every block would render
-        /// outside the initial viewport). Scaled cell-index layouts are already
-        /// margin-based, so they only get a span check.
+        /// Keeps the section's layout as the Control Expert grid placed it; only
+        /// compresses the whole bounding box when it exceeds <see cref="MaxSectionSpan"/>
+        /// so the editor's scrollable canvas stays usable. Positions are already
+        /// margin-based, so no translation is needed.
         /// </summary>
-        private static void NormalizeSectionLayout(PlcXmlSection section, bool absoluteLayout)
+        private static void NormalizeSectionLayout(PlcXmlSection section)
         {
             if (section.Nodes.Count == 0) return;
 
-            var minX = section.Nodes.Min(n => n.X);
-            var minY = section.Nodes.Min(n => n.Y);
             var maxRight = section.Nodes.Max(n => n.X + n.Width);
             var maxBottom = section.Nodes.Max(n => n.Y + n.Height);
-
-            if (absoluteLayout)
-            {
-                foreach (var node in section.Nodes)
-                {
-                    node.X -= minX - SectionMarginX;
-                    node.Y -= minY - SectionMarginY;
-                }
-
-                maxRight -= minX - SectionMarginX;
-                maxBottom -= minY - SectionMarginY;
-            }
 
             var spanX = maxRight - SectionMarginX;
             var spanY = maxBottom - SectionMarginY;
@@ -734,18 +720,31 @@ namespace ModbusForge.Services
             }
         }
 
-        // Unity Pro FBD exports store <objPosition> in one of two spaces: small
-        // per-network cell indices (older/section-local exports) or absolute
-        // canvas units that can run to 100k+ (GGPLC007's ALARMS spans X 4540…93860).
-        // Small indices are scaled by these constants to readable node spacing
-        // (the node editor draws blocks ~240x140); absolute units are kept 1:1
-        // when the section span fits a sane canvas, otherwise scaled down.
-        private const double GridCellWidth = 280;
-        private const double GridCellHeight = 170;
+        // Unity Pro FBD exports place every block with <objPosition posX posY> in
+        // Control Expert grid cells. Empirically (GGPLC007 ALARMS): a block at X=16
+        // with width=7 ends at 23 and the next sits at 30, so one horizontal cell
+        // is 2 units; a block at Y=170 with height=5 ends at 175 and the next sits
+        // at 175, so one vertical cell is 1 unit. <FFBBlock> width/height are in
+        // the same cell counts. These constants map cells to pixels so the import
+        // keeps Control Expert's rows and columns.
+        private const double GridUnitWidth = 20;
+        private const double GridUnitHeight = 20;
 
-        // Positions above this are certainly not cell indices (no realistic FBD
-        // has 200+ columns/rows): treat them as absolute Unity canvas units.
-        private const double CellIndexUpperBound = 200;
+        // A block's <FFBBlock> width/height attributes are in the same grid cells
+        // as its position; honouring them reproduces Control Expert's block sizes
+        // and keeps adjacent blocks from overlapping. Floor so a 1x1 stub stays
+        // clickable.
+        private const double MinBlockWidth = 60;
+        private const double MinBlockHeight = 40;
+
+        // Fallback grid for blocks whose export carries no usable position:
+        // a 4-row flowing column, one block per cell.
+        private const int LegacyRows = 4;
+        private const double LegacyColumnWidth = 280;
+
+        // Legacy placement keeps a 280px horizontal pitch but must never overlap
+        // real grid-placed blocks (which can sit at posX=1: 1*GridUnitWidth).
+        private const double LegacyColumnOffset = 2000;
 
         // Upper bound on a section's pixel span before its layout is compressed;
         // keeps the editor's scrollable canvas usable.
@@ -755,10 +754,15 @@ namespace ModbusForge.Services
         private const double SectionMarginX = 60;
         private const double SectionMarginY = 40;
 
+        private static double LegacyCursorColumn(int cursor)
+            => LegacyColumnOffset + LegacyColumnWidth * (cursor / LegacyRows);
+
+        private static int LegacyCursorRow(int cursor) => cursor % LegacyRows;
+
         private static (double X, double Y) ReadGridPosition(XElement block)
         {
             double x = 0, y = 0;
-            var pos = block.Element("objPosition");
+            var pos = FindPositionFor(block);
             if (pos != null)
             {
                 double.TryParse(pos.Attribute("posX")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out x);
@@ -767,8 +771,30 @@ namespace ModbusForge.Services
             return (x, y);
         }
 
+        // <objPosition> lives at two different depths depending on the export:
+        // sometimes directly under <FFBBlock>, sometimes inside an
+        // <objectPositions>/<positions> container further down. The old code used
+        // a direct child lookup, so every ALARMS block silently fell through to
+        // the legacy cursor — blocks stacked in one corner with no wiring visible.
+        private static XElement? FindPositionFor(XElement block)
+            => block.Descendants("objPosition")
+                   .FirstOrDefault(p => p.Attribute("posX") != null && p.Attribute("posY") != null);
+
+        // The <FFBBlock> width/height attributes are in grid cells like the
+        // position; use them so the relative proportions match Control Expert.
+        private static (double Width, double Height) ReadGridSize(XElement block)
+        {
+            double w = 0, h = 0;
+            double.TryParse(block.Attribute("width")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var aw);
+            double.TryParse(block.Attribute("height")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var ah);
+            if (aw > 0) w = aw * GridUnitWidth;
+            if (ah > 0) h = ah * GridUnitHeight;
+            return (Math.Max(w, MinBlockWidth), Math.Max(h, MinBlockHeight));
+        }
+
         private static VisualNode CreateVisualNode(
             XElement block,
+            string nodeId,
             string uniqueInstance,
             string typeName,
             PlcElementType elementType,
@@ -778,7 +804,7 @@ namespace ModbusForge.Services
             var isOpaque = elementType == Opaque;
             var node = new VisualNode
             {
-                Id = $"S_{uniqueInstance}",
+                Id = nodeId,
                 // Opaque FBs carry the Unity Pro type in their name so the canvas
                 // shows what is being stubbed.
                 Name = isOpaque ? $"{uniqueInstance} [{typeName}]" : uniqueInstance,
@@ -786,9 +812,46 @@ namespace ModbusForge.Services
                 ShowLiveValues = true
             };
 
+            var description = block.Descendants("descriptionFFB").FirstOrDefault();
+
+            // The REAL Unity Pro pin names (EN/IN/PT/ENO/Q/ET...) become the node's
+            // input/output port lists ONLY when they don't collide with the
+            // editor's own Input1/Output connector names (Unity's "IN"/"OUT" are
+            // different strings, so they land as named rows; "Q" maps to the
+            // primary "Output" instead of creating a second, unconnected row).
+            if (description != null)
+            {
+                var outputs = description.Elements("outputVariable")
+                    .Select(v => (string?)v.Attribute("formalParameter"))
+                    .Where(n => !string.IsNullOrEmpty(n) && !IsEnablePin(n) && !IsPrimaryOutputAlias(n))
+                    .Cast<string>()
+                    .ToList();
+                if (outputs.Count > 0)
+                    node.OutputPortNames = new System.Collections.ObjectModel.ObservableCollection<string>(
+                        new[] { "Output" }.Concat(outputs));
+
+                var inputs = description.Elements("inputVariable")
+                    .Select(v => (string?)v.Attribute("formalParameter"))
+                    .Where(n => !string.IsNullOrEmpty(n) && !IsEnablePin(n)
+                                && !IsPrimaryInputAlias(n) && !IsSecondaryInputAlias(n))
+                    .Cast<string>()
+                    .ToList();
+                // Seed with Input1/Input2 ONLY for the aliases actually wired, so
+                // an AND block shows rows IN1/IN2, not phantom Input1/Input2.
+                var rows = new System.Collections.Generic.List<string>();
+                if (description.Elements("inputVariable")
+                        .Any(v => IsPrimaryInputAlias((string?)v.Attribute("formalParameter"))))
+                    rows.Add("Input1");
+                if (description.Elements("inputVariable")
+                        .Any(v => IsSecondaryInputAlias((string?)v.Attribute("formalParameter"))))
+                    rows.Add("Input2");
+                rows.AddRange(inputs);
+                if (rows.Count > 0)
+                    node.InputPortNames = new System.Collections.ObjectModel.ObservableCollection<string>(rows);
+            }
+
             // Bind the primary Modbus addresses from the descriptionFFB pins whose
             // effectiveParameter is a known (addressed) tag.
-            var description = block.Descendants("descriptionFFB").FirstOrDefault();
             if (description != null)
             {
                 foreach (var inputVar in description.Elements("inputVariable"))
@@ -883,6 +946,24 @@ namespace ModbusForge.Services
             }
         }
 
+        /// <summary>EN/ENO are execution-enable pins: not data ports, not wires.</summary>
+        private static bool IsEnablePin(string? formalParameter)
+            => formalParameter is not null
+               && (formalParameter.Equals("EN", StringComparison.OrdinalIgnoreCase)
+                   || formalParameter.Equals("ENO", StringComparison.OrdinalIgnoreCase));
+
+        // Unity's "IN"/"IN1"/"SET"/... are the primary data input: they draw on the
+        // built-in "Input1" row, so they must not appear as a second named row.
+        private static bool IsPrimaryInputAlias(string? pin) => pin != null
+            && NormalizeTargetPort(pin) == "Input1";
+
+        private static bool IsSecondaryInputAlias(string? pin) => pin != null
+            && NormalizeTargetPort(pin) == "Input2";
+
+        // Likewise "OUT"/"OUT1" draw on the built-in "Output" row.
+        private static bool IsPrimaryOutputAlias(string? pin) => pin != null
+            && NormalizeSourcePort(pin) == "Output";
+
         /// <summary>Maps a Unity Pro source pin to a ModbusForge source connector.</summary>
         private static string NormalizeSourcePort(string pin)
         {
@@ -913,14 +994,11 @@ namespace ModbusForge.Services
                 case "IN":
                 case "IN1":
                 case "SET":
-                case "R":
-                case "S":
                 case "START":
                 case "PV":
                     return "Input1";
                 case "IN2":
                 case "MV":
-                case "Q2":
                     return "Input2";
                 default:
                     return pin;

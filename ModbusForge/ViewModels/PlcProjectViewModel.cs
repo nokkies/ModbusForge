@@ -114,10 +114,12 @@ public sealed partial class PlcProjectViewModel : ObservableObject
 
     private string? _lastFitProgram;
 
-    // Reference viewport for the fit (a typical laptop work area inside the PLC tab).
+    // Reference viewport for the fit: the fit is zoom-OUT only (a program smaller
+    // than the viewport stays at 100%), and the zoom floor keeps text readable.
+    // ALARMS (6.9k x 4.4k px) lands at ~25%, where block titles still paint.
     private const double FitViewportWidth = 1200;
     private const double FitViewportHeight = 650;
-    private const double MinFitZoom = 0.1;
+    private const double MinFitZoom = 0.25;
 
     /// <summary>
     /// Test seam: inject FBD sections without a full XEF import (the fit logic

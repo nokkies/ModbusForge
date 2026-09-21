@@ -120,6 +120,14 @@ namespace ModbusForge.Models
         [ObservableProperty]
         private ObservableCollection<string> _outputPortNames = new(new[] { "Output" });
 
+        /// <summary>
+        /// Names of the input ports, top to bottom, when they differ from the
+        /// generic Input1/Input2 pair (imported FBDs carry real pin names like
+        /// IN/IN2/PT/START). The canvas renders one port dot per entry.
+        /// </summary>
+        [ObservableProperty]
+        private ObservableCollection<string>? _inputPortNames;
+
         // Timer/Counter parameters
         [ObservableProperty]
         private int _timerPresetMs = 1000;
