@@ -31,7 +31,7 @@ namespace ModbusForge.Services
             PlcArea area,
             string debugLogMessage,
             string errorLogContext,
-            Func<IModbusMaster, ushort, ushort, T[]?> readFunc)
+            Func<IModbusMaster, ushort, ushort, Task<T[]?>> readFunc)
         {
             if (!isConnected())
                 return null;
@@ -39,51 +39,48 @@ namespace ModbusForge.Services
             await ioLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                return await Task.Run(() =>
+                var results = new List<T>(count);
+
+                try
                 {
-                    var results = new List<T>(count);
+                    logger.LogDebug("{DebugMessage} (Unit ID: {UnitId})", debugLogMessage, unitId);
 
-                    try
+                    if (client == null)
+                        return null;
+
+                    var chunks = addressValidator.GetReadRanges(startAddress, count, area).ToList();
+
+                    foreach (var chunk in chunks)
                     {
-                        logger.LogDebug("{DebugMessage} (Unit ID: {UnitId})", debugLogMessage, unitId);
+                        ushort protocolAddress = toProtocolAddress(chunk.StartAddress);
+                        var chunkResult = await readFunc(client, protocolAddress, (ushort)chunk.Count).ConfigureAwait(false);
 
-                        if (client == null)
-                            return null;
+                        if (chunkResult == null || chunkResult.Length == 0)
+                            break;
 
-                        var chunks = addressValidator.GetReadRanges(startAddress, count, area).ToList();
-
-                        foreach (var chunk in chunks)
+                        if (chunkResult.Length != chunk.Count)
                         {
-                            ushort protocolAddress = toProtocolAddress(chunk.StartAddress);
-                            var chunkResult = readFunc(client, protocolAddress, (ushort)chunk.Count);
-
-                            if (chunkResult == null || chunkResult.Length == 0)
-                                break;
-
-                            if (chunkResult.Length != chunk.Count)
-                            {
-                                // Slave returned fewer points than requested. Keep what we got and stop.
-                                results.AddRange(chunkResult);
-                                break;
-                            }
-
+                            // Slave returned fewer points than requested. Keep what we got and stop.
                             results.AddRange(chunkResult);
+                            break;
                         }
 
-                        return results.Count > 0 ? results.ToArray() : null;
+                        results.AddRange(chunkResult);
                     }
-                    catch (SlaveException ex)
-                    {
-                        logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
-                        return results.Count > 0 ? results.ToArray() : null;
-                    }
-                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-                    {
-                        logger.LogError(ex, errorLogContext);
-                        handleConnectionLoss();
-                        return results.Count > 0 ? results.ToArray() : null;
-                    }
-                }).ConfigureAwait(false);
+
+                    return results.Count > 0 ? results.ToArray() : null;
+                }
+                catch (SlaveException ex)
+                {
+                    logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
+                    return results.Count > 0 ? results.ToArray() : null;
+                }
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                {
+                    logger.LogError(ex, errorLogContext);
+                    handleConnectionLoss();
+                    return results.Count > 0 ? results.ToArray() : null;
+                }
             }
             finally
             {
@@ -105,7 +102,7 @@ namespace ModbusForge.Services
             PlcArea area,
             string debugLogMessage,
             string errorLogContext,
-            Action<IModbusMaster, ushort, T[]> writeAction)
+            Func<IModbusMaster, ushort, T[], Task> writeAction)
         {
             if (!isConnected())
                 return;
@@ -115,40 +112,34 @@ namespace ModbusForge.Services
             await ioLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                await Task.Run(() =>
+                logger.LogDebug("{DebugMessage} (Unit ID: {UnitId})", debugLogMessage, unitId);
+
+                if (client == null)
+                    return;
+
+                int max = addressValidator.GetMaxCountPerRequest(area, isWrite: true);
+                int offset = 0;
+
+                while (offset < values.Length)
                 {
-                    try
-                    {
-                        logger.LogDebug("{DebugMessage} (Unit ID: {UnitId})", debugLogMessage, unitId);
+                    int chunkCount = Math.Min(max, values.Length - offset);
+                    ushort protocolAddress = toProtocolAddress(startAddress + offset);
+                    var chunkValues = values.AsSpan(offset, chunkCount).ToArray();
 
-                        if (client == null)
-                            return;
-
-                        int max = addressValidator.GetMaxCountPerRequest(area, isWrite: true);
-                        int offset = 0;
-
-                        while (offset < values.Length)
-                        {
-                            int chunkCount = Math.Min(max, values.Length - offset);
-                            ushort protocolAddress = toProtocolAddress(startAddress + offset);
-                            var chunkValues = values.AsSpan(offset, chunkCount).ToArray();
-
-                            writeAction(client, protocolAddress, chunkValues);
-                            offset += chunkCount;
-                        }
-                    }
-                    catch (SlaveException ex)
-                    {
-                        logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
-                        throw;
-                    }
-                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-                    {
-                        logger.LogError(ex, errorLogContext);
-                        handleConnectionLoss();
-                        throw;
-                    }
-                }).ConfigureAwait(false);
+                    await writeAction(client, protocolAddress, chunkValues).ConfigureAwait(false);
+                    offset += chunkCount;
+                }
+            }
+            catch (SlaveException ex)
+            {
+                logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
+                throw;
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                logger.LogError(ex, errorLogContext);
+                handleConnectionLoss();
+                throw;
             }
             finally
             {

@@ -31,7 +31,7 @@ namespace ModbusForge.Tests.Services
                     return Enumerable.Range(start, count).Select(i => (ushort)i).ToArray();
                 });
 
-            var result = await ModbusChunkedExecutor.ReadAsync(
+            var result = await ModbusChunkedExecutor.ReadAsync<ushort>(
                 () => true,
                 IoLock,
                 master.Object,
@@ -45,7 +45,7 @@ namespace ModbusForge.Tests.Services
                 PlcArea.HoldingRegister,
                 "Read",
                 "Error",
-                (client, protocolAddress, chunkCount) => client.ReadHoldingRegisters(1, protocolAddress, chunkCount));
+                (client, protocolAddress, chunkCount) => Task.FromResult<ushort[]?>(client.ReadHoldingRegisters(1, protocolAddress, chunkCount)));
 
             Assert.NotNull(result);
             Assert.Equal(300, result!.Length);
@@ -74,7 +74,7 @@ namespace ModbusForge.Tests.Services
                     return null!;
                 });
 
-            var result = await ModbusChunkedExecutor.ReadAsync(
+            var result = await ModbusChunkedExecutor.ReadAsync<ushort>(
                 () => true,
                 IoLock,
                 master.Object,
@@ -88,7 +88,7 @@ namespace ModbusForge.Tests.Services
                 PlcArea.HoldingRegister,
                 "Read",
                 "Error",
-                (client, protocolAddress, chunkCount) => client.ReadHoldingRegisters(1, protocolAddress, chunkCount));
+                (client, protocolAddress, chunkCount) => Task.FromResult<ushort[]?>(client.ReadHoldingRegisters(1, protocolAddress, chunkCount)));
 
             Assert.NotNull(result);
             Assert.Equal(250, result!.Length);
@@ -108,7 +108,7 @@ namespace ModbusForge.Tests.Services
                     return Enumerable.Range(start, count).Select(i => i % 2 == 0).ToArray();
                 });
 
-            var result = await ModbusChunkedExecutor.ReadAsync(
+            var result = await ModbusChunkedExecutor.ReadAsync<bool>(
                 () => true,
                 IoLock,
                 master.Object,
@@ -122,7 +122,7 @@ namespace ModbusForge.Tests.Services
                 PlcArea.Coil,
                 "Read",
                 "Error",
-                (client, protocolAddress, chunkCount) => client.ReadCoils(1, protocolAddress, chunkCount));
+                (client, protocolAddress, chunkCount) => Task.FromResult<bool[]?>(client.ReadCoils(1, protocolAddress, chunkCount)));
 
             Assert.NotNull(result);
             Assert.Equal(4000, result!.Length);
@@ -145,7 +145,7 @@ namespace ModbusForge.Tests.Services
                     return Enumerable.Range(start, count).Select(i => i % 2 == 0).ToArray();
                 });
 
-            var result = await ModbusChunkedExecutor.ReadAsync(
+            var result = await ModbusChunkedExecutor.ReadAsync<bool>(
                 () => true,
                 IoLock,
                 master.Object,
@@ -159,7 +159,7 @@ namespace ModbusForge.Tests.Services
                 PlcArea.DiscreteInput,
                 "Read",
                 "Error",
-                (client, protocolAddress, chunkCount) => client.ReadInputs(1, protocolAddress, chunkCount));
+                (client, protocolAddress, chunkCount) => Task.FromResult<bool[]?>(client.ReadInputs(1, protocolAddress, chunkCount)));
 
             Assert.NotNull(result);
             Assert.Equal(4000, result!.Length);
@@ -183,7 +183,7 @@ namespace ModbusForge.Tests.Services
                     return Enumerable.Range(start, count / 2).Select(i => (ushort)i).ToArray();
                 });
 
-            var result = await ModbusChunkedExecutor.ReadAsync(
+            var result = await ModbusChunkedExecutor.ReadAsync<ushort>(
                 () => true,
                 IoLock,
                 master.Object,
@@ -197,7 +197,7 @@ namespace ModbusForge.Tests.Services
                 PlcArea.HoldingRegister,
                 "Read",
                 "Error",
-                (client, protocolAddress, chunkCount) => client.ReadHoldingRegisters(1, protocolAddress, chunkCount));
+                (client, protocolAddress, chunkCount) => Task.FromResult<ushort[]?>(client.ReadHoldingRegisters(1, protocolAddress, chunkCount)));
 
             Assert.NotNull(result);
             Assert.Equal(62, result!.Length); // first chunk requested 125, got 62
@@ -207,7 +207,7 @@ namespace ModbusForge.Tests.Services
         [Fact]
         public async Task ReadAsync_Returns_Null_When_Client_Is_Null()
         {
-            var result = await ModbusChunkedExecutor.ReadAsync(
+            var result = await ModbusChunkedExecutor.ReadAsync<ushort>(
                 () => true,
                 IoLock,
                 null,
@@ -221,7 +221,7 @@ namespace ModbusForge.Tests.Services
                 PlcArea.HoldingRegister,
                 "Read",
                 "Error",
-                (client, protocolAddress, chunkCount) => client!.ReadHoldingRegisters(1, protocolAddress, chunkCount));
+                (client, protocolAddress, chunkCount) => Task.FromResult<ushort[]?>(client!.ReadHoldingRegisters(1, protocolAddress, chunkCount)));
 
             Assert.Null(result);
         }
@@ -255,7 +255,7 @@ namespace ModbusForge.Tests.Services
                 PlcArea.Coil,
                 "Write",
                 "Error",
-                (client, protocolAddress, chunkValues) => client.WriteMultipleCoils(1, protocolAddress, chunkValues));
+                (client, protocolAddress, chunkValues) => { client.WriteMultipleCoils(1, protocolAddress, chunkValues); return Task.CompletedTask; });
 
             Assert.Equal(3, chunks.Count);
             Assert.Equal(1968, chunks[0].Length);
@@ -293,7 +293,7 @@ namespace ModbusForge.Tests.Services
                 PlcArea.HoldingRegister,
                 "Write",
                 "Error",
-                (client, protocolAddress, chunkValues) => client.WriteMultipleRegisters(1, protocolAddress, chunkValues));
+                (client, protocolAddress, chunkValues) => { client.WriteMultipleRegisters(1, protocolAddress, chunkValues); return Task.CompletedTask; });
 
             Assert.Equal(3, seen.Count);
             Assert.Equal((0, 123), (seen[0].Address, seen[0].Values.Length));
@@ -328,7 +328,7 @@ namespace ModbusForge.Tests.Services
                     PlcArea.HoldingRegister,
                     "Write",
                     "Error",
-                    (client, protocolAddress, chunkValues) => client.WriteMultipleRegisters(1, protocolAddress, chunkValues)));
+                    (client, protocolAddress, chunkValues) => { client.WriteMultipleRegisters(1, protocolAddress, chunkValues); return Task.CompletedTask; }));
         }
     }
 }
