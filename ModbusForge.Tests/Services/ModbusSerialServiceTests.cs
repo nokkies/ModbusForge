@@ -211,5 +211,39 @@ namespace ModbusForge.Tests.Services
             ushort protocolAddress2 = (ushort)(uiAddress2 > 0 ? uiAddress2 - 1 : 0);
             Assert.Equal(99, protocolAddress2);
         }
+
+        [Fact]
+        public async Task ApplySerialTimingAsync_PostTxDelay_UsesNonBlockingDelay()
+        {
+            var loggerMock = new Mock<ILogger<ModbusSerialService>>();
+            var master = new Mock<IModbusMaster>();
+            master
+                .Setup(m => m.WriteSingleRegister(It.IsAny<byte>(), It.IsAny<ushort>(), It.IsAny<ushort>()));
+
+            var service = new TestableSerialService(loggerMock.Object);
+            InjectClient(service, master.Object);
+
+            var profileField = typeof(ModbusSerialService).GetField("_connectionProfile", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            var serialPortField = typeof(ModbusSerialService).GetField("_serialPort", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+            var profile = new ConnectionProfile
+            {
+                Name = "Test",
+                ComPort = "COM1",
+                PostTxDelayMs = 10,
+                PreTxDelayMs = 10
+            };
+            var mockPort = new Mock<SerialPort>();
+
+            profileField.SetValue(service, profile);
+            serialPortField.SetValue(service, mockPort.Object);
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            await service.WriteSingleRegisterAsync(1, 10, 100);
+            sw.Stop();
+
+            Assert.True(sw.ElapsedMilliseconds >= 15, $"Expected delay of ~20ms, elapsed: {sw.ElapsedMilliseconds}ms");
+            master.Verify(m => m.WriteSingleRegister(1, 9, 100), Times.Once);
+        }
     }
 }
