@@ -31,7 +31,7 @@ namespace ModbusForge.Services
             PlcArea area,
             string debugLogMessage,
             string errorLogContext,
-            Func<IModbusMaster, ushort, ushort, T[]?> readFunc)
+            Func<IModbusMaster, ushort, ushort, Task<T[]?>> readFunc)
         {
             if (!isConnected())
                 return null;
@@ -39,7 +39,7 @@ namespace ModbusForge.Services
             await ioLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                return await Task.Run(() =>
+                return await Task.Run(async () =>
                 {
                     var results = new List<T>(count);
 
@@ -55,7 +55,7 @@ namespace ModbusForge.Services
                         foreach (var chunk in chunks)
                         {
                             ushort protocolAddress = toProtocolAddress(chunk.StartAddress);
-                            var chunkResult = readFunc(client, protocolAddress, (ushort)chunk.Count);
+                            var chunkResult = await readFunc(client, protocolAddress, (ushort)chunk.Count).ConfigureAwait(false);
 
                             if (chunkResult == null || chunkResult.Length == 0)
                                 break;
@@ -105,7 +105,7 @@ namespace ModbusForge.Services
             PlcArea area,
             string debugLogMessage,
             string errorLogContext,
-            Action<IModbusMaster, ushort, T[]> writeAction)
+            Func<IModbusMaster, ushort, T[], Task> writeAction)
         {
             if (!isConnected())
                 return;
@@ -115,7 +115,7 @@ namespace ModbusForge.Services
             await ioLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                await Task.Run(() =>
+                await Task.Run(async () =>
                 {
                     try
                     {
@@ -133,7 +133,7 @@ namespace ModbusForge.Services
                             ushort protocolAddress = toProtocolAddress(startAddress + offset);
                             var chunkValues = values.AsSpan(offset, chunkCount).ToArray();
 
-                            writeAction(client, protocolAddress, chunkValues);
+                            await writeAction(client, protocolAddress, chunkValues).ConfigureAwait(false);
                             offset += chunkCount;
                         }
                     }
