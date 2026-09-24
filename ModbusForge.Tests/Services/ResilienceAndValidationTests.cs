@@ -162,6 +162,60 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
+        public async Task RetryPolicyService_ExecuteWithRetryAsync_Void_ExecutesSuccessfully_WithoutRetry()
+        {
+            var logger = new Mock<ILogger<RetryPolicyService>>().Object;
+            var service = new RetryPolicyService(logger);
+            int callCount = 0;
+
+            await service.ExecuteWithRetryAsync(async () =>
+            {
+                callCount++;
+                await Task.CompletedTask;
+            }, "TestVoidSuccess", maxRetries: 3, initialDelayMs: 1);
+
+            Assert.Equal(1, callCount);
+        }
+
+        [Fact]
+        public async Task RetryPolicyService_ExecuteWithRetryAsync_Void_RetriesOnException_AndSucceeds()
+        {
+            var logger = new Mock<ILogger<RetryPolicyService>>().Object;
+            var service = new RetryPolicyService(logger);
+            int callCount = 0;
+
+            await service.ExecuteWithRetryAsync(async () =>
+            {
+                callCount++;
+                if (callCount < 3)
+                {
+                    throw new SocketException((int)SocketError.TimedOut);
+                }
+                await Task.CompletedTask;
+            }, "TestVoidRetry", maxRetries: 3, initialDelayMs: 1);
+
+            Assert.Equal(3, callCount);
+        }
+
+        [Fact]
+        public async Task RetryPolicyService_ExecuteWithRetryAsync_Void_ThrowsException_AfterMaxRetries()
+        {
+            var logger = new Mock<ILogger<RetryPolicyService>>().Object;
+            var service = new RetryPolicyService(logger);
+            int callCount = 0;
+
+            await Assert.ThrowsAsync<SocketException>(() =>
+                service.ExecuteWithRetryAsync(() =>
+                {
+                    callCount++;
+                    return Task.FromException(
+                        new SocketException((int)SocketError.ConnectionRefused));
+                }, "TestVoidMaxRetries", maxRetries: 2, initialDelayMs: 1));
+
+            Assert.Equal(3, callCount); // 1 initial try + 2 retries
+        }
+
+        [Fact]
         public async Task CircuitBreakerService_TripsOpen_AfterFailureThreshold()
         {
             var logger = new Mock<ILogger<CircuitBreakerService>>().Object;
