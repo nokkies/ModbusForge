@@ -156,5 +156,35 @@ namespace ModbusForge.Tests.Helpers
             Assert.Equal(legacy, new[] { (ushort)((bytes[0] << 8) | bytes[1]), (ushort)((bytes[2] << 8) | bytes[3]) });
             Assert.Equal(value, DataTypeConverter.ToSingle(legacy[0], legacy[1], swapBytes, swapWords));
         }
+
+        [Theory]
+        [InlineData(TagDataType.Bool, 1)]
+        [InlineData(TagDataType.Int16, 1)]
+        [InlineData(TagDataType.UInt16, 1)]
+        [InlineData(TagDataType.Int32, 2)]
+        [InlineData(TagDataType.UInt32, 2)]
+        [InlineData(TagDataType.Float, 2)]
+        [InlineData(TagDataType.Double, 4)]
+        [InlineData(TagDataType.String, 2)]
+        public void GetRegisterCount_AllTagDataTypes_ReturnsExpectedRegisterCount(TagDataType dataType, int expectedCount)
+        {
+            // Act
+            int count = DataTypeConverter.GetRegisterCount(dataType);
+
+            // Assert
+            Assert.Equal(expectedCount, count);
+        }
+
+        [Theory]
+        [InlineData((TagDataType)999)]
+        [InlineData((TagDataType)(-1))]
+        public void GetRegisterCount_UndefinedEnum_ReturnsDefaultRegisterCount(TagDataType invalidDataType)
+        {
+            // Act
+            int count = DataTypeConverter.GetRegisterCount(invalidDataType);
+
+            // Assert
+            Assert.Equal(1, count);
+        }
     }
 }
