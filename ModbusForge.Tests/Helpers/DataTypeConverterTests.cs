@@ -156,5 +156,115 @@ namespace ModbusForge.Tests.Helpers
             Assert.Equal(legacy, new[] { (ushort)((bytes[0] << 8) | bytes[1]), (ushort)((bytes[2] << 8) | bytes[3]) });
             Assert.Equal(value, DataTypeConverter.ToSingle(legacy[0], legacy[1], swapBytes, swapWords));
         }
+
+        [Fact]
+        public void RegistersToBytes_NullRegisters_ThrowsArgumentNullException()
+        {
+            Assert.Throws<ArgumentNullException>(() => DataTypeConverter.RegistersToBytes(null!));
+        }
+
+        [Fact]
+        public void RegistersToBytes_EmptyRegisters_ReturnsEmptyByteArray()
+        {
+            byte[] result = DataTypeConverter.RegistersToBytes(Array.Empty<ushort>());
+            Assert.Empty(result);
+        }
+
+        [Theory]
+        [InlineData((ushort)0x1234, new byte[] { 0x12, 0x34 })]
+        [InlineData((ushort)0x00FF, new byte[] { 0x00, 0xFF })]
+        [InlineData((ushort)0xFF00, new byte[] { 0xFF, 0x00 })]
+        [InlineData((ushort)0x0000, new byte[] { 0x00, 0x00 })]
+        [InlineData((ushort)0xFFFF, new byte[] { 0xFF, 0xFF })]
+        public void RegistersToBytes_SingleRegister_ReturnsBigEndianBytes(ushort input, byte[] expected)
+        {
+            byte[] result = DataTypeConverter.RegistersToBytes(new[] { input });
+            Assert.Equal(expected, result);
+        }
+
+        [Fact]
+        public void RegistersToBytes_MultipleRegisters_ReturnsExpectedBigEndianBytes()
+        {
+            ushort[] registers = new ushort[] { 0x1234, 0x5678, 0x9ABC };
+            byte[] expected = new byte[] { 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC };
+
+            byte[] result = DataTypeConverter.RegistersToBytes(registers);
+
+            Assert.Equal(6, result.Length);
+            Assert.Equal(expected, result);
+        }
+
+        [Fact]
+        public void ConvertRegisters_NullRegisters_ThrowsArgumentNullException()
+        {
+            Assert.Throws<ArgumentNullException>(() => DataTypeConverter.ConvertRegisters(TagDataType.Int16, null!));
+        }
+
+        [Fact]
+        public void ConvertRegisters_Int16_ReturnsShort()
+        {
+            ushort[] registers = new ushort[] { 0xFF00 }; // -256 as short
+            object result = DataTypeConverter.ConvertRegisters(TagDataType.Int16, registers);
+            Assert.Equal((short)-256, result);
+        }
+
+        [Fact]
+        public void ConvertRegisters_UInt16_ReturnsUShort()
+        {
+            ushort[] registers = new ushort[] { 0x1234 };
+            object result = DataTypeConverter.ConvertRegisters(TagDataType.UInt16, registers);
+            Assert.Equal((ushort)0x1234, result);
+        }
+
+        [Fact]
+        public void ConvertRegisters_Bool_ReturnsExpectedBoolean()
+        {
+            Assert.True((bool)DataTypeConverter.ConvertRegisters(TagDataType.Bool, new ushort[] { 1 }));
+            Assert.False((bool)DataTypeConverter.ConvertRegisters(TagDataType.Bool, new ushort[] { 0 }));
+        }
+
+        [Fact]
+        public void ConvertRegisters_Int32_ReturnsInteger()
+        {
+            // 0x12345678 in big-endian high word=0x1234, low word=0x5678
+            ushort[] registers = new ushort[] { 0x1234, 0x5678 };
+            object result = DataTypeConverter.ConvertRegisters(TagDataType.Int32, registers);
+            Assert.Equal(0x12345678, result);
+        }
+
+        [Fact]
+        public void ConvertRegisters_UInt32_ReturnsUInteger()
+        {
+            ushort[] registers = new ushort[] { 0x8234, 0x5678 };
+            object result = DataTypeConverter.ConvertRegisters(TagDataType.UInt32, registers);
+            Assert.Equal(0x82345678u, result);
+        }
+
+        [Fact]
+        public void ConvertRegisters_Float_ReturnsSingle()
+        {
+            // 1.0f in IEEE 754 Big-Endian bytes: 0x3F, 0x80, 0x00, 0x00 -> registers 0x3F80, 0x0000
+            ushort[] registers = new ushort[] { 0x3F80, 0x0000 };
+            object result = DataTypeConverter.ConvertRegisters(TagDataType.Float, registers);
+            Assert.Equal(1.0f, result);
+        }
+
+        [Fact]
+        public void ConvertRegisters_Double_ReturnsDouble()
+        {
+            // 1.0 in IEEE 754 Big-Endian: 0x3FF0000000000000 -> registers 0x3FF0, 0x0000, 0x0000, 0x0000
+            ushort[] registers = new ushort[] { 0x3FF0, 0x0000, 0x0000, 0x0000 };
+            object result = DataTypeConverter.ConvertRegisters(TagDataType.Double, registers);
+            Assert.Equal(1.0, result);
+        }
+
+        [Fact]
+        public void ConvertRegisters_String_ReturnsNullTerminatedAsciiString()
+        {
+            // "Test" -> 'T'=0x54, 'e'=0x65, 's'=0x73, 't'=0x74, then null terminator
+            ushort[] registers = new ushort[] { 0x5465, 0x7374, 0x0000 };
+            object result = DataTypeConverter.ConvertRegisters(TagDataType.String, registers);
+            Assert.Equal("Test", result);
+        }
     }
 }
