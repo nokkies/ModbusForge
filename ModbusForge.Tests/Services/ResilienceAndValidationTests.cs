@@ -62,6 +62,19 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
+        public void ValidationService_ValidateModbusValue_ReturnsSuccess()
+        {
+            var logger = new Mock<ILogger<ValidationService>>().Object;
+            var service = new ValidationService(logger);
+
+            Assert.True(service.ValidateModbusValue(ushort.MinValue).IsValid);
+            Assert.True(service.ValidateModbusValue(0).IsValid);
+            Assert.True(service.ValidateModbusValue(100).IsValid);
+            Assert.True(service.ValidateModbusValue(32767).IsValid);
+            Assert.True(service.ValidateModbusValue(ushort.MaxValue).IsValid);
+        }
+
+        [Fact]
         public void ValidationService_ValidateRegisterCount_Limits()
         {
             var logger = new Mock<ILogger<ValidationService>>().Object;
