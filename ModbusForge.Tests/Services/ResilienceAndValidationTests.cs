@@ -62,6 +62,37 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
+        public void ValidationService_ValidateAddress_Boundaries()
+        {
+            var logger = new Mock<ILogger<ValidationService>>().Object;
+            var service = new ValidationService(logger);
+
+            // Valid address boundaries
+            Assert.True(service.ValidateAddress(0).IsValid);
+            Assert.True(service.ValidateAddress(1).IsValid);
+            Assert.True(service.ValidateAddress(1000).IsValid);
+            Assert.True(service.ValidateAddress(65535).IsValid);
+
+            // Invalid address - below 0
+            var lowResult = service.ValidateAddress(-1);
+            Assert.False(lowResult.IsValid);
+            Assert.Contains("Address must be between 0 and 65535", lowResult.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("Provided address: -1", lowResult.ErrorDetails);
+
+            var negativeResult = service.ValidateAddress(-100);
+            Assert.False(negativeResult.IsValid);
+
+            // Invalid address - above 65535
+            var highResult = service.ValidateAddress(65536);
+            Assert.False(highResult.IsValid);
+            Assert.Contains("Address must be between 0 and 65535", highResult.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("Provided address: 65536", highResult.ErrorDetails);
+
+            var tooHighResult = service.ValidateAddress(100000);
+            Assert.False(tooHighResult.IsValid);
+        }
+
+        [Fact]
         public void ValidationService_ValidateRegisterCount_Limits()
         {
             var logger = new Mock<ILogger<ValidationService>>().Object;
