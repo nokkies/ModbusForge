@@ -69,6 +69,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private const int DefaultCustomPeriodMs = 1000;
         private const int MultiRegisterTypeIncrement = 2;
         private const int SingleRegisterTypeIncrement = 1;
+        private const string PlcConsolePrefix = "PLC: ";
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ReadCommand))]
@@ -424,7 +425,15 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public ScriptRulesViewModel? RulesViewModel { get; }
 
+        /// <summary>The Simulation tab's editor: the hand-built plant model.</summary>
         public VisualNodeEditorViewModel? VisualNodeEditorViewModel { get; }
+
+        /// <summary>
+        /// The PLC tab's editor: logic imported from a Unity Pro XEF. Kept apart from
+        /// <see cref="VisualNodeEditorViewModel"/> so a PLC import, program selection
+        /// or Run/Stop never touches the Simulation.
+        /// </summary>
+        public PlcEditorViewModel? PlcEditorViewModel { get; }
 
         /// <summary>Control Expert-style project navigator for a loaded XEF/FEF PLC project.</summary>
         public PlcProjectViewModel PlcProjectViewModel { get; } = new();
@@ -459,7 +468,8 @@ namespace ModbusForge.Avalonia.ViewModels
             IFileSystem? fileSystem = null,
             IDockingHost? dockingHost = null,
             TagService? tagService = null,
-            ITrendSubscriptionService? trendSubscriptionService = null)
+            ITrendSubscriptionService? trendSubscriptionService = null,
+            PlcEditorViewModel? plcEditorViewModel = null)
         {
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -487,6 +497,7 @@ namespace ModbusForge.Avalonia.ViewModels
             RulesViewModel = rulesViewModel;
             SignalGeneratorViewModel = signalGeneratorViewModel;
             VisualNodeEditorViewModel = visualNodeEditorViewModel;
+            PlcEditorViewModel = plcEditorViewModel;
             PlcProjectViewModel.SelectionChanged += PlcProjectSelectionChanged;
             // Keep the CanExecute state fresh whenever busy-ness flips: the PLC page's
             // "Load XEF..." button otherwise stays dead after the first import, because
@@ -502,6 +513,11 @@ namespace ModbusForge.Avalonia.ViewModels
             if (VisualNodeEditorViewModel != null)
             {
                 VisualNodeEditorViewModel.PropertyChanged += OnVisualNodeEditorViewModelPropertyChanged;
+            }
+
+            if (PlcEditorViewModel != null)
+            {
+                PlcEditorViewModel.PropertyChanged += OnVisualNodeEditorViewModelPropertyChanged;
             }
 
             DecodeViewModel = decodeViewModel;
@@ -897,15 +913,18 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void OnVisualNodeEditorViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
+            // Raised by both the Simulation and the PLC editor. They share the editor's
+            // status wording ("Simulation stopped"), so PLC lines are labelled or the
+            // console would report the still-running Simulation as stopped.
             if (e.PropertyName == nameof(VisualNodeEditorViewModel.StatusText) &&
-                VisualNodeEditorViewModel is not null)
+                sender is VisualNodeEditorViewModel editor &&
+                !string.IsNullOrWhiteSpace(editor.StatusText))
             {
-                var message = VisualNodeEditorViewModel.StatusText;
-                if (!string.IsNullOrWhiteSpace(message))
-                {
-                    AppendConsoleMessage(message);
-                    AppendDebugMessage($"{DateTime.Now:HH:mm:ss.fff} {message}");
-                }
+                var message = editor is PlcEditorViewModel
+                    ? PlcConsolePrefix + editor.StatusText
+                    : editor.StatusText;
+                AppendConsoleMessage(message);
+                AppendDebugMessage($"{DateTime.Now:HH:mm:ss.fff} {message}");
             }
         }
 
@@ -970,23 +989,23 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private bool IsTabIndexVisible(int index)
         {
-            // Tab order: Dashboard(0), Trends(1), Frame Inspector(2), MQTT(3),
-            // Script Editor(4), Rules(5), Signal Generator(6), Simulation(7),
-            // Holding(8), Coils(9), Input(10), Discrete(11), Custom Watch(12),
-            // Decode(13), Console(14), Debug(15), PLC(16).
+            // TabItem order in MainView.axaml: Dashboard(0), Trends(1), Frame Inspector(2),
+            // MQTT(3), Script Editor(4), Rules(5), Signal Generator(6), PLC(7),
+            // Simulation(8), Holding(9), Coils(10), Input(11), Discrete(12),
+            // Custom Watch(13), Decode(14), Console(15), Debug(16).
             return index switch
             {
                 0 => true,
                 1 => IsTrendTabVisible,
-                7 => IsSimulationTabVisible,
-                8 => IsRegistersTabVisible,
-                9 => IsCoilsTabVisible,
-                10 => IsInputRegistersTabVisible,
-                11 => IsDiscreteInputsTabVisible,
-                12 => IsCustomWatchTabVisible,
-                13 => IsDecodeTabVisible,
-                14 => IsConsoleTabVisible,
-                15 => IsDebugTabVisible,
+                8 => IsSimulationTabVisible,
+                9 => IsRegistersTabVisible,
+                10 => IsCoilsTabVisible,
+                11 => IsInputRegistersTabVisible,
+                12 => IsDiscreteInputsTabVisible,
+                13 => IsCustomWatchTabVisible,
+                14 => IsDecodeTabVisible,
+                15 => IsConsoleTabVisible,
+                16 => IsDebugTabVisible,
                 _ => true
             };
         }
@@ -3968,8 +3987,8 @@ namespace ModbusForge.Avalonia.ViewModels
         /// <summary>
         /// Imports a Schneider Unity Pro (Quantum) FEF project file (.XEF / .FEF, XML,
         /// optionally gzip-compressed). Parses the symbolic tag table and the FBD logic
-        /// sections into the visual node editor so the simulation can run live against
-        /// the Modbus server. The result can then be saved as a .mfp project.
+        /// sections into the PLC tab's own editor (<see cref="PlcEditorViewModel"/>) and
+        /// fills the PLC project navigator. The Simulation tab's programs are not touched.
         /// </summary>
         private async Task LoadPlcXmlAsync()
         {
@@ -4001,10 +4020,10 @@ namespace ModbusForge.Avalonia.ViewModels
 
                 await _dispatcher.InvokeAsync(() =>
                 {
-                    if (VisualNodeEditorViewModel == null) return;
+                    if (PlcEditorViewModel == null) return;
                     // Load through the program tree so every program/folder bookkeeping
                     // stays consistent and the canvas rebuilds as it does for .mfp loads.
-                    VisualNodeEditorViewModel.LoadImportedPrograms(
+                    PlcEditorViewModel.LoadImportedPrograms(
                         result.Sections.Select(s => (s.Name, s.Nodes, s.Connections)).ToList());
 
                     // Fill the PLC project navigator (programs, tasks, hardware).
@@ -4035,28 +4054,27 @@ namespace ModbusForge.Avalonia.ViewModels
         }
 
         /// <summary>
-        /// Selecting an FBD program in the PLC navigator switches the editor canvas
-        /// to that program (the Simulation tab shows the same editor instance).
+        /// Selecting an FBD program in the PLC navigator switches the PLC editor's
+        /// canvas to that program.
         /// </summary>
         private void PlcProjectSelectionChanged(object? sender, PlcTreeNodeViewModel? node)
         {
             if (node?.Kind != PlcNodeKind.ProgramFbd || string.IsNullOrEmpty(node.ProgramName)) return;
-            if (VisualNodeEditorViewModel?.ActivateProgramByName(node.ProgramName) != true)
+            if (PlcEditorViewModel?.ActivateProgramByName(node.ProgramName) != true)
             {
                 StatusMessage = $"Program '{node.ProgramName}' has no FBD canvas in the loaded project.";
                 _logger.LogDebug("[PLC] Program {Program} has no editor counterpart", node.ProgramName);
                 return;
             }
 
-            // The PLC page embeds its own VisualNodeEditorView instance; the shared
-            // VM's canvas-size notification fired while that instance was detached
-            // (other tab), so re-fit it now that it is on-screen.
-            VisualNodeEditorViewModel?.RefitCanvasSize();
+            // The canvas-size notification fires while the PLC canvas can be off
+            // screen (File > Load PLC from another tab), so re-fit it now.
+            PlcEditorViewModel?.RefitCanvasSize();
 
             // Unity Pro sections span thousands of pixels; opening one at 100% zoom
             // shows an empty corner. Fit the imported layout into the viewport the
             // same way the double-click path does.
-            PlcProjectViewModel.FitEditorToImportedLayout(VisualNodeEditorViewModel, node.ProgramName);
+            PlcProjectViewModel.FitEditorToImportedLayout(PlcEditorViewModel, node.ProgramName);
         }
 
         /// <summary>
@@ -4066,12 +4084,12 @@ namespace ModbusForge.Avalonia.ViewModels
         public void OpenPlcProgram(PlcTreeNodeViewModel? node)
         {
             if (node?.Kind != PlcNodeKind.ProgramFbd || string.IsNullOrEmpty(node.ProgramName)) return;
-            if (!PlcProjectViewModel.ActivateEditorProgram(VisualNodeEditorViewModel, node.ProgramName))
+            if (!PlcProjectViewModel.ActivateEditorProgram(PlcEditorViewModel, node.ProgramName))
             {
                 StatusMessage = $"Program '{node.ProgramName}' could not be opened in the editor.";
                 return;
             }
-            VisualNodeEditorViewModel?.RefitCanvasSize();
+            PlcEditorViewModel?.RefitCanvasSize();
             // PLC nav index -> tab index (the converter owns the permutation).
             SelectedTabIndex = ModbusForge.Avalonia.Converters.NavigationIndexConverter.NavigationToTab(7);
         }
@@ -4603,6 +4621,16 @@ namespace ModbusForge.Avalonia.ViewModels
             if (ActiveProfile != null)
             {
                 ActiveProfile.PropertyChanged -= ActiveProfile_PropertyChanged;
+            }
+
+            if (VisualNodeEditorViewModel != null)
+            {
+                VisualNodeEditorViewModel.PropertyChanged -= OnVisualNodeEditorViewModelPropertyChanged;
+            }
+
+            if (PlcEditorViewModel != null)
+            {
+                PlcEditorViewModel.PropertyChanged -= OnVisualNodeEditorViewModelPropertyChanged;
             }
 
             DecodeViewModel?.Dispose();

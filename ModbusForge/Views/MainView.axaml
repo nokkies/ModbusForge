@@ -280,7 +280,8 @@
                   <TextBlock Grid.Row="0"
                              Text="{Binding PlcProjectViewModel.SelectedFbdProgram, StringFormat='FBD program: {0}'}"
                              FontWeight="SemiBold" Margin="4,2,4,6" />
-                  <views:PlcFbdCanvasView Grid.Row="1" DataContext="{Binding VisualNodeEditorViewModel}" />
+                  <!-- The PLC tab's own editor, never the Simulation tab's (VisualNodeEditorViewModel). -->
+                  <views:PlcFbdCanvasView Grid.Row="1" DataContext="{Binding PlcEditorViewModel}" />
                 </Grid>
                 <TextBlock Text="Select an FBD program in the navigator to open its logic here.&#10;&#10;No PLC project loaded yet? Click 'Load XEF...' and pick a Unity Pro / Control Expert export (.XEF)."
                            TextWrapping="Wrap" Opacity="0.6" Margin="6"

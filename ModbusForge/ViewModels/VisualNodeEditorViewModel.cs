@@ -307,13 +307,6 @@ namespace ModbusForge.Avalonia.ViewModels
         [ObservableProperty]
         private bool _useOrthogonalRouting;
 
-        /// <summary>
-        /// Hides the POU-management panel (create/rename/duplicate/delete + the
-        /// program tree). The PLC navigator owns program selection there, so that
-        /// duplicate control surface is suppressed on the PLC page.
-        /// </summary>
-        public bool IsPlcProjectMode { get; set; }
-
         public ObservableCollection<PaletteItem> Palette { get; } = new();
 
         public ObservableCollection<PaletteItem> FilteredPalette { get; } = new();
@@ -464,9 +457,10 @@ namespace ModbusForge.Avalonia.ViewModels
         }
 
         /// <summary>
-        /// Re-issues the canvas size notifications. Needed when this VM is shown in
-        /// a second host (the PLC tab) after the size changed while it was detached:
-        /// Avalonia bindings don't re-read cached OneWay values on re-attach.
+        /// Re-issues the canvas size notifications. Needed when this VM's view comes
+        /// on screen after the size changed while it was detached (the PLC tab after
+        /// File > Load PLC from another tab): Avalonia bindings don't re-read cached
+        /// OneWay values on re-attach.
         /// </summary>
         public void RefitCanvasSize()
         {

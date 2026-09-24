@@ -453,21 +453,16 @@ namespace ModbusForge.Avalonia.ViewModels
         }
 
         /// <summary>
-        /// Replaces the whole program tree with one program per imported PLC section.
-        /// Used by the PLC (Unity Pro FEF) importer; the program-switch machinery
-        /// (snapshot save, config rebinding, connection-line rebuild) runs exactly as
-        /// it does for .mfp project loads so the canvas and simulation engine stay
-        /// consistent.
+        /// Replaces this editor's whole program tree with one program per imported PLC
+        /// section. Called on the PLC tab's editor (<see cref="PlcEditorViewModel"/>)
+        /// by the Unity Pro XEF importer, never on the Simulation tab's editor. The
+        /// program-switch machinery (snapshot save, config rebinding, connection-line
+        /// rebuild) runs exactly as it does for .mfp project loads so the canvas and
+        /// simulation engine stay consistent.
         /// </summary>
         public void LoadImportedPrograms(IReadOnlyList<(string Name, List<VisualNode> Nodes, List<NodeConnection> Connections)> programs)
         {
             Stop();
-
-            // Preserve the Simulation tab's current program. The PLC import
-            // replaces the program tree with the PLC sections, but we keep the
-            // existing active program so the user can switch back to their
-            // simulation after exploring the PLC.
-            var existingActive = _activeProgram;
 
             // Pre-fill the first program BEFORE the tree swap so Config's collection
             // handlers are attached from the start and the canvas picks the nodes up.
@@ -503,21 +498,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     tree.Programs.Add(program);
                 }
 
-                // If there was an existing simulation tree, nest it under the new
-                // root so the user can still access their sim programs.
-                var existingTree = ProgramTree;
-                if (existingTree != null && existingTree.Programs.Count > 0
-                    && !ReferenceEquals(existingTree, tree))
-                {
-                    var root = new ProgramFolder { Name = "Projects" };
-                    root.Folders.Add(existingTree);
-                    root.Folders.Add(tree);
-                    ProgramTree = root;
-                }
-                else
-                {
-                    ProgramTree = tree;
-                }
+                ProgramTree = tree;
 
                 // Keep the active program's collections instance-stable: point Config
                 // at the first program's own collections, then mark this program
@@ -555,10 +536,7 @@ namespace ModbusForge.Avalonia.ViewModels
             OnPropertyChanged(nameof(Connections));
             NotifyUndoRedoCommands();
 
-            var simNote = existingActive != null
-                ? $" (simulation '{existingActive.Name}' preserved in tree)"
-                : "";
-            StatusText = $"Loaded {programs.Count} imported PLC program(s){simNote}";
+            StatusText = $"Loaded {programs.Count} imported PLC program(s)";
         }
 
         /// <summary>

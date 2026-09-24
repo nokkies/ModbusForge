@@ -9,10 +9,10 @@ namespace ModbusForge.Avalonia.Views
     /// <summary>
     /// The PLC-project rendering of an imported FBD program: the canvas, toolbar,
     /// controls panel and an inline block list, without the Simulation tab's
-    /// duplicated POU tree / palette panels. Program selection is owned by the
-    /// PLC project navigator, so the shared editor VM's POU-management surface
-    /// is hidden (IsPlcProjectMode). Canvas interaction is inherited from
-    /// <see cref="FbdCanvasInteractionBase"/>.
+    /// POU tree / palette panels (the PLC project navigator owns program
+    /// selection). It binds the PLC tab's own editor
+    /// (<see cref="PlcEditorViewModel"/>), never the Simulation's. Canvas
+    /// interaction is inherited from <see cref="FbdCanvasInteractionBase"/>.
     /// </summary>
     public partial class PlcFbdCanvasView : FbdCanvasInteractionBase
     {
@@ -22,19 +22,6 @@ namespace ModbusForge.Avalonia.Views
             // The base ctor wires node/dragn-drop handlers via FindControl, which
             // only works AFTER the derived class has loaded its own XAML.
             OnViewContentLoaded();
-        }
-
-        /// <summary>
-        /// Sets PLC-project mode on the editor VM when it attaches, so the
-        /// (hidden here) POU-management surface stays suppressed on this view.
-        /// </summary>
-        protected override void OnDataContextChanged(EventArgs e)
-        {
-            base.OnDataContextChanged(e);
-            if (ViewModel is { } vm)
-            {
-                vm.IsPlcProjectMode = true;
-            }
         }
 
         /// <summary>
