@@ -183,6 +183,31 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
         }
 
         [Fact]
+        public async Task LoadingALargeXef_ReturnsControlWhileTheFileIsParsed()
+        {
+            // Corpus exports reach 16.8 MB; parsing on the UI thread froze the window.
+            var blocks = string.Concat(Enumerable.Range(0, 3000).Select(i => $@"
+        <FFBBlock instanceName="".{i}"" typeName=""AND"" additionnalPinNumber=""0"" enEnO=""false"" width=""7"" height=""6"">
+          <objPosition posX=""{i % 20 * 10}"" posY=""{i / 20 * 8}""/>
+          <descriptionFFB execAfter="""">
+            <inputVariable invertedPin=""false"" formalParameter=""IN1"" effectiveParameter=""Pump_Run""/>
+            <inputVariable invertedPin=""false"" formalParameter=""IN2"" effectiveParameter=""Pump_Start""/>
+            <outputVariable invertedPin=""false"" formalParameter=""OUT""/>
+          </descriptionFFB>
+        </FFBBlock>"));
+            File.WriteAllText(_xefPath, SampleXef.Replace("</networkFBD>", blocks + "</networkFBD>"));
+            using var simulation = CreateSimulationEditor();
+            using var plc = CreatePlcEditor();
+            using var main = CreateMainViewModel(simulation, plc);
+
+            var load = main.LoadPlcXmlCommand.ExecuteAsync(null);
+
+            Assert.False(load.IsCompleted, "the parse must not run on the calling thread");
+            await load;
+            Assert.True(main.PlcProjectViewModel.HasProject);
+        }
+
+        [Fact]
         public void HidingTheSimulationTab_KeepsThePlcTabOpen()
         {
             using var main = CreateMainViewModel(simulation: null, plc: null);

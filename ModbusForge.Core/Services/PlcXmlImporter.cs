@@ -12,7 +12,8 @@ namespace ModbusForge.Services
 {
     /// <summary>
     /// Importer for Schneider Unity Pro / Unity Pro XL (Quantum) FEF project files
-    /// (<c>.XEF</c> / <c>.FEF</c>, XML; possibly gzip-compressed). Parses the symbolic
+    /// (<c>.XEF</c> / <c>.FEF</c>, XML; possibly gzip-compressed, or a <c>.ZEF</c> zip
+    /// holding the .XEF). Parses the symbolic
     /// tag table and the hand-written FBD logic sections into sets of
     /// <see cref="VisualNode"/>/<see cref="NodeConnection"/> that load directly into the
     /// ModbusForge visual simulation editor and run live against the Modbus server.
@@ -32,10 +33,10 @@ namespace ModbusForge.Services
     /// </summary>
     public sealed class PlcXmlImporter
     {
-        /// <summary>Placeholder element type used for custom FBDs that ModbusForge
-        /// cannot model natively. The node's Name carries the Unity Pro type so it is
-        /// visible on the canvas.</summary>
-        public const PlcElementType Opaque = PlcElementType.SignalGenerator;
+        /// <summary>Element type for Unity FFBs ModbusForge cannot simulate: drawn as
+        /// Control Expert draws them (the Unity type lives in <see cref="PlcBlockInfo"/>)
+        /// but inert in the engine, so they never invent values.</summary>
+        public const PlcElementType Opaque = PlcElementType.PlcBlock;
 
         private static readonly Regex TopologicalAddressRegex = new(
             @"^%?(MW|IW|IB|QB|IBI|MB|QB|Q|M|I)\s*\.?\s*(\d+)\s*(?:\.(\d+))?$",
@@ -253,7 +254,8 @@ namespace ModbusForge.Services
             }
 
             var tags = ParseTagTable(xef, result);
-            var sections = ParseSections(xef, tags, result);
+            var pinPositions = ParsePinPositions(xef);
+            var sections = ParseSections(xef, tags, pinPositions, result);
             ParseHardware(xef, result);
 
             // Unity Pro reuses instance names (".1", "FBI_12", ...) across networks
@@ -314,6 +316,13 @@ namespace ModbusForge.Services
                 var name = (string?)v.Attribute("name");
                 var address = (string?)v.Attribute("topologicalAddress");
                 if (string.IsNullOrWhiteSpace(name)) continue;
+
+                result.Variables.Add(new PlcXmlVariable(
+                    name!,
+                    (string?)v.Attribute("typeName") ?? "",
+                    string.IsNullOrWhiteSpace(address) ? null : address,
+                    (string?)v.Element("variableInit")?.Attribute("value"),
+                    CleanText(v.Element("comment")?.Value)));
 
                 if (!string.IsNullOrWhiteSpace(address))
                 {
@@ -383,6 +392,7 @@ namespace ModbusForge.Services
         private static List<PlcXmlSection> ParseSections(
             XDocument xef,
             Dictionary<string, PlcAddressReference> tags,
+            IReadOnlyDictionary<string, BlockPinPositions> pinPositions,
             PlcXmlImportResult result)
         {
             var sections = new List<PlcXmlSection>();
@@ -435,9 +445,15 @@ namespace ModbusForge.Services
                 {
                     // A program without any source (an empty section skeleton Unity Pro
                     // emits for every task) is noise — don't surface it. Programs in
-                    // other languages (ST, LD, IL, SFC, ...) are real and get listed.
+                    // other languages (ST, LD, IL, SFC, ...) are real and get listed;
+                    // textual ones keep their source so the PLC page can show it.
                     if (!string.IsNullOrEmpty(language))
                     {
+                        if (language is "ST" or "IL")
+                        {
+                            programInfo.SourceText = NormalizeSourceText(program.Element(sourceLang!)?.Value);
+                        }
+
                         result.SkippedPrograms.Add(new PlcXmlSkippedProgram
                         {
                             Name = sectionName,
@@ -447,7 +463,7 @@ namespace ModbusForge.Services
                     continue;
                 }
 
-                var section = ParseFbdSource(fbd, tags, sectionName, task, sectionOrdinal, result);
+                var section = ParseFbdSource(fbd, tags, pinPositions, sectionName, task, sectionOrdinal, result);
                 sections.Add(section with { Location = location, Order = order });
                 sectionOrdinal++;
                 programInfo.HasFbdCanvas = true;
@@ -553,6 +569,7 @@ namespace ModbusForge.Services
         private static PlcXmlSection ParseFbdSource(
             XElement fbdSource,
             Dictionary<string, PlcAddressReference> tags,
+            IReadOnlyDictionary<string, BlockPinPositions> pinPositions,
             string sectionName,
             string task,
             int sectionOrdinal,
@@ -578,15 +595,24 @@ namespace ModbusForge.Services
             // Legacy placement for blocks with no usable <objPosition>: a flowing
             // 4-row grid advanced per placed node.
             int legacyCursor = 0;
+            var textBoxOrdinal = 0;
 
             foreach (var network in networks)
             {
                 var blocks = network.Descendants("FFBBlock").ToList();
                 var links = network.Descendants("linkFB").ToList();
 
-                // Instance-name → node-id within this network (names are reused
-                // across networks, so the map is scoped per network).
-                var instanceToNodeId = new Dictionary<string, string>(StringComparer.Ordinal);
+                // Pins some link attaches to: Control Expert draws a linked EN/ENO
+                // even on a block whose enEnO flag is off (e.g. SET driven via EN).
+                var linkedPins = new HashSet<(string Instance, string Pin)>(
+                    links.SelectMany(l => new[] { l.Element("linkSource"), l.Element("linkDestination") })
+                        .Where(end => end != null)
+                        .Select(end => ((string?)end!.Attribute("parentObjectName") ?? "", (string?)end.Attribute("pinName") ?? "")));
+
+                // Instance name → the network's blocks with that name (names are reused
+                // across networks, so the map is scoped per network; within one network
+                // Unity can still give several EFs the same auto name).
+                var instanceToNodes = new Dictionary<string, List<VisualNode>>(StringComparer.Ordinal);
                 var usedInstances = new HashSet<string>(StringComparer.Ordinal);
 
                 // Measure the widest network so the next one starts below it.
@@ -622,35 +648,43 @@ namespace ModbusForge.Services
                     }
 
                     var nodeId = $"S{sectionOrdinal}_{uniqueInstance}";
-                    instanceToNodeId[rawInstance] = nodeId;
 
-                    var node = CreateVisualNode(block, nodeId, uniqueInstance, typeName, elementType, tags);
+                    var node = CreateVisualNode(block, nodeId, uniqueInstance, rawInstance, typeName, elementType, tags,
+                        pinPositions.GetValueOrDefault(typeName), pin => linkedPins.Contains((rawInstance, pin)));
+                    if (!instanceToNodes.TryGetValue(rawInstance, out var sameName))
+                        instanceToNodes[rawInstance] = sameName = new List<VisualNode>();
+                    sameName.Add(node);
 
-                    // Unity Pro <objPosition> carries the Control Expert grid-cell
-                    // indices: X is in cells of 2 units (a 7-cell-wide TON sits at
-                    // 16 then 30, not 23), Y is in cells of 1 unit (5-cell-tall
-                    // blocks stack at 170, 175, 180...). Multiply by the cell size
-                    // so blocks render at their real relative rows/columns.
-                    var (rawX, rawY) = ReadGridPosition(block);
+                    // Unity Pro <objPosition> carries the Control Expert grid cell
+                    // of the block's top-left corner; width/height are cells too.
+                    // Multiply by the cell size so blocks render at their real rows
+                    // and columns. (0, 0) is a valid cell, so only a missing
+                    // position falls back to the legacy cursor.
                     var (cellW, cellH) = ReadGridSize(block);
-                    if (rawX <= 0 && rawY <= 0)
+                    node.Width = cellW;
+                    node.Height = cellH;
+                    if (ReadGridPosition(block) is { } grid)
                     {
-                        node.Width = cellW;
-                        node.Height = cellH;
+                        node.X = SectionMarginX + grid.X * GridUnitWidth;
+                        node.Y = SectionMarginY + networkOrdinalOffset + grid.Y * GridUnitHeight;
+                    }
+                    else
+                    {
                         node.X = LegacyCursorColumn(legacyCursor);
                         node.Y = networkOrdinalOffset + SectionMarginY + GridUnitHeight * LegacyCursorRow(legacyCursor);
                         legacyCursor++;
                     }
-                    else
-                    {
-                        node.Width = cellW;
-                        node.Height = cellH;
-                        node.X = SectionMarginX + rawX * GridUnitWidth;
-                        node.Y = SectionMarginY + networkOrdinalOffset + rawY * GridUnitHeight;
-                    }
                     maxNodeY = Math.Max(maxNodeY, node.Y);
 
                     section.Nodes.Add(node);
+                }
+
+                // Control Expert text boxes: section comments drawn on the grid.
+                foreach (var textBox in network.Descendants("textBox"))
+                {
+                    var comment = CreateTextBoxNode(textBox, $"S{sectionOrdinal}_#text{++textBoxOrdinal}", networkOrdinalOffset);
+                    maxNodeY = Math.Max(maxNodeY, comment.Y);
+                    section.Nodes.Add(comment);
                 }
 
                 foreach (var link in links)
@@ -666,19 +700,29 @@ namespace ModbusForge.Services
 
                     if (string.IsNullOrEmpty(sourceInstance) || string.IsNullOrEmpty(targetInstance)) continue;
 
-                    if (!instanceToNodeId.TryGetValue(sourceInstance, out var sourceNodeId) ||
-                        !instanceToNodeId.TryGetValue(targetInstance, out var targetNodeId))
+                    var sourceNode = ResolveEndpoint(instanceToNodes, source, isInput: false, networkOrdinalOffset);
+                    var targetNode = ResolveEndpoint(instanceToNodes, dest, isInput: true, networkOrdinalOffset);
+                    if (sourceNode == null || targetNode == null)
                     {
                         result.AddWarning($"Link references unknown instance: {sourceInstance} -> {targetInstance}");
                         continue;
                     }
 
+                    AlignPinToRecordedEndpoint(sourceNode, source, isInput: false, networkOrdinalOffset);
+                    AlignPinToRecordedEndpoint(targetNode, dest, isInput: true, networkOrdinalOffset);
+
                     var sourcePort = NormalizeSourcePort(sourcePin ?? "OUT");
                     var targetPort = NormalizeTargetPort(targetPin ?? "IN");
 
-                    section.Connections.Add(new NodeConnection(sourceNodeId, targetNodeId, targetPort)
+                    section.Connections.Add(new NodeConnection(sourceNode.Id, targetNode.Id, targetPort)
                     {
-                        SourceConnector = sourcePort
+                        SourceConnector = sourcePort,
+                        SourcePin = sourcePin,
+                        TargetPin = targetPin,
+                        RoutePoints = link.Elements("gridObjPosition")
+                            .Select(p => ReadCellCentre(p, networkOrdinalOffset))
+                            .OfType<PlcRoutePoint>()
+                            .ToList()
                     });
                 }
 
@@ -686,49 +730,26 @@ namespace ModbusForge.Services
                 networkOrdinalOffset = maxNodeY + 260;
             }
 
-            NormalizeSectionLayout(section);
-
             if (section.Nodes.Count == 0)
                 result.AddWarning($"Section '{sectionName}' ({task}) produced no nodes.");
 
             return section;
         }
 
-        /// <summary>
-        /// Keeps the section's layout as the Control Expert grid placed it; only
-        /// compresses the whole bounding box when it exceeds <see cref="MaxSectionSpan"/>
-        /// so the editor's scrollable canvas stays usable. Positions are already
-        /// margin-based, so no translation is needed.
-        /// </summary>
-        private static void NormalizeSectionLayout(PlcXmlSection section)
-        {
-            if (section.Nodes.Count == 0) return;
-
-            var maxRight = section.Nodes.Max(n => n.X + n.Width);
-            var maxBottom = section.Nodes.Max(n => n.Y + n.Height);
-
-            var spanX = maxRight - SectionMarginX;
-            var spanY = maxBottom - SectionMarginY;
-            var overshoot = Math.Max(spanX, spanY);
-            if (overshoot <= MaxSectionSpan) return;
-
-            var factor = MaxSectionSpan / overshoot;
-            foreach (var node in section.Nodes)
-            {
-                node.X = SectionMarginX + (node.X - SectionMarginX) * factor;
-                node.Y = SectionMarginY + (node.Y - SectionMarginY) * factor;
-            }
-        }
-
-        // Unity Pro FBD exports place every block with <objPosition posX posY> in
-        // Control Expert grid cells. Empirically (GGPLC007 ALARMS): a block at X=16
-        // with width=7 ends at 23 and the next sits at 30, so one horizontal cell
-        // is 2 units; a block at Y=170 with height=5 ends at 175 and the next sits
-        // at 175, so one vertical cell is 1 unit. <FFBBlock> width/height are in
-        // the same cell counts. These constants map cells to pixels so the import
-        // keeps Control Expert's rows and columns.
+        // Unity Pro FBD exports place every block, link bend and text box on the
+        // Control Expert grid (<objPosition>/<gridObjPosition> posX/posY, and
+        // width/height in cells). Measured on the corpus' 20,843 link endpoints, a
+        // column and a row are the same unit, so the cells render square. The
+        // layout is kept exact (never compressed): long sections grow the canvas.
         private const double GridUnitWidth = 20;
         private const double GridUnitHeight = 20;
+
+        // Control Expert pin rows, per block side (measured on the same endpoints):
+        // EN/ENO sit in the block's fourth row and a data pin sits PositionPin rows
+        // below it, PositionPin being declared by the block type's signature (41,665
+        // of the corpus' 41,694 link endpoints match). Undeclared pins (extensible
+        // IN3.., types without a signature) take the row after the previous pin.
+        private const int EnableRow = 3;
 
         // A block's <FFBBlock> width/height attributes are in the same grid cells
         // as its position; honouring them reproduces Control Expert's block sizes
@@ -746,11 +767,7 @@ namespace ModbusForge.Services
         // real grid-placed blocks (which can sit at posX=1: 1*GridUnitWidth).
         private const double LegacyColumnOffset = 2000;
 
-        // Upper bound on a section's pixel span before its layout is compressed;
-        // keeps the editor's scrollable canvas usable.
-        private const double MaxSectionSpan = 8000;
-
-        // Margins the normalized layout is translated into.
+        // Margins the grid layout is translated into.
         private const double SectionMarginX = 60;
         private const double SectionMarginY = 40;
 
@@ -759,16 +776,30 @@ namespace ModbusForge.Services
 
         private static int LegacyCursorRow(int cursor) => cursor % LegacyRows;
 
-        private static (double X, double Y) ReadGridPosition(XElement block)
+        /// <summary>The element's grid cell, or null when the export gives it no position.</summary>
+        private static (double X, double Y)? ReadGridPosition(XElement element)
         {
-            double x = 0, y = 0;
-            var pos = FindPositionFor(block);
-            if (pos != null)
+            var pos = FindPositionFor(element);
+            if (pos == null
+                || !double.TryParse(pos.Attribute("posX")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
+                || !double.TryParse(pos.Attribute("posY")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
             {
-                double.TryParse(pos.Attribute("posX")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out x);
-                double.TryParse(pos.Attribute("posY")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out y);
+                return null;
             }
             return (x, y);
+        }
+
+        /// <summary>Canvas pixel centre of a grid cell given as posX/posY attributes.</summary>
+        private static PlcRoutePoint? ReadCellCentre(XElement position, double yOffset)
+        {
+            if (!double.TryParse(position.Attribute("posX")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
+                || !double.TryParse(position.Attribute("posY")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
+            {
+                return null;
+            }
+            return new PlcRoutePoint(
+                SectionMarginX + (x + 0.5) * GridUnitWidth,
+                SectionMarginY + yOffset + (y + 0.5) * GridUnitHeight);
         }
 
         // <objPosition> lives at two different depths depending on the export:
@@ -796,23 +827,37 @@ namespace ModbusForge.Services
             XElement block,
             string nodeId,
             string uniqueInstance,
+            string rawInstance,
             string typeName,
             PlcElementType elementType,
-            Dictionary<string, PlcAddressReference> tags)
+            Dictionary<string, PlcAddressReference> tags,
+            BlockPinPositions? declaredPins,
+            Func<string, bool> isLinkedPin)
         {
 
             var isOpaque = elementType == Opaque;
             var node = new VisualNode
             {
                 Id = nodeId,
-                // Opaque FBs carry the Unity Pro type in their name so the canvas
-                // shows what is being stubbed.
+                // Opaque FBs carry the Unity Pro type in their name so the node list
+                // shows what is not simulated.
                 Name = isOpaque ? $"{uniqueInstance} [{typeName}]" : uniqueInstance,
                 ElementType = elementType,
                 ShowLiveValues = true
             };
 
             var description = block.Descendants("descriptionFFB").FirstOrDefault();
+            var showEnEno = string.Equals((string?)block.Attribute("enEnO"), "true", StringComparison.OrdinalIgnoreCase);
+            node.Plc = new PlcBlockInfo
+            {
+                TypeName = typeName,
+                // Unity names elementary functions ".1", ".2", ...; only function
+                // block instances carry a name Control Expert displays.
+                InstanceName = rawInstance.StartsWith('.') ? null : rawInstance,
+                Comment = CleanText(block.Element("comment")?.Value),
+                CellSize = GridUnitHeight,
+                Pins = description == null ? Array.Empty<PlcPin>() : BuildPins(description, showEnEno, declaredPins, isLinkedPin)
+            };
 
             // The REAL Unity Pro pin names (EN/IN/PT/ENO/Q/ET...) become the node's
             // input/output port lists ONLY when they don't collide with the
@@ -872,6 +917,222 @@ namespace ModbusForge.Services
             }
 
             return node;
+        }
+
+        /// <summary>
+        /// Every formal pin as Control Expert draws it: inputs on the left, outputs on
+        /// the right, each in the row its type signature declares (see
+        /// <see cref="EnableRow"/>); EN/ENO when the block shows them or something is
+        /// attached to them. An in/out parameter appears on both sides.
+        /// </summary>
+        private static IReadOnlyList<PlcPin> BuildPins(
+            XElement description, bool showEnEno, BlockPinPositions? declaredPins, Func<string, bool> isLinkedPin)
+        {
+            var pins = new List<PlcPin>();
+            foreach (var (element, isInput) in new[] { ("inputVariable", true), ("outputVariable", false) })
+            {
+                var declared = isInput ? declaredPins?.Inputs : declaredPins?.Outputs;
+                var previousRow = EnableRow;
+                foreach (var variable in description.Elements(element))
+                {
+                    var name = (string?)variable.Attribute("formalParameter") ?? "";
+                    var actual = (string?)variable.Attribute("effectiveParameter");
+                    var isEnable = IsEnablePin(name);
+                    if (isEnable && !showEnEno && string.IsNullOrEmpty(actual) && !isLinkedPin(name)) continue;
+
+                    int row;
+                    if (isEnable)
+                    {
+                        row = EnableRow;
+                    }
+                    else
+                    {
+                        row = declared != null && declared.TryGetValue(name, out var position) && position > 0
+                            ? EnableRow + position
+                            : previousRow + 1;
+                        previousRow = row;
+                    }
+
+                    pins.Add(new PlcPin
+                    {
+                        Name = name,
+                        IsInput = isInput,
+                        CenterY = (row + 0.5) * GridUnitHeight,
+                        ActualParameter = string.IsNullOrEmpty(actual) ? null : actual,
+                        Inverted = string.Equals((string?)variable.Attribute("invertedPin"), "true", StringComparison.OrdinalIgnoreCase)
+                    });
+                }
+            }
+
+            return pins;
+        }
+
+        /// <summary>
+        /// The block a link end attaches to. When several blocks in the network share
+        /// the end's instance name, the end's recorded cell picks the block whose pin
+        /// is drawn there.
+        /// </summary>
+        private static VisualNode? ResolveEndpoint(
+            Dictionary<string, List<VisualNode>> instanceToNodes, XElement end, bool isInput, double yOffset)
+        {
+            var instance = (string?)end.Attribute("parentObjectName");
+            if (string.IsNullOrEmpty(instance) || !instanceToNodes.TryGetValue(instance!, out var candidates)) return null;
+            if (candidates.Count == 1) return candidates[0];
+
+            if (end.Element("objPosition") is not { } position || ReadCellCentre(position, yOffset) is not { } recorded)
+                return candidates[^1];
+
+            var pinName = (string?)end.Attribute("pinName");
+            return candidates
+                .OrderBy(node =>
+                {
+                    var (x, y) = DrawnPinPoint(node, pinName, isInput);
+                    return Math.Abs(x - recorded.X) + Math.Abs(y - recorded.Y);
+                })
+                .First();
+        }
+
+        /// <summary>Where a block draws a pin (its row centre on the frame edge), in canvas pixels.</summary>
+        private static (double X, double Y) DrawnPinPoint(VisualNode node, string? pinName, bool isInput)
+        {
+            var inset = node.Plc?.FrameInset ?? 0;
+            var pin = node.Plc?.Pins.FirstOrDefault(p => p.IsInput == isInput && string.Equals(p.Name, pinName, StringComparison.Ordinal));
+            return (isInput ? node.X + inset : node.X + node.Width - inset, node.Y + (pin?.CenterY ?? node.Height / 2));
+        }
+
+        /// <summary>
+        /// Moves a linked pin to the row Control Expert recorded for the link end when
+        /// the two disagree (exports without type signatures, older block layouts): the
+        /// recorded endpoint is what Control Expert drew. Recorded cells off the pin's
+        /// frame edge or outside the block are stale and ignored.
+        /// </summary>
+        private static void AlignPinToRecordedEndpoint(VisualNode node, XElement end, bool isInput, double yOffset)
+        {
+            if (node.Plc is not { } plc
+                || end.Element("objPosition") is not { } position
+                || ReadCellCentre(position, yOffset) is not { } recorded)
+            {
+                return;
+            }
+
+            var pinName = (string?)end.Attribute("pinName");
+            var pins = plc.Pins.ToList();
+            var index = pins.FindIndex(p => p.IsInput == isInput && string.Equals(p.Name, pinName, StringComparison.Ordinal));
+            if (index < 0) return;
+
+            var (drawnX, drawnY) = DrawnPinPoint(node, pinName, isInput);
+            var recordedCentreY = recorded.Y - node.Y;
+            if (Math.Abs(drawnX - recorded.X) > PositionTolerance
+                || Math.Abs(drawnY - recorded.Y) <= PositionTolerance
+                || recordedCentreY <= 0 || recordedCentreY >= node.Height)
+            {
+                return;
+            }
+
+            pins[index] = pins[index] with { CenterY = recordedCentreY };
+            node.Plc = plc with { Pins = pins };
+        }
+
+        // Pixel positions are exact multiples of the grid; this only absorbs rounding.
+        private const double PositionTolerance = 0.5;
+
+        /// <summary>Declared pin rows (PositionPin) of one block type, per side.</summary>
+        private sealed class BlockPinPositions
+        {
+            public Dictionary<string, int> Inputs { get; } = new(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, int> Outputs { get; } = new(StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Reads each block type's signature (EFSource / EFBSource / FBSource, directly
+        /// or under ExternalToolsOnly for protected DFBs) for its parameters' PositionPin
+        /// attribute: the row Control Expert draws each pin in. In/out parameters sit
+        /// on both sides.
+        /// </summary>
+        private static Dictionary<string, BlockPinPositions> ParsePinPositions(XDocument xef)
+        {
+            var types = new Dictionary<string, BlockPinPositions>(StringComparer.OrdinalIgnoreCase);
+            foreach (var source in xef.Root!.Elements())
+            {
+                var tag = source.Name.LocalName;
+                if (tag is not ("EFSource" or "EFBSource" or "FBSource")) continue;
+
+                var typeName = (string?)source.Attribute($"nameOf{tag[..^"Source".Length]}Type");
+                if (string.IsNullOrEmpty(typeName)) continue;
+
+                var positions = new BlockPinPositions();
+                foreach (var holder in new[] { source, source.Element("ExternalToolsOnly") })
+                {
+                    if (holder == null) continue;
+                    CollectPositions(holder.Element("inputParameters"), positions.Inputs);
+                    CollectPositions(holder.Element("outputParameters"), positions.Outputs);
+                    CollectPositions(holder.Element("inOutParameters"), positions.Inputs, positions.Outputs);
+                }
+
+                types[typeName!] = positions;
+            }
+
+            return types;
+        }
+
+        private static void CollectPositions(XElement? parameters, params Dictionary<string, int>[] targets)
+        {
+            if (parameters == null) return;
+
+            foreach (var variable in parameters.Elements("variables"))
+            {
+                var name = (string?)variable.Attribute("name");
+                var position = variable.Elements("attribute")
+                    .FirstOrDefault(a => (string?)a.Attribute("name") == "PositionPin")?
+                    .Attribute("value");
+                if (string.IsNullOrEmpty(name) || !int.TryParse((string?)position, NumberStyles.Integer, CultureInfo.InvariantCulture, out var row))
+                    continue;
+
+                foreach (var target in targets)
+                    target[name!] = row;
+            }
+        }
+
+        /// <summary>A Control Expert text box: section comment text on the grid, sized in cells.</summary>
+        private static VisualNode CreateTextBoxNode(XElement textBox, string nodeId, double yOffset)
+        {
+            var text = CleanText(string.Concat(textBox.Nodes().OfType<XText>().Select(t => t.Value))) ?? "";
+            var (x, y) = ReadGridPosition(textBox) ?? (0, 0);
+            double.TryParse(textBox.Attribute("width")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var width);
+            double.TryParse(textBox.Attribute("height")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var height);
+            var firstLine = text.Split('\n')[0];
+
+            return new VisualNode
+            {
+                Id = nodeId,
+                Name = firstLine.Length > MaxCommentNameLength ? firstLine[..MaxCommentNameLength] + "..." : firstLine,
+                ElementType = PlcElementType.PlcComment,
+                X = SectionMarginX + x * GridUnitWidth,
+                Y = SectionMarginY + yOffset + y * GridUnitHeight,
+                Width = Math.Max(width, 1) * GridUnitWidth,
+                Height = Math.Max(height, 1) * GridUnitHeight,
+                Plc = new PlcBlockInfo { Text = text, CellSize = GridUnitHeight }
+            };
+        }
+
+        // Node-list label for a text box: its first line, shortened.
+        private const int MaxCommentNameLength = 40;
+
+        /// <summary>
+        /// Program text with normalized line breaks and no surrounding blank lines;
+        /// indentation inside the text is kept as written.
+        /// </summary>
+        private static string? NormalizeSourceText(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return null;
+            return text.Replace("\r\n", "\n").TrimEnd().TrimStart('\n');
+        }
+
+        /// <summary>Trims export whitespace around comment text and normalizes line breaks.</summary>
+        private static string? CleanText(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return null;
+            return text.Replace("\r\n", "\n").Trim();
         }
 
         private static bool IsKnownTag(string? effective, Dictionary<string, PlcAddressReference> tags)
@@ -1016,6 +1277,19 @@ namespace ModbusForge.Services
                 ms.Position = 0;
                 return XDocument.Load(ms);
             }
+
+            // A .ZEF export is a zip archive holding the project's .XEF.
+            if (bytes.Length > 3 && bytes[0] == (byte)'P' && bytes[1] == (byte)'K' && bytes[2] == 3 && bytes[3] == 4)
+            {
+                using var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
+                var entry = zip.Entries.FirstOrDefault(e => e.FullName.EndsWith(".xef", StringComparison.OrdinalIgnoreCase))
+                            ?? zip.Entries.FirstOrDefault(e => e.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase));
+                if (entry == null) return null;
+
+                using var stream = entry.Open();
+                return XDocument.Load(stream);
+            }
+
             return XDocument.Load(path);
         }
     }
@@ -1063,6 +1337,9 @@ namespace ModbusForge.Services
 
         /// <summary>True when the FBD canvas was parsed into nodes.</summary>
         public bool HasFbdCanvas { get; set; }
+
+        /// <summary>Program text for textual languages (ST, IL), as Control Expert shows it; null otherwise.</summary>
+        public string? SourceText { get; set; }
     }
 
     /// <summary>A runtime task as shown under Task Configuration.</summary>
@@ -1098,6 +1375,11 @@ namespace ModbusForge.Services
         public string Reason { get; init; } = "";
     }
 
+    /// <summary>A declared variable: what Control Expert's Data Editor shows for it.</summary>
+    /// <param name="Address">Topological address (%MW100, %M10, ...); null for unlocated variables.</param>
+    /// <param name="InitialValue">Declared initial value (variableInit); null when none.</param>
+    public sealed record PlcXmlVariable(string Name, string TypeName, string? Address, string? InitialValue, string? Comment);
+
     /// <summary>
     /// Outcome of an XEF import: the parsed sections, tag count, the set of
     /// function-block types preserved as Opaque FBs, and any warnings/errors.
@@ -1126,7 +1408,11 @@ namespace ModbusForge.Services
         public List<string> Warnings { get; } = new();
         public List<string> Errors { get; } = new();
 
-        public int TotalNodes => Sections.Sum(s => s.Nodes.Count);
+        /// <summary>Declared variables (the dataBlock), as Control Expert's Data Editor lists them.</summary>
+        public List<PlcXmlVariable> Variables { get; } = new();
+
+        /// <summary>Imported FFB blocks (section text boxes are not counted).</summary>
+        public int TotalNodes => Sections.Sum(s => s.Nodes.Count(n => n.ElementType != PlcElementType.PlcComment));
         public int TotalConnections => Sections.Sum(s => s.Connections.Count);
 
         public static PlcXmlImportResult Failure(string message)

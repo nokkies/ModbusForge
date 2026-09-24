@@ -214,6 +214,30 @@
                 </ItemsPanelTemplate>
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
+                <views:PlcNodeTemplateSelector>
+                <!-- Imported FFB: drawn as Control Expert draws it (PlcBlockView); the
+                     transparent Border keeps the canvas' select/drag handling. -->
+                <views:PlcNodeTemplateSelector.PlcBlockTemplate>
+                <DataTemplate DataType="models:VisualNode">
+                  <Border Width="{Binding Width}" Height="{Binding Height}" Background="Transparent" ClipToBounds="False"
+                          ToolTip.Tip="{Binding Plc.Comment}"
+                          PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
+                    <views:PlcBlockView Width="{Binding Width}" Height="{Binding Height}"/>
+                  </Border>
+                </DataTemplate>
+                </views:PlcNodeTemplateSelector.PlcBlockTemplate>
+                <!-- Control Expert text box (section comment). Text boxes often frame
+                     whole groups of blocks, so they are transparent and sit behind them. -->
+                <views:PlcNodeTemplateSelector.CommentTemplate>
+                <DataTemplate DataType="models:VisualNode">
+                  <Border Width="{Binding Width}" Height="{Binding Height}" Background="Transparent" BorderBrush="#9E9E9E" BorderThickness="1" Padding="4,2"
+                          PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
+                    <TextBlock Text="{Binding Plc.Text}" FontSize="10" Foreground="#333333" TextWrapping="Wrap"/>
+                  </Border>
+                </DataTemplate>
+                </views:PlcNodeTemplateSelector.CommentTemplate>
+                <!-- Blocks added by hand from the block list: the editor's regular node. -->
+                <views:PlcNodeTemplateSelector.DefaultTemplate>
                 <DataTemplate DataType="models:VisualNode">
                   <Border Width="{Binding Width}" Height="{Binding Height}" Classes="node" BorderBrush="{Binding HasError, Converter={StaticResource NodeErrorBrush}}" views:VisualNodeBehavior.IsSelected="{Binding IsSelected}" CornerRadius="4" PointerPressed="Node_PointerPressed" PointerMoved="Node_PointerMoved" PointerReleased="Node_PointerReleased" PointerCaptureLost="Node_PointerCaptureLost">
                     <Border.Background>
@@ -374,8 +398,10 @@
                     </Grid>
                   </Border>
                 </DataTemplate>
+                </views:PlcNodeTemplateSelector.DefaultTemplate>
+                </views:PlcNodeTemplateSelector>
               </ItemsControl.ItemTemplate>
-              <ItemsControl.Styles><Style Selector="ContentPresenter" x:DataType="models:VisualNode"><Setter Property="Canvas.Left" Value="{Binding X}"/><Setter Property="Canvas.Top" Value="{Binding Y}"/></Style></ItemsControl.Styles>
+              <ItemsControl.Styles><Style Selector="ContentPresenter" x:DataType="models:VisualNode"><Setter Property="Canvas.Left" Value="{Binding X}"/><Setter Property="Canvas.Top" Value="{Binding Y}"/><Setter Property="ZIndex" Value="{Binding ElementType, Converter={x:Static converters:PlcNodeLayerConverter.Instance}}"/></Style></ItemsControl.Styles>
             </ItemsControl>
 
             <ItemsControl ItemsSource="{Binding ConnectionLines}" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}" ZIndex="10">
@@ -386,7 +412,12 @@
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="vm:ConnectionLine">
-                  <Path Data="{Binding PathData}" Stroke="{Binding LineBrush}" StrokeThickness="4" Cursor="Hand" PointerPressed="ConnectionLine_PointerPressed"/>
+                  <!-- Thin like Control Expert links; the transparent wide path keeps
+                       them easy to click. -->
+                  <Canvas>
+                    <Path Data="{Binding PathData}" Stroke="Transparent" StrokeThickness="8" Cursor="Hand" PointerPressed="ConnectionLine_PointerPressed"/>
+                    <Path Data="{Binding PathData}" Stroke="{Binding LineBrush}" StrokeThickness="1.5" IsHitTestVisible="False"/>
+                  </Canvas>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>

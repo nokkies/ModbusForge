@@ -170,6 +170,10 @@ namespace ModbusForge.Services
             catalog.Register(new EdgeDetectBlock());
             catalog.Register(new MovingAverageBlock());
 
+            // Imported Unity Pro content without simulation behaviour
+            catalog.Register(new PlcInertBlock(nameof(PlcElementType.PlcBlock), "PLC Block (not simulated)"));
+            catalog.Register(new PlcInertBlock(nameof(PlcElementType.PlcComment), "PLC Comment"));
+
             return catalog;
         }
 

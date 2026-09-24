@@ -61,6 +61,30 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             Assert.Equal(1.0, vm.ZoomLevel);
         }
 
+        [Fact]
+        public void TallPlcSection_FitsItsWidth_SoTheTextStaysReadable()
+        {
+            // Corpus sections run to 1,072 grid rows (~21,000 px). Fitting the height
+            // pins them at the 25% floor; like Control Expert the page instead shows
+            // the full width at a readable size and the user scrolls down.
+            using var vm = CreateVm();
+            var tall = new List<VisualNode>
+            {
+                new() { ElementType = PlcElementType.AND, X = 0, Y = 0, Width = 240, Height = 140 },
+                new() { ElementType = PlcElementType.AND, X = 1760, Y = 21000, Width = 240, Height = 140 },
+            };
+            vm.LoadImportedPrograms(new (string, List<VisualNode>, List<NodeConnection>)[]
+            {
+                ("TALL", tall, new List<NodeConnection>()),
+            });
+            var project = new PlcProjectViewModel();
+            project.LoadImportedSectionsForTest(new Dictionary<string, PlcXmlSection> { ["TALL"] = Section(tall) });
+
+            Assert.True(project.ActivateEditorProgram(vm, "TALL"));
+
+            Assert.Equal(1200.0 / 2000.0, vm.ZoomLevel, 3);
+        }
+
         private static PlcXmlSection Section(List<VisualNode> nodes)
         {
             var s = new PlcXmlSection { Name = "sec" };

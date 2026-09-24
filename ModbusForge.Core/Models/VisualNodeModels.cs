@@ -128,6 +128,13 @@ namespace ModbusForge.Models
         [ObservableProperty]
         private ObservableCollection<string>? _inputPortNames;
 
+        /// <summary>
+        /// Control Expert presentation of a block imported from a Unity Pro XEF (type,
+        /// instance, pins, actual parameters). Null on hand-built Simulation nodes.
+        /// </summary>
+        [ObservableProperty]
+        private PlcBlockInfo? _plc;
+
         // Timer/Counter parameters
         [ObservableProperty]
         private int _timerPresetMs = 1000;
@@ -526,6 +533,18 @@ namespace ModbusForge.Models
 
         [ObservableProperty]
         private bool _isConnected = true;
+
+        /// <summary>Unity pin the link leaves (imported links only; drawing uses it, simulation uses <see cref="SourceConnector"/>).</summary>
+        [ObservableProperty]
+        private string? _sourcePin;
+
+        /// <summary>Unity pin the link enters (imported links only).</summary>
+        [ObservableProperty]
+        private string? _targetPin;
+
+        /// <summary>Bend points Control Expert recorded for the link, in canvas pixels.</summary>
+        [ObservableProperty]
+        private List<PlcRoutePoint> _routePoints = new();
 
         public NodeConnection(string sourceNodeId, string targetNodeId, string targetConnector = "Input1")
         {

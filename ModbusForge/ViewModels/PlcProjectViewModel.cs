@@ -45,6 +45,44 @@ public sealed partial class PlcProjectViewModel : ObservableObject
     /// <summary>True when the selection is an FBD program with a canvas.</summary>
     public bool HasFbdSelected { get; private set; }
 
+    /// <summary>Source of the selected ST/IL program (shown as text, as Control Expert does), else null.</summary>
+    public string? SelectedSourceText { get; private set; }
+
+    /// <summary>True when the selection is a textual program with source to show.</summary>
+    public bool HasSourceSelected { get; private set; }
+
+    /// <summary>True when no canvas, program text or variable list is open (the page shows its hint).</summary>
+    public bool ShowsPlaceholder => !HasFbdSelected && !HasSourceSelected && !HasVariablesSelected;
+
+    /// <summary>The project's declared variables (Data Editor contents).</summary>
+    public IReadOnlyList<PlcXmlVariable> Variables { get; private set; } = Array.Empty<PlcXmlVariable>();
+
+    /// <summary>True when the Data Management row is selected: the page lists the variables.</summary>
+    public bool HasVariablesSelected { get; private set; }
+
+    private string _variableFilter = "";
+
+    /// <summary>Case-insensitive text matched against name, type, address and comment.</summary>
+    public string VariableFilter
+    {
+        get => _variableFilter;
+        set
+        {
+            if (SetProperty(ref _variableFilter, value ?? ""))
+            {
+                OnPropertyChanged(nameof(FilteredVariables));
+            }
+        }
+    }
+
+    /// <summary>The variables matching <see cref="VariableFilter"/>.</summary>
+    public IReadOnlyList<PlcXmlVariable> FilteredVariables => string.IsNullOrWhiteSpace(_variableFilter)
+        ? Variables
+        : Variables.Where(v => Matches(v.Name) || Matches(v.TypeName) || Matches(v.Address) || Matches(v.Comment)).ToList();
+
+    private bool Matches(string? text)
+        => text != null && text.Contains(_variableFilter.Trim(), StringComparison.OrdinalIgnoreCase);
+
     public PlcTreeNodeViewModel? SelectedNode
     {
         get => _selectedNode;
@@ -52,14 +90,22 @@ public sealed partial class PlcProjectViewModel : ObservableObject
         {
             if (!SetProperty(ref _selectedNode, value)) return;
 
-            // Only FBD program rows (not task-assignment rows) switch the canvas.
+            // Only FBD program rows (not task-assignment rows) switch the canvas;
+            // ST/IL program rows open their source text instead.
             SelectedFbdProgram = value != null && value.Kind == PlcNodeKind.ProgramFbd
                 ? value.ProgramName
                 : null;
             HasFbdSelected = !string.IsNullOrEmpty(SelectedFbdProgram);
+            SelectedSourceText = value?.Kind == PlcNodeKind.ProgramText ? value.SourceText : null;
+            HasSourceSelected = SelectedSourceText != null;
+            HasVariablesSelected = value?.Kind == PlcNodeKind.DdtList;
 
             OnPropertyChanged(nameof(SelectedFbdProgram));
             OnPropertyChanged(nameof(HasFbdSelected));
+            OnPropertyChanged(nameof(SelectedSourceText));
+            OnPropertyChanged(nameof(HasSourceSelected));
+            OnPropertyChanged(nameof(HasVariablesSelected));
+            OnPropertyChanged(nameof(ShowsPlaceholder));
             SelectionChanged?.Invoke(this, value);
         }
     }
@@ -89,12 +135,11 @@ public sealed partial class PlcProjectViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Unity Pro layouts spread across huge canvases (GGPLC007's ALARMS spans
-    /// 8000x5000 even after the importer caps it). At 100% zoom a program shows
-    /// only its top-left corner, which looks like "no logic" — so the PLC page
-    /// zooms the editor out until the imported bounding box fits a typical
-    /// laptop viewport, the same first-glance behavior as Control Expert.
-    /// A program smaller than the viewport stays at 100% (never zoom IN).
+    /// Unity Pro sections are wide and often very tall (up to ~100 grid columns by
+    /// 1,072 rows in the corpus). Like Control Expert, the PLC page opens a program
+    /// with its full width in view and lets the user scroll down: fitting the
+    /// height as well would pin tall sections at the zoom floor, too small to read.
+    /// A program narrower than the viewport stays at 100% (never zoom IN).
     /// A zoom the user sets sticks until the next program is selected.
     /// </summary>
     public void FitEditorToImportedLayout(VisualNodeEditorViewModel? editor, string programName)
@@ -104,9 +149,7 @@ public sealed partial class PlcProjectViewModel : ObservableObject
         if (_lastFitProgram == programName && editor.HasUserZoomed) return;
 
         double maxX = section.Nodes.Max(n => n.X + n.Width);
-        double maxY = section.Nodes.Max(n => n.Y + n.Height);
-        double fit = Math.Min(FitViewportWidth / Math.Max(maxX, 1.0),
-                              FitViewportHeight / Math.Max(maxY, 1.0));
+        double fit = FitViewportWidth / Math.Max(maxX, 1.0);
         editor.ResetUserZoomFlag();
         editor.SetZoom(Math.Clamp(fit, MinFitZoom, 1.0));
         _lastFitProgram = programName;
@@ -114,11 +157,10 @@ public sealed partial class PlcProjectViewModel : ObservableObject
 
     private string? _lastFitProgram;
 
-    // Reference viewport for the fit: the fit is zoom-OUT only (a program smaller
-    // than the viewport stays at 100%), and the zoom floor keeps text readable.
-    // ALARMS (6.9k x 4.4k px) lands at ~25%, where block titles still paint.
+    // Reference viewport width for the fit: the fit is zoom-OUT only (a program
+    // narrower than the viewport stays at 100%), and the zoom floor keeps text
+    // readable.
     private const double FitViewportWidth = 1200;
-    private const double FitViewportHeight = 650;
     private const double MinFitZoom = 0.25;
 
     /// <summary>
@@ -136,6 +178,9 @@ public sealed partial class PlcProjectViewModel : ObservableObject
         SourceFile = result.SourceFile;
         SectionsByName = result.Sections.ToDictionary(s => s.Name, StringComparer.Ordinal);
         _hardware = result.Hardware;
+        Variables = result.Variables;
+        OnPropertyChanged(nameof(Variables));
+        OnPropertyChanged(nameof(FilteredVariables));
         Summary = $"{result.SourceFile}: {result.TotalNodes} nodes / {result.TotalConnections} wires, " +
                   $"{result.Programs.Count} programs, {result.TagCount} tags";
 
@@ -160,6 +205,10 @@ public sealed partial class PlcProjectViewModel : ObservableObject
         Summary = "";
         SectionsByName = new Dictionary<string, PlcXmlSection>();
         _hardware = Array.Empty<PlcXmlHardwareModule>();
+        Variables = Array.Empty<PlcXmlVariable>();
+        VariableFilter = "";
+        OnPropertyChanged(nameof(Variables));
+        OnPropertyChanged(nameof(FilteredVariables));
         SelectedNode = null;
         OnPropertyChanged(nameof(SelectedFbdProgram));
         OnPropertyChanged(nameof(HasFbdSelected));
@@ -195,20 +244,29 @@ public sealed partial class PlcProjectViewModel : ObservableObject
                 // produced nodes for it (HasFbdCanvas). An FBD section that parsed
                 // to zero nodes is shown but flagged as empty, not silently blank.
                 var hasCanvas = p.HasFbdCanvas;
-                var nodeCount = hasCanvas && sectionsByName.TryGetValue(p.Name, out var s) ? s.Nodes.Count : 0;
-                var kind = hasCanvas ? PlcNodeKind.ProgramFbd : PlcNodeKind.ProgramReadOnly;
+                var hasText = !hasCanvas && p.SourceText != null;
+                // Blocks only: the section's text boxes are nodes too, but not FFBs.
+                var nodeCount = hasCanvas && sectionsByName.TryGetValue(p.Name, out var s)
+                    ? s.Nodes.Count(n => n.ElementType != ModbusForge.Models.PlcElementType.PlcComment)
+                    : 0;
+                var kind = hasCanvas ? PlcNodeKind.ProgramFbd
+                    : hasText ? PlcNodeKind.ProgramText
+                    : PlcNodeKind.ProgramReadOnly;
                 var suffix = hasCanvas
                     ? (nodeCount == 0 ? " (empty)" : $" ({nodeCount})")
                     : $" [{p.Language}]";
                 var node = new PlcTreeNodeViewModel(p.Name + suffix, kind)
                 {
                     ProgramName = p.Name,
+                    SourceText = p.SourceText,
                     Detail = hasCanvas
                         ? $"{p.Type} ({p.Language}) — task {p.Task}, location {p.Location}, order {p.Order}, {nodeCount} block(s)"
                         : $"{p.Type} ({p.Language}) — task {p.Task}, location {p.Location}, order {p.Order}. " +
-                          (string.Equals(p.Language, "FBD", StringComparison.OrdinalIgnoreCase)
-                              ? "No FBD logic was exported for this program (empty section)."
-                              : "FBD canvas not available (program is not FBD).")
+                          (hasText
+                              ? "Shown as program text; not simulated."
+                              : string.Equals(p.Language, "FBD", StringComparison.OrdinalIgnoreCase)
+                                  ? "No FBD logic was exported for this program (empty section)."
+                                  : "FBD canvas not available (program is not FBD).")
                 };
                 locNode.Children.Add(node);
             }
@@ -216,7 +274,10 @@ public sealed partial class PlcProjectViewModel : ObservableObject
         }
 
         app.Children.Add(secProgs);
-        app.Children.Add(new PlcTreeNodeViewModel("Data Management", PlcNodeKind.DdtList) { Detail = $"{result.TagCount} tags (DDB)" });
+        app.Children.Add(new PlcTreeNodeViewModel("Data Management", PlcNodeKind.DdtList)
+        {
+            Detail = $"{result.Variables.Count} variables declared (name, type, address, initial value, comment)"
+        });
         return app;
     }
 
@@ -302,6 +363,7 @@ public enum PlcNodeKind
     SectionProgramsRoot,
     Location,
     ProgramFbd,
+    ProgramText,
     ProgramReadOnly,
     DdtList,
     TaskConfigRoot,
@@ -332,6 +394,9 @@ public sealed class PlcTreeNodeViewModel : ObservableObject
 
     /// <summary>Program name this node refers to (FBD sections, task assignments).</summary>
     public string? ProgramName { get; init; }
+
+    /// <summary>Program text of an ST/IL section (<see cref="PlcNodeKind.ProgramText"/> rows).</summary>
+    public string? SourceText { get; init; }
 
     /// <summary>Shown in the properties pane when this node is selected.</summary>
     public string Detail { get; init; } = "";

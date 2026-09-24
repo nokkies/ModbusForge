@@ -70,7 +70,8 @@ namespace ModbusForge.Avalonia.ViewModels
         public double Angle => Math.Atan2(ToY - FromY, ToX - FromX) * 180 / Math.PI;
         public double LineTop => FromY - 1;
 
-        public void UpdatePoints(IList<Point>? points, bool isSelected, PortSide targetPortSide = PortSide.Left)
+        /// <param name="straight">Draw a two-point line as a straight segment instead of a curve.</param>
+        public void UpdatePoints(IList<Point>? points, bool isSelected, PortSide targetPortSide = PortSide.Left, bool straight = false)
         {
             TargetPortSide = targetPortSide;
             LineBrush = new SolidColorBrush(Color.Parse(isSelected ? "#1976D2" : "#607D8B"));
@@ -91,7 +92,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 IsFilled = false
             };
 
-            if (points.Count == 2)
+            if (points.Count == 2 && !straight)
             {
                 var (c1, c2) = ComputeBezierControlPoints(points[0], points[1]);
                 figure.Segments!.Add(new BezierSegment
@@ -1527,15 +1528,30 @@ namespace ModbusForge.Avalonia.ViewModels
                     continue;
                 }
 
-                var sourceY = GetPortY(source, connection.SourceConnector, false);
-                var sourcePoint = new Point(source.X + source.Width, sourceY);
-                var targetY = GetPortY(target, connection.TargetConnector, true);
-                var targetPoint = new Point(target.X, targetY);
+                var sourcePoint = GetPlcPinPoint(source, connection.SourcePin, isInput: false)
+                    ?? new Point(source.X + source.Width, GetPortY(source, connection.SourceConnector, false));
+                var targetPoint = GetPlcPinPoint(target, connection.TargetPin, isInput: true)
+                    ?? new Point(target.X, GetPortY(target, connection.TargetConnector, true));
 
-                var obstacles = Config.Nodes.Where(n => n != source && n != target);
-                var points = UseOrthogonalRouting
-                    ? GetOrthogonalPoints(sourcePoint, targetPoint, source, target, obstacles)
-                    : new List<Point> { sourcePoint, targetPoint };
+                // Imported links follow the route Control Expert recorded, drawn as
+                // straight segments like the source editor does.
+                var isPlcLink = connection.SourcePin != null && connection.TargetPin != null;
+                List<Point> points;
+                if (connection.RoutePoints is { Count: > 0 } bends)
+                {
+                    points = new List<Point> { sourcePoint };
+                    points.AddRange(bends.Select(b => new Point(b.X, b.Y)));
+                    points.Add(targetPoint);
+                }
+                else if (UseOrthogonalRouting)
+                {
+                    var obstacles = Config.Nodes.Where(n => n != source && n != target);
+                    points = GetOrthogonalPoints(sourcePoint, targetPoint, source, target, obstacles).ToList();
+                }
+                else
+                {
+                    points = new List<Point> { sourcePoint, targetPoint };
+                }
 
                 var line = new ConnectionLine
                 {
@@ -1549,11 +1565,27 @@ namespace ModbusForge.Avalonia.ViewModels
                     ToX = targetPoint.X,
                     ToY = targetPoint.Y
                 };
-                line.UpdatePoints(points, ReferenceEquals(SelectedConnection, connection), PortSide.Left);
+                line.UpdatePoints(points, ReferenceEquals(SelectedConnection, connection), PortSide.Left, straight: isPlcLink);
                 lines.Add(line);
             }
 
             ConnectionLines = lines;
+        }
+
+        /// <summary>
+        /// Where an imported link meets a Control Expert block: its pin's row, on the
+        /// block frame half a grid cell in from the node edge (the pin cell's centre).
+        /// Null for nodes without Control Expert pins.
+        /// </summary>
+        private static Point? GetPlcPinPoint(VisualNode node, string? pinName, bool isInput)
+        {
+            if (node.Plc is not { } plc || pinName == null) return null;
+
+            var pin = plc.Pins.FirstOrDefault(p => p.IsInput == isInput && string.Equals(p.Name, pinName, StringComparison.Ordinal));
+            if (pin == null) return null;
+
+            var inset = plc.FrameInset;
+            return new Point(isInput ? node.X + inset : node.X + node.Width - inset, node.Y + pin.CenterY);
         }
 
         private static double GetPortY(VisualNode node, string? connector, bool isInput)

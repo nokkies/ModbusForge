@@ -4004,12 +4004,13 @@ namespace ModbusForge.Avalonia.ViewModels
                     ? preseeded
                     : await _fileDialogService.ShowOpenFileDialogAsync(
                         "Load PLC (Unity Pro XEF)",
-                        "Schneider Unity Pro XEF/FEF (*.xef;*.fef)|*.xef;*.fef|XML files (*.xml)|*.xml|All files (*.*)|*.*");
+                        "Schneider Unity Pro / Control Expert export (*.xef;*.zef;*.fef)|*.xef;*.zef;*.fef|XML files (*.xml)|*.xml|All files (*.*)|*.*");
 
                 if (path == null) return;
 
                 _logger.LogInformation("Importing PLC XML {Path}", path);
-                var result = new PlcXmlImporter().Import(path);
+                // Exports reach ~17 MB: parse off the UI thread so the window stays live.
+                var result = await Task.Run(() => new PlcXmlImporter().Import(path));
 
                 if (!result.Success)
                 {

@@ -218,6 +218,13 @@ namespace ModbusForge.Models
                 hasParameters: true,
                 displayNameFormatter: n => $"SignalGen (R) ({n.Waveform}, {n.PeriodMs}ms)",
                 parameterDisplayFormatter: n => $"{n.Waveform}: H={n.Amplitude}, T={n.PeriodMs}ms");
+
+            // Imported Unity Pro content (never offered in the Simulation palette)
+            Add(PlcElementType.PlcBlock, "PlcBlock", "PLC Block", "PLC Block", "PLC", RgbColor.FromRgb(236, 239, 241), "FB",
+                showInPalette: false,
+                displayNameFormatter: n => n.Plc?.TypeName ?? "PLC Block");
+            Add(PlcElementType.PlcComment, "PlcComment", "Comment", "Comment", "PLC", RgbColor.FromRgb(255, 248, 225), "TXT",
+                showInPalette: false);
         }
 
         private static void Add(

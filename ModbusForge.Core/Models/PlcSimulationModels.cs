@@ -62,7 +62,10 @@ namespace ModbusForge.Models
         // its numeric enum value, so existing members must keep their numbers)
         Scale,         // Linear scaling of an analog value (LIN)
         EdgeDetect,    // One-cycle pulse on the selected input transition
-        MovingAverage  // Windowed moving average (MOVAVG)
+        MovingAverage, // Windowed moving average (MOVAVG)
+        // Imported Unity Pro / Control Expert content (appended, see above)
+        PlcBlock,      // Unity FFB with no simulation equivalent: drawn, not executed
+        PlcComment     // Control Expert section text box
     }
 
     /// <summary>
