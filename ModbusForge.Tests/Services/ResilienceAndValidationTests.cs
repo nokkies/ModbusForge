@@ -231,6 +231,86 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
+        public async Task CircuitBreakerService_ExecuteAsyncGeneric_ReturnsResultOnSuccess()
+        {
+            var logger = new Mock<ILogger<CircuitBreakerService>>().Object;
+            var service = new CircuitBreakerService(logger);
+            string circuitName = "GenericSuccessCircuit";
+            bool actionExecuted = false;
+
+            var result = await service.ExecuteAsync(circuitName, async () =>
+            {
+                actionExecuted = true;
+                await Task.CompletedTask;
+                return "OperationResult";
+            });
+
+            Assert.True(actionExecuted);
+            Assert.Equal("OperationResult", result);
+            Assert.Equal(CircuitState.Closed, service.GetState(circuitName));
+        }
+
+        [Fact]
+        public async Task CircuitBreakerService_ExecuteAsyncGeneric_ResetsFailureCountOnSuccess()
+        {
+            var logger = new Mock<ILogger<CircuitBreakerService>>().Object;
+            var service = new CircuitBreakerService(logger);
+            var config = new CircuitBreakerConfig
+            {
+                FailureThreshold = 2,
+                OpenTimeout = TimeSpan.FromMinutes(1)
+            };
+            string circuitName = "GenericFailureResetCircuit";
+
+            // Record 1 failure (below threshold of 2)
+            await Assert.ThrowsAsync<Exception>(async () =>
+            {
+                await service.ExecuteAsync<int>(circuitName, () => throw new Exception("Fail 1"), config);
+            });
+            Assert.Equal(CircuitState.Closed, service.GetState(circuitName));
+
+            // Successful generic call should reset failure count
+            var val = await service.ExecuteAsync(circuitName, () => Task.FromResult(42), config);
+            Assert.Equal(42, val);
+
+            // Another failure should not trip open if failure count was reset to 0
+            await Assert.ThrowsAsync<Exception>(async () =>
+            {
+                await service.ExecuteAsync<int>(circuitName, () => throw new Exception("Fail 2"), config);
+            });
+            Assert.Equal(CircuitState.Closed, service.GetState(circuitName));
+        }
+
+        [Fact]
+        public async Task CircuitBreakerService_ExecuteAsyncGeneric_Closes_AfterSuccessInHalfOpen()
+        {
+            var logger = new Mock<ILogger<CircuitBreakerService>>().Object;
+            var service = new CircuitBreakerService(logger);
+            var config = new CircuitBreakerConfig
+            {
+                FailureThreshold = 1,
+                OpenTimeout = TimeSpan.FromMilliseconds(20),
+                SuccessThreshold = 1
+            };
+            string circuitName = "GenericHalfOpenCircuit";
+
+            // Trip Open
+            await Assert.ThrowsAsync<Exception>(async () =>
+            {
+                await service.ExecuteAsync<string>(circuitName, () => throw new Exception("Fail"), config);
+            });
+            Assert.Equal(CircuitState.Open, service.GetState(circuitName));
+
+            // Wait for OpenTimeout to expire
+            await Task.Delay(30);
+
+            // Generic ExecuteAsync success - transitions to Closed and returns result
+            var result = await service.ExecuteAsync(circuitName, () => Task.FromResult("Recovered"), config);
+            Assert.Equal("Recovered", result);
+            Assert.Equal(CircuitState.Closed, service.GetState(circuitName));
+        }
+
+        [Fact]
         public void ErrorHandlingService_TranslatesExceptions()
         {
             var logger = new Mock<ILogger<ErrorHandlingService>>().Object;
