@@ -66,6 +66,8 @@ namespace ModbusForge.Helpers
         /// </summary>
         public static byte[] RegistersToBytes(ushort[] registers)
         {
+            if (registers is null) throw new ArgumentNullException(nameof(registers));
+
             var bytes = new byte[registers.Length * 2];
             for (var i = 0; i < registers.Length; i++)
             {
