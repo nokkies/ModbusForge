@@ -2025,6 +2025,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     }
 
                     await service.WriteSingleRegisterAsync(unitId, address, value);
+                    _connectionManager.MirrorHoldingRegisters(unitId, address, new ushort[] { value });
                     _dispatcher.Invoke(() => StatusMessage = $"Wrote {value} to holding register {address}.");
                 }
                 else if (area == PlcArea.Coil)
@@ -2037,6 +2038,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     }
 
                     await service.WriteSingleCoilAsync(unitId, address, value);
+                    _connectionManager.MirrorCoils(unitId, address, new bool[] { value });
                     _dispatcher.Invoke(() => StatusMessage = $"Wrote {value} to coil {address}.");
                 }
             }
@@ -2318,6 +2320,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     case PlcArea.HoldingRegister:
                         var holding = await service.ReadHoldingRegistersAsync(unitId, start, count)
                             ?? throw new InvalidOperationException("Read returned no response.");
+                        _connectionManager.MirrorHoldingRegisters(unitId, start, holding);
                         var holdingPartial = holding.Length < count;
                         await _dispatcher.InvokeAsync(() =>
                         {
@@ -2341,6 +2344,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     case PlcArea.InputRegister:
                         var input = await service.ReadInputRegistersAsync(unitId, start, count)
                             ?? throw new InvalidOperationException("Read returned no response.");
+                        _connectionManager.MirrorInputRegisters(unitId, start, input);
                         var inputPartial = input.Length < count;
                         await _dispatcher.InvokeAsync(() =>
                         {
@@ -2364,6 +2368,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     case PlcArea.Coil:
                         var coils = await service.ReadCoilsAsync(unitId, start, count)
                             ?? throw new InvalidOperationException("Read returned no response.");
+                        _connectionManager.MirrorCoils(unitId, start, coils);
                         var coilsPartial = coils.Length < count;
                         await _dispatcher.InvokeAsync(() =>
                         {
@@ -2379,6 +2384,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     case PlcArea.DiscreteInput:
                         var discrete = await service.ReadDiscreteInputsAsync(unitId, start, count)
                             ?? throw new InvalidOperationException("Read returned no response.");
+                        _connectionManager.MirrorDiscreteInputs(unitId, start, discrete);
                         var discretePartial = discrete.Length < count;
                         await _dispatcher.InvokeAsync(() =>
                         {
@@ -3144,6 +3150,11 @@ namespace ModbusForge.Avalonia.ViewModels
                     if (values == null || values.Length == 0)
                         throw new InvalidOperationException("Read returned no response.");
 
+                    if (areaEnum == PlcArea.HoldingRegister)
+                        _connectionManager.MirrorHoldingRegisters(unitId, address, values);
+                    else
+                        _connectionManager.MirrorInputRegisters(unitId, address, values);
+
                     if (type == "real" && values.Length < 2)
                         throw new InvalidOperationException("A REAL value requires two registers.");
 
@@ -3161,6 +3172,12 @@ namespace ModbusForge.Avalonia.ViewModels
                         ? await service.ReadCoilsAsync(unitId, address, 1)
                         : await service.ReadDiscreteInputsAsync(unitId, address, 1);
                     if (coilValues == null || coilValues.Length == 0) return "No response";
+
+                    if (area == "coil")
+                        _connectionManager.MirrorCoils(unitId, address, coilValues);
+                    else
+                        _connectionManager.MirrorDiscreteInputs(unitId, address, coilValues);
+
                     return coilValues[0] ? "1" : "0";
 
                 default:

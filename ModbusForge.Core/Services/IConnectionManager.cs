@@ -24,6 +24,12 @@ public interface IConnectionManager
     Task DisconnectAllAsync();
 
     IModbusService? GetServiceForProfile(ConnectionProfile profile);
+    ModbusServerService? GetMirrorServerForProfile(ConnectionProfile profile) => null;
+
+    void MirrorHoldingRegisters(byte unitId, int startAddress, ushort[] values) { }
+    void MirrorInputRegisters(byte unitId, int startAddress, ushort[] values) { }
+    void MirrorCoils(byte unitId, int startAddress, bool[] values) { }
+    void MirrorDiscreteInputs(byte unitId, int startAddress, bool[] values) { }
 
     void SaveProfiles();
     void LoadProfiles();

@@ -27,6 +27,7 @@ public class ConnectionManager : IConnectionManager
     private readonly ICorrelationContext _correlationContext;
     private readonly IModbusAddressValidator _addressValidator;
     private readonly ConcurrentDictionary<string, IModbusService> _services = new();
+    private readonly ConcurrentDictionary<string, ModbusServerService> _mirrorServers = new();
     private ConnectionProfile? _activeProfile;
     private readonly IDispatcher? _uiDispatcher;
 
@@ -90,6 +91,11 @@ public class ConnectionManager : IConnectionManager
         if (_services.TryRemove(profile.Id, out var removed))
         {
             service = removed;
+        }
+
+        if (_mirrorServers.TryRemove(profile.Id, out var removedMirror))
+        {
+            _ = removedMirror.DisconnectAsync().ContinueWith(_ => removedMirror.Dispose(), TaskScheduler.Default);
         }
 
         Profiles.Remove(profile);
@@ -193,6 +199,12 @@ public class ConnectionManager : IConnectionManager
             if (success)
             {
                 AttachConnectionLostHandler(service, profile);
+
+                if (!profile.IsServerMode && profile.EnableServerMirror)
+                {
+                    await StartMirrorServerAsync(profile).ConfigureAwait(false);
+                }
+
                 profile.IsConnected = true;
                 profile.Status = "Connected";
                 ProfileConnected?.Invoke(this, profile);
@@ -226,6 +238,18 @@ public class ConnectionManager : IConnectionManager
                 await service.DisconnectAsync();
             }
 
+            if (_mirrorServers.TryRemove(profile.Id, out var mirrorServer))
+            {
+                try
+                {
+                    await mirrorServer.DisconnectAsync().ConfigureAwait(false);
+                }
+                finally
+                {
+                    mirrorServer.Dispose();
+                }
+            }
+
             profile.IsConnected = false;
             profile.Status = "Disconnected";
             ProfileDisconnected?.Invoke(this, profile);
@@ -247,6 +271,133 @@ public class ConnectionManager : IConnectionManager
     public IModbusService? GetServiceForProfile(ConnectionProfile profile)
     {
         return _services.TryGetValue(profile.Id, out var service) ? service : null;
+    }
+
+    public ModbusServerService? GetMirrorServerForProfile(ConnectionProfile profile)
+    {
+        return _mirrorServers.TryGetValue(profile.Id, out var mirror) ? mirror : null;
+    }
+
+    private async Task StartMirrorServerAsync(ConnectionProfile profile)
+    {
+        try
+        {
+            var mirror = new ModbusServerService(
+                _loggerFactory.CreateLogger<ModbusServerService>());
+
+            var mirrorUnitIds = string.IsNullOrWhiteSpace(profile.ServerUnitIds)
+                ? profile.UnitId.ToString()
+                : profile.ServerUnitIds;
+
+            int port = profile.ServerMirrorPort <= 0 ? 5020 : profile.ServerMirrorPort;
+            bool started = await mirror.ConnectAsync("0.0.0.0", port, mirrorUnitIds).ConfigureAwait(false);
+            if (started)
+            {
+                _mirrorServers.AddOrUpdate(profile.Id, mirror, (_, old) =>
+                {
+                    old.Dispose();
+                    return mirror;
+                });
+                _logger.LogInformation("Started server mirror for profile {Name} on port {Port}", profile.Name, port);
+            }
+            else
+            {
+                _logger.LogWarning("Failed to start server mirror for profile {Name} on port {Port}", profile.Name, port);
+                mirror.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error starting server mirror for profile {Name}", profile.Name);
+        }
+    }
+
+    public void MirrorHoldingRegisters(byte unitId, int startAddress, ushort[] values)
+    {
+        if (_activeProfile == null || values == null || values.Length == 0) return;
+        var mirror = GetMirrorServerForProfile(_activeProfile);
+        if (mirror == null) return;
+
+        var ds = mirror.GetDataStore(unitId) ?? mirror.GetDataStore();
+        if (ds == null) return;
+
+        lock (ds)
+        {
+            for (int i = 0; i < values.Length; i++)
+            {
+                int targetAddr = startAddress + i;
+                if (targetAddr >= 0 && targetAddr < ds.HoldingRegisters.Count)
+                {
+                    ds.HoldingRegisters[(ushort)targetAddr] = values[i];
+                }
+            }
+        }
+    }
+
+    public void MirrorInputRegisters(byte unitId, int startAddress, ushort[] values)
+    {
+        if (_activeProfile == null || values == null || values.Length == 0) return;
+        var mirror = GetMirrorServerForProfile(_activeProfile);
+        if (mirror == null) return;
+
+        var ds = mirror.GetDataStore(unitId) ?? mirror.GetDataStore();
+        if (ds == null) return;
+
+        lock (ds)
+        {
+            for (int i = 0; i < values.Length; i++)
+            {
+                int targetAddr = startAddress + i;
+                if (targetAddr >= 0 && targetAddr < ds.InputRegisters.Count)
+                {
+                    ds.InputRegisters[(ushort)targetAddr] = values[i];
+                }
+            }
+        }
+    }
+
+    public void MirrorCoils(byte unitId, int startAddress, bool[] values)
+    {
+        if (_activeProfile == null || values == null || values.Length == 0) return;
+        var mirror = GetMirrorServerForProfile(_activeProfile);
+        if (mirror == null) return;
+
+        var ds = mirror.GetDataStore(unitId) ?? mirror.GetDataStore();
+        if (ds == null) return;
+
+        lock (ds)
+        {
+            for (int i = 0; i < values.Length; i++)
+            {
+                int targetAddr = startAddress + i;
+                if (targetAddr >= 0 && targetAddr < ds.CoilDiscretes.Count)
+                {
+                    ds.CoilDiscretes[(ushort)targetAddr] = values[i];
+                }
+            }
+        }
+    }
+
+    public void MirrorDiscreteInputs(byte unitId, int startAddress, bool[] values)
+    {
+        if (_activeProfile == null || values == null || values.Length == 0) return;
+        var mirror = GetMirrorServerForProfile(_activeProfile);
+        if (mirror == null) return;
+
+        var ds = mirror.GetDataStore(unitId) ?? mirror.GetDataStore();
+        if (ds == null) return;
+
+        lock (ds)
+        {
+            for (int i = 0; i < values.Length; i++)
+            {
+                int targetAddr = startAddress + i;
+                if (targetAddr >= 0 && targetAddr < ds.InputDiscretes.Count)
+                {
+                    ds.InputDiscretes[(ushort)targetAddr] = values[i];
+                }
+            }
+        }
     }
 
     private IModbusService GetOrCreateService(ConnectionProfile profile)
@@ -401,7 +552,9 @@ public class ConnectionManager : IConnectionManager
                     Parity = p.Parity,
                     DataBits = p.DataBits,
                     StopBits = p.StopBits,
-                    RtsEnable = p.RtsEnable
+                    RtsEnable = p.RtsEnable,
+                    EnableServerMirror = p.EnableServerMirror,
+                    ServerMirrorPort = p.ServerMirrorPort
                 }).ToList()
             };
 
@@ -468,7 +621,9 @@ public class ConnectionManager : IConnectionManager
                         Parity = dto.Parity,
                         DataBits = dto.DataBits,
                         StopBits = dto.StopBits,
-                        RtsEnable = dto.RtsEnable
+                        RtsEnable = dto.RtsEnable,
+                        EnableServerMirror = dto.EnableServerMirror,
+                        ServerMirrorPort = dto.ServerMirrorPort <= 0 ? 5020 : dto.ServerMirrorPort
                     };
                     Profiles.Add(profile);
 
@@ -519,5 +674,7 @@ public class ConnectionManager : IConnectionManager
         public int DataBits { get; set; } = 8;
         public StopBits StopBits { get; set; } = StopBits.One;
         public bool RtsEnable { get; set; }
+        public bool EnableServerMirror { get; set; }
+        public int ServerMirrorPort { get; set; } = 5020;
     }
 }

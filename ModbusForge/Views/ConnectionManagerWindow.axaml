@@ -124,8 +124,20 @@
           <TextBlock Text="Unit ID:" Grid.Row="4" VerticalAlignment="Center" Margin="0,0,12,8" />
           <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding SelectedProfile.UnitId, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left" Margin="0,0,0,8" />
 
-          <TextBlock Text="Status:" Grid.Row="5" VerticalAlignment="Center" Margin="0,0,12,8" />
-          <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding StatusMessage}" VerticalAlignment="Center" Margin="0,0,0,8" />
+          <!-- Server Mirror Settings -->
+          <TextBlock Text="Server Mirror:" Grid.Row="5" VerticalAlignment="Center" Margin="0,0,12,8"
+                     IsVisible="{Binding SelectedProfile.IsServerMode, Converter={x:Static converters:BoolConverters.Not}}" />
+          <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Vertical" Margin="0,0,0,8"
+                      IsVisible="{Binding SelectedProfile.IsServerMode, Converter={x:Static converters:BoolConverters.Not}}">
+            <CheckBox IsChecked="{Binding SelectedProfile.EnableServerMirror}" Content="Enable Server Mirror for Client mode" Margin="0,0,0,4" />
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding SelectedProfile.EnableServerMirror}">
+              <TextBlock Text="Mirror Port:" VerticalAlignment="Center" />
+              <NumericUpDown Value="{Binding SelectedProfile.ServerMirrorPort}" Minimum="1" Maximum="65535" Width="120" HorizontalAlignment="Left" />
+            </StackPanel>
+          </StackPanel>
+
+          <TextBlock Text="Status:" Grid.Row="6" VerticalAlignment="Center" Margin="0,0,12,8" />
+          <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding StatusMessage}" VerticalAlignment="Center" Margin="0,0,0,8" />
         </Grid>
       </ScrollViewer>
     </Grid>
