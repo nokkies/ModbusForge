@@ -24,6 +24,7 @@ namespace ModbusForge.Avalonia.Views
         public RegisterTemplateImportDialog()
             : this(new RegisterTemplateImportService(), new AvaloniaFileDialogService(), new FileSystem())
         {
+            // Body intentionally left empty; default service dependencies are injected via the constructor initializer.
         }
 
         public RegisterTemplateImportDialog(
