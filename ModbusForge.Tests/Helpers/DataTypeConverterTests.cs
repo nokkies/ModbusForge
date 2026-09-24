@@ -156,5 +156,124 @@ namespace ModbusForge.Tests.Helpers
             Assert.Equal(legacy, new[] { (ushort)((bytes[0] << 8) | bytes[1]), (ushort)((bytes[2] << 8) | bytes[3]) });
             Assert.Equal(value, DataTypeConverter.ToSingle(legacy[0], legacy[1], swapBytes, swapWords));
         }
+
+        [Fact]
+        public void ConvertRegisters_NullRegisters_ThrowsArgumentNullException()
+        {
+            Assert.Throws<ArgumentNullException>(() => DataTypeConverter.ConvertRegisters(TagDataType.Int16, null!));
+        }
+
+        [Theory]
+        [InlineData(0x0000, false)]
+        [InlineData(0x0001, true)]
+        [InlineData(0x1234, true)]
+        public void ConvertRegisters_Bool_ReturnsExpectedBoolean(ushort register, bool expected)
+        {
+            var result = DataTypeConverter.ConvertRegisters(TagDataType.Bool, new ushort[] { register });
+            Assert.IsType<bool>(result);
+            Assert.Equal(expected, result);
+        }
+
+        [Theory]
+        [InlineData(0x0000, (short)0)]
+        [InlineData(0x0064, (short)100)]
+        [InlineData(0xFF9C, (short)-100)]
+        [InlineData(0x7FFF, short.MaxValue)]
+        [InlineData(0x8000, short.MinValue)]
+        public void ConvertRegisters_Int16_ReturnsExpectedShort(ushort register, short expected)
+        {
+            var result = DataTypeConverter.ConvertRegisters(TagDataType.Int16, new ushort[] { register });
+            Assert.IsType<short>(result);
+            Assert.Equal(expected, result);
+        }
+
+        [Theory]
+        [InlineData(0x0000, (ushort)0)]
+        [InlineData(0x0064, (ushort)100)]
+        [InlineData(0xFFFF, ushort.MaxValue)]
+        public void ConvertRegisters_UInt16_ReturnsExpectedUShort(ushort register, ushort expected)
+        {
+            var result = DataTypeConverter.ConvertRegisters(TagDataType.UInt16, new ushort[] { register });
+            Assert.IsType<ushort>(result);
+            Assert.Equal(expected, result);
+        }
+
+        [Theory]
+        [InlineData(new ushort[] { 0x0000, 0x0064 }, 100)]
+        [InlineData(new ushort[] { 0x1234, 0x5678 }, 0x12345678)]
+        [InlineData(new ushort[] { 0xFFFF, 0xFF9C }, -100)]
+        [InlineData(new ushort[] { 0x7FFF, 0xFFFF }, int.MaxValue)]
+        [InlineData(new ushort[] { 0x8000, 0x0000 }, int.MinValue)]
+        public void ConvertRegisters_Int32_ReturnsExpectedInt(ushort[] registers, int expected)
+        {
+            var result = DataTypeConverter.ConvertRegisters(TagDataType.Int32, registers);
+            Assert.IsType<int>(result);
+            Assert.Equal(expected, result);
+        }
+
+        [Theory]
+        [InlineData(new ushort[] { 0x0000, 0x0064 }, 100u)]
+        [InlineData(new ushort[] { 0x1234, 0x5678 }, 0x12345678u)]
+        [InlineData(new ushort[] { 0xFFFF, 0xFFFF }, uint.MaxValue)]
+        public void ConvertRegisters_UInt32_ReturnsExpectedUInt(ushort[] registers, uint expected)
+        {
+            var result = DataTypeConverter.ConvertRegisters(TagDataType.UInt32, registers);
+            Assert.IsType<uint>(result);
+            Assert.Equal(expected, result);
+        }
+
+        [Fact]
+        public void ConvertRegisters_Float_ReturnsExpectedFloat()
+        {
+            var registers = new ushort[] { 0x42C8, 0x0000 };
+            var result = DataTypeConverter.ConvertRegisters(TagDataType.Float, registers);
+            Assert.IsType<float>(result);
+            Assert.Equal(100.0f, result);
+        }
+
+        [Fact]
+        public void ConvertRegisters_Double_ReturnsExpectedDouble()
+        {
+            var registers = new ushort[] { 0x4059, 0x0000, 0x0000, 0x0000 };
+            var result = DataTypeConverter.ConvertRegisters(TagDataType.Double, registers);
+            Assert.IsType<double>(result);
+            Assert.Equal(100.0, result);
+        }
+
+        [Theory]
+        [InlineData(new ushort[] { 0x4865, 0x6C6C, 0x6F00 }, "Hello")]
+        [InlineData(new ushort[] { 0x5465, 0x7374 }, "Test")]
+        [InlineData(new ushort[] { 0x0041, 0x4243 }, "")]
+        public void ConvertRegisters_String_ReturnsExpectedString(ushort[] registers, string expected)
+        {
+            var result = DataTypeConverter.ConvertRegisters(TagDataType.String, registers);
+            Assert.IsType<string>(result);
+            Assert.Equal(expected, result);
+        }
+
+        [Fact]
+        public void ConvertRegisters_UndefinedDataType_ReturnsFirstRegisterAsUShort()
+        {
+            var unmappedType = (TagDataType)999;
+            var registers = new ushort[] { 0x1234, 0x5678 };
+            var result = DataTypeConverter.ConvertRegisters(unmappedType, registers);
+            Assert.IsType<ushort>(result);
+            Assert.Equal((ushort)0x1234, result);
+        }
+
+        [Theory]
+        [InlineData(TagDataType.Bool, 1)]
+        [InlineData(TagDataType.Int16, 1)]
+        [InlineData(TagDataType.UInt16, 1)]
+        [InlineData(TagDataType.Int32, 2)]
+        [InlineData(TagDataType.UInt32, 2)]
+        [InlineData(TagDataType.Float, 2)]
+        [InlineData(TagDataType.Double, 4)]
+        [InlineData(TagDataType.String, 2)]
+        public void GetRegisterCount_AllDataTypes_ReturnsExpectedCount(TagDataType dataType, int expectedCount)
+        {
+            int count = DataTypeConverter.GetRegisterCount(dataType);
+            Assert.Equal(expectedCount, count);
+        }
     }
 }
