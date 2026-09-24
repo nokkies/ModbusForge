@@ -276,6 +276,8 @@ namespace ModbusForge.Avalonia.ViewModels
             }
             catch (OperationCanceledException)
             {
+                // Refresh was cancelled due to a new request or ViewModel disposal.
+                _logger?.LogTrace("Serial port refresh operation was cancelled.");
             }
             catch (Exception ex)
             {
