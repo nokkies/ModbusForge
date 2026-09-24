@@ -87,6 +87,12 @@ public partial class ConnectionProfile : ObservableObject
     [ObservableProperty]
     private int _postTxDelayMs;
 
+    [ObservableProperty]
+    private bool _enableServerMirror;
+
+    [ObservableProperty]
+    private int _serverMirrorPort = 5020;
+
     public string DisplayName => Transport switch
     {
         TransportType.Tcp => $"{Name} ({IpAddress}:{Port})",
@@ -143,7 +149,9 @@ public partial class ConnectionProfile : ObservableObject
             RtsEnable = RtsEnable,
             EnableRtsToggle = EnableRtsToggle,
             PreTxDelayMs = PreTxDelayMs,
-            PostTxDelayMs = PostTxDelayMs
+            PostTxDelayMs = PostTxDelayMs,
+            EnableServerMirror = EnableServerMirror,
+            ServerMirrorPort = ServerMirrorPort
         };
     }
 }
