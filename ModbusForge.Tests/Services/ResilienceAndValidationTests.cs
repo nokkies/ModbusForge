@@ -336,6 +336,66 @@ namespace ModbusForge.Tests.Services
             Assert.False(service.ValidateDataBits(9).IsValid);
         }
 
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void ValidationService_ValidateCoilValue_ReturnsSuccess(bool value)
+        {
+            var logger = new Mock<ILogger<ValidationService>>().Object;
+            var service = new ValidationService(logger);
+
+            var result = service.ValidateCoilValue(value);
+
+            Assert.NotNull(result);
+            Assert.True(result.IsValid);
+            Assert.Empty(result.ErrorMessage);
+        }
+
+        [Theory]
+        [InlineData(ushort.MinValue)]
+        [InlineData((ushort)12345)]
+        [InlineData(ushort.MaxValue)]
+        public void ValidationService_ValidateModbusValue_ReturnsSuccess(ushort value)
+        {
+            var logger = new Mock<ILogger<ValidationService>>().Object;
+            var service = new ValidationService(logger);
+
+            var result = service.ValidateModbusValue(value);
+
+            Assert.NotNull(result);
+            Assert.True(result.IsValid);
+            Assert.Empty(result.ErrorMessage);
+        }
+
+        [Fact]
+        public void ValidationService_ValidateAddress_Boundaries()
+        {
+            var logger = new Mock<ILogger<ValidationService>>().Object;
+            var service = new ValidationService(logger);
+
+            Assert.True(service.ValidateAddress(0).IsValid);
+            Assert.True(service.ValidateAddress(100).IsValid);
+            Assert.True(service.ValidateAddress(65535).IsValid);
+
+            Assert.False(service.ValidateAddress(-1).IsValid);
+            Assert.False(service.ValidateAddress(65536).IsValid);
+        }
+
+        [Fact]
+        public void ValidationService_ValidateParity_Values()
+        {
+            var logger = new Mock<ILogger<ValidationService>>().Object;
+            var service = new ValidationService(logger);
+
+            Assert.True(service.ValidateParity(Parity.None).IsValid);
+            Assert.True(service.ValidateParity(Parity.Even).IsValid);
+            Assert.True(service.ValidateParity(Parity.Odd).IsValid);
+            Assert.True(service.ValidateParity(Parity.Mark).IsValid);
+            Assert.True(service.ValidateParity(Parity.Space).IsValid);
+
+            Assert.False(service.ValidateParity((Parity)999).IsValid);
+        }
+
         [Fact]
         public void ValidationService_ValidateStopBits_Values()
         {
@@ -347,6 +407,7 @@ namespace ModbusForge.Tests.Services
             Assert.True(service.ValidateStopBits(StopBits.OnePointFive).IsValid);
 
             Assert.False(service.ValidateStopBits(StopBits.None).IsValid);
+            Assert.False(service.ValidateStopBits((StopBits)999).IsValid);
         }
 
         [Fact]
@@ -355,10 +416,12 @@ namespace ModbusForge.Tests.Services
             var logger = new Mock<ILogger<ValidationService>>().Object;
             var service = new ValidationService(logger);
 
+            string validPortName = OperatingSystem.IsWindows() ? "COM1" : "/dev/ttyUSB0";
+
             var validSerial = new ConnectionProfile("Serial", "127.0.0.1", 502, 1)
             {
                 Transport = TransportType.Rtu,
-                ComPort = "COM1",
+                ComPort = validPortName,
                 BaudRate = 9600,
                 DataBits = 8,
                 Parity = Parity.None,
@@ -369,7 +432,7 @@ namespace ModbusForge.Tests.Services
             var invalidSerial = new ConnectionProfile("Serial", "127.0.0.1", 502, 1)
             {
                 Transport = TransportType.Ascii,
-                ComPort = "COM1",
+                ComPort = validPortName,
                 BaudRate = 0,
                 DataBits = 8,
                 Parity = Parity.None,
