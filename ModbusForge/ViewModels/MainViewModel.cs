@@ -4396,7 +4396,7 @@ namespace ModbusForge.Avalonia.ViewModels
                         {
                             if (string.IsNullOrWhiteSpace(result.AssetDownloadUrl))
                             {
-                                OpenUrl(result.ReleaseUrl);
+                                UrlHelper.OpenUrl(result.ReleaseUrl);
                                 return;
                             }
 
@@ -4438,21 +4438,6 @@ namespace ModbusForge.Avalonia.ViewModels
             {
                 StatusMessage = $"Update check failed: {ex.Message}";
                 _logger.LogWarning(ex, "Update check failed");
-            }
-        }
-
-        private static void OpenUrl(string url)
-        {
-            try
-            {
-                using var process = new System.Diagnostics.Process();
-                process.StartInfo.UseShellExecute = true;
-                process.StartInfo.FileName = url;
-                process.Start();
-            }
-            catch (Exception)
-            {
-                // ignore
             }
         }
 

@@ -124,7 +124,10 @@ namespace ModbusForge.Avalonia.Tests
                 tagService,
                 new ThrowingMessageBoxService(),
                 connectionManager: connectionManager,
-                dispatcher: new SyncDispatcher());
+                dispatcher: new SyncDispatcher())
+            {
+                SelectedUpdateIntervalMs = 100
+            };
 
             vm.AddTag(tag.Id);
             return (vm, tagService, service);
