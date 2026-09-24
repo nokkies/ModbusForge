@@ -350,6 +350,29 @@ namespace ModbusForge.Tests.Services
         }
 
         [Fact]
+        public void ValidateParity_DefinedAndUndefinedValues_ReturnsExpectedResult()
+        {
+            var logger = new Mock<ILogger<ValidationService>>().Object;
+            var service = new ValidationService(logger);
+
+            // Defined enum values
+            Assert.True(service.ValidateParity(Parity.None).IsValid);
+            Assert.True(service.ValidateParity(Parity.Odd).IsValid);
+            Assert.True(service.ValidateParity(Parity.Even).IsValid);
+            Assert.True(service.ValidateParity(Parity.Mark).IsValid);
+            Assert.True(service.ValidateParity(Parity.Space).IsValid);
+
+            // Undefined integer casted values
+            var invalidPositive = service.ValidateParity((Parity)99);
+            Assert.False(invalidPositive.IsValid);
+            Assert.Contains("Invalid parity value", invalidPositive.ErrorMessage);
+
+            var invalidNegative = service.ValidateParity((Parity)(-1));
+            Assert.False(invalidNegative.IsValid);
+            Assert.Contains("Invalid parity value", invalidNegative.ErrorMessage);
+        }
+
+        [Fact]
         public void ValidationService_ValidateSerialSettings_Profiles()
         {
             var logger = new Mock<ILogger<ValidationService>>().Object;
