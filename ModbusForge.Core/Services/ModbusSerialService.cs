@@ -215,11 +215,7 @@ namespace ModbusForge.Services
                 $"Reading {count} holding registers starting at {startAddress}",
                 "Error reading holding registers",
                 (client, protocolAddress, chunkCount) =>
-                {
-                    ushort[]? result = null;
-                    ApplySerialTiming(() => { result = client.ReadHoldingRegisters(unitId, protocolAddress, chunkCount); });
-                    return result;
-                });
+                    ApplySerialTimingAsync(() => client.ReadHoldingRegisters(unitId, protocolAddress, chunkCount)));
         }
 
         public virtual async Task<ushort[]?> ReadInputRegistersAsync(byte unitId, int startAddress, int count)
@@ -240,11 +236,7 @@ namespace ModbusForge.Services
                 $"Reading {count} input registers starting at {startAddress}",
                 "Error reading input registers",
                 (client, protocolAddress, chunkCount) =>
-                {
-                    ushort[]? result = null;
-                    ApplySerialTiming(() => { result = client.ReadInputRegisters(unitId, protocolAddress, chunkCount); });
-                    return result;
-                });
+                    ApplySerialTimingAsync(() => client.ReadInputRegisters(unitId, protocolAddress, chunkCount)));
         }
 
         public virtual async Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
@@ -265,11 +257,7 @@ namespace ModbusForge.Services
                 $"Reading {count} discrete inputs starting at {startAddress}",
                 "Error reading discrete inputs",
                 (client, protocolAddress, chunkCount) =>
-                {
-                    bool[]? result = null;
-                    ApplySerialTiming(() => { result = client.ReadInputs(unitId, protocolAddress, chunkCount); });
-                    return result;
-                });
+                    ApplySerialTimingAsync(() => client.ReadInputs(unitId, protocolAddress, chunkCount)));
         }
 
         public virtual async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
@@ -290,11 +278,7 @@ namespace ModbusForge.Services
                 $"Reading {count} coils starting at {startAddress}",
                 "Error reading coils",
                 (client, protocolAddress, chunkCount) =>
-                {
-                    bool[]? result = null;
-                    ApplySerialTiming(() => { result = client.ReadCoils(unitId, protocolAddress, chunkCount); });
-                    return result;
-                });
+                    ApplySerialTimingAsync(() => client.ReadCoils(unitId, protocolAddress, chunkCount)));
         }
 
         public virtual async Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
@@ -327,7 +311,7 @@ namespace ModbusForge.Services
                 $"Writing {values.Length} registers starting at {startAddress}",
                 "Error writing multiple registers",
                 (client, protocolAddress, chunkValues) =>
-                    ApplySerialTiming(() => { client.WriteMultipleRegisters(unitId, protocolAddress, chunkValues); }));
+                    ApplySerialTimingAsync(() => client.WriteMultipleRegisters(unitId, protocolAddress, chunkValues)));
         }
 
         public virtual async Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)
@@ -360,7 +344,7 @@ namespace ModbusForge.Services
                 $"Writing {values.Length} coils starting at {startAddress}",
                 "Error writing multiple coils",
                 (client, protocolAddress, chunkValues) =>
-                    ApplySerialTiming(() => { client.WriteMultipleCoils(unitId, protocolAddress, chunkValues); }));
+                    ApplySerialTimingAsync(() => client.WriteMultipleCoils(unitId, protocolAddress, chunkValues)));
         }
 
         public virtual async Task<ushort?> MaskWriteRegisterAsync(byte unitId, int registerAddress, ushort andMask, ushort orMask)
@@ -440,30 +424,27 @@ namespace ModbusForge.Services
             await _ioLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                await Task.Run(() =>
+                try
                 {
-                    try
-                    {
-                        _logger.LogDebug($"{debugLogMessage} (Unit ID: {unitId})");
-                        // NModbus uses 0-based protocol addresses, convert from 1-based UI address
-                        ushort protocolAddress = (ushort)(address > 0 ? address - 1 : 0);
+                    _logger.LogDebug($"{debugLogMessage} (Unit ID: {unitId})");
+                    // NModbus uses 0-based protocol addresses, convert from 1-based UI address
+                    ushort protocolAddress = (ushort)(address > 0 ? address - 1 : 0);
 
-                        if (_client != null)
-                            ApplySerialTiming(() => writeAction(_client, protocolAddress));
-                    }
-                    catch (NModbus.SlaveException ex)
-                    {
-                        // A slave exception response is a valid Modbus answer (e.g. the
-                        // device rejected the address), not a dead line - keep the
-                        // connection, as ExecuteMasterAsync and the chunked executor do.
-                        _logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
-                    }
-                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-                    {
-                        _logger.LogError(ex, errorLogContext);
-                        HandleConnectionLoss();
-                    }
-                }).ConfigureAwait(false);
+                    if (_client != null)
+                        await ApplySerialTimingAsync(() => writeAction(_client, protocolAddress)).ConfigureAwait(false);
+                }
+                catch (NModbus.SlaveException ex)
+                {
+                    // A slave exception response is a valid Modbus answer (e.g. the
+                    // device rejected the address), not a dead line - keep the
+                    // connection, as ExecuteMasterAsync and the chunked executor do.
+                    _logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
+                }
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                {
+                    _logger.LogError(ex, errorLogContext);
+                    HandleConnectionLoss();
+                }
             }
             finally
             {
@@ -509,30 +490,25 @@ namespace ModbusForge.Services
             await _ioLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                return await Task.Run(() =>
+                try
                 {
-                    try
-                    {
-                        _logger.LogDebug(debugLogMessage);
-                        if (_client == null)
-                            return default;
+                    _logger.LogDebug(debugLogMessage);
+                    if (_client == null)
+                        return default;
 
-                        T? result = default;
-                        ApplySerialTiming(() => result = operation(_client));
-                        return result;
-                    }
-                    catch (NModbus.SlaveException ex)
-                    {
-                        _logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
-                        return default;
-                    }
-                    catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
-                    {
-                        _logger.LogError(ex, errorLogContext);
-                        HandleConnectionLoss();
-                        return default;
-                    }
-                }).ConfigureAwait(false);
+                    return await ApplySerialTimingAsync(() => operation(_client)).ConfigureAwait(false);
+                }
+                catch (NModbus.SlaveException ex)
+                {
+                    _logger.LogWarning(ex, "{Context}: slave returned exception code {Code}", errorLogContext, ex.SlaveExceptionCode);
+                    return default;
+                }
+                catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+                {
+                    _logger.LogError(ex, errorLogContext);
+                    HandleConnectionLoss();
+                    return default;
+                }
             }
             finally
             {
@@ -540,7 +516,44 @@ namespace ModbusForge.Services
             }
         }
 
-        private void ApplySerialTiming(Action operation)
+        private async Task<T?> ApplySerialTimingAsync<T>(Func<T?> operation)
+        {
+            if (_connectionProfile is null || _serialPort is null)
+            {
+                return operation();
+            }
+
+            if (_connectionProfile.PreTxDelayMs > 0)
+                await Task.Delay(_connectionProfile.PreTxDelayMs).ConfigureAwait(false);
+
+            if (_connectionProfile.EnableRtsToggle)
+                _serialPort.RtsEnable = true;
+
+            T? result;
+            try
+            {
+                result = operation();
+
+                if (_connectionProfile.EnableRtsToggle)
+                {
+                    _serialPort.BaseStream.Flush();
+                    _serialPort.RtsEnable = false;
+                }
+            }
+            catch
+            {
+                if (_connectionProfile.EnableRtsToggle)
+                    _serialPort.RtsEnable = false;
+                throw;
+            }
+
+            if (_connectionProfile.PostTxDelayMs > 0)
+                await Task.Delay(_connectionProfile.PostTxDelayMs).ConfigureAwait(false);
+
+            return result;
+        }
+
+        private async Task ApplySerialTimingAsync(Action operation)
         {
             if (_connectionProfile is null || _serialPort is null)
             {
@@ -549,7 +562,7 @@ namespace ModbusForge.Services
             }
 
             if (_connectionProfile.PreTxDelayMs > 0)
-                Thread.Sleep(_connectionProfile.PreTxDelayMs);
+                await Task.Delay(_connectionProfile.PreTxDelayMs).ConfigureAwait(false);
 
             if (_connectionProfile.EnableRtsToggle)
                 _serialPort.RtsEnable = true;
@@ -572,7 +585,7 @@ namespace ModbusForge.Services
             }
 
             if (_connectionProfile.PostTxDelayMs > 0)
-                Thread.Sleep(_connectionProfile.PostTxDelayMs);
+                await Task.Delay(_connectionProfile.PostTxDelayMs).ConfigureAwait(false);
         }
 
         private void HandleConnectionLoss()

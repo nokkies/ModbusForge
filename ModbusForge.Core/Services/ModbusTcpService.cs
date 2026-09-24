@@ -73,7 +73,7 @@ namespace ModbusForge.Services
                 PlcArea.InputRegister,
                 $"Reading {count} input registers starting at {startAddress}",
                 "Error reading input registers",
-                (client, protocolAddress, chunkCount) => client.ReadInputRegisters(unitId, protocolAddress, chunkCount));
+                (client, protocolAddress, chunkCount) => Task.FromResult<ushort[]?>(client.ReadInputRegisters(unitId, protocolAddress, chunkCount)));
         }
 
         public virtual async Task<bool[]?> ReadDiscreteInputsAsync(byte unitId, int startAddress, int count)
@@ -93,7 +93,7 @@ namespace ModbusForge.Services
                 PlcArea.DiscreteInput,
                 $"Reading {count} discrete inputs starting at {startAddress}",
                 "Error reading discrete inputs",
-                (client, protocolAddress, chunkCount) => client.ReadInputs(unitId, protocolAddress, chunkCount));
+                (client, protocolAddress, chunkCount) => Task.FromResult<bool[]?>(client.ReadInputs(unitId, protocolAddress, chunkCount)));
         }
 
         public virtual string BoundEndpoint => string.Empty;
@@ -233,7 +233,7 @@ namespace ModbusForge.Services
                 PlcArea.HoldingRegister,
                 $"Reading {count} holding registers starting at {startAddress}",
                 "Error reading holding registers",
-                (client, protocolAddress, chunkCount) => client.ReadHoldingRegisters(unitId, protocolAddress, chunkCount));
+                (client, protocolAddress, chunkCount) => Task.FromResult<ushort[]?>(client.ReadHoldingRegisters(unitId, protocolAddress, chunkCount)));
         }
 
         public virtual async Task WriteSingleRegisterAsync(byte unitId, int registerAddress, ushort value)
@@ -265,7 +265,11 @@ namespace ModbusForge.Services
                 PlcArea.HoldingRegister,
                 $"Writing {values.Length} registers starting at {startAddress}",
                 "Error writing multiple registers",
-                (client, protocolAddress, chunkValues) => client.WriteMultipleRegisters(unitId, protocolAddress, chunkValues));
+                (client, protocolAddress, chunkValues) =>
+                {
+                    client.WriteMultipleRegisters(unitId, protocolAddress, chunkValues);
+                    return Task.CompletedTask;
+                });
         }
 
         public virtual async Task<bool[]?> ReadCoilsAsync(byte unitId, int startAddress, int count)
@@ -285,7 +289,7 @@ namespace ModbusForge.Services
                 PlcArea.Coil,
                 $"Reading {count} coils starting at {startAddress}",
                 "Error reading coils",
-                (client, protocolAddress, chunkCount) => client.ReadCoils(unitId, protocolAddress, chunkCount));
+                (client, protocolAddress, chunkCount) => Task.FromResult<bool[]?>(client.ReadCoils(unitId, protocolAddress, chunkCount)));
         }
 
         public virtual async Task WriteSingleCoilAsync(byte unitId, int coilAddress, bool value)
@@ -317,7 +321,11 @@ namespace ModbusForge.Services
                 PlcArea.Coil,
                 $"Writing {values.Length} coils starting at {startAddress}",
                 "Error writing multiple coils",
-                (client, protocolAddress, chunkValues) => client.WriteMultipleCoils(unitId, protocolAddress, chunkValues));
+                (client, protocolAddress, chunkValues) =>
+                {
+                    client.WriteMultipleCoils(unitId, protocolAddress, chunkValues);
+                    return Task.CompletedTask;
+                });
         }
 
         public virtual async Task<ushort?> MaskWriteRegisterAsync(byte unitId, int registerAddress, ushort andMask, ushort orMask)

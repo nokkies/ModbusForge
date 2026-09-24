@@ -34,6 +34,18 @@ namespace ModbusForge.Tests.Services
             field.SetValue(service, master);
         }
 
+        private static void InjectProfile(ModbusSerialService service, ConnectionProfile profile)
+        {
+            var field = typeof(ModbusSerialService).GetField("_connectionProfile", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            field.SetValue(service, profile);
+        }
+
+        private static void InjectSerialPort(ModbusSerialService service, SerialPort port)
+        {
+            var field = typeof(ModbusSerialService).GetField("_serialPort", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            field.SetValue(service, port);
+        }
+
         [Fact]
         public void Constructor_InvalidTransport_Throws()
         {
@@ -210,6 +222,41 @@ namespace ModbusForge.Tests.Services
             const int uiAddress2 = 100;
             ushort protocolAddress2 = (ushort)(uiAddress2 > 0 ? uiAddress2 - 1 : 0);
             Assert.Equal(99, protocolAddress2);
+        }
+
+        [Fact]
+        public async Task ReadHoldingRegistersAsync_WithPreAndPostTxDelay_AppliesDelays()
+        {
+            var loggerMock = new Mock<ILogger<ModbusSerialService>>();
+            var master = new Mock<IModbusMaster>();
+            master
+                .Setup(m => m.ReadHoldingRegisters(It.IsAny<byte>(), It.IsAny<ushort>(), It.IsAny<ushort>()))
+                .Returns(new ushort[] { 1234 });
+
+            var service = new TestableSerialService(loggerMock.Object);
+            InjectClient(service, master.Object);
+
+            var profile = new ConnectionProfile
+            {
+                Name = "Test",
+                Transport = TransportType.Rtu,
+                ComPort = "COM1",
+                BaudRate = 9600,
+                PreTxDelayMs = 50,
+                PostTxDelayMs = 50
+            };
+            InjectProfile(service, profile);
+            using var serialPort = new SerialPort();
+            InjectSerialPort(service, serialPort);
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var result = await service.ReadHoldingRegistersAsync(1, 1, 1);
+            sw.Stop();
+
+            Assert.NotNull(result);
+            Assert.Single(result!);
+            Assert.Equal(1234, result![0]);
+            Assert.True(sw.ElapsedMilliseconds >= 80, $"Expected delay >= 80ms due to PreTx and PostTx delays, but measured {sw.ElapsedMilliseconds}ms");
         }
     }
 }
