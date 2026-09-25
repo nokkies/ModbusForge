@@ -198,20 +198,24 @@ namespace ModbusForge.Services
             _logger.LogInformation("Visual simulation started (scan {IntervalMs} ms, store: {StoreMode})", ScanIntervalMs, StoreMode);
         }
 
+        /// <summary>
+        /// Stops ticking without resetting anything: the timer stops, a tick in
+        /// progress finishes, and every node keeps the values that tick set. A host
+        /// that reports the final state (the headless runner) halts first, so the
+        /// report cannot read nodes a tick is still updating. <see cref="Stop"/> then
+        /// resets them.
+        /// </summary>
+        public void Halt()
+        {
+            if (StopTicking())
+                _tickLock.Release();
+        }
+
         public void Stop()
         {
-            lock (_sync)
-            {
-                IsRunning = false;
-            }
-
-            OnStopTimer();
-
-            // Wait for a running tick so the reset below cannot be clobbered by a
-            // half-finished node update. If the wait times out (a tick stuck on a
-            // contended store lock), reset anyway - IsRunning is already false, so
-            // no further ticks will start.
-            var acquired = _tickLock.Wait(StopTickWaitTimeout);
+            // Holding the tick lock through the reset below means a half-finished
+            // node update cannot clobber it.
+            var acquired = StopTicking();
             try
             {
                 if (_config?.Nodes != null)
@@ -251,6 +255,23 @@ namespace ModbusForge.Services
             }
 
             _logger.LogInformation("Visual simulation stopped");
+        }
+
+        /// <summary>
+        /// Stops the timer and waits for a running tick. True when the tick lock is
+        /// now held (the caller releases it). If the wait times out (a tick stuck on a
+        /// contended store lock), false: IsRunning is already false, so no further
+        /// ticks will start.
+        /// </summary>
+        private bool StopTicking()
+        {
+            lock (_sync)
+            {
+                IsRunning = false;
+            }
+
+            OnStopTimer();
+            return _tickLock.Wait(StopTickWaitTimeout);
         }
 
         protected abstract void OnStartTimer();

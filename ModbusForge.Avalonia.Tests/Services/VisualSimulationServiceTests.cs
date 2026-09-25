@@ -245,6 +245,48 @@ namespace ModbusForge.Avalonia.Tests.Services
         }
 
         [Fact]
+        public async Task Halt_WaitsForTheTickUpdatingNodes_AndKeepsTheirValues()
+        {
+            // A host that reports the final state (the headless runner) halts before
+            // reading the nodes: the report must never see a tick half-way through
+            // its node updates, and must see the values that tick set.
+            var service = new TestableVisualSimulationService();
+            var node = new VisualNode
+            {
+                Id = "in1",
+                Name = "IN",
+                ElementType = PlcElementType.InputBool,
+                Input1Address = new PlcAddressReference { Area = PlcArea.Coil, Address = 1 }
+            };
+            SetConfig(service, new VisualNodeEditorConfig { Nodes = new ObservableCollection<VisualNode> { node } });
+            GetDataStore(service)!.CoilDiscretes[1] = true;
+            service.IsRunningForTest = true;
+
+            using var updating = new ManualResetEventSlim();
+            using var release = new ManualResetEventSlim();
+            node.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName != nameof(VisualNode.CurrentValue)) return;
+                updating.Set();
+                release.Wait(TimeSpan.FromSeconds(10));
+            };
+
+            var tick = Task.Run(() => service.UpdateNodeValues());
+            Assert.True(updating.Wait(TimeSpan.FromSeconds(10)), "the tick should reach its node updates");
+
+            var halt = Task.Run(() => service.Halt());
+            var first = await Task.WhenAny(halt, Task.Delay(TimeSpan.FromMilliseconds(300)));
+            Assert.False(ReferenceEquals(first, halt), "Halt must wait for the tick in progress");
+
+            release.Set();
+            await Task.WhenAll(tick, halt);
+
+            Assert.True(node.CurrentValue);
+            Assert.True(service.GetNodeValue("in1"));
+            Assert.False(service.IsRunning);
+        }
+
+        [Fact]
         public void Stop_ClearsLiveNodeValues()
         {
             var service = new TestableVisualSimulationService();
