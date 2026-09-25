@@ -6,6 +6,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using ModbusForge.Core.Plc;
 using ModbusForge.Models;
 
 namespace ModbusForge.Services
@@ -267,9 +268,37 @@ namespace ModbusForge.Services
             result.Sections = sections;
             result.TagCount = tags.Count;
             result.SectionsFound = sections.Count;
+            result.Project = CompileProject(xef, result);
             result.Success = result.Errors.Count == 0;
 
             return result;
+        }
+
+        /// <summary>
+        /// Compiles the sections for the PLC runtime, reusing the node each block is
+        /// drawn as (so Run can show live values on the canvas), then drops the XEF
+        /// element references.
+        /// </summary>
+        private static PlcProject CompileProject(XDocument xef, PlcXmlImportResult result)
+        {
+            var builder = new PlcProjectBuilder(xef);
+            foreach (var section in result.Sections)
+            {
+                builder.AddSection(
+                    section.Name,
+                    section.Task,
+                    section.RuntimeBlocks.Select(b => (b.Block, (string?)b.Node.Id)).ToList(),
+                    section.RuntimeLinks.Select(l => (l.Link, l.Source.Id, l.Target.Id)).ToList());
+                section.RuntimeBlocks.Clear();
+                section.RuntimeLinks.Clear();
+            }
+
+            foreach (var program in result.Programs.Where(p => !p.HasFbdCanvas && !string.IsNullOrEmpty(p.Language)))
+            {
+                builder.AddSkippedSection(program.Name, program.Language);
+            }
+
+            return builder.Build();
         }
 
         private static void EnsureGlobalNodeIdUniqueness(PlcXmlImportResult result)
@@ -651,6 +680,7 @@ namespace ModbusForge.Services
 
                     var node = CreateVisualNode(block, nodeId, uniqueInstance, rawInstance, typeName, elementType, tags,
                         pinPositions.GetValueOrDefault(typeName), pin => linkedPins.Contains((rawInstance, pin)));
+                    section.RuntimeBlocks.Add((block, node));
                     if (!instanceToNodes.TryGetValue(rawInstance, out var sameName))
                         instanceToNodes[rawInstance] = sameName = new List<VisualNode>();
                     sameName.Add(node);
@@ -710,6 +740,7 @@ namespace ModbusForge.Services
 
                     AlignPinToRecordedEndpoint(sourceNode, source, isInput: false, networkOrdinalOffset);
                     AlignPinToRecordedEndpoint(targetNode, dest, isInput: true, networkOrdinalOffset);
+                    section.RuntimeLinks.Add((link, sourceNode, targetNode));
 
                     var sourcePort = NormalizeSourcePort(sourcePin ?? "OUT");
                     var targetPort = NormalizeTargetPort(targetPin ?? "IN");
@@ -1313,6 +1344,11 @@ namespace ModbusForge.Services
 
         public List<VisualNode> Nodes { get; } = new();
         public List<NodeConnection> Connections { get; } = new();
+
+        // The XEF elements behind the nodes and wires, kept only until the PLC
+        // runtime project is compiled (then cleared so the document can be freed).
+        internal List<(XElement Block, VisualNode Node)> RuntimeBlocks { get; } = new();
+        internal List<(XElement Link, VisualNode Source, VisualNode Target)> RuntimeLinks { get; } = new();
     }
 
     /// <summary>A program (section/subprogram) as listed by Control Expert, in any language.</summary>
@@ -1410,6 +1446,9 @@ namespace ModbusForge.Services
 
         /// <summary>Declared variables (the dataBlock), as Control Expert's Data Editor lists them.</summary>
         public List<PlcXmlVariable> Variables { get; } = new();
+
+        /// <summary>The project compiled for the PLC runtime (what Run executes); null when the import failed.</summary>
+        public PlcProject? Project { get; set; }
 
         /// <summary>Imported FFB blocks (section text boxes are not counted).</summary>
         public int TotalNodes => Sections.Sum(s => s.Nodes.Count(n => n.ElementType != PlcElementType.PlcComment));

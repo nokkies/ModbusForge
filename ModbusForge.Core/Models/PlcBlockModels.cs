@@ -60,4 +60,32 @@ namespace ModbusForge.Models
 
     /// <summary>A bend point of a Control Expert link, in canvas pixels.</summary>
     public sealed record PlcRoutePoint(double X, double Y);
+
+    /// <summary>
+    /// A block's values in the PLC runtime's last scan, as the canvas shows them
+    /// while the PLC tab runs: pin name to display text (TRUE, 12, 1.5, T#2S), per side.
+    /// </summary>
+    /// <param name="Executed">False when EN or the section's activation condition held the block off.</param>
+    /// <param name="Simulated">False for blocks the runtime does not compute (DFBs, unsupported types).</param>
+    public sealed record PlcLiveState(
+        IReadOnlyDictionary<string, string> Inputs,
+        IReadOnlyDictionary<string, string> Outputs,
+        bool Executed,
+        bool Simulated)
+    {
+        /// <summary>True when both states show the same values (records compare dictionaries by reference).</summary>
+        public bool SameAs(PlcLiveState? other)
+            => other != null && Executed == other.Executed && Simulated == other.Simulated
+               && SameValues(Inputs, other.Inputs) && SameValues(Outputs, other.Outputs);
+
+        private static bool SameValues(IReadOnlyDictionary<string, string> a, IReadOnlyDictionary<string, string> b)
+        {
+            if (a.Count != b.Count) return false;
+            foreach (var (key, value) in a)
+            {
+                if (!b.TryGetValue(key, out var other) || !string.Equals(value, other, StringComparison.Ordinal)) return false;
+            }
+            return true;
+        }
+    }
 }

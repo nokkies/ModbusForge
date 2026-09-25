@@ -670,8 +670,17 @@ namespace ModbusForge.Avalonia.ViewModels
             // A loop warning raised during Start (the graph rebuild fires
             // CyclesChanged synchronously) must survive the status update, or
             // the only visible sign that blocks are locked out vanishes.
-            StatusText = _lastCycleWarning ?? $"Simulation running — {SimulationStoreMode}";
+            StatusText = _lastCycleWarning ?? RunningStatusText(SimulationStoreMode);
         }
+
+        /// <summary>The engine Run/Stop drive (set before the constructor can start it).</summary>
+        protected IVisualSimulationService SimulationService => _visualSimulation;
+
+        /// <summary>The status line while running; <paramref name="storeMode"/> names the data store in use.</summary>
+        protected virtual string RunningStatusText(string storeMode) => $"Simulation running — {storeMode}";
+
+        /// <summary>The status line after a stop.</summary>
+        protected virtual string StoppedStatusText => "Simulation stopped";
 
         private void StopSimulation()
         {
@@ -685,7 +694,7 @@ namespace ModbusForge.Avalonia.ViewModels
             SimulationStoreMode = string.Empty;
             _cycleMarkedNodeIds.Clear();
             _lastCycleWarning = null;
-            StatusText = "Simulation stopped";
+            StatusText = StoppedStatusText;
         }
 
         partial void OnConfigChanged(VisualNodeEditorConfig value)

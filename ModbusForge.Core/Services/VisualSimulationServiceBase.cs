@@ -108,7 +108,8 @@ namespace ModbusForge.Services
             _dataStore = DataStoreFactory.CreateDefaultDataStore();
         }
 
-        private static FunctionBlockCatalog CreateCatalog()
+        /// <summary>The block catalog every visual editor uses (also the PLC tab's, for its node ports).</summary>
+        internal static FunctionBlockCatalog CreateCatalog()
         {
             var catalog = new FunctionBlockCatalog();
 

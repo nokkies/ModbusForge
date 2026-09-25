@@ -135,6 +135,14 @@ namespace ModbusForge.Models
         [ObservableProperty]
         private PlcBlockInfo? _plc;
 
+        /// <summary>
+        /// Runtime-only: the block's pin values from the PLC runtime's last scan while
+        /// the PLC tab runs; null when stopped. Not serialized.
+        /// </summary>
+        [ObservableProperty]
+        [property: JsonIgnore]
+        private PlcLiveState? _plcLive;
+
         // Timer/Counter parameters
         [ObservableProperty]
         private int _timerPresetMs = 1000;

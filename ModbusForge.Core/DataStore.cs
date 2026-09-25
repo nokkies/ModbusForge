@@ -159,6 +159,30 @@ namespace ModbusForge.Data
         public void RemoveAt(int index)
             => throw new NotSupportedException();
 
+        /// <summary>
+        /// Reads <paramref name="count"/> consecutive points starting at the 1-based
+        /// <paramref name="index"/> in one call (the indexer costs a call per point).
+        /// </summary>
+        public T[] ReadRange(int index, int count)
+        {
+            if (index < 1 || count < 0 || index + count > Count)
+                throw new ArgumentOutOfRangeException(nameof(index), "Range was out of the collection.");
+
+            return count == 0 ? Array.Empty<T>() : _pointSource.ReadPoints((ushort)(index - 1), (ushort)count);
+        }
+
+        /// <summary>Writes consecutive points starting at the 1-based <paramref name="index"/> in one call.</summary>
+        public void WriteRange(int index, T[] values)
+        {
+            if (values is null)
+                throw new ArgumentNullException(nameof(values));
+            if (index < 1 || index + values.Length > Count)
+                throw new ArgumentOutOfRangeException(nameof(index), "Range was out of the collection.");
+
+            if (values.Length > 0)
+                _pointSource.WritePoints((ushort)(index - 1), values);
+        }
+
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

@@ -4027,16 +4027,19 @@ namespace ModbusForge.Avalonia.ViewModels
                     PlcEditorViewModel.LoadImportedPrograms(
                         result.Sections.Select(s => (s.Name, s.Nodes, s.Connections)).ToList());
 
+                    // Run on the PLC tab executes the whole compiled project.
+                    PlcEditorViewModel.LoadProject(result.Project);
+
                     // Fill the PLC project navigator (programs, tasks, hardware).
                     PlcProjectViewModel.LoadProject(result);
 
-                    var opaque = result.UsedOpaqueTypes.Count;
+                    var computed = result.Project?.Blocks.Count(b => b.IsSimulated) ?? 0;
                     var skipped = result.SkippedPrograms.Count;
                     StatusMessage =
-                        $"PLC import: {result.TotalNodes} nodes / {result.TotalConnections} wires across " +
+                        $"PLC import: {result.TotalNodes} blocks / {result.TotalConnections} wires across " +
                         $"{result.SectionsFound} sections ({result.TagCount} tags); " +
-                        $"{opaque} opaque FB type(s) preserved as stubs" +
-                        (skipped > 0 ? $", {skipped} program(s) skipped" : "") + ".";
+                        $"Run computes {computed} blocks, {result.TotalNodes - computed} DFB or unsupported blocks keep their outputs" +
+                        (skipped > 0 ? $", {skipped} program(s) in other languages not run" : "") + ".";
 
                     // Surface a sample of any warnings in the structured log.
                     foreach (var w in result.Warnings.Take(5))

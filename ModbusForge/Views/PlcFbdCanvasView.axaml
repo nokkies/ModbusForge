@@ -91,10 +91,10 @@
       </Border>
       <Border Classes="ToolGroup">
         <StackPanel Orientation="Horizontal" Spacing="2">
-          <TextBlock Text="Sim" Classes="ToolGroupHeader"/>
-          <Button Content="Run" Command="{Binding RunCommand}"/>
+          <TextBlock Text="PLC" Classes="ToolGroupHeader"/>
+          <Button Content="Run" Command="{Binding RunCommand}" ToolTip.Tip="Run the imported project: every FBD section, every scan, against the Modbus registers"/>
           <Button Content="Stop" Command="{Binding StopCommand}"/>
-          <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" ToolTip.Tip="Simulation scan period in milliseconds">
+          <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" ToolTip.Tip="PLC scan period (MAST cycle) in milliseconds">
             <TextBlock Text="Scan" FontSize="10" VerticalAlignment="Center"/>
             <NumericUpDown Value="{Binding ScanIntervalMs}" Minimum="10" Maximum="10000" Increment="10" ShowButtonSpinner="False" Width="52" VerticalAlignment="Center" Padding="2,0" FontSize="10"/>
           </StackPanel>
