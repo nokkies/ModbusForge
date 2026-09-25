@@ -69,6 +69,7 @@ namespace ModbusForge.Avalonia.ViewModels
         private const int DefaultCustomPeriodMs = 1000;
         private const int MultiRegisterTypeIncrement = 2;
         private const int SingleRegisterTypeIncrement = 1;
+        private const string PlcConsolePrefix = "PLC: ";
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(ReadCommand))]
@@ -424,7 +425,18 @@ namespace ModbusForge.Avalonia.ViewModels
 
         public ScriptRulesViewModel? RulesViewModel { get; }
 
+        /// <summary>The Simulation tab's editor: the hand-built plant model.</summary>
         public VisualNodeEditorViewModel? VisualNodeEditorViewModel { get; }
+
+        /// <summary>
+        /// The PLC tab's editor: logic imported from a Unity Pro XEF. Kept apart from
+        /// <see cref="VisualNodeEditorViewModel"/> so a PLC import, program selection
+        /// or Run/Stop never touches the Simulation.
+        /// </summary>
+        public PlcEditorViewModel? PlcEditorViewModel { get; }
+
+        /// <summary>Control Expert-style project navigator for a loaded XEF/FEF PLC project.</summary>
+        public PlcProjectViewModel PlcProjectViewModel { get; } = new();
 
         public DecodeViewModel? DecodeViewModel { get; }
 
@@ -456,7 +468,8 @@ namespace ModbusForge.Avalonia.ViewModels
             IFileSystem? fileSystem = null,
             IDockingHost? dockingHost = null,
             TagService? tagService = null,
-            ITrendSubscriptionService? trendSubscriptionService = null)
+            ITrendSubscriptionService? trendSubscriptionService = null,
+            PlcEditorViewModel? plcEditorViewModel = null)
         {
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -484,9 +497,28 @@ namespace ModbusForge.Avalonia.ViewModels
             RulesViewModel = rulesViewModel;
             SignalGeneratorViewModel = signalGeneratorViewModel;
             VisualNodeEditorViewModel = visualNodeEditorViewModel;
+            PlcEditorViewModel = plcEditorViewModel;
+            PlcProjectViewModel.SelectionChanged += PlcProjectSelectionChanged;
+            // Keep the CanExecute state fresh whenever busy-ness flips: the PLC page's
+            // "Load XEF..." button otherwise stays dead after the first import, because
+            // AsyncRelayCommand only raises CanExecuteChanged when it finishes its own
+            // execution (and a cancelled file dialog may never get there).
+            PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(IsBusy))
+                {
+                    LoadPlcXmlCommand.NotifyCanExecuteChanged();
+                }
+            };
             if (VisualNodeEditorViewModel != null)
             {
                 VisualNodeEditorViewModel.PropertyChanged += OnVisualNodeEditorViewModelPropertyChanged;
+            }
+
+            if (PlcEditorViewModel != null)
+            {
+                PlcEditorViewModel.PropertyChanged += OnVisualNodeEditorViewModelPropertyChanged;
+                PlcEditorViewModel.PlcRuntime.ProblemReported += OnPlcRuntimeProblemReported;
             }
 
             DecodeViewModel = decodeViewModel;
@@ -525,6 +557,7 @@ namespace ModbusForge.Avalonia.ViewModels
             LoadCustomCommand = new AsyncRelayCommand(LoadCustomAsync, () => CanLoadCustom());
             SaveProjectCommand = new AsyncRelayCommand(SaveProjectAsync, () => CanSaveProject());
             LoadProjectCommand = new AsyncRelayCommand(LoadProjectAsync, () => CanLoadProject());
+            LoadPlcXmlCommand = new AsyncRelayCommand(LoadPlcXmlAsync, () => CanLoadProject());
 
             OpenPreferencesCommand = new RelayCommand(() => _windowService?.ShowPreferences());
             OpenAboutCommand = new RelayCommand(() => _windowService?.ShowAbout());
@@ -635,6 +668,7 @@ namespace ModbusForge.Avalonia.ViewModels
         public IAsyncRelayCommand LoadCustomCommand { get; }
         public IAsyncRelayCommand SaveProjectCommand { get; }
         public IAsyncRelayCommand LoadProjectCommand { get; }
+        public IAsyncRelayCommand LoadPlcXmlCommand { get; }
 
         public ICommand OpenPreferencesCommand { get; }
         public ICommand OpenAboutCommand { get; }
@@ -856,6 +890,11 @@ namespace ModbusForge.Avalonia.ViewModels
         partial void OnIsConsoleTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
         partial void OnIsDebugTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
 
+        // What the PLC runtime could not do (DFB code it cannot run, run-time errors).
+        // Raised on the scan thread; the console list belongs to the UI thread.
+        private void OnPlcRuntimeProblemReported(string message)
+            => _ = _dispatcher.InvokeAsync(() => AppendConsoleMessage(PlcConsolePrefix + message));
+
         private void AppendConsoleMessage(string message)
         {
             if (string.IsNullOrWhiteSpace(message)) return;
@@ -880,15 +919,18 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void OnVisualNodeEditorViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
+            // Raised by both the Simulation and the PLC editor. They share the editor's
+            // status wording ("Simulation stopped"), so PLC lines are labelled or the
+            // console would report the still-running Simulation as stopped.
             if (e.PropertyName == nameof(VisualNodeEditorViewModel.StatusText) &&
-                VisualNodeEditorViewModel is not null)
+                sender is VisualNodeEditorViewModel editor &&
+                !string.IsNullOrWhiteSpace(editor.StatusText))
             {
-                var message = VisualNodeEditorViewModel.StatusText;
-                if (!string.IsNullOrWhiteSpace(message))
-                {
-                    AppendConsoleMessage(message);
-                    AppendDebugMessage($"{DateTime.Now:HH:mm:ss.fff} {message}");
-                }
+                var message = editor is PlcEditorViewModel
+                    ? PlcConsolePrefix + editor.StatusText
+                    : editor.StatusText;
+                AppendConsoleMessage(message);
+                AppendDebugMessage($"{DateTime.Now:HH:mm:ss.fff} {message}");
             }
         }
 
@@ -948,28 +990,28 @@ namespace ModbusForge.Avalonia.ViewModels
         {
             if (IsTabIndexVisible(SelectedTabIndex)) return;
 
-            SelectedTabIndex = Enumerable.Range(0, 16).FirstOrDefault(IsTabIndexVisible);
+            SelectedTabIndex = Enumerable.Range(0, 17).FirstOrDefault(IsTabIndexVisible);
         }
 
         private bool IsTabIndexVisible(int index)
         {
-            // Tab order: Dashboard(0), Trends(1), Frame Inspector(2), MQTT(3),
-            // Script Editor(4), Rules(5), Signal Generator(6), Simulation(7),
-            // Holding(8), Coils(9), Input(10), Discrete(11), Custom Watch(12),
-            // Decode(13), Console(14), Debug(15).
+            // TabItem order in MainView.axaml: Dashboard(0), Trends(1), Frame Inspector(2),
+            // MQTT(3), Script Editor(4), Rules(5), Signal Generator(6), PLC(7),
+            // Simulation(8), Holding(9), Coils(10), Input(11), Discrete(12),
+            // Custom Watch(13), Decode(14), Console(15), Debug(16).
             return index switch
             {
                 0 => true,
                 1 => IsTrendTabVisible,
-                7 => IsSimulationTabVisible,
-                8 => IsRegistersTabVisible,
-                9 => IsCoilsTabVisible,
-                10 => IsInputRegistersTabVisible,
-                11 => IsDiscreteInputsTabVisible,
-                12 => IsCustomWatchTabVisible,
-                13 => IsDecodeTabVisible,
-                14 => IsConsoleTabVisible,
-                15 => IsDebugTabVisible,
+                8 => IsSimulationTabVisible,
+                9 => IsRegistersTabVisible,
+                10 => IsCoilsTabVisible,
+                11 => IsInputRegistersTabVisible,
+                12 => IsDiscreteInputsTabVisible,
+                13 => IsCustomWatchTabVisible,
+                14 => IsDecodeTabVisible,
+                15 => IsConsoleTabVisible,
+                16 => IsDebugTabVisible,
                 _ => true
             };
         }
@@ -3948,6 +3990,126 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
+        /// <summary>
+        /// Imports a Schneider Unity Pro (Quantum) FEF project file (.XEF / .FEF, XML,
+        /// optionally gzip-compressed). Parses the symbolic tag table and the FBD logic
+        /// sections into the PLC tab's own editor (<see cref="PlcEditorViewModel"/>) and
+        /// fills the PLC project navigator. The Simulation tab's programs are not touched.
+        /// </summary>
+        private async Task LoadPlcXmlAsync()
+        {
+            if (_fileDialogService == null) return;
+
+            IsBusy = true;
+            try
+            {
+                // DSH_PLC_XEF lets automated tests pre-supply the file the native
+                // picker would return; normal launches never set it.
+                var preseeded = Environment.GetEnvironmentVariable("DSH_PLC_XEF");
+                var path = !string.IsNullOrEmpty(preseeded) && File.Exists(preseeded)
+                    ? preseeded
+                    : await _fileDialogService.ShowOpenFileDialogAsync(
+                        "Load PLC (Unity Pro XEF)",
+                        "Schneider Unity Pro / Control Expert export (*.xef;*.zef;*.fef)|*.xef;*.zef;*.fef|XML files (*.xml)|*.xml|All files (*.*)|*.*");
+
+                if (path == null) return;
+
+                _logger.LogInformation("Importing PLC XML {Path}", path);
+                // Exports reach ~17 MB: parse off the UI thread so the window stays live.
+                var result = await Task.Run(() => new PlcXmlImporter().Import(path));
+
+                if (!result.Success)
+                {
+                    StatusMessage = $"PLC import failed: {string.Join("; ", result.Errors)}";
+                    _logger.LogError("PLC import failed: {Errors}", string.Join("; ", result.Errors));
+                    return;
+                }
+
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    if (PlcEditorViewModel == null) return;
+                    // Load through the program tree so every program/folder bookkeeping
+                    // stays consistent and the canvas rebuilds as it does for .mfp loads.
+                    PlcEditorViewModel.LoadImportedPrograms(
+                        result.Sections.Select(s => (s.Name, s.Nodes, s.Connections)).ToList());
+
+                    // Run on the PLC tab executes the whole compiled project.
+                    PlcEditorViewModel.LoadProject(result.Project);
+
+                    // Fill the PLC project navigator (programs, tasks, hardware).
+                    PlcProjectViewModel.LoadProject(result);
+
+                    var computed = result.Project?.Blocks.Count(b => b.IsSimulated) ?? 0;
+
+                    // Run executes the FBD and ST sections of the cyclic tasks; the other
+                    // programs (LD, SFC, IL, subroutines, event sections) are listed but not run.
+                    var running = new HashSet<string>(
+                        result.Project?.Sections.Select(s => s.Name) ?? Enumerable.Empty<string>(),
+                        StringComparer.OrdinalIgnoreCase);
+                    var notRun = result.Programs.Count(p => !string.IsNullOrEmpty(p.Language) && !running.Contains(p.Name));
+                    StatusMessage =
+                        $"PLC import: {result.TotalNodes} blocks / {result.TotalConnections} wires across " +
+                        $"{result.SectionsFound} sections ({result.TagCount} tags); " +
+                        $"Run computes {computed} blocks, {result.TotalNodes - computed} keep their outputs (protected DFB code or unsupported type)" +
+                        (notRun > 0 ? $", {notRun} program(s) not run (LD, SFC, IL, subroutine or event section)" : "") + ".";
+
+                    // Surface a sample of any warnings in the structured log.
+                    foreach (var w in result.Warnings.Take(5))
+                        _logger.LogDebug("[PLC] {Warning}", w);
+                });
+            }
+            catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
+            {
+                _logger.LogError(ex, "Error importing PLC XML");
+                StatusMessage = $"PLC import error: {ex.Message}";
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        /// <summary>
+        /// Selecting an FBD program in the PLC navigator switches the PLC editor's
+        /// canvas to that program.
+        /// </summary>
+        private void PlcProjectSelectionChanged(object? sender, PlcTreeNodeViewModel? node)
+        {
+            if (node?.Kind != PlcNodeKind.ProgramFbd || string.IsNullOrEmpty(node.ProgramName)) return;
+            if (PlcEditorViewModel?.ActivateProgramByName(node.ProgramName) != true)
+            {
+                StatusMessage = $"Program '{node.ProgramName}' has no FBD canvas in the loaded project.";
+                _logger.LogDebug("[PLC] Program {Program} has no editor counterpart", node.ProgramName);
+                return;
+            }
+
+            // The canvas-size notification fires while the PLC canvas can be off
+            // screen (File > Load PLC from another tab), so re-fit it now.
+            PlcEditorViewModel?.RefitCanvasSize();
+
+            // Unity Pro sections span thousands of pixels; opening one at 100% zoom
+            // shows an empty corner. Fit the imported layout into the viewport the
+            // same way the double-click path does.
+            PlcProjectViewModel.FitEditorToImportedLayout(PlcEditorViewModel, node.ProgramName);
+        }
+
+        /// <summary>
+        /// Tree node double-click: same as selection, with the duplicate-name
+        /// fallback (editor tree names can carry a "_N" suffix).
+        /// </summary>
+        public void OpenPlcProgram(PlcTreeNodeViewModel? node)
+        {
+            if (node?.Kind != PlcNodeKind.ProgramFbd || string.IsNullOrEmpty(node.ProgramName)) return;
+            if (!PlcProjectViewModel.ActivateEditorProgram(PlcEditorViewModel, node.ProgramName))
+            {
+                StatusMessage = $"Program '{node.ProgramName}' could not be opened in the editor.";
+                return;
+            }
+            PlcEditorViewModel?.RefitCanvasSize();
+            // PLC nav index -> tab index (the converter owns the permutation).
+            SelectedTabIndex = ModbusForge.Avalonia.Converters.NavigationIndexConverter.NavigationToTab(7);
+        }
+
         private ProjectWorkspaceSnapshot BuildWorkspaceSnapshot()
         {
             SyncCurrentUnitConfiguration();
@@ -4477,6 +4639,17 @@ namespace ModbusForge.Avalonia.ViewModels
                 ActiveProfile.PropertyChanged -= ActiveProfile_PropertyChanged;
             }
 
+            if (VisualNodeEditorViewModel != null)
+            {
+                VisualNodeEditorViewModel.PropertyChanged -= OnVisualNodeEditorViewModelPropertyChanged;
+            }
+
+            if (PlcEditorViewModel != null)
+            {
+                PlcEditorViewModel.PropertyChanged -= OnVisualNodeEditorViewModelPropertyChanged;
+                PlcEditorViewModel.PlcRuntime.ProblemReported -= OnPlcRuntimeProblemReported;
+            }
+
             DecodeViewModel?.Dispose();
             _trendLogger?.Stop();
             StopPolling();
@@ -4484,3 +4657,6 @@ namespace ModbusForge.Avalonia.ViewModels
         }
     }
 }
+
+
+

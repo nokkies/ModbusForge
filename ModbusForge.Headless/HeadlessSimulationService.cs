@@ -128,10 +128,14 @@ namespace ModbusForge.Headless
         {
             if (_service is not null)
             {
-                // Capture the final state BEFORE stopping: Stop() resets node
-                // values and error text to their stopped defaults. Dispose
-                // stops the engine (it calls Stop internally) and releases
-                // the timer - do not call Stop() separately.
+                // Halt first: a tick still running when the host stops has already
+                // written its registers but may be half-way through updating the
+                // nodes, and the dump must not read that torn state. Capture the
+                // state BEFORE stopping: Stop() resets node values and error text
+                // to their stopped defaults. Dispose stops the engine (it calls
+                // Stop internally) and releases the timer - do not call Stop()
+                // separately.
+                _service.Halt();
                 DumpFinalState();
                 _service.Dispose();
                 _service = null;

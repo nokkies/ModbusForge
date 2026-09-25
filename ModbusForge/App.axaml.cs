@@ -207,9 +207,12 @@ namespace ModbusForge.Avalonia
             services.AddSingleton<ScriptRulesViewModel>();
             services.AddSingleton<SignalGeneratorViewModel>();
 
-            // Visual simulation
+            // Visual simulation (the Simulation tab's plant model)
             services.AddSingleton<IVisualSimulationService, AvaloniaVisualSimulationService>();
             services.AddSingleton<VisualNodeEditorViewModel>();
+
+            // PLC tab: imported XEF logic on its own editor and engine
+            services.AddSingleton<PlcEditorViewModel>();
 
             // ViewModels
             services.AddSingleton<TrendViewModel>();

@@ -117,6 +117,7 @@
               <ListBoxItem Content="Script Editor" />
               <ListBoxItem Content="Rules" />
               <ListBoxItem Content="Signal Generator" />
+              <ListBoxItem Content="PLC" />
               <ListBoxItem Content="Simulation" />
               <ListBoxItem Content="Registers" Margin="0,16,0,0" />
               <ListBoxItem Content="Input Registers" />
@@ -236,6 +237,88 @@
 
       <TabItem x:Name="SignalGeneratorTab" Header="Signal Generator">
         <views:SignalGeneratorView DataContext="{Binding SignalGeneratorViewModel}" />
+      </TabItem>
+
+      <TabItem x:Name="PlcTab" Header="PLC">
+        <Grid RowDefinitions="Auto,Auto,*">
+          <!-- Import row: the PLC project comes from a Unity Pro / Control Expert export -->
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+            <Button Content="Load XEF..." Command="{Binding LoadPlcXmlCommand}" />
+            <TextBlock Text="{Binding PlcProjectViewModel.Summary}" VerticalAlignment="Center" Opacity="0.75" />
+          </StackPanel>
+
+          <Border Grid.Row="1" BorderBrush="#40000000" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,8">
+            <StackPanel Spacing="2">
+              <TextBlock Text="{Binding PlcProjectViewModel.SelectedNode.Title, FallbackValue='Properties'}" FontSize="16" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding PlcProjectViewModel.SelectedNode.Detail}" TextWrapping="Wrap" Opacity="0.85" />
+            </StackPanel>
+          </Border>
+
+          <!-- Control Expert layout: navigator left, program editor right. -->
+          <Grid Grid.Row="2" ColumnDefinitions="360,Auto,*">
+            <Border Grid.Column="0" BorderBrush="#40000000" BorderThickness="1" CornerRadius="6" Padding="6" Margin="0,0,8,0">
+              <Grid RowDefinitions="Auto,*">
+                <TextBlock Grid.Row="0" Text="Project navigator" FontSize="14" FontWeight="SemiBold" Margin="4,2,4,6" />
+                <TreeView Grid.Row="1"
+                          x:Name="PlcProjectTree"
+                          ItemsSource="{Binding PlcProjectViewModel.RootNodes}"
+                          SelectedItem="{Binding PlcProjectViewModel.SelectedNode, Mode=TwoWay}">
+                  <TreeView.ItemTemplate>
+                    <TreeDataTemplate ItemsSource="{Binding Children}">
+                      <TextBlock Text="{Binding Title}" />
+                    </TreeDataTemplate>
+                  </TreeView.ItemTemplate>
+                </TreeView>
+              </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="1" Width="5" Margin="0,0,8,0" />
+
+            <Border Grid.Column="2" BorderBrush="#40000000" BorderThickness="1" CornerRadius="6" Padding="6">
+              <Grid>
+                <Grid RowDefinitions="Auto,*" IsVisible="{Binding PlcProjectViewModel.HasFbdSelected}">
+                  <TextBlock Grid.Row="0"
+                             Text="{Binding PlcProjectViewModel.SelectedFbdProgram, StringFormat='FBD program: {0}'}"
+                             FontWeight="SemiBold" Margin="4,2,4,6" />
+                  <!-- The PLC tab's own editor, never the Simulation tab's (VisualNodeEditorViewModel). -->
+                  <views:PlcFbdCanvasView Grid.Row="1" DataContext="{Binding PlcEditorViewModel}" />
+                </Grid>
+                <!-- ST / IL section: its program text, read-only, as Control Expert shows it. -->
+                <Grid RowDefinitions="Auto,*" IsVisible="{Binding PlcProjectViewModel.HasSourceSelected}">
+                  <TextBlock Grid.Row="0"
+                             Text="{Binding PlcProjectViewModel.SelectedNode.Title, StringFormat='Program: {0}'}"
+                             FontWeight="SemiBold" Margin="4,2,4,6" />
+                  <TextBox Grid.Row="1" Text="{Binding PlcProjectViewModel.SelectedSourceText, Mode=OneWay}"
+                           IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                           FontFamily="Consolas, Cascadia Mono, Courier New, monospace" FontSize="12"
+                           ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                </Grid>
+                <!-- Data Management: the declared variables, as Control Expert's Data Editor lists them. -->
+                <Grid RowDefinitions="Auto,Auto,*" IsVisible="{Binding PlcProjectViewModel.HasVariablesSelected}">
+                  <TextBlock Grid.Row="0"
+                             Text="{Binding PlcProjectViewModel.FilteredVariables.Count, StringFormat='Variables: {0} shown'}"
+                             FontWeight="SemiBold" Margin="4,2,4,6" />
+                  <TextBox Grid.Row="1" Text="{Binding PlcProjectViewModel.VariableFilter, Mode=TwoWay}"
+                           Watermark="Filter by name, type, address or comment" Margin="0,0,0,6" />
+                  <DataGrid Grid.Row="2" ItemsSource="{Binding PlcProjectViewModel.FilteredVariables}"
+                            IsReadOnly="True" AutoGenerateColumns="False" CanUserResizeColumns="True" CanUserSortColumns="True"
+                            GridLinesVisibility="Horizontal">
+                    <DataGrid.Columns>
+                      <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" />
+                      <DataGridTextColumn Header="Type" Binding="{Binding TypeName}" Width="*" />
+                      <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*" />
+                      <DataGridTextColumn Header="Initial value" Binding="{Binding InitialValue}" Width="*" />
+                      <DataGridTextColumn Header="Comment" Binding="{Binding Comment}" Width="3*" />
+                    </DataGrid.Columns>
+                  </DataGrid>
+                </Grid>
+                <TextBlock Text="Select an FBD or ST program in the navigator to open its logic here.&#10;&#10;No PLC project loaded yet? Click 'Load XEF...' and pick a Unity Pro / Control Expert export (.XEF)."
+                           TextWrapping="Wrap" Opacity="0.6" Margin="6"
+                           IsVisible="{Binding PlcProjectViewModel.ShowsPlaceholder}" />
+              </Grid>
+            </Border>
+          </Grid>
+        </Grid>
       </TabItem>
 
       <TabItem x:Name="SimulationTab" Header="Simulation" IsVisible="{Binding IsSimulationTabVisible}">
@@ -612,3 +695,6 @@
 
   </Grid>
 </UserControl>
+
+
+

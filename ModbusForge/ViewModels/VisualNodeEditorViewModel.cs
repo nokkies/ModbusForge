@@ -70,7 +70,8 @@ namespace ModbusForge.Avalonia.ViewModels
         public double Angle => Math.Atan2(ToY - FromY, ToX - FromX) * 180 / Math.PI;
         public double LineTop => FromY - 1;
 
-        public void UpdatePoints(IList<Point>? points, bool isSelected, PortSide targetPortSide = PortSide.Left)
+        /// <param name="straight">Draw a two-point line as a straight segment instead of a curve.</param>
+        public void UpdatePoints(IList<Point>? points, bool isSelected, PortSide targetPortSide = PortSide.Left, bool straight = false)
         {
             TargetPortSide = targetPortSide;
             LineBrush = new SolidColorBrush(Color.Parse(isSelected ? "#1976D2" : "#607D8B"));
@@ -91,7 +92,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 IsFilled = false
             };
 
-            if (points.Count == 2)
+            if (points.Count == 2 && !straight)
             {
                 var (c1, c2) = ComputeBezierControlPoints(points[0], points[1]);
                 figure.Segments!.Add(new BezierSegment
@@ -405,16 +406,44 @@ namespace ModbusForge.Avalonia.ViewModels
                 : 1.0;
             set
             {
-                var normalized = double.IsFinite(value)
-                    ? Math.Clamp(value, MinimumZoom, MaximumZoom)
-                    : 1.0;
-                if (Math.Abs(Config.ZoomLevel - normalized) < double.Epsilon) return;
-                Config.ZoomLevel = normalized;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(ZoomText));
-                UpdateScaledCanvasSize();
-                UpdateConnectionLines();
+                ApplyZoom(value);
+                // Marking user control happens inside ApplyZoom for anything that
+                // actually changed the level (commands, wheel, toolbar) — a no-op
+                // write must not flag it.
             }
+        }
+
+        /// <summary>
+        /// Set once the zoom changes through the public surface (toolbar buttons,
+        /// wheel, zoom commands). Hosts that fit a program's own layout use
+        /// <see cref="SetZoom"/> instead, so a program selection always refits.
+        /// </summary>
+        public bool HasUserZoomed { get; private set; }
+
+        /// <summary>
+        /// Programmatic zoom (import fit): applies the zoom without flagging it
+        /// as a user choice.
+        /// </summary>
+        public void SetZoom(double value) => ApplyZoom(value, userDriven: false);
+
+        /// <summary>
+        /// The PLC page calls this when a different program is selected: the fit
+        /// belongs to the diagram, so the next selection always refits.
+        /// </summary>
+        public void ResetUserZoomFlag() => HasUserZoomed = false;
+
+        private void ApplyZoom(double value, bool userDriven = true)
+        {
+            var normalized = double.IsFinite(value)
+                ? Math.Clamp(value, MinimumZoom, MaximumZoom)
+                : 1.0;
+            if (Math.Abs(Config.ZoomLevel - normalized) < double.Epsilon) return;
+            Config.ZoomLevel = normalized;
+            if (userDriven) HasUserZoomed = true;
+            OnPropertyChanged(nameof(ZoomLevel));
+            OnPropertyChanged(nameof(ZoomText));
+            UpdateScaledCanvasSize();
+            UpdateConnectionLines();
         }
 
         /// <summary>
@@ -426,6 +455,20 @@ namespace ModbusForge.Avalonia.ViewModels
             var zoom = ZoomLevel;
             ScaledCanvasWidth = Config.CanvasWidth * zoom;
             ScaledCanvasHeight = Config.CanvasHeight * zoom;
+        }
+
+        /// <summary>
+        /// Re-issues the canvas size notifications. Needed when this VM's view comes
+        /// on screen after the size changed while it was detached (the PLC tab after
+        /// File > Load PLC from another tab): Avalonia bindings don't re-read cached
+        /// OneWay values on re-attach.
+        /// </summary>
+        public void RefitCanvasSize()
+        {
+            UpdateScaledCanvasSize();
+            OnPropertyChanged(nameof(ScaledCanvasWidth));
+            OnPropertyChanged(nameof(ScaledCanvasHeight));
+            RefreshConnectionLines();
         }
 
         public bool ShowGrid
@@ -627,8 +670,17 @@ namespace ModbusForge.Avalonia.ViewModels
             // A loop warning raised during Start (the graph rebuild fires
             // CyclesChanged synchronously) must survive the status update, or
             // the only visible sign that blocks are locked out vanishes.
-            StatusText = _lastCycleWarning ?? $"Simulation running — {SimulationStoreMode}";
+            StatusText = _lastCycleWarning ?? RunningStatusText(SimulationStoreMode);
         }
+
+        /// <summary>The engine Run/Stop drive (set before the constructor can start it).</summary>
+        protected IVisualSimulationService SimulationService => _visualSimulation;
+
+        /// <summary>The status line while running; <paramref name="storeMode"/> names the data store in use.</summary>
+        protected virtual string RunningStatusText(string storeMode) => $"Simulation running — {storeMode}";
+
+        /// <summary>The status line after a stop.</summary>
+        protected virtual string StoppedStatusText => "Simulation stopped";
 
         private void StopSimulation()
         {
@@ -642,7 +694,7 @@ namespace ModbusForge.Avalonia.ViewModels
             SimulationStoreMode = string.Empty;
             _cycleMarkedNodeIds.Clear();
             _lastCycleWarning = null;
-            StatusText = "Simulation stopped";
+            StatusText = StoppedStatusText;
         }
 
         partial void OnConfigChanged(VisualNodeEditorConfig value)
@@ -1485,15 +1537,30 @@ namespace ModbusForge.Avalonia.ViewModels
                     continue;
                 }
 
-                var sourceY = GetPortY(source, connection.SourceConnector, false);
-                var sourcePoint = new Point(source.X + source.Width, sourceY);
-                var targetY = GetPortY(target, connection.TargetConnector, true);
-                var targetPoint = new Point(target.X, targetY);
+                var sourcePoint = GetPlcPinPoint(source, connection.SourcePin, isInput: false)
+                    ?? new Point(source.X + source.Width, GetPortY(source, connection.SourceConnector, false));
+                var targetPoint = GetPlcPinPoint(target, connection.TargetPin, isInput: true)
+                    ?? new Point(target.X, GetPortY(target, connection.TargetConnector, true));
 
-                var obstacles = Config.Nodes.Where(n => n != source && n != target);
-                var points = UseOrthogonalRouting
-                    ? GetOrthogonalPoints(sourcePoint, targetPoint, source, target, obstacles)
-                    : new List<Point> { sourcePoint, targetPoint };
+                // Imported links follow the route Control Expert recorded, drawn as
+                // straight segments like the source editor does.
+                var isPlcLink = connection.SourcePin != null && connection.TargetPin != null;
+                List<Point> points;
+                if (connection.RoutePoints is { Count: > 0 } bends)
+                {
+                    points = new List<Point> { sourcePoint };
+                    points.AddRange(bends.Select(b => new Point(b.X, b.Y)));
+                    points.Add(targetPoint);
+                }
+                else if (UseOrthogonalRouting)
+                {
+                    var obstacles = Config.Nodes.Where(n => n != source && n != target);
+                    points = GetOrthogonalPoints(sourcePoint, targetPoint, source, target, obstacles).ToList();
+                }
+                else
+                {
+                    points = new List<Point> { sourcePoint, targetPoint };
+                }
 
                 var line = new ConnectionLine
                 {
@@ -1507,11 +1574,27 @@ namespace ModbusForge.Avalonia.ViewModels
                     ToX = targetPoint.X,
                     ToY = targetPoint.Y
                 };
-                line.UpdatePoints(points, ReferenceEquals(SelectedConnection, connection), PortSide.Left);
+                line.UpdatePoints(points, ReferenceEquals(SelectedConnection, connection), PortSide.Left, straight: isPlcLink);
                 lines.Add(line);
             }
 
             ConnectionLines = lines;
+        }
+
+        /// <summary>
+        /// Where an imported link meets a Control Expert block: its pin's row, on the
+        /// block frame half a grid cell in from the node edge (the pin cell's centre).
+        /// Null for nodes without Control Expert pins.
+        /// </summary>
+        private static Point? GetPlcPinPoint(VisualNode node, string? pinName, bool isInput)
+        {
+            if (node.Plc is not { } plc || pinName == null) return null;
+
+            var pin = plc.Pins.FirstOrDefault(p => p.IsInput == isInput && string.Equals(p.Name, pinName, StringComparison.Ordinal));
+            if (pin == null) return null;
+
+            var inset = plc.FrameInset;
+            return new Point(isInput ? node.X + inset : node.X + node.Width - inset, node.Y + pin.CenterY);
         }
 
         private static double GetPortY(VisualNode node, string? connector, bool isInput)
@@ -1521,8 +1604,14 @@ namespace ModbusForge.Avalonia.ViewModels
 
             if (isInput)
             {
-                var ratio = connector == "Input2" ? 0.667 : 0.333;
-                return node.Y + headerHeight + contentH * ratio;
+                var names = node.InputPortNames is { Count: > 0 } named
+                    ? named
+                    : new System.Collections.ObjectModel.ObservableCollection<string> { "Input1", "Input2" };
+                var name = string.IsNullOrWhiteSpace(connector) ? names[0] : connector!;
+                var index = names.IndexOf(name);
+                if (index < 0) index = 0;
+                var inputRatio = (index + 1.0) / (names.Count + 1.0);
+                return node.Y + headerHeight + (contentH * inputRatio);
             }
 
             var outputPortNames = node.OutputPortNames;
@@ -2284,6 +2373,10 @@ namespace ModbusForge.Avalonia.ViewModels
 
         private void ZoomOut() => ZoomLevel -= ZoomStep;
 
+        /// <summary>
+        /// "100%" on the toolbar: back to 1:1, and the fit hands control of the
+        /// zoom to the user until the next program selection.
+        /// </summary>
         private void ResetZoom() => ZoomLevel = 1.0;
 
         private void AlignLeft()
