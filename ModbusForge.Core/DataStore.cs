@@ -204,8 +204,7 @@ namespace ModbusForge.Data
         /// <summary>Writes consecutive points starting at the 1-based <paramref name="index"/> in one call.</summary>
         public void WriteRange(int index, T[] values)
         {
-            if (values is null)
-                throw new ArgumentNullException(nameof(values));
+            ArgumentNullException.ThrowIfNull(values);
             WriteRange(index, (ReadOnlySpan<T>)values);
         }
 

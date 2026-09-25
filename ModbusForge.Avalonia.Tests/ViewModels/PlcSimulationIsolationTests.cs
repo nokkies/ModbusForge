@@ -188,7 +188,7 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             // Corpus exports reach 16.8 MB; parsing on the UI thread froze the window.
             var blocks = string.Concat(Enumerable.Range(0, 3000).Select(i => $@"
         <FFBBlock instanceName="".{i}"" typeName=""AND"" additionnalPinNumber=""0"" enEnO=""false"" width=""7"" height=""6"">
-          <objPosition posX=""{i % 20 * 10}"" posY=""{i / 20 * 8}""/>
+          <objPosition posX=""{(i % 20) * 10}"" posY=""{(i / 20) * 8}""/>
           <descriptionFFB execAfter="""">
             <inputVariable invertedPin=""false"" formalParameter=""IN1"" effectiveParameter=""Pump_Run""/>
             <inputVariable invertedPin=""false"" formalParameter=""IN2"" effectiveParameter=""Pump_Start""/>

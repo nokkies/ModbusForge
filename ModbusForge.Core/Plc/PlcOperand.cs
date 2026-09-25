@@ -157,7 +157,7 @@ namespace ModbusForge.Core.Plc
                     return default;
                 }
                 var element = type.ElementType!;
-                var offset = location.Space.IsBitTable ? location.Offset + (int)index : location.Offset + (int)index * element.Size;
+                var offset = location.Space.IsBitTable ? location.Offset + (int)index : location.Offset + ((int)index * element.Size);
                 return new PlcLocation(location.Space, offset, element);
             }
         }

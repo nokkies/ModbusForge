@@ -119,8 +119,8 @@ public class PlcXefCorpusSmokeTests
                     endpoints++;
                     var drawnX = isInput ? node.X + node.Plc!.FrameInset : node.X + node.Width - node.Plc!.FrameInset;
                     var drawnY = node.Y + pin.CenterY;
-                    var recordedX = 60 + ((int)pos.Attribute("posX")! + 0.5) * 20;
-                    var recordedY = 40 + ((int)pos.Attribute("posY")! + 0.5) * 20;
+                    var recordedX = 60 + (((int)pos.Attribute("posX")! + 0.5) * 20);
+                    var recordedY = 40 + (((int)pos.Attribute("posY")! + 0.5) * 20);
                     if (drawnX != recordedX || drawnY != recordedY)
                     {
                         misplaced.Add($"{node.Id} {node.Plc.TypeName}.{pin.Name} drawn ({drawnX},{drawnY}) recorded ({recordedX},{recordedY})");

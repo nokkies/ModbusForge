@@ -1611,7 +1611,7 @@ namespace ModbusForge.Avalonia.ViewModels
                 var index = names.IndexOf(name);
                 if (index < 0) index = 0;
                 var inputRatio = (index + 1.0) / (names.Count + 1.0);
-                return node.Y + headerHeight + contentH * inputRatio;
+                return node.Y + headerHeight + (contentH * inputRatio);
             }
 
             var outputPortNames = node.OutputPortNames;

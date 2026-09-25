@@ -382,7 +382,7 @@ end_if;
 
             var move = Block(Import(xml), "MOVE");
 
-            Assert.Equal(40.0 + 1000 * 20, move.Y);
+            Assert.Equal(40.0 + (1000 * 20), move.Y);
         }
     }
 }

@@ -424,12 +424,12 @@ namespace ModbusForge.Avalonia.Views
 
             if (connector == "Input2" && node.HasSecondInput)
             {
-                return new Point(node.X, node.Y + HeaderHeight + contentH * 0.667);
+                return new Point(node.X, node.Y + HeaderHeight + (contentH * 0.667));
             }
 
             if (connector == "Input1" || (connector?.StartsWith("Input") == true))
             {
-                return new Point(node.X, node.Y + HeaderHeight + contentH * 0.333);
+                return new Point(node.X, node.Y + HeaderHeight + (contentH * 0.333));
             }
 
             // Output ports are distributed on the right edge.
@@ -438,7 +438,7 @@ namespace ModbusForge.Avalonia.Views
             if (portIndex < 0) portIndex = 0;
             var outputCount = Math.Max(outputPortNames.Count, 1);
             var yRatio = (portIndex + 1.0) / (outputCount + 1.0);
-            return new Point(node.X + node.Width, node.Y + HeaderHeight + contentH * yRatio);
+            return new Point(node.X + node.Width, node.Y + HeaderHeight + (contentH * yRatio));
         }
 
         private void TryCompleteConnection(PointerEventArgs e)
@@ -546,15 +546,15 @@ namespace ModbusForge.Avalonia.Views
                     ViewModel.SetZoom(newZoom);
 
                     _canvasScrollViewer.Offset = new Vector(
-                        offset.X + viewportPos.X * (newZoom / oldZoom - 1.0),
-                        offset.Y + viewportPos.Y * (newZoom / oldZoom - 1.0));
+                        offset.X + (viewportPos.X * ((newZoom / oldZoom) - 1.0)),
+                        offset.Y + (viewportPos.Y * ((newZoom / oldZoom) - 1.0)));
                 }
             }
             else if ((e.KeyModifiers & KeyModifiers.Shift) == KeyModifiers.Shift)
             {
                 e.Handled = true;
                 _canvasScrollViewer.Offset = new Vector(
-                    _canvasScrollViewer.Offset.X - e.Delta.Y * HorizontalWheelStep,
+                    _canvasScrollViewer.Offset.X - (e.Delta.Y * HorizontalWheelStep),
                     _canvasScrollViewer.Offset.Y);
             }
         }
@@ -659,7 +659,7 @@ namespace ModbusForge.Avalonia.Views
             var current = e.GetPosition(listBox);
             var deltaX = current.X - _paletteDragStart.X;
             var deltaY = current.Y - _paletteDragStart.Y;
-            if (_paletteDragStarted || Math.Sqrt(deltaX * deltaX + deltaY * deltaY) < DragThreshold)
+            if (_paletteDragStarted || Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY)) < DragThreshold)
             {
                 return;
             }
@@ -1160,7 +1160,7 @@ namespace ModbusForge.Avalonia.Views
             var current = e.GetPosition(treeView);
             var deltaX = current.X - _treeDragStart.X;
             var deltaY = current.Y - _treeDragStart.Y;
-            if (_treeDragStarted || Math.Sqrt(deltaX * deltaX + deltaY * deltaY) < DragThreshold)
+            if (_treeDragStarted || Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY)) < DragThreshold)
             {
                 return;
             }

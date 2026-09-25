@@ -99,7 +99,7 @@ public class PlcImportUITests : IDisposable
         // Real mouse + keyboard: the launched app is the foreground window.
         var fileRect = fileMenu!.BoundingRectangle;
         FlaUI.Core.Input.Mouse.Click(new System.Drawing.Point(
-            fileRect.X + fileRect.Width / 2, fileRect.Y + fileRect.Height / 2));
+            fileRect.X + (fileRect.Width / 2), fileRect.Y + (fileRect.Height / 2)));
         Thread.Sleep(1200);
 
         // Highlight "Load PLC" (third item) and commit.
@@ -145,7 +145,7 @@ public class PlcImportUITests : IDisposable
         Assert.NotNull(root);
         var rootRect = root!.BoundingRectangle;
         FlaUI.Core.Input.Mouse.Click(new System.Drawing.Point(
-            rootRect.X + rootRect.Width / 2, rootRect.Y + rootRect.Height / 2));
+            rootRect.X + (rootRect.Width / 2), rootRect.Y + (rootRect.Height / 2)));
         Thread.Sleep(500);
         foreach (var _ in Enumerable.Range(0, 3))
         {
@@ -162,7 +162,7 @@ public class PlcImportUITests : IDisposable
         {
             var rRect = runButton.BoundingRectangle;
             FlaUI.Core.Input.Mouse.Click(new System.Drawing.Point(
-                rRect.X + rRect.Width / 2, rRect.Y + rRect.Height / 2));
+                rRect.X + (rRect.Width / 2), rRect.Y + (rRect.Height / 2)));
             Thread.Sleep(TimeSpan.FromSeconds(8));
             _output.WriteLine("Clicked Run.");
         }
@@ -189,7 +189,7 @@ public class PlcImportUITests : IDisposable
         Assert.NotNull(element);
         var rect = element!.BoundingRectangle;
         FlaUI.Core.Input.Mouse.Click(new System.Drawing.Point(
-            rect.X + rect.Width / 2, rect.Y + rect.Height / 2));
+            rect.X + (rect.Width / 2), rect.Y + (rect.Height / 2)));
         Thread.Sleep(TimeSpan.FromSeconds(3));
     }
 

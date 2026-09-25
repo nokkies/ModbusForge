@@ -126,7 +126,7 @@ namespace ModbusForge.Avalonia.Views
             var height = _node.Height;
             var inset = plc.FrameInset;
             var live = _node.PlcLive;
-            var frame = new Rect(inset, plc.CellSize, Math.Max(width - 2 * inset, 1), Math.Max(height - plc.CellSize, 1));
+            var frame = new Rect(inset, plc.CellSize, Math.Max(width - (2 * inset), 1), Math.Max(height - plc.CellSize, 1));
             var framePen = _node.HasError ? ErrorPen : _node.IsSelected ? SelectedPen
                 : live is { Executed: false } ? IdlePen : FramePen;
 
@@ -207,9 +207,9 @@ namespace ModbusForge.Avalonia.Views
                 _ => (NumberFill, NumberText)
             };
             var formatted = Format(value, Bold, ValueFontSize, brush);
-            var boxWidth = formatted.Width + 2 * ValuePadding;
+            var boxWidth = formatted.Width + (2 * ValuePadding);
             var left = rightAligned ? x - boxWidth : x;
-            var box = new Rect(left, centreY - formatted.Height / 2, boxWidth, formatted.Height);
+            var box = new Rect(left, centreY - (formatted.Height / 2), boxWidth, formatted.Height);
             context.DrawRectangle(fill, null, box, 2, 2);
             context.DrawText(formatted, new Point(left + ValuePadding, box.Top));
         }
@@ -220,14 +220,14 @@ namespace ModbusForge.Avalonia.Views
         private static void DrawCentered(DrawingContext context, string text, Typeface typeface, double size, IBrush brush, double centreX, double centreY)
         {
             var formatted = Format(text, typeface, size, brush);
-            context.DrawText(formatted, new Point(centreX - formatted.Width / 2, centreY - formatted.Height / 2));
+            context.DrawText(formatted, new Point(centreX - (formatted.Width / 2), centreY - (formatted.Height / 2)));
         }
 
         /// <returns>The drawn text's width.</returns>
         private static double DrawLeftAligned(DrawingContext context, string text, Typeface typeface, double size, IBrush brush, double left, double centreY)
         {
             var formatted = Format(text, typeface, size, brush);
-            context.DrawText(formatted, new Point(left, centreY - formatted.Height / 2));
+            context.DrawText(formatted, new Point(left, centreY - (formatted.Height / 2)));
             return formatted.Width;
         }
 
@@ -235,7 +235,7 @@ namespace ModbusForge.Avalonia.Views
         private static double DrawRightAligned(DrawingContext context, string text, Typeface typeface, double size, IBrush brush, double right, double centreY)
         {
             var formatted = Format(text, typeface, size, brush);
-            context.DrawText(formatted, new Point(right - formatted.Width, centreY - formatted.Height / 2));
+            context.DrawText(formatted, new Point(right - formatted.Width, centreY - (formatted.Height / 2)));
             return formatted.Width;
         }
     }

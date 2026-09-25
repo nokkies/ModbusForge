@@ -469,8 +469,8 @@ namespace ModbusForge.Core.Plc
                 {
                     Kind.Shl => n >= width ? 0 : (value << n) & mask,
                     Kind.Shr => n >= width ? 0 : value >> n,
-                    Kind.Rol => ((value << (n % width)) | (value >> ((width - n % width) % width))) & mask,
-                    _ => ((value >> (n % width)) | (value << ((width - n % width) % width))) & mask
+                    Kind.Rol => ((value << (n % width)) | (value >> ((width - (n % width)) % width))) & mask,
+                    _ => ((value >> (n % width)) | (value << ((width - (n % width)) % width))) & mask
                 };
                 call.SetOutput("OUT", PlcValue.FromInteger(type, result));
             }

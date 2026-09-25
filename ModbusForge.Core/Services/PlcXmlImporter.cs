@@ -408,7 +408,7 @@ namespace ModbusForge.Services
                 _ => PlcArea.HoldingRegister
             };
 
-            var finalAddress = bit.HasValue ? word * 16 + bit.Value : word;
+            var finalAddress = bit.HasValue ? (word * 16) + bit.Value : word;
 
             return new PlcAddressReference
             {
@@ -622,8 +622,6 @@ namespace ModbusForge.Services
             if (networks.Count == 0)
                 networks = new List<XElement> { fbdSource };
 
-
-
             double networkOrdinalOffset = 0;
             // Legacy placement for blocks with no usable <objPosition>: a flowing
             // 4-row grid advanced per placed node.
@@ -699,13 +697,13 @@ namespace ModbusForge.Services
                     node.Height = cellH;
                     if (ReadGridPosition(block) is { } grid)
                     {
-                        node.X = SectionMarginX + grid.X * GridUnitWidth;
-                        node.Y = SectionMarginY + networkOrdinalOffset + grid.Y * GridUnitHeight;
+                        node.X = SectionMarginX + (grid.X * GridUnitWidth);
+                        node.Y = SectionMarginY + networkOrdinalOffset + (grid.Y * GridUnitHeight);
                     }
                     else
                     {
                         node.X = LegacyCursorColumn(legacyCursor);
-                        node.Y = networkOrdinalOffset + SectionMarginY + GridUnitHeight * LegacyCursorRow(legacyCursor);
+                        node.Y = networkOrdinalOffset + SectionMarginY + (GridUnitHeight * LegacyCursorRow(legacyCursor));
                         legacyCursor++;
                     }
                     maxNodeY = Math.Max(maxNodeY, node.Y);
@@ -807,7 +805,7 @@ namespace ModbusForge.Services
         private const double SectionMarginY = 40;
 
         private static double LegacyCursorColumn(int cursor)
-            => LegacyColumnOffset + LegacyColumnWidth * (cursor / LegacyRows);
+            => LegacyColumnOffset + (LegacyColumnWidth * (cursor / LegacyRows));
 
         private static int LegacyCursorRow(int cursor) => cursor % LegacyRows;
 
@@ -833,8 +831,8 @@ namespace ModbusForge.Services
                 return null;
             }
             return new PlcRoutePoint(
-                SectionMarginX + (x + 0.5) * GridUnitWidth,
-                SectionMarginY + yOffset + (y + 0.5) * GridUnitHeight);
+                SectionMarginX + ((x + 0.5) * GridUnitWidth),
+                SectionMarginY + yOffset + ((y + 0.5) * GridUnitHeight));
         }
 
         // <objPosition> lives at two different depths depending on the export:
@@ -869,7 +867,6 @@ namespace ModbusForge.Services
             BlockPinPositions? declaredPins,
             Func<string, bool> isLinkedPin)
         {
-
             var isOpaque = elementType == Opaque;
             var node = new VisualNode
             {
@@ -1142,8 +1139,8 @@ namespace ModbusForge.Services
                 Id = nodeId,
                 Name = firstLine.Length > MaxCommentNameLength ? firstLine[..MaxCommentNameLength] + "..." : firstLine,
                 ElementType = PlcElementType.PlcComment,
-                X = SectionMarginX + x * GridUnitWidth,
-                Y = SectionMarginY + yOffset + y * GridUnitHeight,
+                X = SectionMarginX + (x * GridUnitWidth),
+                Y = SectionMarginY + yOffset + (y * GridUnitHeight),
                 Width = Math.Max(width, 1) * GridUnitWidth,
                 Height = Math.Max(height, 1) * GridUnitHeight,
                 Plc = new PlcBlockInfo { Text = text, CellSize = GridUnitHeight }

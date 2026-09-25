@@ -110,7 +110,7 @@ namespace ModbusForge.Services
         /// </summary>
         public void Start(VisualNodeEditorConfig config)
         {
-            if (config == null) throw new ArgumentNullException(nameof(config));
+            ArgumentNullException.ThrowIfNull(config);
             if (config.ScanIntervalMs > 0) SetScanIntervalMs(config.ScanIntervalMs);
 
             lock (_sync)

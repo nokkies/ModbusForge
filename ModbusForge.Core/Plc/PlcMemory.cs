@@ -153,7 +153,7 @@ namespace ModbusForge.Core.Plc
             var register = offset / 2;
             if (!InRange(table, register)) return;
             var word = table![register];
-            var mask = (ushort)(1 << (bit + (offset % 2) * 8));
+            var mask = (ushort)(1 << (bit + ((offset % 2) * 8)));
             var updated = value ? (ushort)(word | mask) : (ushort)(word & ~mask);
             if (updated != word) table[register] = updated;
         }
@@ -172,7 +172,7 @@ namespace ModbusForge.Core.Plc
             for (var i = 0; i < destination.Length; i++)
             {
                 var position = offset + i;
-                var index = position / 2 - first;
+                var index = (position / 2) - first;
                 var word = index >= 0 && index < words.Length ? words[index] : (ushort)0;
                 destination[i] = (byte)(position % 2 == 0 ? word & 0xFF : word >> 8);
             }
@@ -192,7 +192,7 @@ namespace ModbusForge.Core.Plc
             for (var i = 0; i < source.Length; i++)
             {
                 var position = offset + i;
-                var index = position / 2 - first;
+                var index = (position / 2) - first;
                 if (index < 0 || index >= words.Length) continue;
                 var word = words[index];
                 var updated = position % 2 == 0 ? (ushort)((word & 0xFF00) | source[i]) : (ushort)((word & 0x00FF) | (source[i] << 8));
@@ -372,7 +372,7 @@ namespace ModbusForge.Core.Plc
             if (location.Bit >= 0)
             {
                 var bit = location.Bit;
-                return PlcOps.FromBool((space.ReadByte(location.Offset + bit / 8) & (1 << (bit % 8))) != 0);
+                return PlcOps.FromBool((space.ReadByte(location.Offset + (bit / 8)) & (1 << (bit % 8))) != 0);
             }
 
             var type = location.Type;
@@ -461,7 +461,7 @@ namespace ModbusForge.Core.Plc
             }
             if (location.Bit >= 0)
             {
-                space.WriteBitOfByte(location.Offset + location.Bit / 8, location.Bit % 8, value.AsBool());
+                space.WriteBitOfByte(location.Offset + (location.Bit / 8), location.Bit % 8, value.AsBool());
                 return;
             }
 

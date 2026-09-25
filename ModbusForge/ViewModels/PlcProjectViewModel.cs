@@ -281,7 +281,6 @@ public sealed partial class PlcProjectViewModel : ObservableObject
         return app;
     }
 
-
     private static PlcTreeNodeViewModel BuildTaskNode(PlcXmlImportResult result)
     {
         var tc = new PlcTreeNodeViewModel("Task Configuration", PlcNodeKind.TaskConfigRoot);

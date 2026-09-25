@@ -121,10 +121,10 @@ namespace ModbusForge.Core.Plc
             bits.WriteBit(FirstCycleInRunBit, _coldStart);
             bits.WriteBit(IoErrorBit, true);
             bits.WriteBit(PlcRunningBit, true);
-            bits.WriteBit(TimeBase10MsBit, Now / 5 % 2 == 1);
-            bits.WriteBit(TimeBase100MsBit, Now / 50 % 2 == 1);
-            bits.WriteBit(TimeBase1SBit, Now / 500 % 2 == 1);
-            bits.WriteBit(TimeBase1MinBit, Now / 30_000 % 2 == 1);
+            bits.WriteBit(TimeBase10MsBit, (Now / 5) % 2 == 1);
+            bits.WriteBit(TimeBase100MsBit, (Now / 50) % 2 == 1);
+            bits.WriteBit(TimeBase1SBit, (Now / 500) % 2 == 1);
+            bits.WriteBit(TimeBase1MinBit, (Now / 30_000) % 2 == 1);
 
             foreach (var task in Project.Tasks)
             {
@@ -560,7 +560,7 @@ namespace ModbusForge.Core.Plc
             _dfbDepth++;
             try
             {
-                var task = _currentTask ?? Project.Tasks.FirstOrDefault() ?? DefaultTask;
+                var task = _currentTask ?? (Project.Tasks.Count > 0 ? Project.Tasks[0] : DefaultTask);
                 foreach (var (blocks, program) in body.Sections)
                 {
                     if (program != null)
