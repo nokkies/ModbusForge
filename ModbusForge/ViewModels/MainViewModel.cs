@@ -518,6 +518,7 @@ namespace ModbusForge.Avalonia.ViewModels
             if (PlcEditorViewModel != null)
             {
                 PlcEditorViewModel.PropertyChanged += OnVisualNodeEditorViewModelPropertyChanged;
+                PlcEditorViewModel.PlcRuntime.ProblemReported += OnPlcRuntimeProblemReported;
             }
 
             DecodeViewModel = decodeViewModel;
@@ -888,6 +889,11 @@ namespace ModbusForge.Avalonia.ViewModels
         partial void OnIsTrendTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
         partial void OnIsConsoleTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
         partial void OnIsDebugTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
+
+        // What the PLC runtime could not do (DFB code it cannot run, run-time errors).
+        // Raised on the scan thread; the console list belongs to the UI thread.
+        private void OnPlcRuntimeProblemReported(string message)
+            => _ = _dispatcher.InvokeAsync(() => AppendConsoleMessage(PlcConsolePrefix + message));
 
         private void AppendConsoleMessage(string message)
         {
@@ -4034,12 +4040,18 @@ namespace ModbusForge.Avalonia.ViewModels
                     PlcProjectViewModel.LoadProject(result);
 
                     var computed = result.Project?.Blocks.Count(b => b.IsSimulated) ?? 0;
-                    var skipped = result.SkippedPrograms.Count;
+
+                    // Run executes the FBD and ST sections of the cyclic tasks; the other
+                    // programs (LD, SFC, IL, subroutines, event sections) are listed but not run.
+                    var running = new HashSet<string>(
+                        result.Project?.Sections.Select(s => s.Name) ?? Enumerable.Empty<string>(),
+                        StringComparer.OrdinalIgnoreCase);
+                    var notRun = result.Programs.Count(p => !string.IsNullOrEmpty(p.Language) && !running.Contains(p.Name));
                     StatusMessage =
                         $"PLC import: {result.TotalNodes} blocks / {result.TotalConnections} wires across " +
                         $"{result.SectionsFound} sections ({result.TagCount} tags); " +
-                        $"Run computes {computed} blocks, {result.TotalNodes - computed} DFB or unsupported blocks keep their outputs" +
-                        (skipped > 0 ? $", {skipped} program(s) in other languages not run" : "") + ".";
+                        $"Run computes {computed} blocks, {result.TotalNodes - computed} keep their outputs (protected DFB code or unsupported type)" +
+                        (notRun > 0 ? $", {notRun} program(s) not run (LD, SFC, IL, subroutine or event section)" : "") + ".";
 
                     // Surface a sample of any warnings in the structured log.
                     foreach (var w in result.Warnings.Take(5))
@@ -4635,6 +4647,7 @@ namespace ModbusForge.Avalonia.ViewModels
             if (PlcEditorViewModel != null)
             {
                 PlcEditorViewModel.PropertyChanged -= OnVisualNodeEditorViewModelPropertyChanged;
+                PlcEditorViewModel.PlcRuntime.ProblemReported -= OnPlcRuntimeProblemReported;
             }
 
             DecodeViewModel?.Dispose();

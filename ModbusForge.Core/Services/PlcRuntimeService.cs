@@ -36,6 +36,7 @@ namespace ModbusForge.Services
         private readonly object _sync = new();
 
         private PlcRuntime? _runtime;
+        private RuntimeReports _reported;
         private Dictionary<string, PlcBlock> _blocksByNode = new(StringComparer.Ordinal);
         private VisualNodeEditorConfig? _config;
         private TimeSpan _lastTick;
@@ -71,6 +72,12 @@ namespace ModbusForge.Services
         /// </summary>
         public DataStore CurrentDataStore => EffectiveStore;
 
+        /// <summary>
+        /// Something the runtime could not do, reported once: DFB code it cannot execute
+        /// or the first run-time error of a kind. Raised on the scan thread.
+        /// </summary>
+        public event Action<string>? ProblemReported;
+
         /// <summary>The PLC runtime has no graph cycles to report: loops go through variables.</summary>
         public event Action<IReadOnlyList<string>>? CyclesChanged
         {
@@ -88,6 +95,7 @@ namespace ModbusForge.Services
             lock (_sync)
             {
                 _runtime = project != null ? new PlcRuntime(project) : null;
+                _reported = default;
                 _blocksByNode = project?.Blocks
                     .Where(b => b.NodeId != null)
                     .GroupBy(b => b.NodeId!, StringComparer.Ordinal)
@@ -196,6 +204,7 @@ namespace ModbusForge.Services
                     runtime.Scan(store, step);
                 }
 
+                ReportProblems(runtime);
                 ShowValues(config);
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
@@ -206,6 +215,51 @@ namespace ModbusForge.Services
             {
                 _tickLock.Release();
             }
+        }
+
+        /// <summary>What has been reported about the loaded runtime, so each problem is reported once.</summary>
+        private struct RuntimeReports
+        {
+            public int DfbProblems;
+            public bool StError;
+            public bool BlockError;
+            public bool IndexError;
+        }
+
+        /// <summary>
+        /// Tells the user what the runtime could not do: DFB code it cannot execute
+        /// (found when an instance first runs) and the first run-time error of each kind.
+        /// Called on the scan thread, after the scan.
+        /// </summary>
+        private void ReportProblems(PlcRuntime runtime)
+        {
+            var problems = runtime.DfbProblems;
+            for (; _reported.DfbProblems < problems.Count; _reported.DfbProblems++)
+            {
+                Report($"DFB code not run: {problems[_reported.DfbProblems]}");
+            }
+
+            if (!_reported.StError && runtime.StErrors > 0)
+            {
+                _reported.StError = true;
+                Report("ST run-time error (division by zero, a loop cut off or a failed call); the rest of that code was skipped for the cycle");
+            }
+            if (!_reported.BlockError && runtime.BlockErrors > 0)
+            {
+                _reported.BlockError = true;
+                Report("a block failed to execute; it behaves as if ENO were 0");
+            }
+            if (!_reported.IndexError && runtime.IndexErrors > 0)
+            {
+                _reported.IndexError = true;
+                Report("an array index was outside the declared bounds (%S20 set)");
+            }
+        }
+
+        private void Report(string message)
+        {
+            _logger.LogWarning("PLC: {Message}", message);
+            ProblemReported?.Invoke(message);
         }
 
         /// <summary>The block a canvas node draws, when the loaded project has it.</summary>

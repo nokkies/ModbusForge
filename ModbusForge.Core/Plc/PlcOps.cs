@@ -72,18 +72,37 @@ namespace ModbusForge.Core.Plc
         {
             PlcType? chosen = null;
             var sawLiteral = false;
-            foreach (var value in values)
-            {
-                if (!value.HasValue) continue;
-                var type = value.Type!;
-                if (type.Kind == PlcTypeKind.AnyInteger)
-                {
-                    sawLiteral = true;
-                    continue;
-                }
-                if (chosen == null || (type.IsReal && !chosen.IsReal)) chosen = type;
-            }
+            foreach (var value in values) Consider(value, ref chosen, ref sawLiteral);
+            return OperatingType(chosen, sawLiteral);
+        }
 
+        /// <summary>The operating type of two operands (an ST binary operator), without an array.</summary>
+        public static PlcType OperatingType(PlcValue a, PlcValue b)
+        {
+            PlcType? chosen = null;
+            var sawLiteral = false;
+            Consider(a, ref chosen, ref sawLiteral);
+            Consider(b, ref chosen, ref sawLiteral);
+            return OperatingType(chosen, sawLiteral);
+        }
+
+        /// <summary>The operating type of one operand (an ST unary operator).</summary>
+        public static PlcType OperatingType(PlcValue value) => OperatingType(value, default);
+
+        private static void Consider(PlcValue value, ref PlcType? chosen, ref bool sawLiteral)
+        {
+            if (!value.HasValue) return;
+            var type = value.Type!;
+            if (type.Kind == PlcTypeKind.AnyInteger)
+            {
+                sawLiteral = true;
+                return;
+            }
+            if (chosen == null || (type.IsReal && !chosen.IsReal)) chosen = type;
+        }
+
+        private static PlcType OperatingType(PlcType? chosen, bool sawLiteral)
+        {
             if (chosen == null) return sawLiteral ? PlcType.AnyInteger : PlcType.Bool;
             return chosen.Kind == PlcTypeKind.Ebool ? PlcType.Bool : chosen;
         }

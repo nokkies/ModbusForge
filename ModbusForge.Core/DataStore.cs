@@ -1,15 +1,12 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using NModbus;
-using NModbus.Data;
 
 namespace ModbusForge.Data
 {
     /// <summary>
     /// Compatibility data store that exposes the old NModbus4 1-based
-    /// <see cref="ModbusDataCollection{T}"/> API on top of the NModbus v3
-    /// <see cref="IPointSource{T}"/> implementation.
+    /// <see cref="ModbusDataCollection{T}"/> API.
     /// </summary>
     public class DataStore
     {
@@ -48,13 +45,19 @@ namespace ModbusForge.Data
     }
 
     /// <summary>
-    /// 1-based Modbus data collection backed by an NModbus v3 <see cref="IPointSource{T}"/>.
-    /// Index 0 is an unused placeholder, matching the NModbus4 behaviour.
+    /// 1-based Modbus data collection. Index 0 is an unused placeholder, matching the
+    /// NModbus4 behaviour. Every access takes a lock, as the NModbus v3 point source
+    /// did, but without its per-call LINQ slice and array allocations: the PLC runtime
+    /// reads registers and coils one at a time, thousands of times per scan.
     /// </summary>
     public class ModbusDataCollection<T> : IList<T>, IReadOnlyList<T> where T : struct
     {
-        private readonly IPointSource<T> _pointSource;
+        private readonly object _sync = new();
         private readonly int _count;
+
+        // Point n-1 holds index n. Allocated on the first write, so an unused table
+        // costs nothing; until then every point reads as zero.
+        private T[]? _points;
 
         public ModbusDataCollection()
             : this(ushort.MaxValue)
@@ -63,9 +66,11 @@ namespace ModbusForge.Data
 
         public ModbusDataCollection(ushort size)
         {
-            _pointSource = new PointSource<T>();
             _count = size + 1; // +1 for the unused 0-based placeholder at index 0
         }
+
+        /// <summary>The storage, allocated when first needed. Call only while holding <see cref="_sync"/>.</summary>
+        private T[] Points => _points ??= new T[_count - 1];
 
         public int Count => _count;
 
@@ -81,7 +86,10 @@ namespace ModbusForge.Data
                 if (index < 0 || index >= Count)
                     throw new ArgumentOutOfRangeException(nameof(index), "Index was out of range.");
 
-                return _pointSource.ReadPoints((ushort)(index - 1), 1)[0];
+                lock (_sync)
+                {
+                    return _points is { } points ? points[index - 1] : default;
+                }
             }
             set
             {
@@ -91,7 +99,10 @@ namespace ModbusForge.Data
                 if (index < 0 || index >= Count)
                     throw new ArgumentOutOfRangeException(nameof(index), "Index was out of range.");
 
-                _pointSource.WritePoints((ushort)(index - 1), new[] { value });
+                lock (_sync)
+                {
+                    Points[index - 1] = value;
+                }
             }
         }
 
@@ -110,9 +121,9 @@ namespace ModbusForge.Data
 
         public void Clear()
         {
-            for (int i = 1; i < Count; i++)
+            lock (_sync)
             {
-                _pointSource.WritePoints((ushort)(i - 1), new[] { default(T) });
+                if (_points != null) Array.Clear(_points);
             }
         }
 
@@ -168,7 +179,26 @@ namespace ModbusForge.Data
             if (index < 1 || count < 0 || index + count > Count)
                 throw new ArgumentOutOfRangeException(nameof(index), "Range was out of the collection.");
 
-            return count == 0 ? Array.Empty<T>() : _pointSource.ReadPoints((ushort)(index - 1), (ushort)count);
+            if (count == 0) return Array.Empty<T>();
+
+            var values = new T[count];
+            ReadRange(index, values);
+            return values;
+        }
+
+        /// <summary>Copies consecutive points starting at the 1-based <paramref name="index"/> into <paramref name="destination"/>.</summary>
+        public void ReadRange(int index, Span<T> destination)
+        {
+            if (index < 1 || index + destination.Length > Count)
+                throw new ArgumentOutOfRangeException(nameof(index), "Range was out of the collection.");
+
+            lock (_sync)
+            {
+                if (_points is { } points)
+                    points.AsSpan(index - 1, destination.Length).CopyTo(destination);
+                else
+                    destination.Clear();
+            }
         }
 
         /// <summary>Writes consecutive points starting at the 1-based <paramref name="index"/> in one call.</summary>
@@ -176,11 +206,21 @@ namespace ModbusForge.Data
         {
             if (values is null)
                 throw new ArgumentNullException(nameof(values));
+            WriteRange(index, (ReadOnlySpan<T>)values);
+        }
+
+        /// <summary>Writes consecutive points starting at the 1-based <paramref name="index"/> in one call.</summary>
+        public void WriteRange(int index, ReadOnlySpan<T> values)
+        {
             if (index < 1 || index + values.Length > Count)
                 throw new ArgumentOutOfRangeException(nameof(index), "Range was out of the collection.");
 
-            if (values.Length > 0)
-                _pointSource.WritePoints((ushort)(index - 1), values);
+            if (values.Length == 0) return;
+
+            lock (_sync)
+            {
+                values.CopyTo(Points.AsSpan(index - 1));
+            }
         }
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();

@@ -134,6 +134,17 @@ namespace ModbusForge.Core.Plc
                 return typed(suffixType);
             }
 
+            // Table functions: LENGTH_ARINT, SUM_ARREAL, MOVE_INT_ARINT, ...
+            if (name.StartsWith("LENGTH_AR", StringComparison.OrdinalIgnoreCase)) return new TableLengthFunction();
+            if (name.StartsWith("SUM_AR", StringComparison.OrdinalIgnoreCase) && TypeNames.TryGetValue(name[6..], out var sumType))
+                return new TableSumFunction(sumType);
+            var fill = name.IndexOf("_AR", StringComparison.OrdinalIgnoreCase);
+            if (name.StartsWith("MOVE_", StringComparison.OrdinalIgnoreCase) && fill > 5
+                && TypeNames.TryGetValue(name[5..fill], out var fillType) && name[(fill + 3)..].Equals(name[5..fill], StringComparison.OrdinalIgnoreCase))
+            {
+                return new TableFillFunction(fillType);
+            }
+
             // Conversions: INT_TO_REAL, REAL_TO_INT, WORD_TO_INT, TIME_TO_DINT, BOOL_TO_INT, ...
             var to = name.IndexOf("_TO_", StringComparison.OrdinalIgnoreCase);
             if (to > 0 && TypeNames.TryGetValue(name[..to], out var from) && TypeNames.TryGetValue(name[(to + 4)..], out var target))
@@ -152,16 +163,16 @@ namespace ModbusForge.Core.Plc
         {
             public override bool IsFunctionBlock => false;
 
+            /// <summary>The input values in pin order.</summary>
+            protected static ReadOnlySpan<PlcValue> Inputs(PlcCall call) => call.Inputs;
+
             /// <summary>The input values in pin order, leaving out the pin named <paramref name="except"/>.</summary>
-            protected static PlcValue[] Inputs(PlcCall call, string? except = null)
+            protected static PlcValue[] InputsExcept(PlcCall call, string except)
             {
                 var skip = -1;
-                if (except != null)
+                for (var i = 0; i < call.InputCount && skip < 0; i++)
                 {
-                    for (var i = 0; i < call.InputCount && skip < 0; i++)
-                    {
-                        if (string.Equals(except, call.InputName(i), StringComparison.OrdinalIgnoreCase)) skip = i;
-                    }
+                    if (string.Equals(except, call.InputName(i), StringComparison.OrdinalIgnoreCase)) skip = i;
                 }
 
                 var values = new PlcValue[skip < 0 ? call.InputCount : call.InputCount - 1];
@@ -261,7 +272,7 @@ namespace ModbusForge.Core.Plc
 
             public override void Execute(PlcCall call)
             {
-                var inputs = Inputs(call, "K");
+                var inputs = InputsExcept(call, "K");
                 var k = call.Input("K").AsInteger();
                 if (k < 0 || k >= inputs.Length)
                 {
@@ -568,6 +579,9 @@ namespace ModbusForge.Core.Plc
             }
         }
 
+        /// <summary>BIT0 ... BIT31, interned so pin lookups match by reference.</summary>
+        private static readonly string[] BitPinNames = Enumerable.Range(0, 32).Select(i => string.Intern("BIT" + i)).ToArray();
+
         /// <summary>BIT_TO_WORD / BIT_TO_BYTE: OUT = {BITn, ..., BIT0}.</summary>
         private sealed class BitsToWordFunction : Function
         {
@@ -579,7 +593,7 @@ namespace ModbusForge.Core.Plc
                 long result = 0;
                 for (var bit = 0; bit < _type.BitWidth; bit++)
                 {
-                    if (call.Input("BIT" + bit).AsBool()) result |= 1L << bit;
+                    if (call.Input(BitPinNames[bit]).AsBool()) result |= 1L << bit;
                 }
                 call.SetOutput("OUT", PlcValue.FromInteger(_type, result));
             }
@@ -596,7 +610,7 @@ namespace ModbusForge.Core.Plc
                 var value = PlcOps.Convert(call.Input("IN"), _type).AsInteger();
                 for (var bit = 0; bit < _type.BitWidth; bit++)
                 {
-                    call.SetOutput("BIT" + bit, PlcOps.FromBool((value & (1L << bit)) != 0));
+                    call.SetOutput(BitPinNames[bit], PlcOps.FromBool((value & (1L << bit)) != 0));
                 }
             }
         }
@@ -649,6 +663,64 @@ namespace ModbusForge.Core.Plc
                 {
                     call.SetOutput(pin, PlcValue.FromInteger(type, (bits >> shift) & ((1L << type.BitWidth) - 1)));
                 }
+            }
+        }
+
+        /// <summary>LENGTH_AR*: the number of elements of the table at IN.</summary>
+        private sealed class TableLengthFunction : Function
+        {
+            public override void Execute(PlcCall call)
+            {
+                if (call.Input("IN").Type is not { Kind: PlcTypeKind.Array } table)
+                {
+                    call.Fail();
+                    return;
+                }
+                call.SetOutput("OUT", PlcValue.FromInteger(PlcType.Int, table.Length));
+            }
+        }
+
+        /// <summary>SUM_AR*: the sum of the elements of the table at IN.</summary>
+        private sealed class TableSumFunction : Function
+        {
+            private readonly PlcType _type;
+            public TableSumFunction(PlcType type) => _type = type;
+
+            public override void Execute(PlcCall call)
+            {
+                var input = call.Input("IN");
+                if (input.Type is not { Kind: PlcTypeKind.Array, ElementType: { } element } table)
+                {
+                    call.Fail();
+                    return;
+                }
+                var bytes = input.AsBytes();
+                var sum = PlcValue.DefaultOf(_type);
+                for (var i = 0; i < table.Length; i++)
+                {
+                    sum = PlcOps.Add(_type, sum, PlcValue.Decode(element, bytes.AsSpan(i * element.Size, element.Size)));
+                }
+                call.SetOutput("OUT", sum);
+            }
+        }
+
+        /// <summary>MOVE_*_AR*: every element of the table written to OUT gets IN.</summary>
+        private sealed class TableFillFunction : Function
+        {
+            private readonly PlcType _type;
+            public TableFillFunction(PlcType type) => _type = type;
+
+            public override void Execute(PlcCall call)
+            {
+                if (call.OutputType("OUT") is not { Kind: PlcTypeKind.Array, ElementType: { } element } table)
+                {
+                    call.Fail();
+                    return;
+                }
+                var one = PlcValue.Encode(PlcOps.Convert(call.Input("IN"), _type), element);
+                var bytes = new byte[table.Size];
+                for (var i = 0; i < table.Length; i++) one.CopyTo(bytes, i * element.Size);
+                call.SetOutput("OUT", PlcValue.FromBytes(table, bytes));
             }
         }
 

@@ -62,7 +62,7 @@ public sealed class PlcEditorViewModel : VisualNodeEditorViewModel
         var text = $"Running {sections} sections: {computed} of {blocks.Count} blocks computed";
         if (computed < blocks.Count)
         {
-            text += $", {blocks.Count - computed} DFB or unsupported blocks keep their outputs";
+            text += $", {blocks.Count - computed} keep their outputs (protected DFB code or unsupported type)";
         }
         return text + $", {storeMode}";
     }

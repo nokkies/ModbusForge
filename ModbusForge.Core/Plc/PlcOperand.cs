@@ -1,14 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 
 namespace ModbusForge.Core.Plc
 {
     /// <summary>
-    /// An actual parameter on a pin: a literal, a variable reference (with field,
-    /// array and bit-extraction steps: <c>Pump.Status</c>, <c>Tab[3]</c>,
-    /// <c>Flags.4</c>), or a direct address (<c>%MW100</c>, <c>%M5</c>).
+    /// An actual parameter on a pin, or an expression in Structured Text: a literal,
+    /// a variable reference (with field, array and bit-extraction steps:
+    /// <c>Pump.Status</c>, <c>Tab[3]</c>, <c>Flags.4</c>), or a direct address
+    /// (<c>%MW100</c>, <c>%M5</c>).
     /// </summary>
     public abstract class PlcOperand
     {
@@ -56,21 +58,21 @@ namespace ModbusForge.Core.Plc
     /// <summary>A variable or direct-address reference, resolved against controller memory on every access.</summary>
     public sealed class PlcReferenceOperand : PlcOperand
     {
-        private readonly PlcVariable? _variable;
-        private readonly PlcAddress? _address;
+        private readonly PlcRoot _root;
         private readonly Step[] _steps;
         private readonly bool _hasIndex;
 
-        // The location last resolved and the runtime it belongs to: variable memory
-        // never moves while a runtime lives, so only array indexes need re-evaluating.
+        // The location last resolved, the runtime it belongs to and the root's binding
+        // then: variable memory never moves while a runtime lives, so only array indexes
+        // and in/out parameters (bound per call) need re-evaluating.
         private PlcRuntime? _resolvedFor;
         private PlcLocation _resolved;
+        private int _resolvedBinding;
 
-        internal PlcReferenceOperand(string text, PlcVariable? variable, PlcAddress? address, IReadOnlyList<Step> steps, PlcType staticType)
+        internal PlcReferenceOperand(string text, PlcRoot root, IReadOnlyList<Step> steps, PlcType staticType)
             : base(text)
         {
-            _variable = variable;
-            _address = address;
+            _root = root;
             _steps = steps.ToArray();
             _hasIndex = _steps.Any(s => s is IndexStep);
             StaticType = staticType;
@@ -78,13 +80,16 @@ namespace ModbusForge.Core.Plc
 
         public override PlcType? StaticType { get; }
 
-        /// <summary>The root variable, when the reference starts with a symbol.</summary>
-        public PlcVariable? Variable => _variable;
+        /// <summary>The root variable, when the reference starts with a declared variable.</summary>
+        public PlcVariable? Variable => (_root as PlcVariableRoot)?.Variable;
 
-        /// <summary>The direct address, when the reference is one.</summary>
-        public PlcAddress? Address => _address ?? _variable?.Address;
+        /// <summary>The direct address, when the reference is one or starts with a located variable.</summary>
+        public PlcAddress? Address => (_root as PlcAddressRoot)?.Address ?? Variable?.Address;
 
         public override bool IsWritable => true;
+
+        /// <summary>True when the reference has an array index, so where it points can change.</summary>
+        public bool HasIndex => _hasIndex;
 
         public override PlcValue Read(PlcRuntime runtime)
         {
@@ -101,9 +106,10 @@ namespace ModbusForge.Core.Plc
         /// <summary>Where the reference points now (array indexes are evaluated on each access).</summary>
         public PlcLocation Resolve(PlcRuntime runtime)
         {
-            if (!_hasIndex && ReferenceEquals(_resolvedFor, runtime)) return _resolved;
+            if (!_hasIndex && ReferenceEquals(_resolvedFor, runtime) && _resolvedBinding == _root.Binding) return _resolved;
 
-            var location = _variable != null ? runtime.Locate(_variable) : runtime.Memory.Locate(_address!);
+            var binding = _root.Binding;
+            var location = _root.Locate(runtime);
             for (var i = 0; i < _steps.Length && location.IsValid; i++)
             {
                 location = _steps[i].Apply(location, runtime);
@@ -113,6 +119,7 @@ namespace ModbusForge.Core.Plc
             {
                 _resolved = location;
                 _resolvedFor = runtime;
+                _resolvedBinding = binding;
             }
             return location;
         }
@@ -170,10 +177,211 @@ namespace ModbusForge.Core.Plc
         }
     }
 
-    /// <summary>Turns actual-parameter text into operands against a symbol table.</summary>
+    /// <summary>Where a reference starts: a declared variable, a direct address, or a fixed location.</summary>
+    public abstract class PlcRoot
+    {
+        public abstract PlcType Type { get; }
+
+        public abstract PlcLocation Locate(PlcRuntime runtime);
+
+        /// <summary>
+        /// Changes when the root starts pointing somewhere else (an in/out parameter
+        /// bound to another caller's variable), so references from it resolve again.
+        /// </summary>
+        internal int Binding { get; private protected set; }
+    }
+
+    /// <summary>A declared (global) variable.</summary>
+    public sealed class PlcVariableRoot : PlcRoot
+    {
+        public PlcVariableRoot(PlcVariable variable) => Variable = variable;
+
+        public PlcVariable Variable { get; }
+
+        public override PlcType Type => Variable.Address?.Bit.HasValue == true ? PlcType.Bool : Variable.Type;
+
+        public override PlcLocation Locate(PlcRuntime runtime) => runtime.Locate(Variable);
+    }
+
+    /// <summary>A direct address (%MW10, %M5, %S21).</summary>
+    public sealed class PlcAddressRoot : PlcRoot
+    {
+        public PlcAddressRoot(PlcAddress address) => Address = address;
+
+        public PlcAddress Address { get; }
+
+        public override PlcType Type => Address.DefaultType;
+
+        public override PlcLocation Locate(PlcRuntime runtime) => runtime.Memory.Locate(Address);
+    }
+
+    /// <summary>A location known when the code is compiled: a variable of one DFB instance.</summary>
+    public sealed class PlcFixedRoot : PlcRoot
+    {
+        private readonly PlcLocation _location;
+
+        public PlcFixedRoot(PlcLocation location) => _location = location;
+
+        public override PlcType Type => _location.Type;
+
+        public override PlcLocation Locate(PlcRuntime runtime) => _location;
+    }
+
+    /// <summary>
+    /// An in/out parameter of one DFB instance. IEC 61131-3 passes VAR_IN_OUT by
+    /// reference, so each call binds it to that call's actual variable; when the actual
+    /// is not a variable, to the instance's own field, which the call copies in and out.
+    /// </summary>
+    public sealed class PlcInOutRoot : PlcRoot
+    {
+        public PlcInOutRoot(PlcLocation own)
+        {
+            Own = own;
+            Current = own;
+        }
+
+        /// <summary>The instance's own field for the parameter.</summary>
+        public PlcLocation Own { get; }
+
+        /// <summary>Where the call in progress bound the parameter.</summary>
+        public PlcLocation Current { get; private set; }
+
+        /// <summary>True when bound to the caller's variable rather than the instance's field.</summary>
+        public bool ByReference { get; private set; }
+
+        public override PlcType Type => Own.Type;
+
+        public override PlcLocation Locate(PlcRuntime runtime) => Current;
+
+        /// <summary>Binds the parameter to the caller's variable for this call.</summary>
+        internal void Bind(PlcLocation actual)
+        {
+            ByReference = true;
+            Move(actual);
+        }
+
+        /// <summary>Binds the parameter to the instance's own field (the value is copied in and out).</summary>
+        internal void BindOwn()
+        {
+            ByReference = false;
+            Move(Own);
+        }
+
+        private void Move(PlcLocation location)
+        {
+            if (location.SameAs(Current)) return;
+            Current = location;
+            Binding++;
+        }
+    }
+
+    /// <summary>The names code can refer to.</summary>
+    public interface IPlcScope
+    {
+        PlcRoot? Resolve(string name);
+    }
+
+    /// <summary>The project's declared variables: what sections see.</summary>
+    public sealed class PlcGlobalScope : IPlcScope
+    {
+        private readonly IReadOnlyDictionary<string, PlcVariable> _variables;
+
+        public PlcGlobalScope(IReadOnlyDictionary<string, PlcVariable> variables) => _variables = variables;
+
+        public PlcRoot? Resolve(string name) => _variables.TryGetValue(name, out var variable) ? new PlcVariableRoot(variable) : null;
+    }
+
+    /// <summary>
+    /// The code of one DFB instance: its own parameters and variables first (at the
+    /// instance's memory), then whatever the outer scope has.
+    /// </summary>
+    public sealed class PlcInstanceScope : IPlcScope
+    {
+        private readonly PlcLocation _instance;
+        private readonly IPlcScope _outer;
+        private readonly IReadOnlyDictionary<string, PlcInOutRoot>? _inOuts;
+
+        /// <param name="inOuts">The instance's in/out parameters, which each call binds to its own variables.</param>
+        public PlcInstanceScope(PlcLocation instance, IPlcScope outer, IReadOnlyDictionary<string, PlcInOutRoot>? inOuts = null)
+        {
+            _instance = instance;
+            _outer = outer;
+            _inOuts = inOuts;
+        }
+
+        public PlcRoot? Resolve(string name)
+        {
+            if (_inOuts != null && _inOuts.TryGetValue(name, out var inOut)) return inOut;
+            return _instance.Type.FindField(name) is { } field
+                ? new PlcFixedRoot(new PlcLocation(_instance.Space, _instance.Offset + field.Offset, field.Type))
+                : _outer.Resolve(name);
+        }
+    }
+
+    /// <summary>Builds a reference from its root and steps, checking each step against the types.</summary>
+    internal sealed class PlcReferenceBuilder
+    {
+        private readonly string _text;
+        private readonly PlcRoot _root;
+        private readonly List<PlcReferenceOperand.Step> _steps = new();
+        private PlcType _type;
+        private string? _error;
+
+        public PlcReferenceBuilder(string text, PlcRoot root)
+        {
+            _text = text;
+            _root = root;
+            _type = root.Type;
+        }
+
+        public void Field(string name)
+        {
+            if (_error != null) return;
+            if (_type.FindField(name) is not { } member)
+            {
+                _error = _type.Kind == PlcTypeKind.Unknown ? $"type {_type} is not defined in the XEF" : $"{_type} has no field {name}";
+                return;
+            }
+            _steps.Add(new PlcReferenceOperand.FieldStep(name));
+            _type = member.Type;
+        }
+
+        public void Bit(int bit)
+        {
+            if (_error != null) return;
+            if (!_type.IsInteger || bit >= _type.BitWidth)
+            {
+                _error = $"no bit {bit} in {_type}";
+                return;
+            }
+            _steps.Add(new PlcReferenceOperand.BitStep(bit));
+            _type = PlcType.Bool;
+        }
+
+        public void Index(PlcOperand index)
+        {
+            if (_error != null) return;
+            if (_type.Kind != PlcTypeKind.Array)
+            {
+                _error = $"{_type} is not an array";
+                return;
+            }
+            _steps.Add(new PlcReferenceOperand.IndexStep(index));
+            _type = _type.ElementType!;
+        }
+
+        public PlcOperand Build() => _error != null
+            ? new PlcUnresolvedOperand(_text, _error)
+            : new PlcReferenceOperand(_text, _root, _steps, _type);
+    }
+
+    /// <summary>Turns actual-parameter text into operands against a scope.</summary>
     public static class PlcOperandParser
     {
         public static PlcOperand Parse(string text, IReadOnlyDictionary<string, PlcVariable> symbols)
+            => Parse(text, new PlcGlobalScope(symbols));
+
+        public static PlcOperand Parse(string text, IPlcScope scope)
         {
             var trimmed = text.Trim();
             if (PlcLiteral.TryParse(trimmed, out var literal)) return new PlcConstantOperand(text, literal);
@@ -181,38 +389,27 @@ namespace ModbusForge.Core.Plc
             if (trimmed.StartsWith('%'))
             {
                 return PlcAddress.TryParse(trimmed) is { } address
-                    ? new PlcReferenceOperand(text, null, address, Array.Empty<PlcReferenceOperand.Step>(), address.DefaultType)
+                    ? new PlcReferenceBuilder(text, new PlcAddressRoot(address)).Build()
                     : new PlcUnresolvedOperand(text, "unsupported direct address");
             }
 
             var reader = new Reader(trimmed);
-            var root = reader.Identifier();
-            if (root == null) return new PlcUnresolvedOperand(text, "not a variable reference");
-            if (!symbols.TryGetValue(root, out var variable)) return new PlcUnresolvedOperand(text, $"'{root}' is not declared");
+            var name = reader.Identifier();
+            if (name == null) return new PlcUnresolvedOperand(text, "not a variable reference");
+            if (scope.Resolve(name) is not { } root) return new PlcUnresolvedOperand(text, $"'{name}' is not declared");
 
-            // The type each step lands on, so a reference that cannot resolve is caught here.
-            var type = variable.Address?.Bit.HasValue == true ? PlcType.Bool : variable.Type;
-            var steps = new List<PlcReferenceOperand.Step>();
+            var reference = new PlcReferenceBuilder(text, root);
             while (!reader.AtEnd)
             {
                 if (reader.TryConsume('.'))
                 {
                     if (reader.Number() is { } bit)
                     {
-                        if (!type.IsInteger || bit >= type.BitWidth) return new PlcUnresolvedOperand(text, $"no bit {bit} in {type}");
-                        steps.Add(new PlcReferenceOperand.BitStep(bit));
-                        type = PlcType.Bool;
+                        reference.Bit(bit);
                         continue;
                     }
                     if (reader.Identifier() is not { } field) return new PlcUnresolvedOperand(text, "bad field name");
-                    if (type.FindField(field) is not { } member)
-                    {
-                        return new PlcUnresolvedOperand(text, type.Kind == PlcTypeKind.Unknown
-                            ? $"type {type} is not defined in the XEF"
-                            : $"{type} has no field {field}");
-                    }
-                    steps.Add(new PlcReferenceOperand.FieldStep(field));
-                    type = member.Type;
+                    reference.Field(field);
                     continue;
                 }
 
@@ -222,11 +419,9 @@ namespace ModbusForge.Core.Plc
                     if (indexes == null) return new PlcUnresolvedOperand(text, "unterminated index");
                     foreach (var index in indexes.Split(','))
                     {
-                        if (type.Kind != PlcTypeKind.Array) return new PlcUnresolvedOperand(text, $"{type} is not an array");
-                        var operand = Parse(index, symbols);
+                        var operand = Parse(index, scope);
                         if (operand is PlcUnresolvedOperand) return new PlcUnresolvedOperand(text, "unsupported index");
-                        steps.Add(new PlcReferenceOperand.IndexStep(operand));
-                        type = type.ElementType!;
+                        reference.Index(operand);
                     }
                     continue;
                 }
@@ -234,7 +429,7 @@ namespace ModbusForge.Core.Plc
                 return new PlcUnresolvedOperand(text, "expression");
             }
 
-            return new PlcReferenceOperand(text, variable, null, steps, type);
+            return reference.Build();
         }
 
         private sealed class Reader

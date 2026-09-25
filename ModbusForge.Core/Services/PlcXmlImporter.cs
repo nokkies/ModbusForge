@@ -293,9 +293,13 @@ namespace ModbusForge.Services
                 section.RuntimeLinks.Clear();
             }
 
-            foreach (var program in result.Programs.Where(p => !p.HasFbdCanvas && !string.IsNullOrEmpty(p.Language)))
+            foreach (var program in result.Programs.Where(p => !p.HasFbdCanvas && !string.IsNullOrEmpty(p.Language)
+                                                               && string.Equals(p.Type, "section", StringComparison.OrdinalIgnoreCase)))
             {
-                builder.AddSkippedSection(program.Name, program.Language);
+                if (program.Language == "ST" && program.SourceText != null)
+                    builder.AddStSection(program.Name, program.Task, program.SourceText);
+                else
+                    builder.AddSkippedSection(program.Name, program.Language);
             }
 
             return builder.Build();

@@ -36,8 +36,30 @@ namespace ModbusForge.Core.Plc
         Unknown
     }
 
+    /// <summary>What a function block field is to its callers.</summary>
+    public enum PlcParameterDirection
+    {
+        /// <summary>A structure (DDT) field.</summary>
+        None,
+        Input,
+        InOut,
+        Output,
+
+        /// <summary>A public variable: readable from outside as Instance.Name.</summary>
+        Public,
+
+        /// <summary>A private variable of the block's own code.</summary>
+        Private
+    }
+
     /// <summary>A field of a structure or function block type at its byte offset.</summary>
-    public sealed record PlcField(string Name, PlcType Type, int Offset);
+    public sealed record PlcField(string Name, PlcType Type, int Offset)
+    {
+        public PlcParameterDirection Direction { get; init; }
+
+        /// <summary>The field's declared initial values, relative to the field ("" for the field itself).</summary>
+        public IReadOnlyList<PlcInitialValue> Defaults { get; init; } = System.Array.Empty<PlcInitialValue>();
+    }
 
     /// <summary>
     /// A PLC data type with its size and layout in controller memory. Structures
@@ -170,14 +192,20 @@ namespace ModbusForge.Core.Plc
         public static PlcType NewUnknown(string name) => new(name, PlcTypeKind.Unknown, 0, 1) { _sealed = true };
 
         /// <summary>Appends a field at the next offset its alignment allows.</summary>
-        public PlcField AddField(string name, PlcType type)
+        public PlcField AddField(string name, PlcType type,
+            PlcParameterDirection direction = PlcParameterDirection.None,
+            IReadOnlyList<PlcInitialValue>? defaults = null)
         {
             if (_sealed) throw new InvalidOperationException($"Type {Name} is complete.");
             if (Kind is not (PlcTypeKind.Struct or PlcTypeKind.FunctionBlock))
                 throw new InvalidOperationException($"Type {Name} has no fields.");
 
             var offset = Align(Size, type.Alignment);
-            var field = new PlcField(name, type, offset);
+            var field = new PlcField(name, type, offset)
+            {
+                Direction = direction,
+                Defaults = defaults ?? System.Array.Empty<PlcInitialValue>()
+            };
             _fields.Add(field);
             _fieldsByName.TryAdd(name, field);
             Size = offset + type.Size;
@@ -191,10 +219,17 @@ namespace ModbusForge.Core.Plc
             if (!_sealed)
             {
                 Size = Align(Size, Alignment);
+                HasDefaults = _fields.Any(f => f.Defaults.Count > 0 || f.Type.HasDefaults);
                 _sealed = true;
             }
             return this;
         }
+
+        /// <summary>True when the type, or a structure inside it, declares initial values.</summary>
+        public bool HasDefaults { get; private set; }
+
+        /// <summary>The user function block code behind a DFB type; null for other types and encrypted DFBs.</summary>
+        public PlcDfbDefinition? Dfb { get; internal set; }
 
         private static int Align(int offset, int alignment) => alignment <= 1 ? offset : (offset + alignment - 1) / alignment * alignment;
 

@@ -228,6 +228,92 @@ namespace ModbusForge.Avalonia.Tests.ViewModels
             Assert.Contains("4 of 4 blocks", plc.StatusText);
         }
 
+        // A DFB with an ST section the runtime runs and an LD section it cannot.
+        private const string MixedDfbXef = @"<FEFExchangeFile>
+  <FBSource nameOfFBType=""Mixed"">
+    <inputParameters><variables name=""A"" typeName=""BOOL""/></inputParameters>
+    <outputParameters><variables name=""Q"" typeName=""BOOL""/></outputParameters>
+    <FBProgram name=""Code""><STSource>Q := A;</STSource></FBProgram>
+    <FBProgram name=""Rungs""><LDSource></LDSource></FBProgram>
+  </FBSource>
+  <dataBlock>
+    <variables name=""M1"" typeName=""Mixed""/>
+    <variables name=""X"" typeName=""EBOOL"" topologicalAddress=""%M3""/>
+  </dataBlock>
+  <program>
+    <identProgram name=""Main"" type=""section"" task=""MAST""/>
+    <FBDSource><networkFBD>
+      <FFBBlock instanceName=""M1"" typeName=""Mixed"" additionnalPinNumber=""0"" enEnO=""false"" width=""7"" height=""5"">
+        <objPosition posX=""10"" posY=""2""/>
+        <descriptionFFB execAfter="""">
+          <inputVariable invertedPin=""false"" formalParameter=""A"" effectiveParameter=""TRUE""/>
+          <outputVariable invertedPin=""false"" formalParameter=""Q"" effectiveParameter=""X""/>
+        </descriptionFFB>
+      </FFBBlock>
+    </networkFBD></FBDSource>
+  </program>
+  <logicConf><resource><taskDesc task=""MAST"" taskType=""cyclic""><sectionDesc name=""Main""/></taskDesc></resource></logicConf>
+</FEFExchangeFile>";
+
+        [Fact]
+        public async Task DfbCodeTheRuntimeCannotRun_IsReportedInTheConsoleTab()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"plc-mixed-{Guid.NewGuid():N}.xef");
+            File.WriteAllText(path, MixedDfbXef);
+            try
+            {
+                using var plc = new PlcEditorViewModel(NoopTagWindowService.Instance) { ScanIntervalMs = 10_000 };
+                using var main = new MainViewModel(
+                    new NullConnectionManager(),
+                    NullLogger<MainViewModel>.Instance,
+                    new SyncDispatcher(),
+                    fileDialogService: new FixedPathFileDialogService(path),
+                    plcEditorViewModel: plc);
+                await main.LoadPlcXmlCommand.ExecuteAsync(null);
+
+                plc.RunCommand.Execute(null);
+                plc.PlcRuntime.Tick(Scan);
+
+                Assert.Single(main.ConsoleMessages, m => m.StartsWith("PLC: ") && m.Contains("Rungs") && m.Contains("LD"));
+                Assert.True(plc.PlcRuntime.CurrentDataStore.CoilDiscretes[3]); // the DFB's ST section ran
+            }
+            finally
+            {
+                try { File.Delete(path); } catch (IOException) { }
+            }
+        }
+
+        [Fact]
+        public async Task ImportStatus_CountsOnlyProgramsRunDoesNotExecute()
+        {
+            // FBD and ST sections run; the LD section is the one program that does not.
+            var xef = MotorXef
+                .Replace("<logicConf>", @"<program><identProgram name=""Calc"" type=""section"" task=""MAST""/><STSource>Limit := 5;</STSource></program>
+  <program><identProgram name=""Rungs"" type=""section"" task=""MAST""/><LDSource></LDSource></program>
+  <logicConf>")
+                .Replace(@"<sectionDesc name=""Speed""/>", @"<sectionDesc name=""Speed""/><sectionDesc name=""Calc""/><sectionDesc name=""Rungs""/>");
+            var path = Path.Combine(Path.GetTempPath(), $"plc-langs-{Guid.NewGuid():N}.xef");
+            File.WriteAllText(path, xef);
+            try
+            {
+                using var plc = new PlcEditorViewModel(NoopTagWindowService.Instance) { ScanIntervalMs = 10_000 };
+                using var main = new MainViewModel(
+                    new NullConnectionManager(),
+                    NullLogger<MainViewModel>.Instance,
+                    new SyncDispatcher(),
+                    fileDialogService: new FixedPathFileDialogService(path),
+                    plcEditorViewModel: plc);
+
+                await main.LoadPlcXmlCommand.ExecuteAsync(null);
+
+                Assert.Contains(", 1 program(s) not run (LD", main.StatusMessage);
+            }
+            finally
+            {
+                try { File.Delete(path); } catch (IOException) { }
+            }
+        }
+
         private async Task<PlcEditorViewModel> LoadedPlcEditor()
         {
             var plc = new PlcEditorViewModel(NoopTagWindowService.Instance);

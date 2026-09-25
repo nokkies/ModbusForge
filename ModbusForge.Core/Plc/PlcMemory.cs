@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ModbusForge.Data;
 
 namespace ModbusForge.Core.Plc
@@ -30,6 +31,10 @@ namespace ModbusForge.Core.Plc
         public int Bit { get; }
 
         public bool IsValid => Space != null;
+
+        /// <summary>True when both denote the same storage with the same type.</summary>
+        internal bool SameAs(PlcLocation other)
+            => ReferenceEquals(Space, other.Space) && Offset == other.Offset && ReferenceEquals(Type, other.Type) && Bit == other.Bit;
     }
 
     /// <summary>One memory space: private bytes, a Modbus register table viewed as bytes, or a bit table.</summary>
@@ -87,6 +92,22 @@ namespace ModbusForge.Core.Plc
             if (offset >= _bytes.Length) Array.Resize(ref _bytes, Math.Max(offset + 1, _bytes.Length * 2));
             _bytes[offset] = value;
         }
+
+        public override void ReadBytes(int offset, Span<byte> destination)
+        {
+            if (offset >= 0 && offset + destination.Length <= _bytes.Length)
+                _bytes.AsSpan(offset, destination.Length).CopyTo(destination);
+            else
+                base.ReadBytes(offset, destination);
+        }
+
+        public override void WriteBytes(int offset, ReadOnlySpan<byte> source)
+        {
+            if (offset >= 0 && offset + source.Length <= _bytes.Length)
+                source.CopyTo(_bytes.AsSpan(offset, source.Length));
+            else
+                base.WriteBytes(offset, source);
+        }
     }
 
     /// <summary>
@@ -137,10 +158,17 @@ namespace ModbusForge.Core.Plc
             if (updated != word) table[register] = updated;
         }
 
+        // Values up to this many registers are read and written without allocating.
+        private const int StackWords = 64;
+
         public override void ReadBytes(int offset, Span<byte> destination)
         {
             if (destination.Length == 0) return;
-            var (first, words) = ReadWords(Table, offset, destination.Length);
+            var table = Table;
+            var (first, count) = WordRange(table, offset, destination.Length);
+            Span<ushort> words = count <= StackWords ? stackalloc ushort[StackWords] : new ushort[count];
+            words = words[..count];
+            if (count > 0) table!.ReadRange(first, words);
             for (var i = 0; i < destination.Length; i++)
             {
                 var position = offset + i;
@@ -154,8 +182,11 @@ namespace ModbusForge.Core.Plc
         {
             if (source.Length == 0) return;
             var table = Table;
-            var (first, words) = ReadWords(table, offset, source.Length);
-            if (words.Length == 0) return;
+            var (first, count) = WordRange(table, offset, source.Length);
+            if (count == 0) return;
+            Span<ushort> words = count <= StackWords ? stackalloc ushort[StackWords] : new ushort[count];
+            words = words[..count];
+            table!.ReadRange(first, words);
 
             var changed = false;
             for (var i = 0; i < source.Length; i++)
@@ -171,16 +202,16 @@ namespace ModbusForge.Core.Plc
             }
 
             // One write for the whole span, and none when nothing changed.
-            if (changed) table!.WriteRange(first, words);
+            if (changed) table.WriteRange(first, (ReadOnlySpan<ushort>)words);
         }
 
-        /// <summary>The registers covering a byte span, clipped to the table, in one read.</summary>
-        private static (int First, ushort[] Words) ReadWords(ModbusDataCollection<ushort>? table, int offset, int length)
+        /// <summary>The registers covering a byte span, clipped to the table.</summary>
+        private static (int First, int Count) WordRange(ModbusDataCollection<ushort>? table, int offset, int length)
         {
-            if (table == null) return (0, Array.Empty<ushort>());
+            if (table == null) return (0, 0);
             var first = Math.Max(offset / 2, 1);
             var last = Math.Min((offset + length - 1) / 2, table.Count - 1);
-            return last < first ? (first, Array.Empty<ushort>()) : (first, table.ReadRange(first, last - first + 1));
+            return last < first ? (first, 0) : (first, last - first + 1);
         }
 
         private static bool InRange(ModbusDataCollection<ushort>? table, int register)
@@ -254,6 +285,14 @@ namespace ModbusForge.Core.Plc
 
         private readonly Dictionary<string, PlcByteSpace> _privateObjects = new(StringComparer.OrdinalIgnoreCase);
 
+        // EBOOL edges for RE/FE. Control Expert keeps the previous value in the EBOOL's
+        // history bit: a write copies the old value there, so a variable written only
+        // once keeps its edge (35006144, "Restrictions for EBOOL"). Inputs are refreshed
+        // by the I/O scan every cycle, so an input's history is last cycle's value.
+        private readonly Dictionary<(PlcSpace Space, int Offset, int Bit), bool> _history = new();
+        private readonly HashSet<(PlcSpace Space, int Offset, int Bit)> _tracked = new();
+        private readonly Dictionary<(PlcSpace Space, int Offset, int Bit), bool> _inputs = new();
+
         public PlcMemory()
         {
             HoldingRegisters = new PlcRegisterSpace(this, PlcMemoryArea.HoldingRegister);
@@ -313,6 +352,23 @@ namespace ModbusForge.Core.Plc
             if (!location.IsValid) return default;
 
             var space = location.Space;
+
+            // Fast paths for the commonest private values (BOOL/EBOOL, 16-bit words); the
+            // value keeps the location's type, as the general path below gives it.
+            if (space is PlcByteSpace bytes && location.Bit < 0)
+            {
+                switch (location.Type.Kind)
+                {
+                    case PlcTypeKind.Bool:
+                    case PlcTypeKind.Ebool:
+                        return PlcValue.FromInteger(location.Type, bytes.ReadByte(location.Offset) & 1);
+                    case PlcTypeKind.Int:
+                        return PlcValue.FromInteger(location.Type, (short)(bytes.ReadByte(location.Offset) | (bytes.ReadByte(location.Offset + 1) << 8)));
+                    case PlcTypeKind.Word:
+                    case PlcTypeKind.Uint:
+                        return PlcValue.FromInteger(location.Type, bytes.ReadByte(location.Offset) | (bytes.ReadByte(location.Offset + 1) << 8));
+                }
+            }
             if (location.Bit >= 0)
             {
                 var bit = location.Bit;
@@ -337,12 +393,72 @@ namespace ModbusForge.Core.Plc
             return PlcValue.Decode(type, buffer);
         }
 
+        /// <summary>
+        /// The value and history bits RE/FE compare. Reading a location through here
+        /// starts keeping its history.
+        /// </summary>
+        public (bool Value, bool History) ReadEdge(PlcLocation location)
+        {
+            var key = (location.Space, location.Offset, location.Bit);
+            var value = Read(location).AsBool();
+            if (ReferenceEquals(location.Space, DiscreteInputs))
+            {
+                if (!_inputs.ContainsKey(key))
+                {
+                    _inputs[key] = value;
+                    _history[key] = false;
+                }
+                return (value, _history[key]);
+            }
+
+            _tracked.Add(key);
+            return (value, _history.TryGetValue(key, out var history) && history);
+        }
+
+        /// <summary>The start of a scan: inputs RE/FE watch move their last value into history.</summary>
+        public void BeginScan()
+        {
+            if (_inputs.Count == 0) return;
+            foreach (var key in _inputs.Keys.ToList())
+            {
+                _history[key] = _inputs[key];
+                _inputs[key] = Read(new PlcLocation(key.Space, key.Offset, PlcType.Ebool, key.Bit)).AsBool();
+            }
+        }
+
         /// <summary>Writes a value, converted to the location's type.</summary>
         public void Write(PlcLocation location, PlcValue value)
         {
             if (!location.IsValid) return;
 
+            // Only EBOOLs have a history bit (RE/FE take EBOOL variables).
+            if (_tracked.Count > 0 && location.Type.Kind == PlcTypeKind.Ebool)
+            {
+                var key = (location.Space, location.Offset, location.Bit);
+                if (_tracked.Contains(key)) _history[key] = Read(location).AsBool();
+            }
+
             var space = location.Space;
+
+            if (space is PlcByteSpace bytes && location.Bit < 0)
+            {
+                switch (location.Type.Kind)
+                {
+                    case PlcTypeKind.Bool:
+                    case PlcTypeKind.Ebool:
+                        bytes.WriteByte(location.Offset, (byte)(PlcOps.Convert(value, PlcType.Bool).AsBool() ? 1 : 0));
+                        return;
+                    case PlcTypeKind.Int:
+                    case PlcTypeKind.Word:
+                    case PlcTypeKind.Uint:
+                    {
+                        var word = (ushort)PlcOps.Convert(value, location.Type).AsInteger();
+                        bytes.WriteByte(location.Offset, (byte)word);
+                        bytes.WriteByte(location.Offset + 1, (byte)(word >> 8));
+                        return;
+                    }
+                }
+            }
             if (location.Bit >= 0)
             {
                 space.WriteBitOfByte(location.Offset + location.Bit / 8, location.Bit % 8, value.AsBool());

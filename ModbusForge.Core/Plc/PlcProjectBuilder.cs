@@ -3,19 +3,21 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Xml.Linq;
+using ModbusForge.Core.Plc.St;
 
 namespace ModbusForge.Core.Plc
 {
     /// <summary>
     /// Compiles an XEF into a <see cref="PlcProject"/>: the declared variables with
     /// their types and initial values, the tasks with their section order and
-    /// activation conditions, and each FBD section's blocks, pins and links in
-    /// Control Expert's execution order.
+    /// activation conditions, each FBD section's blocks, pins and links in Control
+    /// Expert's execution order, and each ST section's statements.
     /// </summary>
     public sealed class PlcProjectBuilder
     {
         private readonly PlcTypeRegistry _types;
         private readonly Dictionary<string, PlcVariable> _variables = new(StringComparer.OrdinalIgnoreCase);
+        private readonly PlcGlobalScope _scope;
         private readonly List<TaskInfo> _tasks = new();
         private readonly Dictionary<string, (TaskInfo Task, int Order, string? Condition)> _assignments = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<(PlcSection Section, TaskInfo Task, int Order)> _sections = new();
@@ -27,13 +29,14 @@ namespace ModbusForge.Core.Plc
         public PlcProjectBuilder(XDocument xef)
         {
             _types = new PlcTypeRegistry(xef);
+            _scope = new PlcGlobalScope(_variables);
             ReadVariables(xef);
             ReadTasks(xef);
         }
 
         public IReadOnlyDictionary<string, PlcVariable> Variables => _variables;
 
-        /// <summary>A section in another language, listed but not executed.</summary>
+        /// <summary>A section in a language the runtime does not execute (LD, IL, SFC), listed but not run.</summary>
         public void AddSkippedSection(string name, string language) => _skipped.Add($"{name} ({language})");
 
         /// <summary>
@@ -47,60 +50,46 @@ namespace ModbusForge.Core.Plc
             IReadOnlyList<(XElement Block, string? NodeId)> blocks,
             IReadOnlyList<(XElement Link, string SourceNodeId, string TargetNodeId)> links)
         {
+            var compiler = new PlcFbdCompiler(_types, _scope, _warnings);
             var compiled = new List<PlcBlock>(blocks.Count);
             var byNodeId = new Dictionary<string, PlcBlock>(StringComparer.Ordinal);
             foreach (var (element, nodeId) in blocks)
             {
-                var block = CompileBlock(element);
+                var block = compiler.CompileBlock(element);
                 block.NodeId = nodeId;
                 compiled.Add(block);
                 if (nodeId != null) byNodeId[nodeId] = block;
             }
 
-            var edges = new List<(PlcBlock From, PlcBlock To)>();
-            foreach (var (link, sourceId, targetId) in links)
-            {
-                if (!byNodeId.TryGetValue(sourceId, out var source) || !byNodeId.TryGetValue(targetId, out var target)) continue;
-                var sourcePin = (string?)link.Element("linkSource")?.Attribute("pinName") ?? "";
-                var targetPin = (string?)link.Element("linkDestination")?.Attribute("pinName") ?? "";
+            var resolved = links
+                .Where(l => byNodeId.ContainsKey(l.SourceNodeId) && byNodeId.ContainsKey(l.TargetNodeId))
+                .Select(l => (l.Link, byNodeId[l.SourceNodeId], byNodeId[l.TargetNodeId]));
+            return Add(new PlcSectionBuilder(name, defaultTask, compiler.Connect(compiled, resolved, name), null));
+        }
 
-                var input = FindPin(target.Inputs, targetPin)
-                            ?? (string.Equals(targetPin, "EN", StringComparison.OrdinalIgnoreCase) ? target.En : null);
-                if (input == null)
-                {
-                    _warnings.Add($"{name}: link to unknown pin {target.InstanceName}.{targetPin}");
-                    continue;
-                }
+        /// <summary>Compiles one ST section (its program text as the XEF exports it).</summary>
+        public PlcSection AddStSection(string name, string defaultTask, string source)
+        {
+            var program = new StCompiler(_scope, _types).Compile(source);
+            foreach (var problem in program.Problems) _warnings.Add($"{name} (ST) {problem}");
+            return Add(new PlcSectionBuilder(name, defaultTask, Array.Empty<PlcBlock>(), program));
+        }
 
-                int outputIndex;
-                if (string.Equals(sourcePin, "ENO", StringComparison.OrdinalIgnoreCase))
-                {
-                    outputIndex = -1;
-                }
-                else
-                {
-                    outputIndex = IndexOfPin(source.Outputs, sourcePin);
-                    if (outputIndex < 0)
-                    {
-                        _warnings.Add($"{name}: link from unknown pin {source.InstanceName}.{sourcePin}");
-                        continue;
-                    }
-                }
+        private sealed record PlcSectionBuilder(string Name, string DefaultTask, IReadOnlyList<PlcBlock> Blocks, StProgram? Program);
 
-                input.SourceBlock = source;
-                input.SourceOutput = outputIndex;
-                edges.Add((source, target));
-            }
-
-            var ordered = ExecutionOrder(compiled, edges, name);
-            var (task, order, condition) = _assignments.TryGetValue(name, out var assignment)
+        private PlcSection Add(PlcSectionBuilder section)
+        {
+            var (task, order, condition) = _assignments.TryGetValue(section.Name, out var assignment)
                 ? assignment
-                : (TaskFor(defaultTask), int.MaxValue, null);
+                : (TaskFor(section.DefaultTask), int.MaxValue, null);
 
-            var section = new PlcSection(name, task.Name, ordered,
-                string.IsNullOrWhiteSpace(condition) ? null : PlcOperandParser.Parse(condition!, _variables));
-            _sections.Add((section, task, order));
-            return section;
+            var compiled = new PlcSection(section.Name, task.Name, section.Blocks,
+                string.IsNullOrWhiteSpace(condition) ? null : PlcOperandParser.Parse(condition!, _scope))
+            {
+                Program = section.Program
+            };
+            _sections.Add((compiled, task, order));
+            return compiled;
         }
 
         public PlcProject Build()
@@ -118,7 +107,9 @@ namespace ModbusForge.Core.Plc
                     g.OrderBy(s => s.Order).Select(s => s.Section).ToList()))
                 .ToList();
 
-            var project = new PlcProject(_variables, tasks);
+            // DFB bodies are compiled per instance while running; the types keep what that needs.
+            _types.Freeze();
+            var project = new PlcProject(_variables, tasks) { Types = _types };
             project.Warnings.AddRange(_warnings);
             project.SkippedSections.AddRange(_skipped);
             return project;
@@ -144,21 +135,8 @@ namespace ModbusForge.Core.Plc
                 var variable = new PlcVariable(name!, _types.Resolve(typeName!), address);
                 if ((string?)declaration.Element("variableInit")?.Attribute("value") is { } init)
                     variable.InitialValues.Add(new PlcInitialValue("", init));
-                CollectInitialValues(declaration, "", variable.InitialValues);
+                PlcInitialValues.Collect(declaration, "", variable.InitialValues);
                 _variables[name!] = variable;
-            }
-        }
-
-        /// <summary>instanceElementDesc name="field"|"[3]" with a value, possibly nested.</summary>
-        private static void CollectInitialValues(XElement parent, string prefix, List<PlcInitialValue> values)
-        {
-            foreach (var element in parent.Elements("instanceElementDesc"))
-            {
-                var name = (string?)element.Attribute("name");
-                if (string.IsNullOrEmpty(name)) continue;
-                var path = prefix.Length == 0 ? name! : name!.StartsWith('[') ? prefix + name : prefix + "." + name;
-                if (element.Element("value") is { } value) values.Add(new PlcInitialValue(path, value.Value.Trim()));
-                CollectInitialValues(element, path, values);
             }
         }
 
@@ -181,12 +159,27 @@ namespace ModbusForge.Core.Plc
         private TaskInfo TaskFor(string name)
             => _tasks.FirstOrDefault(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase))
                ?? new TaskInfo(string.IsNullOrWhiteSpace(name) ? "MAST" : name, "cyclic");
+    }
 
-        // ------------------------------------------------------------------
-        // Blocks
-        // ------------------------------------------------------------------
+    /// <summary>
+    /// Compiles FBD blocks, their links and their execution order against a scope:
+    /// the project's variables for sections, or one DFB instance's variables for the
+    /// DFB's own FBD code.
+    /// </summary>
+    internal sealed class PlcFbdCompiler
+    {
+        private readonly PlcTypeRegistry _types;
+        private readonly IPlcScope _scope;
+        private readonly List<string> _warnings;
 
-        private PlcBlock CompileBlock(XElement element)
+        public PlcFbdCompiler(PlcTypeRegistry types, IPlcScope scope, List<string> warnings)
+        {
+            _types = types;
+            _scope = scope;
+            _warnings = warnings;
+        }
+
+        public PlcBlock CompileBlock(XElement element)
         {
             var rawType = (string?)element.Attribute("typeName") ?? "";
             var dot = rawType.LastIndexOf('.');
@@ -218,7 +211,7 @@ namespace ModbusForge.Core.Plc
                 var formal = (string?)variable.Attribute("formalParameter") ?? "";
                 var effective = (string?)variable.Attribute("effectiveParameter");
                 var inverted = string.Equals((string?)variable.Attribute("invertedPin"), "true", StringComparison.OrdinalIgnoreCase);
-                var operand = string.IsNullOrWhiteSpace(effective) ? null : PlcOperandParser.Parse(effective!, _variables);
+                var operand = string.IsNullOrWhiteSpace(effective) ? null : PlcOperandParser.Parse(effective!, _scope);
                 var pin = new PlcBlockPin(formal, inverted, operand);
 
                 if (isInput && formal.Equals("EN", StringComparison.OrdinalIgnoreCase)) en = pin;
@@ -232,22 +225,109 @@ namespace ModbusForge.Core.Plc
                     ? null
                     : ((string)description!.Attribute("execAfter")!).Trim()
             };
+            for (var i = 0; i < outputs.Count; i++) block.Call.SetOutputType(i, outputs[i].Operand?.StaticType);
 
-            if (kind != PlcBlockKind.Function && _variables.TryGetValue(instanceName, out var instance)
-                && instance.Type.Kind is PlcTypeKind.FunctionBlock)
+            if (kind != PlcBlockKind.Function && _scope.Resolve(instanceName) is { Type.Kind: PlcTypeKind.FunctionBlock } instance)
             {
-                block.Instance = instance;
+                block.InstanceRoot = instance;
             }
 
             var position = element.Descendants("objPosition").FirstOrDefault(p => p.Attribute("posX") != null && p.Attribute("posY") != null);
             if (position != null)
             {
-                block.X = double.TryParse((string?)position.Attribute("posX"), NumberStyles.Float, CultureInfo.InvariantCulture, out var x) ? x : 0;
-                block.Y = double.TryParse((string?)position.Attribute("posY"), NumberStyles.Float, CultureInfo.InvariantCulture, out var y) ? y : 0;
+                block.X = Number(position.Attribute("posX"));
+                block.Y = Number(position.Attribute("posY"));
             }
 
             return block;
         }
+
+        /// <summary>
+        /// A whole FBDSource (a DFB's FBD code): its blocks, and its links resolved by
+        /// instance name; when names repeat, the link end's recorded cell picks the block.
+        /// </summary>
+        public List<PlcBlock> CompileSource(XElement fbdSource, string sectionName)
+        {
+            var blocks = new List<PlcBlock>();
+            var areas = new Dictionary<PlcBlock, (double X, double Y, double W, double H)>();
+            var byName = new Dictionary<string, List<PlcBlock>>(StringComparer.Ordinal);
+            foreach (var element in fbdSource.Descendants("FFBBlock"))
+            {
+                var block = CompileBlock(element);
+                blocks.Add(block);
+                areas[block] = (block.X, block.Y, Number(element.Attribute("width")), Number(element.Attribute("height")));
+                if (!byName.TryGetValue(block.InstanceName, out var same)) byName[block.InstanceName] = same = new List<PlcBlock>();
+                same.Add(block);
+            }
+
+            PlcBlock? End(XElement? end)
+            {
+                if (end == null || !byName.TryGetValue((string?)end.Attribute("parentObjectName") ?? "", out var candidates)) return null;
+                if (candidates.Count == 1) return candidates[0];
+                var cell = end.Element("objPosition");
+                var x = Number(cell?.Attribute("posX"));
+                var y = Number(cell?.Attribute("posY"));
+                return candidates.FirstOrDefault(b =>
+                {
+                    var (bx, by, bw, bh) = areas[b];
+                    return x >= bx && x <= bx + bw && y >= by && y <= by + bh;
+                }) ?? candidates[^1];
+            }
+
+            var links = new List<(XElement, PlcBlock, PlcBlock)>();
+            foreach (var link in fbdSource.Descendants("linkFB"))
+            {
+                if (End(link.Element("linkSource")) is { } source && End(link.Element("linkDestination")) is { } target)
+                    links.Add((link, source, target));
+                else
+                    _warnings.Add($"{sectionName}: link references an unknown block");
+            }
+
+            return Connect(blocks, links, sectionName);
+        }
+
+        /// <summary>Wires the links into the input pins and returns the blocks in execution order.</summary>
+        public List<PlcBlock> Connect(List<PlcBlock> blocks, IEnumerable<(XElement Link, PlcBlock Source, PlcBlock Target)> links, string sectionName)
+        {
+            var edges = new List<(PlcBlock From, PlcBlock To)>();
+            foreach (var (link, source, target) in links)
+            {
+                var sourcePin = (string?)link.Element("linkSource")?.Attribute("pinName") ?? "";
+                var targetPin = (string?)link.Element("linkDestination")?.Attribute("pinName") ?? "";
+
+                var input = FindPin(target.Inputs, targetPin)
+                            ?? (string.Equals(targetPin, "EN", StringComparison.OrdinalIgnoreCase) ? target.En : null);
+                if (input == null)
+                {
+                    _warnings.Add($"{sectionName}: link to unknown pin {target.InstanceName}.{targetPin}");
+                    continue;
+                }
+
+                int outputIndex;
+                if (string.Equals(sourcePin, "ENO", StringComparison.OrdinalIgnoreCase))
+                {
+                    outputIndex = -1;
+                }
+                else
+                {
+                    outputIndex = IndexOfPin(source.Outputs, sourcePin);
+                    if (outputIndex < 0)
+                    {
+                        _warnings.Add($"{sectionName}: link from unknown pin {source.InstanceName}.{sourcePin}");
+                        continue;
+                    }
+                }
+
+                input.SourceBlock = source;
+                input.SourceOutput = outputIndex;
+                edges.Add((source, target));
+            }
+
+            return ExecutionOrder(blocks, edges, sectionName);
+        }
+
+        private static double Number(XAttribute? attribute)
+            => double.TryParse((string?)attribute, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : 0;
 
         private static PlcBlockPin? FindPin(IReadOnlyList<PlcBlockPin> pins, string name)
         {

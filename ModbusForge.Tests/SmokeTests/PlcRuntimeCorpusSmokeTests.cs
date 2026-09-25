@@ -56,7 +56,10 @@ public class PlcRuntimeCorpusSmokeTests
         var blocks = project.Blocks.ToList();
         var linkedPins = blocks.SelectMany(b => b.Inputs.Append(b.En)).Count(p => p?.IsLinked == true);
 
-        Assert.Equal(result.SectionsFound, project.Sections.Count());
+        var expectedSt = xml.Descendants("program")
+            .Count(p => (string?)p.Element("identProgram")?.Attribute("type") == "section" && !string.IsNullOrWhiteSpace(p.Element("STSource")?.Value));
+        Assert.Equal(result.SectionsFound, project.Sections.Count(s => s.Program == null));
+        Assert.Equal(expectedSt, project.Sections.Count(s => s.Program != null));
         Assert.Equal(expectedBlocks, blocks.Count);
         Assert.Equal(expectedLinks, linkedPins);
         Assert.DoesNotContain(project.Warnings, w => w.Contains("unknown pin", StringComparison.Ordinal));
@@ -86,6 +89,15 @@ public class PlcRuntimeCorpusSmokeTests
         foreach (var sample in unresolved.GroupBy(u => u.Reason).Select(g => $"  {g.Count()} {g.Key}: e.g. {g.First().Text}"))
         {
             _output.WriteLine(sample);
+        }
+
+        var stSections = project.Sections.Count(s => s.Program != null);
+        var stProblems = project.Warnings.Where(w => w.Contains("(ST)", StringComparison.Ordinal)).ToList();
+        _output.WriteLine($"  ST sections: {stSections}, ST problems: {stProblems.Count}, ST run errors: {runtime.StErrors}; " +
+                          $"DFB code problems: {runtime.DfbProblems.Count}; skipped: {string.Join(", ", project.SkippedSections)}");
+        foreach (var problem in stProblems.Concat(runtime.DfbProblems).Take(40))
+        {
+            _output.WriteLine("    " + problem);
         }
 
         Assert.Equal(0, runtime.BlockErrors);

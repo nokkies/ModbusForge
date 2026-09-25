@@ -161,5 +161,44 @@ namespace ModbusForge.Tests.Plc
             Assert.Contains(true, seen);
             Assert.Contains(false, seen);
         }
+
+        [Fact]
+        public void HealthStatusBits_ReadAsAHealthyControllerInRun()
+        {
+            // EIO0000002135: %S10 IOERR and %S16 IOERRTSK are normally 1 (0 means an
+            // I/O error); %S12 PLCRUNNING is 1 while the controller is in RUN.
+            var plc = new PlcHarness(new XefBuilder()
+                .Variable("IoOk", "BOOL").Variable("TaskIoOk", "BOOL").Variable("Running", "BOOL")
+                .StSection("Code", "IoOk := %S10; TaskIoOk := %S16; Running := %S12;")
+                .Project());
+
+            plc.Scan(2);
+
+            Assert.True(plc.Bool("IoOk"));
+            Assert.True(plc.Bool("TaskIoOk"));
+            Assert.True(plc.Bool("Running"));
+        }
+
+        [Fact]
+        public void IndexOverflow_SetsS20_UntilTheApplicationResetsIt()
+        {
+            // EIO0000002135: %S20 INDEXOVF is set on an index overflow and must be
+            // reset by the application.
+            var plc = new PlcHarness(new XefBuilder()
+                .Variable("Tab", "ARRAY[1..3] OF INT").Variable("I", "INT").Variable("V", "INT").Variable("Seen", "BOOL")
+                .StSection("Code", "V := Tab[I]; Seen := %S20;")
+                .Project());
+
+            plc.Scan();
+            Assert.True(plc.Bool("Seen"));   // I = 0 is below the lower bound
+
+            plc.Runtime.Write("I", PlcValue.FromInteger(PlcType.Int, 2));
+            plc.Scan();
+            Assert.True(plc.Bool("Seen"));   // still set: nothing reset it
+
+            plc.Runtime.Write("%S20", PlcOps.False);
+            plc.Scan();
+            Assert.False(plc.Bool("Seen"));
+        }
     }
 }

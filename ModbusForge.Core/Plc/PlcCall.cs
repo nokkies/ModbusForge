@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace ModbusForge.Core.Plc
 {
@@ -14,15 +15,33 @@ namespace ModbusForge.Core.Plc
         private readonly string[] _outputNames;
         private readonly PlcValue[] _outputs;
         private readonly bool[] _written;
+        private readonly PlcType?[] _outputTypes;
 
         public PlcCall(string[] inputNames, string[] outputNames)
         {
+            // Interned upper-case names: the behaviours' literal pin names ("IN", "Q")
+            // then match by reference, without a string comparison.
+            inputNames = inputNames.Select(n => string.Intern(n.ToUpperInvariant())).ToArray();
+            outputNames = outputNames.Select(n => string.Intern(n.ToUpperInvariant())).ToArray();
             _inputNames = inputNames;
             _inputs = new PlcValue[inputNames.Length];
             _outputNames = outputNames;
             _outputs = new PlcValue[outputNames.Length];
             _written = new bool[outputNames.Length];
+            _outputTypes = new PlcType?[outputNames.Length];
         }
+
+        /// <summary>
+        /// The type of the variable an output is written to, when known: a generic
+        /// output (MOVE_INT_ARINT's table) takes its shape from it.
+        /// </summary>
+        public PlcType? OutputType(string name)
+        {
+            var index = IndexOf(_outputNames, name);
+            return index >= 0 ? _outputTypes[index] : null;
+        }
+
+        internal void SetOutputType(int index, PlcType? type) => _outputTypes[index] = type;
 
         /// <summary>Per-instance state of a function block (timers, edges, counters).</summary>
         public object? State { get; set; }
@@ -46,6 +65,9 @@ namespace ModbusForge.Core.Plc
         public string OutputName(int index) => _outputNames[index];
 
         public PlcValue Input(int index) => _inputs[index];
+
+        /// <summary>All input values in pin order.</summary>
+        public ReadOnlySpan<PlcValue> Inputs => _inputs;
 
         /// <summary>The value at the named input; "no value" when the block has no such pin.</summary>
         public PlcValue Input(string name)
@@ -86,6 +108,10 @@ namespace ModbusForge.Core.Plc
 
         private static int IndexOf(string[] names, string name)
         {
+            for (var i = 0; i < names.Length; i++)
+            {
+                if (ReferenceEquals(names[i], name)) return i;
+            }
             for (var i = 0; i < names.Length; i++)
             {
                 if (string.Equals(names[i], name, StringComparison.OrdinalIgnoreCase)) return i;

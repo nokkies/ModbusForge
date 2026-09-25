@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using ModbusForge.Models;
@@ -72,6 +73,63 @@ namespace ModbusForge.Tests.Plc
             service.Tick(Scan);
 
             Assert.Equal(0, service.Runtime!.ScanCount);
+        }
+
+        // A DFB with an ST section the runtime runs and an LD section it cannot.
+        private const string MixedDfb = @"<FBSource nameOfFBType=""Mixed"">
+  <inputParameters><variables name=""A"" typeName=""BOOL""/></inputParameters>
+  <outputParameters><variables name=""Q"" typeName=""BOOL""/></outputParameters>
+  <FBProgram name=""Code""><STSource>Q := A;</STSource></FBProgram>
+  <FBProgram name=""Rungs""><LDSource></LDSource></FBProgram>
+</FBSource>";
+
+        private static (PlcRuntimeService Service, List<string> Reports) RunningWithReports(XefBuilder xef)
+        {
+            var result = new PlcXmlImporter().ImportFromXml(xef.Build(), "test.xef");
+            var reports = new List<string>();
+            var service = new PlcRuntimeService();
+            service.ProblemReported += reports.Add;
+            service.Load(result.Project);
+            service.SetScanIntervalMs(10_000);
+            service.Start(new VisualNodeEditorConfig
+            {
+                Nodes = new ObservableCollection<VisualNode>(result.Sections.SelectMany(s => s.Nodes)),
+                ScanIntervalMs = 10_000
+            });
+            return (service, reports);
+        }
+
+        [Fact]
+        public void DfbCodeTheRuntimeCannotRun_IsReportedOnce()
+        {
+            var (service, reports) = RunningWithReports(new XefBuilder().Raw(MixedDfb)
+                .Variable("M1", "Mixed").Variable("X", "BOOL")
+                .Section("S", Block("M1", "Mixed", 2, 2, "A=TRUE|Q=X")));
+            using var _ = service;
+
+            service.Tick(Scan);
+            service.Tick(Scan);
+
+            var report = Assert.Single(reports, m => m.Contains("Rungs"));
+            Assert.Contains("Mixed", report);
+            Assert.Contains("LD", report);
+            Assert.True(service.Runtime!.Read("X").AsBool()); // the ST section still ran
+        }
+
+        [Fact]
+        public void AnStRunTimeError_IsReportedOnce()
+        {
+            var (service, reports) = RunningWithReports(new XefBuilder()
+                .Variable("Y", "INT").Variable("Z", "INT")
+                .StSection("Code", "Y := 10 / Z;"));
+            using var _ = service;
+
+            service.Tick(Scan);
+            service.Tick(Scan);
+            service.Tick(Scan);
+
+            Assert.Equal(3, service.Runtime!.StErrors);
+            Assert.Single(reports, m => m.Contains("ST") && m.Contains("error"));
         }
     }
 }

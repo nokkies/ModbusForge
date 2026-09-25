@@ -46,6 +46,14 @@ namespace ModbusForge.Tests.Plc
             return this;
         }
 
+        /// <summary>An ST section with its program text.</summary>
+        public XefBuilder StSection(string name, string source, string task = "MAST")
+        {
+            _programs.Append($"<program><identProgram name=\"{name}\" type=\"section\" task=\"{task}\"/><STSource>{Escape(source).Replace(">", "&gt;")}</STSource></program>");
+            _tasks.Append($"<sectionDesc name=\"{name}\" task=\"{task}\"/>");
+            return this;
+        }
+
         public XDocument Build(string? taskXml = null)
         {
             var taskDesc = taskXml ?? $"<taskDesc task=\"MAST\" taskType=\"cyclic\">{_tasks}</taskDesc>";

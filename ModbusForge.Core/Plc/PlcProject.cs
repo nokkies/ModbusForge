@@ -38,7 +38,7 @@ namespace ModbusForge.Core.Plc
         /// <summary>A standard function block (EFB) the runtime executes.</summary>
         FunctionBlock,
 
-        /// <summary>A user function block (DFB): its code is not executed (most exports encrypt it).</summary>
+        /// <summary>A user function block (DFB): its own FBD/ST code runs when the XEF contains it (not when encrypted).</summary>
         UserFunctionBlock,
 
         /// <summary>A standard type the runtime does not simulate.</summary>
@@ -89,6 +89,8 @@ namespace ModbusForge.Core.Plc
             Behavior = behavior;
             Inputs = inputs;
             Outputs = outputs;
+            InputPins = inputs.ToArray();
+            OutputPins = outputs.ToArray();
             En = en;
             Eno = eno;
             Call = new PlcCall(inputs.Select(p => p.Name).ToArray(), outputs.Select(p => p.Name).ToArray());
@@ -106,10 +108,11 @@ namespace ModbusForge.Core.Plc
 
         public PlcBlockKind Kind { get; }
 
-        /// <summary>Null for blocks that do not compute (user function blocks, unsupported types).</summary>
+        /// <summary>The standard block behaviour; null for DFBs and types the runtime does not simulate.</summary>
         public PlcBlockBehavior? Behavior { get; }
 
-        public bool IsSimulated => Behavior != null;
+        /// <summary>True when the block computes: a standard type, or a DFB whose code the XEF contains.</summary>
+        public bool IsSimulated => Behavior != null || (Kind == PlcBlockKind.UserFunctionBlock && InstanceRoot?.Type.Dfb != null);
 
         public bool IsFunctionBlock => Behavior?.IsFunctionBlock ?? Kind != PlcBlockKind.Function;
 
@@ -119,11 +122,18 @@ namespace ModbusForge.Core.Plc
         /// <summary>Data outputs in pin order (ENO excluded).</summary>
         public IReadOnlyList<PlcBlockPin> Outputs { get; }
 
+        // The pins as arrays, for the scan.
+        internal PlcBlockPin[] InputPins { get; }
+        internal PlcBlockPin[] OutputPins { get; }
+
         public PlcBlockPin? En { get; }
         public PlcBlockPin? Eno { get; }
 
-        /// <summary>The declared instance (function blocks): its fields hold the parameters.</summary>
-        public PlcVariable? Instance { get; internal set; }
+        /// <summary>
+        /// The block's instance (function blocks): a declared variable, or a variable of
+        /// the DFB whose code the block is in. Its fields hold the parameters.
+        /// </summary>
+        public PlcRoot? InstanceRoot { get; internal set; }
 
         /// <summary>Grid cell of the block's top-left corner (execution order ties).</summary>
         public double X { get; internal set; }
@@ -140,7 +150,23 @@ namespace ModbusForge.Core.Plc
         /// <summary>Instance fields per pin, resolved on the first execution.</summary>
         internal PinFields? InstanceFields { get; set; }
 
-        internal sealed record PinFields(PlcLocation?[] Inputs, PlcLocation?[] Outputs);
+        /// <summary>For a DFB: the code this block calls, resolved on the first execution.</summary>
+        internal PlcRuntime.DfbCall? DfbCall { get; set; }
+
+        /// <summary>Forgets what an earlier runtime left on the block: a new runtime starts cold.</summary>
+        internal void ResetRuntimeState()
+        {
+            State = null;
+            InstanceFields = null;
+            DfbCall = null;
+            Array.Clear(OutputLinks);
+            Array.Clear(LastInputs);
+            LastEno = false;
+            LastEn = null;
+            ExecutedLastScan = false;
+        }
+
+        internal sealed record PinFields(PlcLocation Instance, PlcLocation?[] Inputs, PlcLocation?[] Outputs);
 
         /// <summary>Values on the output links after the last execution (pin negation applied).</summary>
         public PlcValue[] OutputLinks { get; }
@@ -179,6 +205,9 @@ namespace ModbusForge.Core.Plc
 
         /// <summary>The section's activation condition (a BOOL variable), if any.</summary>
         public PlcOperand? Condition { get; }
+
+        /// <summary>The compiled code of an ST section; null for FBD sections.</summary>
+        public St.StProgram? Program { get; init; }
 
         /// <summary>False when the activation condition held the section off in the last scan.</summary>
         public bool ActiveLastScan { get; internal set; }
@@ -224,5 +253,8 @@ namespace ModbusForge.Core.Plc
         public List<string> SkippedSections { get; } = new();
 
         public List<string> Warnings { get; } = new();
+
+        /// <summary>The project's types and call signatures (DFB code is compiled per instance while running).</summary>
+        public PlcTypeRegistry? Types { get; init; }
     }
 }
