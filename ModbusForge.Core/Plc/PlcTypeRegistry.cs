@@ -80,6 +80,7 @@ namespace ModbusForge.Core.Plc
         private readonly Dictionary<string, PlcSignature> _signatures = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, PlcType> _built = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _building = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<string> _protectedDfbTypes = new();
 
         // The interface sections of an FBSource/EFBSource, in the order their fields are laid out.
         private static readonly (string Section, PlcParameterDirection Direction)[] InterfaceSections =
@@ -101,7 +102,7 @@ namespace ModbusForge.Core.Plc
                         _ddtSources.TryAdd(ddt, source);
                         break;
                     case "FBSource" when (string?)source.Attribute("nameOfFBType") is { Length: > 0 } fb:
-                        _fbSources.TryAdd(fb, source);
+                        if (_fbSources.TryAdd(fb, source) && source.Element("crypted") != null) _protectedDfbTypes.Add(fb);
                         _signatures.TryAdd(fb, ReadSignature(source));
                         break;
                     case "EFBSource" when (string?)source.Attribute("nameOfEFBType") is { Length: > 0 } efb:
@@ -122,6 +123,9 @@ namespace ModbusForge.Core.Plc
 
         /// <summary>True for a user function block (DFB) type the XEF defines.</summary>
         public bool IsUserFunctionBlock(string typeName) => _dfbNames?.Contains(typeName) ?? _fbSources.ContainsKey(typeName);
+
+        /// <summary>The DFB types whose code the XEF encrypts, in XEF order.</summary>
+        public IReadOnlyList<string> ProtectedDfbTypes => _protectedDfbTypes;
 
         /// <summary>
         /// Builds every named type now and lets go of the XEF elements, so a compiled
@@ -215,7 +219,11 @@ namespace ModbusForge.Core.Plc
             }
 
             type.Seal();
-            if (dfb) type.Dfb = ReadCode(name, source);
+            if (dfb)
+            {
+                type.Dfb = ReadCode(name, source);
+                type.IsProtected = source.Element("crypted") != null;
+            }
             return type;
         }
 

@@ -114,6 +114,9 @@ namespace ModbusForge.Core.Plc
         /// <summary>True when the block computes: a standard type, or a DFB whose code the XEF contains.</summary>
         public bool IsSimulated => Behavior != null || (Kind == PlcBlockKind.UserFunctionBlock && InstanceRoot?.Type.Dfb != null);
 
+        /// <summary>True for a user function block whose type is protected: its code is encrypted in the XEF, so the runtime cannot run it.</summary>
+        public bool IsProtectedDfb => Kind == PlcBlockKind.UserFunctionBlock && InstanceRoot?.Type is { IsProtected: true };
+
         public bool IsFunctionBlock => Behavior?.IsFunctionBlock ?? Kind != PlcBlockKind.Function;
 
         /// <summary>Data inputs in pin order (EN excluded).</summary>

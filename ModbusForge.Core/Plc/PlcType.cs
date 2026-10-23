@@ -231,6 +231,9 @@ namespace ModbusForge.Core.Plc
         /// <summary>The user function block code behind a DFB type; null for other types and encrypted DFBs.</summary>
         public PlcDfbDefinition? Dfb { get; internal set; }
 
+        /// <summary>True for a user function block type whose code is encrypted in the XEF: its interface is kept, its code is not.</summary>
+        public bool IsProtected { get; internal set; }
+
         private static int Align(int offset, int alignment) => alignment <= 1 ? offset : (offset + alignment - 1) / alignment * alignment;
 
         /// <summary>

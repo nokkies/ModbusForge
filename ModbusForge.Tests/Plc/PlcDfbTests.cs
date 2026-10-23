@@ -10,7 +10,7 @@ namespace ModbusForge.Tests.Plc
     public class PlcDfbTests
     {
         // A DFB with FBD code: Q := A AND B.
-        private const string AndDfb = @"<FBSource nameOfFBType=""MyAnd"">
+        internal const string AndDfb = @"<FBSource nameOfFBType=""MyAnd"">
   <inputParameters><variables name=""A"" typeName=""BOOL""/><variables name=""B"" typeName=""BOOL""/></inputParameters>
   <outputParameters><variables name=""Q"" typeName=""BOOL""/></outputParameters>
   <FBProgram name=""Body""><FBDSource><networkFBD>
@@ -24,7 +24,7 @@ namespace ModbusForge.Tests.Plc
 </FBSource>";
 
         // A DFB with ST code and a nested TON: Count counts Pulse edges, Late is Pulse held 300 ms.
-        private const string CounterDfb = @"<EFBSource nameOfEFBType=""TON""><ExternalToolsOnly>
+        internal const string CounterDfb = @"<EFBSource nameOfEFBType=""TON""><ExternalToolsOnly>
   <inputParameters><variables name=""IN"" typeName=""BOOL""/><variables name=""PT"" typeName=""TIME""/></inputParameters>
   <outputParameters><variables name=""Q"" typeName=""BOOL""/><variables name=""ET"" typeName=""TIME""/></outputParameters>
 </ExternalToolsOnly></EFBSource>
@@ -45,6 +45,10 @@ Late := Hold.Q;</STSource></FBProgram>
   <inOutParameters><variables name=""Val"" typeName=""INT""/></inOutParameters>
   <FBProgram name=""Body""><STSource>Val := Val + 1;</STSource></FBProgram>
 </FBSource>";
+
+        // A DFB whose code is encrypted in the XEF: its interface is exported, its code is not.
+        internal const string SecretDfb = @"<FBSource nameOfFBType=""Secret""><crypted>00</crypted><ExternalToolsOnly>
+                    <outputParameters><variables name=""Q"" typeName=""BOOL""/></outputParameters></ExternalToolsOnly></FBSource>";
 
         [Fact]
         public void FbdDfb_CalledFromFbd_RunsItsOwnCode()
@@ -192,14 +196,26 @@ Late := Hold.Q;</STSource></FBProgram>
         public void EncryptedDfb_StaysInert()
         {
             var plc = new PlcHarness(new XefBuilder()
-                .Raw(@"<FBSource nameOfFBType=""Secret""><crypted>00</crypted><ExternalToolsOnly>
-                    <outputParameters><variables name=""Q"" typeName=""BOOL""/></outputParameters></ExternalToolsOnly></FBSource>")
+                .Raw(SecretDfb)
                 .Variable("S1", "Secret").Variable("Out", "BOOL")
                 .Section("S", Block("S1", "Secret", 2, 2, "|Q=Out"))
                 .Project()).Scan();
 
             Assert.False(plc.BlockNamed("S1").IsSimulated);
             Assert.False(plc.Bool("Out"));
+        }
+
+        [Fact]
+        public void EncryptedDfb_IsAProtectedShell()
+        {
+            var plc = new PlcHarness(new XefBuilder().Raw(SecretDfb).Raw(AndDfb)
+                .Variable("S1", "Secret").Variable("A1", "MyAnd").Variable("Out", "BOOL").Variable("Q", "BOOL")
+                .Section("S", Block("S1", "Secret", 2, 2, "|Q=Out") + Block("A1", "MyAnd", 20, 2, "A=TRUE,B=TRUE|Q=Q"))
+                .Project());
+
+            Assert.True(plc.BlockNamed("S1").IsProtectedDfb);
+            Assert.False(plc.BlockNamed("A1").IsProtectedDfb);
+            Assert.Equal(new[] { "Secret" }, plc.Runtime.Project.Types!.ProtectedDfbTypes);
         }
     }
 }
