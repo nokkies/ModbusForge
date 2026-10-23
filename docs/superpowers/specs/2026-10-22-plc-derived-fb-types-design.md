@@ -33,8 +33,9 @@ The user's rules that shape this:
 3. The engineer can give a locked type their own code in ST, FBD or LD, the languages a
    DFB section can have. It runs for every instance of the type, as a DFB section does in
    Control Expert.
-4. The engineer's code is saved inside the XEF, never in a separate file, and comes back
-   when the XEF is opened again.
+4. Saving writes a ModbusForge project file (.xef_sf); the XEF is only for the first
+   import. The engineer's code is saved in that one file and comes back when it is opened
+   again.
 5. Types whose code is exported keep running it, as today. Their sections are part of the
    selection on the left: selecting one opens it read-only, as a program section opens.
 
@@ -47,6 +48,8 @@ The user's rules that shape this:
 - Editing exported (unlocked) code.
 - Sharing the engineer's code between projects: it belongs to the project file it was
   written for.
+- Exporting back to XEF for Control Expert. It is planned for a later stage; when it
+  comes, the engineer's code must not leave as the protected DFB's real code.
 
 ## Anti-goals (a failure even if it works)
 
@@ -132,20 +135,19 @@ which would also run the exported LD sections.
 
 ### Storage
 
-The engineer's code is saved inside the XEF, never in a separate file. The protected
-original (`<crypted>`) stays untouched. The engineer's variables and sections go into a
-ModbusForge-only part of the type, never into Control Expert's own section elements:
-written as normal DFB code, the stand-in would replace the protected DFB if that XEF were
-imported into Control Expert. Each type's saved code carries a fingerprint of the
-interface it was written for.
+Saving writes a ModbusForge project file with its own extension, .xef_sf (the user's
+name). The XEF is only for the first import and is never changed; from then on the
+engineer opens the .xef_sf. The file holds, per type, the engineer's variables and
+sections, kept apart from the protected original, each type's with a fingerprint of the
+interface it was written for. It does not need to open in Control Expert.
 
 ## Phases
 
 1. The Derived FB Types node: every type with its interface and sections, exported
    sections opening read-only (ST as text, FBD drawn), and locked types marked empty in
    the navigator, on the canvas, in the Console and in the status text.
-2. The engineer's ST sections and variables for locked types, saved in the XEF and run
-   per instance.
+2. The .xef_sf project file, and the engineer's ST sections and variables for locked
+   types, saved in it and run per instance.
 3. The engineer's FBD sections.
 4. LD: an engine and a view, for exported LD sections and the engineer's.
 
@@ -164,19 +166,18 @@ On LCPLC001 (locked types):
 - ST written for xANL101 (for example fRealVal scaled from fAnaIn between nEngZero and
   nEngFull) makes both instances compute after Run, marked as the engineer's code, and
   the Console says so.
-- Saving LCPLC001 and opening it again brings the xANL101 code back, and the protected
-  original in the file is unchanged.
-- After xANL101's interface in the XEF changes, the code is kept, not run, and the
-  engineer is told.
+- Saving as LCPLC001.xef_sf and opening that file brings the xANL101 code back;
+  LCPLC001.XEF is unchanged.
+- If xANL101's interface in the file no longer matches the one its code was written for
+  (for example after the file was edited outside ModbusForge), the code is kept, not run,
+  and the engineer is told.
 
 ## Open questions
 
-1. When saving, does ModbusForge write into the XEF that was opened, or into a copy of it
-   that leaves the client's export as received?
-2. Must the saved XEF still import into Control Expert? How Control Expert treats content
-   it does not know is not documented; it may refuse the file.
+1. What the .xef_sf holds: the XEF's content as imported plus the engineer's part, so
+   opening it reuses the XEF import; or only what ModbusForge uses, in its own layout.
 
 ## Left to the builder
 
-The XML layout of the saved code, the fingerprint method, the exact layout of the type
-view, how compile errors are shown, and the tests.
+The layout of the engineer's part in the file, the fingerprint method, the exact layout
+of the type view, how compile errors are shown, and the tests.
