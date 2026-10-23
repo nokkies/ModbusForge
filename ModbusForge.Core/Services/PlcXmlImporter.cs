@@ -266,6 +266,7 @@ namespace ModbusForge.Services
             // duplicate ids crash the engine when the graph loads.
             var dfbCanvases = result.DfbTypes.SelectMany(t => t.Sections).Select(s => s.Canvas)
                 .OfType<PlcXmlSection>().ToList();
+            // Must run before CompileProject, which reads the node ids the runtime blocks are drawn as.
             EnsureGlobalNodeIdUniqueness(sections.Concat(dfbCanvases));
             foreach (var canvas in dfbCanvases)
             {
@@ -777,7 +778,11 @@ namespace ModbusForge.Services
             }
 
             if (section.Nodes.Count == 0)
-                result.AddWarning($"Section '{sectionName}' ({task}) produced no nodes.");
+            {
+                // A DFB canvas has no task, so its warning leaves the parentheses out.
+                var taskText = string.IsNullOrEmpty(task) ? "" : $" ({task})";
+                result.AddWarning($"Section '{sectionName}'{taskText} produced no nodes.");
+            }
 
             return section;
         }

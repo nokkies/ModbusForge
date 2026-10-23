@@ -25,7 +25,7 @@ namespace ModbusForge.Tests.Services
   <FBProgram name=""Body""><LDSource></LDSource></FBProgram>
 </FBSource>";
 
-        // Code the export encrypts, yet a protected DFB's XML can still carry it: Q := A AND B, in FBD and in ST.
+        // Code under a protected type: no corpus file carries any, so this FBD and ST pair (Q := A AND B) is a defensive case.
         private const string LockedFbdProgram = @"<FBProgram name=""Body""><FBDSource><networkFBD>
   <FFBBlock instanceName="".1"" typeName=""AND"" enEnO=""false"" width=""7"" height=""6""><objPosition posX=""2"" posY=""2""/>
     <descriptionFFB execAfter="""">
@@ -186,6 +186,14 @@ namespace ModbusForge.Tests.Services
                 Block(".1", "AND", 2, 2, "IN1=A,IN2=B|OUT") + Link(".1", "OUT", ".9", "IN"))));
 
             Assert.Contains("DFB Broken: Link references unknown instance: .1 -> .9", result.Warnings);
+        }
+
+        [Fact]
+        public void AnEmptyDfbCanvas_WarnsWithoutParenthesesForItsTask()
+        {
+            var result = Import(new XefBuilder().Raw(FbdType("Blank", "")));
+
+            Assert.Contains("DFB Blank: Section 'Body' produced no nodes.", result.Warnings);
         }
 
         private static PlcXmlImportResult Import(XefBuilder xef)

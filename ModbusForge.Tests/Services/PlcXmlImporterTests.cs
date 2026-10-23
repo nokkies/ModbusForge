@@ -4,7 +4,9 @@ using System.Linq;
 using System.Xml.Linq;
 using ModbusForge.Models;
 using ModbusForge.Services;
+using ModbusForge.Tests.Plc;
 using Xunit;
+using static ModbusForge.Tests.Plc.XefBuilder;
 
 namespace ModbusForge.Tests.Services
 {
@@ -205,6 +207,49 @@ namespace ModbusForge.Tests.Services
 
             Assert.False(result.Success);
             Assert.Single(result.Errors);
+        }
+
+        // ----------------------------------------------------------------
+        // Program sections: node ids across networks
+        // ----------------------------------------------------------------
+
+        [Fact]
+        public void AProgramWithTwoNetworks_KeepsNodeIdsDistinctAndWiresWithinEachNetwork()
+        {
+            // Each network names its blocks ".1" and ".2", as Control Expert does.
+            var first = Block(".1", "AND", 2, 2, "IN1=X,IN2=Y|OUT") + Block(".2", "NOT", 20, 2, "IN|OUT=Z") + Link(".1", "OUT", ".2", "IN");
+            var second = Block(".1", "AND", 2, 12, "IN1=P,IN2=Q|OUT") + Block(".2", "NOT", 20, 12, "IN|OUT=R") + Link(".1", "OUT", ".2", "IN");
+            var xef = new XefBuilder()
+                .Variable("X", "BOOL").Variable("Y", "BOOL").Variable("Z", "BOOL")
+                .Variable("P", "BOOL").Variable("Q", "BOOL").Variable("R", "BOOL")
+                .Raw("<program><identProgram name=\"Twins\" type=\"section\" task=\"MAST\"/><FBDSource>" +
+                     $"<networkFBD>{first}</networkFBD><networkFBD>{second}</networkFBD></FBDSource></program>");
+
+            var result = new PlcXmlImporter().ImportFromXml(xef.Build(), "Twins.xef");
+
+            Assert.True(result.Success, string.Join("; ", result.Errors));
+            var section = Assert.Single(result.Sections);
+            var ids = section.Nodes.Select(n => n.Id).ToList();
+            Assert.Equal(ids.Count, ids.Distinct().Count());
+
+            // The second network's blocks carry the renamed ids, so its .1 is wired to its own .2.
+            Assert.Equal(new[] { ("S0_.1", "S0_.2"), ("S0_.1_2", "S0_.2_2") },
+                section.Connections.Select(c => (c.SourceNodeId, c.TargetNodeId)));
+
+            // The runtime's blocks are drawn as those same nodes.
+            Assert.Equal(ids.OrderBy(id => id, StringComparer.Ordinal),
+                result.Project!.Blocks.Select(b => b.NodeId!).OrderBy(id => id, StringComparer.Ordinal));
+        }
+
+        [Fact]
+        public void AnEmptyProgramSection_WarnsWithItsTask()
+        {
+            var xef = new XefBuilder()
+                .Raw("<program><identProgram name=\"Empty\" type=\"section\" task=\"MAST\"/><FBDSource><networkFBD/></FBDSource></program>");
+
+            var result = new PlcXmlImporter().ImportFromXml(xef.Build(), "Empty.xef");
+
+            Assert.Contains("Section 'Empty' (MAST) produced no nodes.", result.Warnings);
         }
 
         // ----------------------------------------------------------------
