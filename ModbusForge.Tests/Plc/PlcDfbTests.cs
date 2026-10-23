@@ -219,6 +219,22 @@ Late := Hold.Q;</STSource></FBProgram>
         }
 
         [Fact]
+        public void LdOnlyDfb_IsListedButNotComputed()
+        {
+            // The runtime runs FBD and ST sections only, so a DFB whose only code is LD computes nothing.
+            var project = new XefBuilder()
+                .Raw(@"<FBSource nameOfFBType=""Ladder""><FBProgram name=""Rungs""><LDSource/></FBProgram></FBSource>")
+                .Variable("L1", "Ladder")
+                .Section("S", Block("L1", "Ladder", 2, 2, ""))
+                .Project();
+
+            var block = Assert.Single(project.Blocks);
+            Assert.False(block.IsSimulated);
+            Assert.False(block.IsProtectedDfb);
+            Assert.Equal(new PlcBlockCounts(1, 0, 0, 1), PlcBlockCounts.Of(project.Blocks));
+        }
+
+        [Fact]
         public void BlockCounts_TellEmptyProtectedDfbsFromUnsupportedTypes()
         {
             var project = new XefBuilder().Raw(SecretDfb).Raw(AndDfb)

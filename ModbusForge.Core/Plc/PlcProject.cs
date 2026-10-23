@@ -111,8 +111,12 @@ namespace ModbusForge.Core.Plc
         /// <summary>The standard block behaviour; null for DFBs and types the runtime does not simulate.</summary>
         public PlcBlockBehavior? Behavior { get; }
 
-        /// <summary>True when the block computes: a standard type, or a DFB whose code the XEF contains.</summary>
-        public bool IsSimulated => Behavior != null || (Kind == PlcBlockKind.UserFunctionBlock && InstanceRoot?.Type.Dfb != null);
+        /// <summary>
+        /// True when the block computes: a standard type, or a DFB with FBD or ST code in the XEF. The runtime
+        /// runs FBD and ST only, so a DFB whose sections are all in another language is not computed.
+        /// </summary>
+        public bool IsSimulated => Behavior != null
+            || (Kind == PlcBlockKind.UserFunctionBlock && InstanceRoot?.Type.Dfb?.Sections.Any(s => s.Fbd != null || s.Text != null) == true);
 
         /// <summary>True for a user function block whose type is protected: its code is encrypted in the XEF, so the runtime cannot run it.</summary>
         public bool IsProtectedDfb => Kind == PlcBlockKind.UserFunctionBlock && InstanceRoot?.Type is { IsProtected: true };
