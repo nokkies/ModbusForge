@@ -256,5 +256,8 @@ namespace ModbusForge.Core.Plc
 
         /// <summary>The project's types and call signatures (DFB code is compiled per instance while running).</summary>
         public PlcTypeRegistry? Types { get; init; }
+
+        /// <summary>The modules of the project's I/O map, for the I/O configuration blocks.</summary>
+        public IReadOnlyList<PlcIoModule> IoModules { get; init; } = Array.Empty<PlcIoModule>();
     }
 }

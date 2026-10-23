@@ -62,6 +62,7 @@ namespace ModbusForge.Core.Plc
         {
             Project = project ?? throw new ArgumentNullException(nameof(project));
             Memory = new PlcMemory();
+            Io = new PlcIo(project.IoModules, Memory);
             _globalScope = new PlcGlobalScope(project.Variables);
             foreach (var block in project.Blocks) block.ResetRuntimeState();
             Memory.SystemBits.WriteBit(IoErrorBit, true);
@@ -77,6 +78,8 @@ namespace ModbusForge.Core.Plc
         public Func<DateTime> LocalClock { get; set; } = () => DateTime.Now;
 
         internal DateTime LocalTime => _localTime;
+
+        internal PlcIo Io { get; }
 
         /// <summary>Controller time in milliseconds (sum of the scan periods run so far).</summary>
         public long Now => (long)_clock;
@@ -95,14 +98,15 @@ namespace ModbusForge.Core.Plc
         /// <summary>What could not be compiled in DFB code, once per DFB type.</summary>
         public List<string> DfbProblems { get; } = new();
 
-        /// <summary>What blocks told the user (<see cref="PlcCall.Notice"/>), once per block type.</summary>
+        /// <summary>What blocks told the user (<see cref="PlcCall.Notice"/>), each notice once per block type.</summary>
         public List<string> Notices { get; } = new();
 
-        private readonly HashSet<string> _noticedTypes = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, HashSet<string>> _notices = new(StringComparer.OrdinalIgnoreCase);
 
         internal void Notify(string typeName, string notice)
         {
-            if (_noticedTypes.Add(typeName)) Notices.Add($"{typeName}: {notice}");
+            if (!_notices.TryGetValue(typeName, out var told)) _notices[typeName] = told = new HashSet<string>();
+            if (told.Add(notice)) Notices.Add($"{typeName}: {notice}");
         }
 
         /// <summary>
@@ -393,6 +397,7 @@ namespace ModbusForge.Core.Plc
             call.State = block.State;
             call.Now = Now;
             call.LocalTime = _localTime;
+            call.Io = Io;
             call.ColdStart = _coldStart;
             call.FirstTaskCycle = task.FirstCycle;
             if (block.Behavior!.ReadsOutputs) SeedOutputs(block, call);
@@ -537,6 +542,7 @@ namespace ModbusForge.Core.Plc
             fbCall.State = _instanceStates.TryGetValue(key, out var state) ? state : null;
             fbCall.Now = Now;
             fbCall.LocalTime = _localTime;
+            fbCall.Io = Io;
             fbCall.ColdStart = _coldStart;
             fbCall.FirstTaskCycle = _currentTask?.FirstCycle ?? false;
             entry.Behavior.Execute(fbCall);

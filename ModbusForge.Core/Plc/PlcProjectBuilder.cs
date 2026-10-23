@@ -23,6 +23,7 @@ namespace ModbusForge.Core.Plc
         private readonly List<(PlcSection Section, TaskInfo Task, int Order)> _sections = new();
         private readonly List<string> _warnings = new();
         private readonly List<string> _skipped = new();
+        private readonly List<PlcIoModule> _ioModules;
 
         private sealed record TaskInfo(string Name, string Kind);
 
@@ -32,6 +33,7 @@ namespace ModbusForge.Core.Plc
             _scope = new PlcGlobalScope(_variables);
             ReadVariables(xef);
             ReadTasks(xef);
+            _ioModules = ReadIoMap(xef);
         }
 
         public IReadOnlyDictionary<string, PlcVariable> Variables => _variables;
@@ -109,10 +111,34 @@ namespace ModbusForge.Core.Plc
 
             // DFB bodies are compiled per instance while running; the types keep what that needs.
             _types.Freeze();
-            var project = new PlcProject(_variables, tasks) { Types = _types };
+            var project = new PlcProject(_variables, tasks) { Types = _types, IoModules = _ioModules };
             project.Warnings.AddRange(_warnings);
             project.SkippedSections.AddRange(_skipped);
             return project;
+        }
+
+        /// <summary>The modules of the Quantum I/O map (IOConf, each moduleQuantum of every rack).</summary>
+        private static List<PlcIoModule> ReadIoMap(XDocument xef)
+        {
+            static int Number(XAttribute? attribute)
+                => int.TryParse((string?)attribute, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : 0;
+
+            var modules = new List<PlcIoModule>();
+            foreach (var module in xef.Descendants("moduleQuantum"))
+            {
+                var info = module.Element("moduleInfo");
+                var parameters = (info?.Element("modData")?.Elements("parameterWords") ?? Enumerable.Empty<XElement>())
+                    .OrderBy(w => Number(w.Attribute("parameterWordNumber")))
+                    .Select(w => Number(w.Attribute("parameterValue")))
+                    .ToList();
+                modules.Add(new PlcIoModule(
+                    (string?)module.Element("equipInfo")?.Attribute("topoAddress") ?? "",
+                    (string?)module.Element("partItem")?.Attribute("partNumber") ?? "",
+                    Number(info?.Attribute("inputRefOffset")),
+                    Number(info?.Attribute("outputRefOffset")),
+                    parameters));
+            }
+            return modules;
         }
 
         // ------------------------------------------------------------------

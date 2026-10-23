@@ -35,6 +35,12 @@ namespace ModbusForge.Core.Plc
             // Communication Block Library, Schneider Electric 33002527.24: the address of
             // READ_REG and the blocks like it, built by TCP_IP_ADDR (p. 348).
             yield return Array("WordArr5", "ARRAY[1..5] OF WORD");
+
+            // I/O Management Block Library, Schneider Electric 33002531.26: an analog input
+            // channel, as the Quantum I/O configuration blocks hand it to the scaling blocks (p. 331).
+            yield return Structure("ANL_IN",
+                ("valuePtr", "UDINT"), ("rawControl", "BYTE"), ("rawSpecific", "BYTE"), ("offset", "INT"), ("range", "WORD"),
+                ("channel", "BYTE"), ("statusMode", "BYTE"), ("statusPtr", "UDINT"), ("warnCode", "BYTE"));
         }
 
         private static (string, XElement) Array(string name, string definition)

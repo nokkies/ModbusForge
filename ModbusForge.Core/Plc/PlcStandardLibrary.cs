@@ -135,6 +135,9 @@ namespace ModbusForge.Core.Plc
             ["TCP_IP_ADDR"] = new TcpIpAddress(),
             ["READ_REG"] = new RemoteExchange("REQ", "NDR", "ERROR", "STATUS", "read requests complete at once without reading data"),
             ["XXMIT"] = new RemoteExchange("START", "DONE", "ERROR", "STATUS", "transmissions complete at once without a reply"),
+            ["QUANTUM"] = new QuantumRack(),
+            ["AVI030"] = new Avi030Module(),
+            ["I_SCALE_WARN"] = new ScaledAnalogInput(),
         };
 
         /// <summary>The behaviour of a standard type, or null when the runtime does not simulate it.</summary>
@@ -1459,6 +1462,150 @@ namespace ModbusForge.Core.Plc
                 call.SetOutput("RECCOUNT", PlcValue.FromInteger(PlcType.Int, 0));
                 call.SetOutput("RETRY", PlcValue.FromInteger(PlcType.Int, 0));
                 if (started) call.Notice = _notice;
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Quantum analog inputs, as the I/O Management Block Library describes
+        // the blocks (Schneider Electric 33002531.26) and the Discrete and Analog
+        // I/O Reference Manual the AVI 030 00 module (35010516.17). The
+        // configuration blocks read the project's I/O map; the scaling blocks
+        // read the input words the module fills.
+        // ------------------------------------------------------------------
+
+        // ANL_IN.statusMode of an AVI 030 00 channel (AVI_STATUS_MODE, p. 51).
+        private const int AviStatusMode = 1;
+
+        /// <summary>
+        /// The AVI 030 00's input ranges in the 16-bit data format, by range code: the raw
+        /// values of 0 and 100 percent (35010516.17, p. 119) and the limits past which the
+        /// module reports the channel out of range: 2.4 percent over the rated input, and in
+        /// 1..5 V and 4..20 mA below 0.5 V and 2.08 mA (pp. 117-120).
+        /// </summary>
+        private static readonly (int Zero, int Full, int Low, int High)[] Avi030Ranges =
+        {
+            (768, 64768, 0, 65535),       // 0: -10..+10 V
+            (0, 64000, 0, 65535),         // 1: 0..10 V
+            (16768, 48768, 16384, 49152), // 2: -5..+5 V
+            (0, 32000, 0, 32768),         // 3: 0..5 V
+            (6400, 32000, 3200, 32768),   // 4: 1..5 V
+            (16768, 48768, 16384, 49152), // 5: -20..+20 mA
+            (0, 32000, 0, 32768),         // 6: 0..20 mA
+            (6400, 32000, 3328, 32768),   // 7: 4..20 mA
+        };
+
+        /// <summary>
+        /// QUANTUM: SLOT1 to SLOT16 refer to the slots of the local rack, for the module
+        /// blocks (AVI030, ...) connected to them (pp. 31, 284). The values are not meant to
+        /// be used otherwise; here each is its slot number.
+        /// </summary>
+        private sealed class QuantumRack : FunctionBlock<NoState>
+        {
+            private static readonly string[] SlotPins = Enumerable.Range(1, 16).Select(n => "SLOT" + n).ToArray();
+
+            protected override void Execute(PlcCall call, NoState s)
+            {
+                for (var i = 0; i < SlotPins.Length; i++) call.SetOutput(SlotPins[i], PlcValue.FromInteger(PlcType.Int, i + 1));
+            }
+        }
+
+        /// <summary>
+        /// AVI030: the eight channels of the AVI 030 00 in the local rack slot on SLOT, each
+        /// an ANL_IN for the scaling blocks (pp. 249-252). valuePtr is the channel's input
+        /// word: the module has eight channel words, then a status word (statusPtr), from the
+        /// first input word the I/O map gives it (35010516.17, p. 120). range is the
+        /// channel's input range code. With no such module in the slot, ENO is 0 and the
+        /// channels stay unconfigured.
+        /// </summary>
+        /// <remarks>
+        /// The XEF carries the module's configuration as parameter words in a layout Schneider
+        /// does not publish. Read here as bytes, low byte first: byte 0 is 1 in every module
+        /// seen; bytes 1 to 8 are the input ranges of channels 1 to 8 in the order the
+        /// parameter dialog lists them, 0 (-10..+10 V, the default) to 7 (4..20 mA) (p. 122).
+        /// That is an inference: modules left at their defaults have all ranges 0, a module
+        /// with channels 5 to 8 unused has them 0, and range 7 channels feed transmitters
+        /// checked against 3.6 and 20.4 mA. The data format is taken to be 16 bit, the
+        /// default and the only one seen.
+        /// </remarks>
+        private sealed class Avi030Module : FunctionBlock<NoState>
+        {
+            private const string PartNumber = "140AVI03000";
+            private const int Channels = 8;
+            private static readonly string[] ChannelPins = Enumerable.Range(1, Channels).Select(n => "CHANNEL" + n).ToArray();
+
+            protected override void Execute(PlcCall call, NoState s)
+            {
+                var slot = (int)call.Input("SLOT").AsInteger();
+                if (call.Io?.LocalModule(slot) is not { } module || !module.PartNumber.Equals(PartNumber, StringComparison.OrdinalIgnoreCase))
+                {
+                    call.Notice = $"no AVI 030 00 in slot {slot} of the local rack; its channels are not configured";
+                    call.Fail();
+                    return;
+                }
+
+                for (var c = 1; c <= Channels; c++)
+                {
+                    if (Structure(call, ChannelPins[c - 1],
+                            ("valuePtr", PlcValue.FromInteger(PlcType.Udint, module.InputStart + c - 1)),
+                            ("range", PlcValue.FromInteger(PlcType.Word, ParameterByte(module, c))),
+                            ("channel", PlcValue.FromInteger(PlcType.Byte, c)),
+                            ("statusMode", PlcValue.FromInteger(PlcType.Byte, AviStatusMode)),
+                            ("statusPtr", PlcValue.FromInteger(PlcType.Udint, module.InputStart + Channels))) is { } channel)
+                    {
+                        call.SetOutput(ChannelPins[c - 1], channel);
+                    }
+                }
+            }
+
+            private static int ParameterByte(PlcIoModule module, int index)
+            {
+                var word = index / 2 < module.Parameters.Count ? module.Parameters[index / 2] : 0;
+                return index % 2 == 0 ? word & 0xFF : (word >> 8) & 0xFF;
+            }
+        }
+
+        /// <summary>
+        /// I_SCALE_WARN: the channel's input word scaled so MN is 0 percent and MX 100 percent
+        /// of its input range, and past them in the advisory range (pp. 78-81). WARN is the
+        /// module's range warning for the channel: its bit in the status word, or a value
+        /// outside the rated range, which the module itself would flag (35010516.17, p. 120).
+        /// Out of range (its bit in the status word, or past the module's limits) is an
+        /// error: ENO is 0. A channel no AVI030 has configured is an error too, and Y and
+        /// WARN keep their values.
+        /// </summary>
+        private sealed class ScaledAnalogInput : FunctionBlock<NoState>
+        {
+            private const string NotConfigured = "input channel not configured; AVI030 configures it in the configuration section";
+            private const string OutOfRange = "input out of range or broken wire (ENO = 0)";
+
+            protected override void Execute(PlcCall call, NoState s)
+            {
+                var channel = call.Input("CHANNEL");
+                var register = (int)Field(channel, "valuePtr").AsInteger();
+                var code = (int)Field(channel, "range").AsInteger();
+                if (call.Io is not { } io || register < 1 || Field(channel, "statusMode").AsInteger() != AviStatusMode
+                    || code < 0 || code >= Avi030Ranges.Length)
+                {
+                    call.Notice = NotConfigured;
+                    call.Fail();
+                    return;
+                }
+
+                var (zero, full, low, high) = Avi030Ranges[code];
+                var raw = io.InputWord(register);
+                var mn = RealInput(call, "MN");
+                call.SetOutput("Y", PlcValue.FromReal(mn + ((RealInput(call, "MX") - mn) * (raw - zero) / (full - zero))));
+
+                // Word 9: bit 8 + n says channel n + 1 is out of range, bit n warns for it.
+                var bit = (int)Field(channel, "channel").AsInteger() - 1;
+                var status = bit is >= 0 and < 8 ? io.InputWord((int)Field(channel, "statusPtr").AsInteger()) : 0;
+                var outOfRange = raw < low || raw > high || (status & (1 << (bit + 8))) != 0;
+                call.SetOutput("WARN", PlcOps.FromBool(outOfRange || raw < zero || raw > full || (status & (1 << bit)) != 0));
+                if (outOfRange)
+                {
+                    call.Eno = false;
+                    call.Notice = OutOfRange;
+                }
             }
         }
 

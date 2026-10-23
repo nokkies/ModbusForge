@@ -41,6 +41,7 @@ namespace ModbusForge.Core.Plc.St
             _call.BeginCall();
             _call.Now = runtime.Now;
             _call.LocalTime = runtime.LocalTime;
+            _call.Io = runtime.Io;
             if (_behavior.ReadsOutputs)
             {
                 foreach (var (output, target) in _targets) _call.SeedOutput(output, target.Read(runtime));
