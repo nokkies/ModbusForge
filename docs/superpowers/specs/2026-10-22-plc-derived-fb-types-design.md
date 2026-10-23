@@ -100,7 +100,10 @@ Inputs, Outputs, Inputs/Outputs, Public variables and Private variables (name, t
 initial value, comment, in the Data Management grid), then Sections (name, language,
 protection). A locked type's original code is one greyed, locked section: "Empty: the
 code is protected in the export". The engineer's sections are listed beside it, marked as
-the engineer's.
+the engineer's. A section protected on its own in an otherwise exported type (possible in
+Control Expert, p. 359, though no project in the corpus has one) shows the same way, and
+the type is marked partly locked, so the rest of its code is never taken for the whole
+(my call).
 
 Selecting a section opens it as a program section opens: ST as text, FBD drawn on the
 canvas, LD listed until there is an LD view. Exported code opens read-only. A section
