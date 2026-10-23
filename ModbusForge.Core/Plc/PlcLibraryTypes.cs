@@ -19,6 +19,14 @@ namespace ModbusForge.Core.Plc
                 ("in_min", "REAL"), ("in_max", "REAL"), ("out_min", "REAL"), ("out_max", "REAL"), ("clip", "BOOL"));
             yield return Structure("Para_RAMP", // p. 331
                 ("inc_rate", "REAL"), ("dec_rate", "REAL"));
+
+            // Obsolete Block Library, Schneider Electric 33002543.19 (10/2019).
+            yield return Structure("Para_PWM", // p. 343
+                ("t_period", "TIME"), ("t_pause", "TIME"), ("t_brake", "TIME"), ("t_min", "TIME"), ("t_max", "TIME"),
+                ("up_pos", "REAL"), ("up_neg", "REAL"));
+            yield return Structure("Para_FGEN", // pp. 190-191
+                ("func_no", "INT"), ("amplitude", "REAL"), ("halfperiod", "TIME"), ("t_off", "TIME"), ("t_rise", "TIME"),
+                ("t_acc", "TIME"), ("unipolar", "BOOL"));
         }
 
         private static (string, XElement) Structure(string name, params (string Field, string Type)[] fields)

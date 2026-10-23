@@ -125,6 +125,10 @@ namespace ModbusForge.Core.Plc
             ["INC"] = new StepFunction(+1),
             ["DEC"] = new StepFunction(-1),
             ["EXTRACT"] = new ExtractFunction(),
+            ["COMPARE"] = new CompareIntegers(),
+            ["PWM"] = new PulseWidthModulation(),
+            ["FGEN"] = new FunctionGenerator(),
+            ["T2T"] = new TableToTable(),
         };
 
         /// <summary>The behaviour of a standard type, or null when the runtime does not simulate it.</summary>
@@ -149,6 +153,8 @@ namespace ModbusForge.Core.Plc
             if (TableFunction(name, "FIND_LT_AR")) return new TableFindFunction(TableFindFunction.Kind.Lt);
             if (TableFunction(name, "ROL_AR")) return new TableRotateFunction(left: true);
             if (TableFunction(name, "ROR_AR")) return new TableRotateFunction(left: false);
+            if (name.StartsWith("R2T_", StringComparison.OrdinalIgnoreCase) && TypeNames.TryGetValue(name[4..], out var r2tType))
+                return new RegisterToTable(r2tType);
             if (name.StartsWith("LENGTH_AR", StringComparison.OrdinalIgnoreCase)) return new TableLengthFunction();
             if (name.StartsWith("SUM_AR", StringComparison.OrdinalIgnoreCase) && TypeNames.TryGetValue(name[6..], out var sumType))
                 return new TableSumFunction(sumType);
@@ -967,6 +973,335 @@ namespace ModbusForge.Core.Plc
                     }
                 }
                 call.SetOutput("ERR", PlcValue.FromInteger(PlcType.Int, error));
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Obsolete library, as the Obsolete Block Library manual describes it:
+        // Schneider Electric 33002543.19, 10/2019.
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// COMPARE: with VAL = 1, SUP, EQU, INF and DIF tell whether IN1 is greater than,
+        /// equal to, less than or different from IN2; with VAL = 0 nothing is compared
+        /// (p. 415).
+        /// </summary>
+        private sealed class CompareIntegers : Function
+        {
+            public override void Execute(PlcCall call)
+            {
+                if (!call.Input("VAL").AsBool()) return;
+                var order = PlcOps.Convert(call.Input("IN1"), PlcType.Int).AsInteger()
+                    .CompareTo(PlcOps.Convert(call.Input("IN2"), PlcType.Int).AsInteger());
+                call.SetOutput("SUP", PlcOps.FromBool(order > 0));
+                call.SetOutput("EQU", PlcOps.FromBool(order == 0));
+                call.SetOutput("INF", PlcOps.FromBool(order < 0));
+                call.SetOutput("DIF", PlcOps.FromBool(order != 0));
+            }
+        }
+
+        private sealed class TableCopyState
+        {
+            /// <summary>R2T wrote the last element: no more copies until R or OFF changes.</summary>
+            public bool Full;
+        }
+
+        /// <summary>
+        /// R2T_*: each cycle SRC goes into element OFF (from 1) of DEST, read as a table of
+        /// SRC's type, and OFF moves on by one unless NOINC = 1. R = 1 sets OFF back to 1
+        /// first. Once the last element is written END is 1 and nothing more is copied; an
+        /// OFF outside the table also gives END = 1 (pp. 541-546).
+        /// </summary>
+        private sealed class RegisterToTable : FunctionBlock<TableCopyState>
+        {
+            private readonly PlcType _element;
+            public RegisterToTable(PlcType element) => _element = element;
+
+            public override bool ReadsOutputs => true;
+
+            protected override void Execute(PlcCall call, TableCopyState s)
+            {
+                var current = call.CurrentOutput("DEST");
+                if ((call.OutputType("DEST") ?? current.Type) is not { } tableType || _element.Size == 0)
+                {
+                    call.Fail();
+                    return;
+                }
+
+                var offset = PlcOps.Convert(call.Input("OFF"), PlcType.Uint).AsInteger();
+                if (call.Input("R").AsBool())
+                {
+                    offset = 1;
+                    s.Full = false;
+                }
+                var length = tableType.Size / _element.Size;
+
+                bool end;
+                if (offset < 1 || offset > length || (s.Full && offset == length))
+                {
+                    end = true;
+                }
+                else
+                {
+                    var bytes = PlcValue.Encode(current.HasValue ? current : PlcValue.DefaultOf(tableType), tableType);
+                    PlcValue.Encode(PlcOps.Convert(call.Input("SRC"), _element), _element, bytes.AsSpan((int)((offset - 1) * _element.Size), _element.Size));
+                    call.SetOutput("DEST", PlcValue.Decode(tableType, bytes));
+                    s.Full = offset == length;
+                    end = s.Full;
+                    if (!s.Full && !call.Input("NOINC").AsBool()) offset++;
+                }
+                if (offset != length) s.Full = false;
+                call.SetOutput("OFF", PlcValue.FromInteger(PlcType.Uint, offset));
+                call.SetOutput("END", PlcOps.FromBool(end));
+            }
+        }
+
+        /// <summary>
+        /// T2T: each cycle SIZE 16-bit words from word OFF (from 1) of SRC go to the same
+        /// words of DEST, both read as plain memory, and OFF moves on by SIZE unless NOINC
+        /// = 1. R = 1 sets OFF back to 1 first. OFF = 0, or words past the end of either
+        /// table, give END = 1 without a copy. ENO is always 1 (pp. 589-594).
+        /// </summary>
+        private sealed class TableToTable : FunctionBlock<NoState>
+        {
+            public override bool ReadsOutputs => true;
+
+            protected override void Execute(PlcCall call, NoState s)
+            {
+                var source = call.Input("SRC");
+                var current = call.CurrentOutput("DEST");
+                if (source.Type is not { } sourceType || (call.OutputType("DEST") ?? current.Type) is not { } tableType)
+                {
+                    call.Fail();
+                    return;
+                }
+
+                var offset = PlcOps.Convert(call.Input("OFF"), PlcType.Uint).AsInteger();
+                if (call.Input("R").AsBool()) offset = 1;
+                var size = PlcOps.Convert(call.Input("SIZE"), PlcType.Uint).AsInteger();
+                var words = Math.Min(sourceType.Size, tableType.Size) / 2;
+
+                bool end;
+                if (offset == 0 || offset + size - 1 > words)
+                {
+                    end = true;
+                }
+                else
+                {
+                    var bytes = PlcValue.Encode(current.HasValue ? current : PlcValue.DefaultOf(tableType), tableType);
+                    source.AsBytes().AsSpan((int)((offset - 1) * 2), (int)(size * 2)).CopyTo(bytes.AsSpan((int)((offset - 1) * 2)));
+                    call.SetOutput("DEST", PlcValue.Decode(tableType, bytes));
+                    end = false;
+                    if (!call.Input("NOINC").AsBool()) offset += size;
+                }
+                call.SetOutput("OFF", PlcValue.FromInteger(PlcType.Uint, offset));
+                call.SetOutput("END", PlcOps.FromBool(end));
+            }
+        }
+
+        private sealed class PwmState
+        {
+            public bool Started;
+            public long PeriodStart;
+            public long Period;
+            public long On;
+            public int Direction;
+            public long Pause;
+            public long Brake;
+        }
+
+        /// <summary>
+        /// PWM: each period t_period starts with a pulse on Y_POS (X &gt; 0) or Y_NEG (X &lt; 0)
+        /// of t_period · |X| / |up_pos| (or |up_neg|), so the mean output follows X; a pulse
+        /// longer than t_max is cut to t_max, one shorter than t_min is left out. After the
+        /// pulse and t_pause, the other output gives a brake pulse of t_brake. R = 1 resets.
+        /// The pulse is worked out at the start of each period (pp. 339-347; the pulse length
+        /// formulas are figures, this follows the text: "the adjusted average energy
+        /// corresponds to the quotient of the switch on duration T_on and the cycle time").
+        /// </summary>
+        private sealed class PulseWidthModulation : FunctionBlock<PwmState>
+        {
+            protected override void Execute(PlcCall call, PwmState s)
+            {
+                var para = call.Input("PARA");
+                long Time(string field) => Math.Max(0, PlcOps.Convert(Field(para, field), PlcType.Time).AsInteger());
+
+                if (call.Input("R").AsBool() || call.ColdStart)
+                {
+                    s.Started = false;
+                    call.SetOutput("Y_POS", PlcOps.False);
+                    call.SetOutput("Y_NEG", PlcOps.False);
+                    if (call.Input("R").AsBool()) return;
+                }
+
+                if (!s.Started || s.Period <= 0 || call.Now - s.PeriodStart >= s.Period)
+                {
+                    s.PeriodStart = s.Started && s.Period > 0 ? s.PeriodStart + ((call.Now - s.PeriodStart) / s.Period * s.Period) : call.Now;
+                    s.Started = true;
+                    s.Period = Time("t_period");
+                    s.Pause = Time("t_pause");
+                    s.Brake = Time("t_brake");
+
+                    var x = RealInput(call, "X");
+                    var limit = Math.Abs(RealOf(Field(para, x >= 0 ? "up_pos" : "up_neg")));
+                    var on = limit > 0 && IsFinite(x) ? Math.Abs(x) / limit * s.Period : 0;
+                    on = Math.Min(on, Math.Min(Time("t_max"), s.Period));
+                    s.On = on < Time("t_min") ? 0 : (long)Math.Round(on);
+                    s.Direction = s.On == 0 ? 0 : Math.Sign(x);
+                }
+
+                var elapsed = call.Now - s.PeriodStart;
+                var pulse = s.Direction != 0 && elapsed < s.On;
+                var brake = s.Direction != 0 && s.Brake > 0 && elapsed >= s.On + s.Pause && elapsed < s.On + s.Pause + s.Brake;
+                call.SetOutput("Y_POS", PlcOps.FromBool(s.Direction > 0 ? pulse : brake));
+                call.SetOutput("Y_NEG", PlcOps.FromBool(s.Direction < 0 ? pulse : brake));
+            }
+        }
+
+        private sealed class FgenState
+        {
+            public bool PreviousStart;
+            public bool Running;
+            public long Start;
+            public int Count;
+
+            // The function and its parameters, taken at the start of each cycle.
+            public int Function;
+            public double Amplitude;
+            public long HalfPeriod;
+            public long Idle;
+            public long Rise;
+            public bool Unipolar;
+
+            public readonly Random Random = new();
+        }
+
+        /// <summary>
+        /// FGEN: a function generator; Y = YOFF + the waveform func_no of Para_FGEN (pp.
+        /// 189-203). R = 1 stops it with Y = YOFF, N = 0, ACTIVE = 0. Jump (1), ramp (2) and
+        /// random number (8) follow START as the text describes (p. 202). The periodic
+        /// functions run while START = 1, finishing the cycle under way when it drops; N
+        /// counts the cycles, and the function and its parameters change only between cycles.
+        /// A cycle is two half waves of halfperiod (the second negative unless unipolar),
+        /// each drawn over halfperiod - t_off and then idle for t_off: saw-tooth (3) rises
+        /// over that time, delta (4) rises over half of it and falls back, square (5) holds
+        /// the amplitude, trapezoid (6) rises and falls over t_rise, sine (7) is a half sine.
+        /// The waveform figures (pp. 198-201) are images; the shapes above follow the text,
+        /// and the S-curve smoothing of t_acc is not applied.
+        /// </summary>
+        private sealed class FunctionGenerator : FunctionBlock<FgenState>
+        {
+            private const int Jump = 1, Ramp = 2, SawTooth = 3, Delta = 4, Square = 5, Trapezoid = 6, Sine = 7, RandomNumber = 8;
+
+            protected override void Execute(PlcCall call, FgenState s)
+            {
+                var offset = RealInput(call, "YOFF");
+                var para = call.Input("PARA");
+                var start = call.Input("START").AsBool();
+                var rising = start && !s.PreviousStart;
+                s.PreviousStart = start;
+
+                if (call.Input("R").AsBool() || call.ColdStart)
+                {
+                    s.Running = false;
+                    s.Count = 0;
+                    if (call.Input("R").AsBool())
+                    {
+                        Output(call, offset, false, 0);
+                        return;
+                    }
+                }
+
+                var function = (int)PlcOps.Convert(Field(para, "func_no"), PlcType.Int).AsInteger();
+                if (!s.Running && function is Jump or Ramp or RandomNumber) Latch(s, para, function);
+
+                switch (s.Running ? s.Function : function)
+                {
+                    case Jump:
+                        if (rising) s.Count++;
+                        Output(call, offset + (start ? s.Amplitude : 0), start, s.Count);
+                        return;
+
+                    case Ramp:
+                        if (rising)
+                        {
+                            s.Count++;
+                            s.Start = call.Now;
+                        }
+                        var rise = s.Rise <= 0 ? 1 : Math.Min(1.0, (call.Now - s.Start) / (double)s.Rise);
+                        Output(call, offset + (start ? s.Amplitude * rise : 0), start, s.Count);
+                        return;
+
+                    case RandomNumber:
+                        if (rising) s.Count++;
+                        var low = s.Unipolar ? 0 : -s.Amplitude;
+                        Output(call, offset + (start ? low + (s.Random.NextDouble() * (s.Amplitude - low)) : 0), start, s.Count);
+                        return;
+                }
+
+                if (!s.Running && start)
+                {
+                    if (function != s.Function) s.Count = 0;
+                    Latch(s, para, function);
+                    s.Running = true;
+                    s.Start = call.Now;
+                    s.Count++;
+                }
+                else if (s.Running && call.Now - s.Start >= 2 * s.HalfPeriod)
+                {
+                    if (start && s.HalfPeriod > 0)
+                    {
+                        s.Start += (call.Now - s.Start) / (2 * s.HalfPeriod) * (2 * s.HalfPeriod);
+                        if (function != s.Function) s.Count = 0;
+                        Latch(s, para, function);
+                        s.Count++;
+                    }
+                    else
+                    {
+                        s.Running = false;
+                    }
+                }
+
+                Output(call, s.Running ? offset + Wave(s, call.Now - s.Start) : offset, s.Running, s.Count);
+            }
+
+            private static void Latch(FgenState s, PlcValue para, int function)
+            {
+                s.Function = function;
+                s.Amplitude = RealOf(Field(para, "amplitude"));
+                s.HalfPeriod = Math.Max(0, PlcOps.Convert(Field(para, "halfperiod"), PlcType.Time).AsInteger());
+                s.Idle = Math.Max(0, PlcOps.Convert(Field(para, "t_off"), PlcType.Time).AsInteger());
+                s.Rise = Math.Max(0, PlcOps.Convert(Field(para, "t_rise"), PlcType.Time).AsInteger());
+                s.Unipolar = Field(para, "unipolar").AsBool() || function is Jump or Ramp;
+            }
+
+            private static double Wave(FgenState s, long time)
+            {
+                if (s.HalfPeriod <= 0) return 0;
+                var second = time >= s.HalfPeriod;
+                var within = time - (second ? s.HalfPeriod : 0);
+                var drawn = s.HalfPeriod - s.Idle;
+                if (drawn <= 0 || within >= drawn) return 0;
+
+                var u = within / (double)drawn;
+                var rise = Math.Min(0.5, s.Rise / (double)drawn);
+                var shape = s.Function switch
+                {
+                    SawTooth => u,
+                    Delta => u < 0.5 ? 2 * u : 2 * (1 - u),
+                    Square => 1,
+                    Trapezoid => rise <= 0 ? 1 : u < rise ? u / rise : u > 1 - rise ? (1 - u) / rise : 1,
+                    Sine => Math.Sin(Math.PI * u),
+                    _ => 0
+                };
+                return shape * s.Amplitude * (second && !s.Unipolar ? -1 : 1);
+            }
+
+            private static void Output(PlcCall call, double y, bool active, int count)
+            {
+                call.SetOutput("Y", PlcValue.FromReal(y));
+                call.SetOutput("ACTIVE", PlcOps.FromBool(active));
+                call.SetOutput("N", PlcValue.FromInteger(PlcType.Int, count));
             }
         }
 
