@@ -82,7 +82,7 @@ The user's rules that shape this:
   to the client's library and an integrator's (for example `_DNP_IEDStatus`: "based on
   PTQ-DNP module command error responses").
 - The runtime already runs exported FBD and ST sections per instance. LD, IL and SFC
-  sections are listed but not run. Exported types in the corpus have 105 FBD, 66 ST and
+  sections are listed but not run. Exported types in the corpus have 111 FBD, 66 ST and
   5 LD sections.
 
 ## Approaches considered
