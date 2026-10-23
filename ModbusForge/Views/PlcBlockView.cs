@@ -140,10 +140,15 @@ namespace ModbusForge.Avalonia.Views
 
             DrawCentered(context, plc.TypeName, Bold, TypeNameFontSize, TextBrush, width / 2, plc.CellSize * 2);
 
-            // While running, say why the runtime does not compute a block.
+            // While running, say why the runtime does not compute a block. A note wider
+            // than the frame would run past its edges, so it is left out.
             if (IdleNote(live) is { } note && height >= plc.CellSize * 4)
             {
-                DrawCentered(context, note, Italic, ValueFontSize, NoteBrush, width / 2, plc.CellSize * 3);
+                var noteText = Format(note, Italic, ValueFontSize, NoteBrush);
+                if (FitsInFrame(noteText.Width, frame.Width))
+                {
+                    DrawCentered(context, noteText, width / 2, plc.CellSize * 3);
+                }
             }
 
             foreach (var pin in plc.Pins)
@@ -167,6 +172,9 @@ namespace ModbusForge.Avalonia.Views
 
             return live.ProtectedDfb ? "empty (protected DFB)" : "not simulated";
         }
+
+        /// <summary>Whether a text this wide fits inside a block frame this wide.</summary>
+        internal static bool FitsInFrame(double textWidth, double frameWidth) => textWidth <= frameWidth;
 
         private static void DrawPin(DrawingContext context, PlcPin pin, double width, double inset, string? value)
         {
@@ -233,7 +241,11 @@ namespace ModbusForge.Avalonia.Views
 
         private static void DrawCentered(DrawingContext context, string text, Typeface typeface, double size, IBrush brush, double centreX, double centreY)
         {
-            var formatted = Format(text, typeface, size, brush);
+            DrawCentered(context, Format(text, typeface, size, brush), centreX, centreY);
+        }
+
+        private static void DrawCentered(DrawingContext context, FormattedText formatted, double centreX, double centreY)
+        {
             context.DrawText(formatted, new Point(centreX - (formatted.Width / 2), centreY - (formatted.Height / 2)));
         }
 
