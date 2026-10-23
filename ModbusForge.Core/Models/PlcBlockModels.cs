@@ -67,15 +67,18 @@ namespace ModbusForge.Models
     /// </summary>
     /// <param name="Executed">False when EN or the section's activation condition held the block off.</param>
     /// <param name="Simulated">False for blocks the runtime does not compute (DFBs, unsupported types).</param>
+    /// <param name="ProtectedDfb">True for an instance of a DFB whose code is protected in the export; the runtime leaves it empty.</param>
     public sealed record PlcLiveState(
         IReadOnlyDictionary<string, string> Inputs,
         IReadOnlyDictionary<string, string> Outputs,
         bool Executed,
-        bool Simulated)
+        bool Simulated,
+        bool ProtectedDfb = false)
     {
         /// <summary>True when both states show the same values (records compare dictionaries by reference).</summary>
         public bool SameAs(PlcLiveState? other)
             => other != null && Executed == other.Executed && Simulated == other.Simulated
+               && ProtectedDfb == other.ProtectedDfb
                && SameValues(Inputs, other.Inputs) && SameValues(Outputs, other.Outputs);
 
         private static bool SameValues(IReadOnlyDictionary<string, string> a, IReadOnlyDictionary<string, string> b)

@@ -73,8 +73,9 @@ namespace ModbusForge.Services
         public DataStore CurrentDataStore => EffectiveStore;
 
         /// <summary>
-        /// Something the runtime could not do, reported once: DFB code it cannot execute
-        /// or the first run-time error of a kind. Raised on the scan thread.
+        /// Something the runtime could not do, reported once: DFB code it cannot execute,
+        /// the protected DFB types (Start names them), or the first run-time error of a kind.
+        /// Raised on the scan thread, and by Start on its caller's thread.
         /// </summary>
         public event Action<string>? ProblemReported;
 
@@ -113,6 +114,7 @@ namespace ModbusForge.Services
             ArgumentNullException.ThrowIfNull(config);
             if (config.ScanIntervalMs > 0) SetScanIntervalMs(config.ScanIntervalMs);
 
+            IReadOnlyList<string>? protectedDfbTypes;
             lock (_sync)
             {
                 _config = config;
@@ -124,6 +126,12 @@ namespace ModbusForge.Services
                 _clock.Restart();
                 _lastTick = TimeSpan.Zero;
                 IsRunning = true;
+                protectedDfbTypes = _runtime?.Project.Types?.ProtectedDfbTypes;
+            }
+
+            if (protectedDfbTypes is { Count: > 0 })
+            {
+                Report($"protected DFB types run empty (their code is protected in the export): {string.Join(", ", protectedDfbTypes)}");
             }
 
             _timer.Start();
@@ -358,7 +366,7 @@ namespace ModbusForge.Services
             }
             if (block.Eno != null) outputs[block.Eno.Name] = block.LastEno ? "TRUE" : "FALSE";
 
-            return new PlcLiveState(inputs, outputs, block.ExecutedLastScan, block.IsSimulated);
+            return new PlcLiveState(inputs, outputs, block.ExecutedLastScan, block.IsSimulated, block.IsProtectedDfb);
         }
 
         /// <summary>Elementary values only; whole structures have no one-line value.</summary>

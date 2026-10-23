@@ -99,6 +99,18 @@ namespace ModbusForge.Tests.Plc
             return (service, reports);
         }
 
+        private static (PlcRuntimeService Service, ObservableCollection<VisualNode> Nodes) Started(XefBuilder xef, List<string> reports)
+        {
+            var result = new PlcXmlImporter().ImportFromXml(xef.Build(), "test.xef");
+            var nodes = new ObservableCollection<VisualNode>(result.Sections.Single().Nodes);
+            var service = new PlcRuntimeService();
+            service.ProblemReported += reports.Add;
+            service.Load(result.Project);
+            service.SetScanIntervalMs(10_000);
+            service.Start(new VisualNodeEditorConfig { Nodes = nodes, ScanIntervalMs = 10_000 });
+            return (service, nodes);
+        }
+
         [Fact]
         public void DfbCodeTheRuntimeCannotRun_IsReportedOnce()
         {
@@ -130,6 +142,54 @@ namespace ModbusForge.Tests.Plc
 
             Assert.Equal(3, service.Runtime!.StErrors);
             Assert.Single(reports, m => m.Contains("ST") && m.Contains("error"));
+        }
+
+        [Fact]
+        public void ProtectedDfbInstance_IsTaggedAsAnEmptyProtectedDfb()
+        {
+            var reports = new List<string>();
+            var (service, nodes) = Started(new XefBuilder().Raw(PlcDfbTests.SecretDfb).Variable("S1", "Secret").Variable("Out", "BOOL")
+                .Section("S", Block("S1", "Secret", 2, 2, "|Q=Out")), reports);
+            using var _ = service;
+            service.Tick(Scan);
+
+            var live = Node(nodes, "Secret").PlcLive!;
+            Assert.False(live.Simulated);
+            Assert.True(live.ProtectedDfb);
+        }
+
+        [Fact]
+        public void OrdinaryBlock_IsNotTaggedAsProtectedDfb()
+        {
+            var reports = new List<string>();
+            var (service, nodes) = Started(new XefBuilder().Variable("A", "INT").Variable("B", "INT")
+                .Section("S", Block(".1", "MOVE", 2, 2, "IN=A|OUT=B")), reports);
+            using var _ = service;
+            service.Tick(Scan);
+
+            Assert.False(Node(nodes, "MOVE").PlcLive!.ProtectedDfb);
+        }
+
+        [Fact]
+        public void Start_NamesTheProtectedDfbTypes()
+        {
+            var reports = new List<string>();
+            var (service, _) = Started(new XefBuilder().Raw(PlcDfbTests.SecretDfb).Variable("S1", "Secret").Variable("Out", "BOOL")
+                .Section("S", Block("S1", "Secret", 2, 2, "|Q=Out")), reports);
+            using var _ = service;
+
+            Assert.Single(reports, "protected DFB types run empty (their code is protected in the export): Secret");
+        }
+
+        [Fact]
+        public void Start_WithoutProtectedDfbs_SaysNothingAboutThem()
+        {
+            var reports = new List<string>();
+            var (service, _) = Started(new XefBuilder().Variable("A", "INT").Variable("B", "INT")
+                .Section("S", Block(".1", "MOVE", 2, 2, "IN=A|OUT=B")), reports);
+            using var _ = service;
+
+            Assert.DoesNotContain(reports, r => r.Contains("protected DFB"));
         }
     }
 }
