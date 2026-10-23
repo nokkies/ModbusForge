@@ -29,11 +29,13 @@ The user's rules that shape this:
 2. A locked type shows its interface and one empty section, greyed with a lock and the
    note "Empty: the code is protected in the export". Its instances on the canvas read
    "empty (protected DFB)" instead of "not simulated".
-3. The engineer can give a locked type their own code: ST first, then FBD, then LD. It
-   runs for every instance of the type, as a DFB section does in Control Expert.
-4. The engineer's code is stored on their machine next to the XEF and comes back when the
-   same XEF is imported again.
-5. Types whose code is exported keep running it, as today, and are shown read-only.
+3. The engineer can give a locked type their own code in ST, FBD or LD, the languages a
+   DFB section can have. It runs for every instance of the type, as a DFB section does in
+   Control Expert.
+4. The engineer's code is stored on their machine next to the project file and comes back
+   when the same file is opened again.
+5. Types whose code is exported keep running it, as today. Their sections are part of the
+   selection on the left: selecting one opens it read-only, as a program section opens.
 
 ## Non-goals
 
@@ -42,6 +44,8 @@ The user's rules that shape this:
 - Generating DFB code automatically.
 - Building any client DFB into ModbusForge.
 - Editing exported (unlocked) code.
+- Sharing the engineer's code between projects: it belongs to the project file it was
+  written for.
 
 ## Anti-goals (a failure even if it works)
 
@@ -74,8 +78,6 @@ The user's rules that shape this:
 - The runtime already runs exported FBD and ST sections per instance. LD, IL and SFC
   sections are listed but not run. Exported types in the corpus have 105 FBD, 66 ST and
   5 LD sections.
-- One client's library recurs across projects: the 67 locked types are declared 994 times
-  in the 23 projects (xVLV101, zScale and others in about 20 each).
 
 ## Approaches considered
 
@@ -100,6 +102,11 @@ protection). A locked type's original code is one greyed, locked section: "Empty
 code is protected in the export". The engineer's sections are listed beside it, marked as
 the engineer's.
 
+Selecting a section opens it as a program section opens: ST as text, FBD drawn on the
+canvas, LD listed until there is an LD view. Exported code opens read-only. A section
+opens without live values, because values belong to an instance, not to the type;
+showing them for a chosen instance is left for later (my call).
+
 ### Canvas, Console and status
 
 Instances of a locked type without code read "empty (protected DFB)" and keep their
@@ -110,11 +117,13 @@ unsupported types.
 
 ### Writing the code (ST first)
 
-On a locked type, the engineer can add a section (name, language) and add variables,
+On a locked type, the engineer can add a section (name; language ST, FBD or LD, built in
+that order: the ST compiler and the canvas exist, LD needs an engine) and add variables,
 private or public (name, type, initial value; FB types such as TON allowed). My call:
 private variables give the code somewhere to keep timers and latches, and public ones
-cover fields the export left out. The ST
-editor shows the type's parameters and variables beside the text; the existing ST
+cover fields the export left out.
+
+The ST editor shows the type's parameters and variables beside the text; the existing ST
 compiler checks it on save and lists errors with line numbers. Sections run in their
 order, every scan, for every instance. Changes take effect at the next Run, which is a
 cold start (my call). FBD sections follow on the PLC canvas. LD waits for an LD engine,
@@ -122,21 +131,30 @@ which would also run the exported LD sections.
 
 ### Storage
 
-One local, human-readable file next to the XEF (the XEF's name with a fixed suffix)
-holds, per type: a fingerprint of the type's interface in the XEF, the engineer's
-variables, and the engineer's sections (name, language, code). Each type's entry stands on
-its own, so it can be copied to another project later. Importing the XEF loads the file.
-Nothing is written into the XEF.
+The code belongs to the project file it was written for. One local, human-readable file
+next to that file (today an XEF or ZEF export, named after it with a fixed suffix) holds,
+per type: a fingerprint of the type's interface in the export, the engineer's variables,
+and the engineer's sections (name, language, code). Opening the project file loads it.
+Nothing is written into the export.
 
 ## Phases
 
-1. The Derived FB Types node and the empty markings (navigator, canvas, Console, status).
-2. The engineer's ST sections and variables for locked types, stored next to the XEF and
-   run per instance.
+1. The Derived FB Types node: every type with its interface and sections, exported
+   sections opening read-only (ST as text, FBD drawn), and locked types marked empty in
+   the navigator, on the canvas, in the Console and in the status text.
+2. The engineer's ST sections and variables for locked types, stored next to the project
+   file and run per instance.
 3. The engineer's FBD sections.
-4. An LD engine.
+4. LD: an engine and a view, for exported LD sections and the engineer's.
 
-## Acceptance for phases 1 and 2, on LCPLC001
+## Acceptance for phases 1 and 2
+
+On SN6550 (exported types):
+
+- Selecting LCN_DIG101's Command_FBD section draws it on the canvas, read-only.
+- Selecting LCN_xILock's Status section shows its ST.
+
+On LCPLC001 (locked types):
 
 - Derived FB Types lists zPLCInfo, xANL101, xANL102 and zScale as locked (empty), with
   the interface the XEF gives each (xANL101: 19 inputs, 14 outputs, 5 inputs/outputs).
@@ -147,15 +165,6 @@ Nothing is written into the XEF.
 - Closing and importing LCPLC001 again brings the xANL101 code back.
 - After xANL101's interface in the XEF changes, the code is kept, not run, and the
   engineer is told.
-
-## Open questions
-
-1. For exported types, how much of the code does phase 1 show: only the navigator rows,
-   also the code read-only (ST as text, FBD drawn), or also live values for one chosen
-   instance, as Control Expert animates DFB code?
-2. Should the engineer's code for a type also export to a file and import into the
-   client's other projects in phases 1 and 2, or later? A real .XDB for Control Expert
-   would carry the stand-in code into Control Expert unmarked.
 
 ## Left to the builder
 
