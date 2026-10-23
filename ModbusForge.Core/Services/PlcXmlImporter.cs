@@ -820,7 +820,9 @@ namespace ModbusForge.Services
                     localTags.TryAdd(variable.Name, new PlcAddressReference { SymbolicName = variable.Name });
                 }
 
-                foreach (var (fbProgram, sectionOrdinal) in fbSource.Elements("FBProgram").Select((p, i) => (p, i)))
+                // A protected type keeps no sections, whatever FBProgram its XML carries: its code is encrypted.
+                var fbPrograms = type.IsProtected ? Enumerable.Empty<XElement>() : fbSource.Elements("FBProgram");
+                foreach (var (fbProgram, sectionOrdinal) in fbPrograms.Select((p, i) => (p, i)))
                 {
                     var sectionName = (string?)fbProgram.Attribute("name") ?? $"Section{sectionOrdinal + 1}";
                     var sourceElement = fbProgram.Elements()

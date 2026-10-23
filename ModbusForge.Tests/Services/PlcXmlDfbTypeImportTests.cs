@@ -25,6 +25,18 @@ namespace ModbusForge.Tests.Services
   <FBProgram name=""Body""><LDSource></LDSource></FBProgram>
 </FBSource>";
 
+        // Code the export encrypts, yet a protected DFB's XML can still carry it: Q := A AND B, in FBD and in ST.
+        private const string LockedFbdProgram = @"<FBProgram name=""Body""><FBDSource><networkFBD>
+  <FFBBlock instanceName="".1"" typeName=""AND"" enEnO=""false"" width=""7"" height=""6""><objPosition posX=""2"" posY=""2""/>
+    <descriptionFFB execAfter="""">
+      <inputVariable invertedPin=""false"" formalParameter=""IN1"" effectiveParameter=""A""/>
+      <inputVariable invertedPin=""false"" formalParameter=""IN2"" effectiveParameter=""B""/>
+      <outputVariable invertedPin=""false"" formalParameter=""OUT"" effectiveParameter=""Q""/>
+    </descriptionFFB></FFBBlock>
+</networkFBD></FBDSource></FBProgram>";
+
+        private const string LockedStProgram = @"<FBProgram name=""Body""><STSource>Q := A AND B;</STSource></FBProgram>";
+
         [Fact]
         public void ExportedDfbTypes_AreListedWithTheirInterface()
         {
@@ -77,6 +89,14 @@ namespace ModbusForge.Tests.Services
             Assert.Empty(secret.Sections);
             Assert.Empty(secret.PrivateVariables);
         }
+
+        [Fact]
+        public void AProtectedTypeWithFbdCodeInItsXml_KeepsNoSections()
+            => AssertProtectedKeepsNoSections(LockedFbdProgram);
+
+        [Fact]
+        public void AProtectedTypeWithStCodeInItsXml_KeepsNoSections()
+            => AssertProtectedKeepsNoSections(LockedStProgram);
 
         [Fact]
         public void ATypeWithoutCode_IsNotProtected()
@@ -174,6 +194,24 @@ namespace ModbusForge.Tests.Services
             Assert.True(result.Success, string.Join("; ", result.Errors));
             return result;
         }
+
+        // A protected DFB is listed with its interface and no sections, whatever FBProgram its XML carries.
+        private static void AssertProtectedKeepsNoSections(string program)
+        {
+            var locked = Import(new XefBuilder().Raw(ProtectedDfbWith(program))).DfbTypes.Single();
+
+            Assert.True(locked.IsProtected);
+            Assert.Equal(new[] { "A", "B" }, locked.Inputs.Select(v => v.Name));
+            Assert.Equal(new[] { "Q" }, locked.Outputs.Select(v => v.Name));
+            Assert.Empty(locked.Sections);
+        }
+
+        // An encrypted DFB ("crypted") with the interface A, B (in) and Q (out), followed by the given FBProgram.
+        private static string ProtectedDfbWith(string program)
+            => "<FBSource nameOfFBType=\"Locked\"><crypted>00</crypted><ExternalToolsOnly>" +
+               "<inputParameters><variables name=\"A\" typeName=\"BOOL\"/><variables name=\"B\" typeName=\"BOOL\"/></inputParameters>" +
+               "<outputParameters><variables name=\"Q\" typeName=\"BOOL\"/></outputParameters>" +
+               "</ExternalToolsOnly>" + program + "</FBSource>";
 
         // A DFB with the interface A, B (in) and Q (out), and an FBD body of one network per argument.
         private static string FbdType(string typeName, params string[] networks)

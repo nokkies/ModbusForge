@@ -128,6 +128,16 @@ Late := Hold.Q;</STSource></FBProgram>
   </program>
 </FEFExchangeFile>";
 
+        // Secret's code is encrypted in the export, yet its XML still carries an FBD program named Body.
+        private const string SecretFbdProgram = @"<FBProgram name=""Body""><FBDSource><networkFBD>
+  <FFBBlock instanceName="".1"" typeName=""AND"" enEnO=""false"" width=""7"" height=""6""><objPosition posX=""2"" posY=""2""/>
+    <descriptionFFB execAfter="""">
+      <inputVariable invertedPin=""false"" formalParameter=""IN1"" effectiveParameter=""X""/>
+      <inputVariable invertedPin=""false"" formalParameter=""IN2"" effectiveParameter=""Y""/>
+      <outputVariable invertedPin=""false"" formalParameter=""OUT"" effectiveParameter=""Alarm""/>
+    </descriptionFFB></FFBBlock>
+</networkFBD></FBDSource></FBProgram>";
+
         // TabItem index of the PLC tab (see PlcSimulationIsolationTests).
         private const int PlcTabIndex = 7;
 
@@ -306,6 +316,21 @@ Late := Hold.Q;</STSource></FBProgram>
 
             Assert.Empty(Node(main, "Application", "Derived FB Types").Children);
             Assert.DoesNotContain("MyAnd/Body", ProgramNames(plc.ProgramTree));
+        }
+
+        [Fact]
+        public async Task AProtectedTypeWithCodeInItsXml_AddsNoEditorProgram()
+        {
+            File.WriteAllText(_xefPath, FixtureXef.Replace("<crypted>00</crypted>", "<crypted>00</crypted>" + SecretFbdProgram));
+            using var simulation = CreateSimulationEditor();
+            using var plc = CreatePlcEditor();
+            using var main = CreateMainViewModel(simulation, plc);
+
+            await main.LoadPlcXmlCommand.ExecuteAsync(null);
+
+            Assert.DoesNotContain("Secret/Body", ProgramNames(plc.ProgramTree));
+            Assert.Equal(new[] { "Protected code (empty)" },
+                Titles(Node(main, "Application", "Derived FB Types", "Secret (protected, empty)", "Sections (1)").Children));
         }
 
         private MainViewModel CreateMainViewModel(VisualNodeEditorViewModel simulation, PlcEditorViewModel plc)
