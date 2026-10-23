@@ -257,13 +257,22 @@ namespace ModbusForge.Services
             var tags = ParseTagTable(xef, result);
             var pinPositions = ParsePinPositions(xef);
             var sections = ParseSections(xef, tags, pinPositions, result);
+            ParseDfbTypes(xef, pinPositions, result);
             ParseHardware(xef, result);
 
             // Unity Pro reuses instance names (".1", "FBI_12", ...) across networks
             // AND across programs. The editor and the simulation engine both key by
             // global node id, so enforce uniqueness across the entire import here —
             // duplicate ids crash the engine when the graph loads.
-            EnsureGlobalNodeIdUniqueness(result);
+            var dfbCanvases = result.DfbTypes.SelectMany(t => t.Sections).Select(s => s.Canvas)
+                .OfType<PlcXmlSection>().ToList();
+            EnsureGlobalNodeIdUniqueness(sections.Concat(dfbCanvases));
+            foreach (var canvas in dfbCanvases)
+            {
+                // DFB canvases are listed, not run: drop the XEF references kept for the pass above.
+                canvas.RuntimeBlocks.Clear();
+                canvas.RuntimeLinks.Clear();
+            }
 
             result.Sections = sections;
             result.TagCount = tags.Count;
@@ -305,10 +314,14 @@ namespace ModbusForge.Services
             return builder.Build();
         }
 
-        private static void EnsureGlobalNodeIdUniqueness(PlcXmlImportResult result)
+        /// <summary>
+        /// Renames repeated node ids across the given canvases. Wires then take their ends' ids from
+        /// the nodes they join, because one id can name several nodes (instance names repeat across networks).
+        /// </summary>
+        private static void EnsureGlobalNodeIdUniqueness(IEnumerable<PlcXmlSection> sections)
         {
             var seen = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var section in result.Sections)
+            foreach (var section in sections)
             {
                 foreach (var node in section.Nodes)
                 {
@@ -317,15 +330,13 @@ namespace ModbusForge.Services
                     var suffix = 2;
                     string candidate;
                     do { candidate = $"{node.Id}_{suffix++}"; } while (!seen.Add(candidate));
-
-                    // Rewire every connection that pointed at the colliding id.
-                    var oldId = node.Id;
                     node.Id = candidate;
-                    foreach (var conn in section.Connections)
-                    {
-                        if (conn.SourceNodeId == oldId) conn.SourceNodeId = candidate;
-                        if (conn.TargetNodeId == oldId) conn.TargetNodeId = candidate;
-                    }
+                }
+
+                foreach (var (_, source, target, connection) in section.RuntimeLinks)
+                {
+                    connection.SourceNodeId = source.Id;
+                    connection.TargetNodeId = target.Id;
                 }
             }
         }
@@ -496,7 +507,7 @@ namespace ModbusForge.Services
                     continue;
                 }
 
-                var section = ParseFbdSource(fbd, tags, pinPositions, sectionName, task, sectionOrdinal, result);
+                var section = ParseFbdSource(fbd, tags, pinPositions, sectionName, task, sectionOrdinal, $"S{sectionOrdinal}", result);
                 sections.Add(section with { Location = location, Order = order });
                 sectionOrdinal++;
                 programInfo.HasFbdCanvas = true;
@@ -606,6 +617,7 @@ namespace ModbusForge.Services
             string sectionName,
             string task,
             int sectionOrdinal,
+            string idPrefix,
             PlcXmlImportResult result)
         {
             var section = new PlcXmlSection
@@ -678,7 +690,7 @@ namespace ModbusForge.Services
                         result.UsedOpaqueTypes.Add(typeName);
                     }
 
-                    var nodeId = $"S{sectionOrdinal}_{uniqueInstance}";
+                    var nodeId = $"{idPrefix}_{uniqueInstance}";
 
                     var node = CreateVisualNode(block, nodeId, uniqueInstance, rawInstance, typeName, elementType, tags,
                         pinPositions.GetValueOrDefault(typeName), pin => linkedPins.Contains((rawInstance, pin)));
@@ -714,7 +726,7 @@ namespace ModbusForge.Services
                 // Control Expert text boxes: section comments drawn on the grid.
                 foreach (var textBox in network.Descendants("textBox"))
                 {
-                    var comment = CreateTextBoxNode(textBox, $"S{sectionOrdinal}_#text{++textBoxOrdinal}", networkOrdinalOffset);
+                    var comment = CreateTextBoxNode(textBox, $"{idPrefix}_#text{++textBoxOrdinal}", networkOrdinalOffset);
                     maxNodeY = Math.Max(maxNodeY, comment.Y);
                     section.Nodes.Add(comment);
                 }
@@ -742,12 +754,11 @@ namespace ModbusForge.Services
 
                     AlignPinToRecordedEndpoint(sourceNode, source, isInput: false, networkOrdinalOffset);
                     AlignPinToRecordedEndpoint(targetNode, dest, isInput: true, networkOrdinalOffset);
-                    section.RuntimeLinks.Add((link, sourceNode, targetNode));
 
                     var sourcePort = NormalizeSourcePort(sourcePin ?? "OUT");
                     var targetPort = NormalizeTargetPort(targetPin ?? "IN");
 
-                    section.Connections.Add(new NodeConnection(sourceNode.Id, targetNode.Id, targetPort)
+                    var connection = new NodeConnection(sourceNode.Id, targetNode.Id, targetPort)
                     {
                         SourceConnector = sourcePort,
                         SourcePin = sourcePin,
@@ -756,7 +767,9 @@ namespace ModbusForge.Services
                             .Select(p => ReadCellCentre(p, networkOrdinalOffset))
                             .OfType<PlcRoutePoint>()
                             .ToList()
-                    });
+                    };
+                    section.Connections.Add(connection);
+                    section.RuntimeLinks.Add((link, sourceNode, targetNode, connection));
                 }
 
                 // The next network starts below this one.
@@ -767,6 +780,106 @@ namespace ModbusForge.Services
                 result.AddWarning($"Section '{sectionName}' ({task}) produced no nodes.");
 
             return section;
+        }
+
+        // ------------------------------------------------------------------
+        // DFB types (user function blocks)
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Lists every root FBSource (a user function block type) with its interface and code
+        /// sections. An FBD section gets a canvas whose ids start with "D", so it shares no id with
+        /// a program; ST and IL keep their text; other languages are listed only. Nothing is run.
+        /// </summary>
+        private static void ParseDfbTypes(
+            XDocument xef, IReadOnlyDictionary<string, BlockPinPositions> pinPositions, PlcXmlImportResult result)
+        {
+            foreach (var (fbSource, typeOrdinal) in xef.Root!.Elements("FBSource").Select((s, i) => (s, i)))
+            {
+                var typeName = (string?)fbSource.Attribute("nameOfFBType") ?? "";
+                var type = new PlcXmlDfbType
+                {
+                    Name = typeName,
+                    Version = (string?)fbSource.Attribute("version") ?? "",
+                    IsProtected = fbSource.Element("crypted") != null
+                };
+
+                var holders = new[] { fbSource, fbSource.Element("ExternalToolsOnly") };
+                AddInterfaceVariables(holders, "inputParameters", type.Inputs);
+                AddInterfaceVariables(holders, "outputParameters", type.Outputs);
+                AddInterfaceVariables(holders, "inOutParameters", type.InOuts);
+                AddInterfaceVariables(holders, "publicLocalVariables", type.PublicVariables);
+                AddInterfaceVariables(holders, "privateLocalVariables", type.PrivateVariables);
+
+                // The type's own names resolve to unbound placeholders, so a local name never
+                // picks up a global's address.
+                var localTags = new Dictionary<string, PlcAddressReference>(StringComparer.Ordinal);
+                foreach (var variable in type.Inputs.Concat(type.Outputs).Concat(type.InOuts)
+                             .Concat(type.PublicVariables).Concat(type.PrivateVariables))
+                {
+                    localTags.TryAdd(variable.Name, new PlcAddressReference { SymbolicName = variable.Name });
+                }
+
+                foreach (var (fbProgram, sectionOrdinal) in fbSource.Elements("FBProgram").Select((p, i) => (p, i)))
+                {
+                    var sectionName = (string?)fbProgram.Attribute("name") ?? $"Section{sectionOrdinal + 1}";
+                    var sourceElement = fbProgram.Elements()
+                        .FirstOrDefault(e => e.Name.LocalName.EndsWith("Source", StringComparison.Ordinal));
+                    if (sourceElement == null) continue;
+
+                    var language = sourceElement.Name.LocalName[..^"Source".Length];
+                    var editorKey = $"{typeName}/{sectionName}";
+                    if (language == "FBD")
+                    {
+                        var scratch = new PlcXmlImportResult();
+                        var canvas = ParseFbdSource(sourceElement, localTags, pinPositions, sectionName, "", 0,
+                            $"D{typeOrdinal}.{sectionOrdinal}", scratch);
+                        foreach (var warning in scratch.Warnings)
+                            result.AddWarning($"DFB {typeName}: {warning}");
+
+                        type.Sections.Add(new PlcXmlDfbSection
+                        {
+                            Name = sectionName,
+                            Language = language,
+                            EditorKey = editorKey,
+                            Canvas = canvas
+                        });
+                    }
+                    else
+                    {
+                        type.Sections.Add(new PlcXmlDfbSection
+                        {
+                            Name = sectionName,
+                            Language = language,
+                            EditorKey = editorKey,
+                            SourceText = (language is "ST" or "IL") ? NormalizeSourceText(sourceElement.Value) : null
+                        });
+                    }
+                }
+
+                result.DfbTypes.Add(type);
+            }
+        }
+
+        /// <summary>
+        /// Adds the variables of one interface group, read from each holder in turn. A name the
+        /// group already has keeps its first declaration.
+        /// </summary>
+        private static void AddInterfaceVariables(IEnumerable<XElement?> holders, string group, List<PlcXmlVariable> target)
+        {
+            var declared = holders.SelectMany(h => h?.Element(group)?.Elements("variables") ?? Enumerable.Empty<XElement>());
+            foreach (var variable in declared)
+            {
+                var name = (string?)variable.Attribute("name");
+                if (string.IsNullOrWhiteSpace(name) || target.Any(v => v.Name == name)) continue;
+
+                target.Add(new PlcXmlVariable(
+                    name,
+                    (string?)variable.Attribute("typeName") ?? "",
+                    null,
+                    (string?)variable.Element("variableInit")?.Attribute("value"),
+                    CleanText(variable.Element("comment")?.Value)));
+            }
         }
 
         // Unity Pro FBD exports place every block, link bend and text box on the
@@ -1346,10 +1459,51 @@ namespace ModbusForge.Services
         public List<VisualNode> Nodes { get; } = new();
         public List<NodeConnection> Connections { get; } = new();
 
-        // The XEF elements behind the nodes and wires, kept only until the PLC
-        // runtime project is compiled (then cleared so the document can be freed).
+        // The XEF elements behind the nodes and wires, kept only until the node ids are settled
+        // and the PLC runtime project is compiled (then cleared so the document can be freed).
         internal List<(XElement Block, VisualNode Node)> RuntimeBlocks { get; } = new();
-        internal List<(XElement Link, VisualNode Source, VisualNode Target)> RuntimeLinks { get; } = new();
+        internal List<(XElement Link, VisualNode Source, VisualNode Target, NodeConnection Connection)> RuntimeLinks { get; } = new();
+    }
+
+    /// <summary>A user function block (DFB) type of the project: its interface and its code sections.</summary>
+    public sealed class PlcXmlDfbType
+    {
+        public string Name { get; init; } = "";
+        public string Version { get; init; } = "";
+
+        /// <summary>True when the export encrypts the type's code (it has a crypted child); the interface is still listed.</summary>
+        public bool IsProtected { get; init; }
+
+        public List<PlcXmlVariable> Inputs { get; } = new();
+        public List<PlcXmlVariable> Outputs { get; } = new();
+        public List<PlcXmlVariable> InOuts { get; } = new();
+
+        /// <summary>Variables of the public local group, visible to the caller.</summary>
+        public List<PlcXmlVariable> PublicVariables { get; } = new();
+
+        /// <summary>Variables of the private local group, kept per instance.</summary>
+        public List<PlcXmlVariable> PrivateVariables { get; } = new();
+
+        /// <summary>Code sections in XEF order; empty for a protected type.</summary>
+        public List<PlcXmlDfbSection> Sections { get; } = new();
+    }
+
+    /// <summary>One code section of a DFB type.</summary>
+    public sealed class PlcXmlDfbSection
+    {
+        public string Name { get; init; } = "";
+
+        /// <summary>Source language as the export names it: "FBD", "ST", "LD", "IL" or "SFC".</summary>
+        public string Language { get; init; } = "";
+
+        /// <summary>The PLC editor's program name for this section, in the form type/section.</summary>
+        public string EditorKey { get; init; } = "";
+
+        /// <summary>The FBD canvas; null for other languages.</summary>
+        public PlcXmlSection? Canvas { get; init; }
+
+        /// <summary>The program text of an ST or IL section; null otherwise.</summary>
+        public string? SourceText { get; init; }
     }
 
     /// <summary>A program (section/subprogram) as listed by Control Expert, in any language.</summary>
@@ -1447,6 +1601,9 @@ namespace ModbusForge.Services
 
         /// <summary>Declared variables (the dataBlock), as Control Expert's Data Editor lists them.</summary>
         public List<PlcXmlVariable> Variables { get; } = new();
+
+        /// <summary>User function block types, in XEF order. They are listed, not run.</summary>
+        public List<PlcXmlDfbType> DfbTypes { get; } = new();
 
         /// <summary>The project compiled for the PLC runtime (what Run executes); null when the import failed.</summary>
         public PlcProject? Project { get; set; }
