@@ -49,6 +49,9 @@ namespace ModbusForge.Core.Plc
         /// <summary>Controller time in milliseconds since the runtime started.</summary>
         public long Now { get; internal set; }
 
+        /// <summary>The controller's real-time clock (local time), read once per scan.</summary>
+        public DateTime LocalTime { get; internal set; }
+
         /// <summary>True during the first cycle after a cold start.</summary>
         public bool ColdStart { get; internal set; }
 

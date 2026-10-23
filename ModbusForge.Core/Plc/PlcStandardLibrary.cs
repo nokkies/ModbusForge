@@ -129,6 +129,9 @@ namespace ModbusForge.Core.Plc
             ["PWM"] = new PulseWidthModulation(),
             ["FGEN"] = new FunctionGenerator(),
             ["T2T"] = new TableToTable(),
+            ["RRTC_DT"] = new ReadClock(),
+            ["RRTC_DT_MS"] = new ReadClockMilliseconds(),
+            ["DT_AS_BYTE"] = new DateTimeBytes(),
         };
 
         /// <summary>The behaviour of a standard type, or null when the runtime does not simulate it.</summary>
@@ -1302,6 +1305,83 @@ namespace ModbusForge.Core.Plc
                 call.SetOutput("Y", PlcValue.FromReal(y));
                 call.SetOutput("ACTIVE", PlcOps.FromBool(active));
                 call.SetOutput("N", PlcValue.FromInteger(PlcType.Int, count));
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Clock: System Block Library, Schneider Electric 33002539.25. The
+        // controller's real-time clock is the PC's local time.
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// A date and time in the DT format: BCD year (16 bits), month, day, hour, minute and
+        /// second, then an unused least significant byte (35006144.27, p. 136).
+        /// </summary>
+        private static long ToDt(DateTime time)
+        {
+            static long Bcd(int value, int digits)
+            {
+                long result = 0;
+                for (var i = 0; i < digits; i++, value /= 10) result |= (long)(value % 10) << (4 * i);
+                return result;
+            }
+            return (Bcd(time.Year, 4) << 48) | (Bcd(time.Month, 2) << 40) | (Bcd(time.Day, 2) << 32)
+                   | (Bcd(time.Hour, 2) << 24) | (Bcd(time.Minute, 2) << 16) | (Bcd(time.Second, 2) << 8);
+        }
+
+        /// <summary>A structured output built field by field; null when the output's type is not known.</summary>
+        private static PlcValue? Structure(PlcCall call, string output, params (string Field, PlcValue Value)[] fields)
+        {
+            if (call.OutputType(output) is not { } type) return null;
+            var bytes = new byte[type.Size];
+            foreach (var (name, value) in fields)
+            {
+                if (type.FindField(name) is { } field) PlcValue.Encode(value, field.Type, bytes.AsSpan(field.Offset, field.Type.Size));
+            }
+            return PlcValue.FromBytes(type, bytes);
+        }
+
+        /// <summary>RRTC_DT: OUT is the controller's date and time (local time) (p. 244).</summary>
+        private sealed class ReadClock : Function
+        {
+            public override void Execute(PlcCall call)
+                => call.SetOutput("OUT", PlcValue.FromInteger(PlcType.DateAndTime, ToDt(call.LocalTime)));
+        }
+
+        /// <summary>
+        /// RRTC_DT_MS: the date and time with milliseconds, as a Display_NTPC (DT_value,
+        /// Milisecond) on OUT1 and a Calc_NTPC (Seconds since 1980-01-01 00:00,
+        /// Fraction_Second) on OUT2; STATUS 0 says the time is valid (pp. 246-247).
+        /// </summary>
+        private sealed class ReadClockMilliseconds : Function
+        {
+            private static readonly DateTime Epoch = new(1980, 1, 1);
+
+            public override void Execute(PlcCall call)
+            {
+                var time = call.LocalTime;
+                var milliseconds = PlcValue.FromInteger(PlcType.Int, time.Millisecond);
+                if (Structure(call, "OUT1", ("DT_value", PlcValue.FromInteger(PlcType.DateAndTime, ToDt(time))), ("Milisecond", milliseconds)) is { } display)
+                    call.SetOutput("OUT1", display);
+                if (Structure(call, "OUT2", ("Seconds", PlcValue.FromInteger(PlcType.Udint, (long)(time - Epoch).TotalSeconds)), ("Fraction_Second", milliseconds)) is { } calc)
+                    call.SetOutput("OUT2", calc);
+                call.SetOutput("STATUS", PlcValue.FromInteger(PlcType.Int, 0));
+            }
+        }
+
+        /// <summary>
+        /// DT_AS_BYTE: the eight bytes of the DT on IN, BYTE1 the least significant (the
+        /// unused byte) to BYTE8 the most (the century), as the other *_AS_BYTE functions
+        /// start from the low byte. The XEF describes it only as "Date time broken down into
+        /// Bytes"; the order is an inference.
+        /// </summary>
+        private sealed class DateTimeBytes : Function
+        {
+            public override void Execute(PlcCall call)
+            {
+                var value = PlcOps.Convert(call.Input("IN"), PlcType.DateAndTime).AsInteger();
+                for (var i = 0; i < 8; i++)
+                    call.SetOutput("BYTE" + (i + 1), PlcValue.FromInteger(PlcType.Byte, (value >> (8 * i)) & 0xFF));
             }
         }
 

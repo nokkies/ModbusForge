@@ -56,6 +56,7 @@ namespace ModbusForge.Core.Plc
         private DataStore? _initializedStore;
         private PlcTask? _currentTask;
         private int _dfbDepth;
+        private DateTime _localTime;
 
         public PlcRuntime(PlcProject project)
         {
@@ -71,6 +72,11 @@ namespace ModbusForge.Core.Plc
         public PlcProject Project { get; }
 
         public PlcMemory Memory { get; }
+
+        /// <summary>The controller's real-time clock: local time, read once at the start of each scan.</summary>
+        public Func<DateTime> LocalClock { get; set; } = () => DateTime.Now;
+
+        internal DateTime LocalTime => _localTime;
 
         /// <summary>Controller time in milliseconds (sum of the scan periods run so far).</summary>
         public long Now => (long)_clock;
@@ -116,6 +122,7 @@ namespace ModbusForge.Core.Plc
             }
 
             _clock += Math.Max(0, elapsed.TotalMilliseconds);
+            _localTime = LocalClock();
             Memory.BeginScan();
             var bits = Memory.SystemBits;
             bits.WriteBit(ColdStartBit, _coldStart);
@@ -375,6 +382,7 @@ namespace ModbusForge.Core.Plc
             call.BeginCall();
             call.State = block.State;
             call.Now = Now;
+            call.LocalTime = _localTime;
             call.ColdStart = _coldStart;
             call.FirstTaskCycle = task.FirstCycle;
             if (block.Behavior!.ReadsOutputs) SeedOutputs(block, call);
@@ -517,6 +525,7 @@ namespace ModbusForge.Core.Plc
             for (var i = 0; i < entry.Inputs.Length; i++) fbCall.SetInput(i, Memory.Read(FieldOf(instance, entry.Inputs[i])));
             fbCall.State = _instanceStates.TryGetValue(key, out var state) ? state : null;
             fbCall.Now = Now;
+            fbCall.LocalTime = _localTime;
             fbCall.ColdStart = _coldStart;
             fbCall.FirstTaskCycle = _currentTask?.FirstCycle ?? false;
             entry.Behavior.Execute(fbCall);

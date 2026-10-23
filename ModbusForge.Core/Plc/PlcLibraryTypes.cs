@@ -27,6 +27,10 @@ namespace ModbusForge.Core.Plc
             yield return Structure("Para_FGEN", // pp. 190-191
                 ("func_no", "INT"), ("amplitude", "REAL"), ("halfperiod", "TIME"), ("t_off", "TIME"), ("t_rise", "TIME"),
                 ("t_acc", "TIME"), ("unipolar", "BOOL"));
+
+            // System Block Library, Schneider Electric 33002539.25: RRTC_DT_MS outputs (p. 247).
+            yield return Structure("Display_NTPC", ("DT_value", "DT"), ("Milisecond", "INT"));
+            yield return Structure("Calc_NTPC", ("Seconds", "UDINT"), ("Fraction_Second", "INT"));
         }
 
         private static (string, XElement) Structure(string name, params (string Field, string Type)[] fields)
