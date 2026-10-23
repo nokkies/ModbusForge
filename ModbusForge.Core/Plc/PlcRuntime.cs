@@ -402,7 +402,7 @@ namespace ModbusForge.Core.Plc
                 pin.Operand?.Write(this, value);
             }
 
-            block.LastEno = true;
+            block.LastEno = call.Eno;
             WriteEno(block);
             block.ExecutedLastScan = true;
         }

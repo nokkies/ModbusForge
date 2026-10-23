@@ -113,6 +113,9 @@ namespace ModbusForge.Core.Plc
                         break;
                 }
             }
+
+            // Library structures (Para_SCALING, ...) the XEF uses without defining them.
+            foreach (var (name, source) in PlcLibraryTypes.Structures()) _ddtSources.TryAdd(name, source);
         }
 
         private HashSet<string>? _dfbNames;
@@ -138,8 +141,9 @@ namespace ModbusForge.Core.Plc
         public PlcSignature? Signature(string typeName) => _signatures.TryGetValue(typeName, out var signature) ? signature : null;
 
         /// <summary>
-        /// The type a name denotes. Undefined names (library structures such as
-        /// Para_SCALING) resolve to an <see cref="PlcTypeKind.Unknown"/> type.
+        /// The type a name denotes. Library structures the XEF does not define (such as
+        /// Para_SCALING) come from <see cref="PlcLibraryTypes"/>; other undefined names
+        /// resolve to an <see cref="PlcTypeKind.Unknown"/> type.
         /// </summary>
         public PlcType Resolve(string typeName)
         {

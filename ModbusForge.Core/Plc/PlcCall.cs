@@ -94,6 +94,13 @@ namespace ModbusForge.Core.Plc
 
         public void Fail() => Failed = true;
 
+        /// <summary>
+        /// ENO after the call. A block that reports an error in a status output (as the
+        /// Control library blocks do) clears it, keeping the outputs it did write; Fail
+        /// instead drops every output.
+        /// </summary>
+        public bool Eno { get; set; } = true;
+
         internal void SetInput(int index, PlcValue value) => _inputs[index] = value;
 
         internal PlcValue Output(int index) => _outputs[index];
@@ -103,6 +110,7 @@ namespace ModbusForge.Core.Plc
         internal void BeginCall()
         {
             Failed = false;
+            Eno = true;
             Array.Clear(_written);
         }
 

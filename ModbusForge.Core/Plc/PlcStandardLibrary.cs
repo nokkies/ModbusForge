@@ -116,6 +116,11 @@ namespace ModbusForge.Core.Plc
             ["RS"] = new Bistable(setDominant: false),
             ["SAMPLETM"] = new SampleTimer(),
             ["SYSSTATE"] = new SystemState(),
+            ["COMP_DB"] = new DeadBandComparison(),
+            ["AVGMV"] = new MovingAverage(),
+            ["LOOKUP_TABLE1"] = new LookupTable(),
+            ["SCALING"] = new Scaling(),
+            ["RAMP"] = new Ramp(),
         };
 
         /// <summary>The behaviour of a standard type, or null when the runtime does not simulate it.</summary>
@@ -1015,6 +1020,301 @@ namespace ModbusForge.Core.Plc
                 call.SetOutput("COLD", PlcOps.FromBool(call.ColdStart));
                 call.SetOutput("WARM", PlcOps.FromBool(call.FirstTaskCycle || call.ColdStart));
                 call.SetOutput("ERROR", PlcOps.False);
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Control library (CONT_CTL), as the Control Block Library manual describes
+        // it: Schneider Electric 33002535.16, 09/2020.
+        // ------------------------------------------------------------------
+
+        // Status word bits the Control library blocks share ("Common Floating Point
+        // Errors"); with these ENO is 0 and the other outputs keep their values.
+        private const int StatusInvalidInput = 0x0002;
+
+        // Block-specific status bits reported with ENO = 1.
+        private const int StatusWarning = 0x0010;
+        private const int StatusEmptyRange = 0x0080;
+
+        private static double RealInput(PlcCall call, string pin) => RealOf(call.Input(pin));
+
+        private static double RealOf(PlcValue value) => PlcOps.Convert(value, PlcType.Real).AsDouble();
+
+        private static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
+
+        /// <summary>A field of a structured value (a PARA parameter); "no value" when the type has no such field.</summary>
+        private static PlcValue Field(PlcValue structure, string name)
+        {
+            if (structure.Type?.FindField(name) is not { } field) return default;
+            var bytes = structure.AsBytes();
+            return field.Offset + field.Type.Size <= bytes.Length
+                ? PlcValue.Decode(field.Type, bytes.AsSpan(field.Offset, field.Type.Size))
+                : default;
+        }
+
+        private static void SetStatus(PlcCall call, int status) => call.SetOutput("STATUS", PlcValue.FromInteger(PlcType.Word, status));
+
+        private sealed class DeadBandState
+        {
+            /// <summary>The last result: 1 greater, 0 equal, -1 less; null before the first call.</summary>
+            public int? Last;
+        }
+
+        /// <summary>
+        /// COMP_DB: GREATER, EQUAL or LESS for IN1 against IN2, where a deviation within the
+        /// dead zone DBAND counts as equal. Coming back from GREATER or LESS, EQUAL needs the
+        /// deviation within DBAND - HYST (pp. 212-215). The boundary itself counts as inside,
+        /// so DBAND = HYST = 0 is the classic comparison the manual describes.
+        /// </summary>
+        private sealed class DeadBandComparison : FunctionBlock<DeadBandState>
+        {
+            protected override void Execute(PlcCall call, DeadBandState s)
+            {
+                var in1 = RealInput(call, "IN1");
+                var in2 = RealInput(call, "IN2");
+                var band = RealInput(call, "DBAND");
+                var hysteresis = RealInput(call, "HYST");
+                if (!IsFinite(in1) || !IsFinite(in2) || !IsFinite(band) || !IsFinite(hysteresis))
+                {
+                    call.Eno = false; // the outputs keep their values
+                    return;
+                }
+
+                // Warnings: a negative DBAND counts as 0; HYST is brought into [0, DBAND].
+                band = Math.Max(0, band);
+                hysteresis = Math.Clamp(hysteresis, 0, band);
+
+                var deviation = in1 - in2;
+                var limit = s.Last is 1 or -1 ? band - hysteresis : band;
+                var result = Math.Abs(deviation) <= limit ? 0 : Math.Sign(deviation);
+                s.Last = result;
+                call.SetOutput("GREATER", PlcOps.FromBool(result > 0));
+                call.SetOutput("EQUAL", PlcOps.FromBool(result == 0));
+                call.SetOutput("LESS", PlcOps.FromBool(result < 0));
+            }
+        }
+
+        private sealed class AverageState
+        {
+            public float[] Window = Array.Empty<float>();
+            public int Count;
+            public int Next;
+            public bool Started;
+        }
+
+        /// <summary>
+        /// AVGMV: Y is the mean of the last N values of X (N from 1 to 50) and RDY is 1 once
+        /// N values are in. A cold or warm start or a new N restarts the window from X;
+        /// MAN = 1 outputs YMAN and fills the window with it (pp. 232-235).
+        /// </summary>
+        private sealed class MovingAverage : FunctionBlock<AverageState>
+        {
+            private const int MaxWindow = 50;
+
+            protected override void Execute(PlcCall call, AverageState s)
+            {
+                var n = PlcOps.Convert(call.Input("N"), PlcType.Int).AsInteger();
+                if (n < 1 || n > MaxWindow)
+                {
+                    call.Eno = false; // "N=0 or N>50": an error, outputs unchanged
+                    return;
+                }
+                var size = (int)n;
+
+                if (call.Input("MAN").AsBool())
+                {
+                    var manual = (float)RealInput(call, "YMAN");
+                    s.Window = Enumerable.Repeat(manual, size).ToArray();
+                    s.Count = size;
+                    s.Next = 0;
+                    s.Started = true;
+                    call.SetOutput("Y", PlcValue.FromReal(manual));
+                    call.SetOutput("RDY", PlcOps.True);
+                    return;
+                }
+
+                if (!s.Started || s.Window.Length != size || call.ColdStart || call.FirstTaskCycle)
+                {
+                    s.Window = new float[size];
+                    s.Count = 0;
+                    s.Next = 0;
+                    s.Started = true;
+                }
+
+                s.Window[s.Next] = (float)RealInput(call, "X");
+                s.Next = (s.Next + 1) % size;
+                if (s.Count < size) s.Count++;
+
+                var sum = 0f;
+                for (var i = 0; i < s.Count; i++) sum += s.Window[i];
+                call.SetOutput("Y", PlcValue.FromReal(sum / s.Count));
+                call.SetOutput("RDY", PlcOps.FromBool(s.Count == size));
+            }
+        }
+
+        /// <summary>
+        /// LOOKUP_TABLE1: Y from X by linear interpolation between the support points
+        /// (X1, Y1), (X2, Y2), ... given in pairs on XIYI1, XIYI2, ... in ascending X. Below
+        /// X1, Y = Y1 and QXLO = 1; above the last point, Y = Ym and QXHI = 1; on a vertical
+        /// step (two equal X at X) Y is the midpoint (pp. 250-253).
+        /// </summary>
+        private sealed class LookupTable : Function
+        {
+            public override void Execute(PlcCall call)
+            {
+                var x = RealInput(call, "X");
+                var values = new List<(int Index, double Value)>();
+                for (var i = 0; i < call.InputCount; i++)
+                {
+                    var name = call.InputName(i);
+                    if (name.StartsWith("XIYI", StringComparison.OrdinalIgnoreCase)
+                        && int.TryParse(name.AsSpan(4), out var index))
+                    {
+                        values.Add((index, RealOf(call.Input(i))));
+                    }
+                }
+                values.Sort((a, b) => a.Index.CompareTo(b.Index));
+                var count = values.Count / 2; // an odd last input has no Y
+                if (count == 0)
+                {
+                    call.Fail();
+                    return;
+                }
+
+                double X(int i) => values[2 * i].Value;
+                double Y(int i) => values[(2 * i) + 1].Value;
+
+                double y;
+                var below = x < X(0);
+                var above = x > X(count - 1);
+                if (below)
+                {
+                    y = Y(0);
+                }
+                else if (above)
+                {
+                    y = Y(count - 1);
+                }
+                else
+                {
+                    y = Y(count - 1);
+                    for (var i = 0; i + 1 < count; i++)
+                    {
+                        if (X(i) == x && X(i + 1) == x)
+                        {
+                            y = 0.5 * (Y(i) + Y(i + 1));
+                            break;
+                        }
+                        if (X(i) <= x && x <= X(i + 1) && X(i) < X(i + 1))
+                        {
+                            y = Y(i) + ((Y(i + 1) - Y(i)) * (x - X(i)) / (X(i + 1) - X(i)));
+                            // At a segment's end a step at the same X may follow; let it decide.
+                            if (x < X(i + 1)) break;
+                        }
+                    }
+                }
+
+                call.SetOutput("Y", PlcValue.FromReal(y));
+                call.SetOutput("QXHI", PlcOps.FromBool(above));
+                call.SetOutput("QXLO", PlcOps.FromBool(below));
+            }
+        }
+
+        /// <summary>
+        /// SCALING: OUT maps IN from [in_min, in_max] onto [out_min, out_max] (out_max may be
+        /// below out_min). With clip = 1, IN is held inside its range (status 16#0010). With
+        /// in_min = in_max, OUT keeps its value (status 16#0080) (pp. 92-95).
+        /// </summary>
+        private sealed class Scaling : FunctionBlock<NoState>
+        {
+            protected override void Execute(PlcCall call, NoState s)
+            {
+                var para = call.Input("PARA");
+                var input = RealInput(call, "IN");
+                var inMin = RealOf(Field(para, "in_min"));
+                var inMax = RealOf(Field(para, "in_max"));
+                var outMin = RealOf(Field(para, "out_min"));
+                var outMax = RealOf(Field(para, "out_max"));
+                if (!IsFinite(input) || !IsFinite(inMin) || !IsFinite(inMax) || !IsFinite(outMin) || !IsFinite(outMax))
+                {
+                    SetStatus(call, StatusInvalidInput);
+                    call.Eno = false;
+                    return;
+                }
+                if (inMin == inMax)
+                {
+                    SetStatus(call, StatusEmptyRange);
+                    return;
+                }
+
+                var status = 0;
+                if (Field(para, "clip").AsBool())
+                {
+                    var clamped = Math.Clamp(input, Math.Min(inMin, inMax), Math.Max(inMin, inMax));
+                    if (clamped != input) status |= StatusWarning;
+                    input = clamped;
+                }
+                call.SetOutput("OUT", PlcValue.FromReal(outMin + ((input - inMin) * (outMax - outMin) / (inMax - inMin))));
+                SetStatus(call, status);
+            }
+        }
+
+        private sealed class RampState
+        {
+            public bool Started;
+            public long Last;
+            public double Setpoint;
+            public bool Done;
+        }
+
+        /// <summary>
+        /// RAMP: SP moves towards RSP at inc_rate (up) or dec_rate (down) units per second,
+        /// or jumps there when that rate is 0; DONE is 1 once SP has reached RSP. TR_S = 1
+        /// tracks: SP = TR_I with DONE = 0. A negative rate counts as 0 (status 16#0010)
+        /// (pp. 330-334). The time step is the controller time since the previous call.
+        /// </summary>
+        private sealed class Ramp : FunctionBlock<RampState>
+        {
+            protected override void Execute(PlcCall call, RampState s)
+            {
+                var para = call.Input("PARA");
+                var target = RealInput(call, "RSP");
+                var initial = RealInput(call, "TR_I");
+                var increase = RealOf(Field(para, "inc_rate"));
+                var decrease = RealOf(Field(para, "dec_rate"));
+                if (!IsFinite(target) || !IsFinite(initial) || !IsFinite(increase) || !IsFinite(decrease))
+                {
+                    SetStatus(call, StatusInvalidInput);
+                    call.Eno = false; // SP and DONE keep their values
+                    return;
+                }
+
+                var status = 0;
+                if (increase < 0 || decrease < 0) status |= StatusWarning;
+                increase = Math.Max(0, increase);
+                decrease = Math.Max(0, decrease);
+
+                var seconds = s.Started ? Math.Max(0, call.Now - s.Last) / 1000.0 : 0;
+                s.Started = true;
+                s.Last = call.Now;
+
+                if (call.Input("TR_S").AsBool())
+                {
+                    s.Setpoint = initial;
+                    s.Done = false;
+                }
+                else
+                {
+                    if (s.Setpoint < target)
+                        s.Setpoint = increase == 0 ? target : Math.Min(target, s.Setpoint + (increase * seconds));
+                    else if (s.Setpoint > target)
+                        s.Setpoint = decrease == 0 ? target : Math.Max(target, s.Setpoint - (decrease * seconds));
+                    s.Done = s.Setpoint == target;
+                }
+
+                call.SetOutput("SP", PlcValue.FromReal(s.Setpoint));
+                call.SetOutput("DONE", PlcOps.FromBool(s.Done));
+                SetStatus(call, status);
             }
         }
     }
