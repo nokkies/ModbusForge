@@ -37,7 +37,7 @@ The user's rules that shape this:
    only what ModbusForge uses; the XEF is only for the first import. The engineer's code
    is saved in that one file and comes back when it is opened again.
 5. Types whose code is exported keep running it, as today. Their sections are part of the
-   selection on the left: selecting one opens it read-only, as a program section opens.
+   selection on the left: selecting one opens it as a program section opens.
 
 ## Non-goals
 
@@ -118,9 +118,11 @@ code is protected in the export". The engineer's sections are listed beside it, 
 the engineer's.
 
 Selecting a section opens it as a program section opens: ST as text, FBD drawn on the
-canvas, LD listed until there is an LD view. Exported code opens read-only. A section
-opens without live values, because values belong to an instance, not to the type;
-showing them for a chosen instance is left for later (my call).
+canvas, LD listed until there is an LD view. As with program sections today, edits on
+the PLC canvas do not change what runs (the runtime runs the imported code); a read-only
+canvas is left for later (my call). A section opens without live values, because values
+belong to an instance, not to the type; showing them for a chosen instance is left for
+later (my call).
 
 ### Canvas, Console and status
 
@@ -162,7 +164,7 @@ Control Expert.
 ## Phases
 
 1. The Derived FB Types node: every type with its interface and sections, exported
-   sections opening read-only (ST as text, FBD drawn), and locked types marked empty in
+   sections opening as program sections do (ST as text, FBD drawn), and locked types marked empty in
    the navigator, on the canvas, in the Console and in the status text.
 2. The .xef_sf project file: Open, Save and Save As on the PLC tab.
 3. The engineer's ST sections and variables for locked types, saved in the .xef_sf and run
@@ -180,7 +182,7 @@ For each of the 23 corpus projects (phase 2):
 
 On SN6550 (exported types):
 
-- Selecting LCN_DIG101's Command_FBD section draws it on the canvas, read-only.
+- Selecting LCN_DIG101's Command_FBD section draws it on the canvas.
 - Selecting LCN_xILock's Status section shows its ST.
 
 On LCPLC001 (locked types):
