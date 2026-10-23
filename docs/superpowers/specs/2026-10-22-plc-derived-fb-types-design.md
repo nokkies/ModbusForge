@@ -33,9 +33,9 @@ The user's rules that shape this:
 3. The engineer can give a locked type their own code in ST, FBD or LD, the languages a
    DFB section can have. It runs for every instance of the type, as a DFB section does in
    Control Expert.
-4. Saving writes a ModbusForge project file (.xef_sf); the XEF is only for the first
-   import. The engineer's code is saved in that one file and comes back when it is opened
-   again.
+4. Saving writes a ModbusForge project file (.xef_sf) in ModbusForge's own layout, with
+   only what ModbusForge uses; the XEF is only for the first import. The engineer's code
+   is saved in that one file and comes back when it is opened again.
 5. Types whose code is exported keep running it, as today. Their sections are part of the
    selection on the left: selecting one opens it read-only, as a program section opens.
 
@@ -56,10 +56,12 @@ The user's rules that shape this:
 - The engineer's code mistaken for the original. Wherever it runs it is marked as the
   engineer's: the type in the navigator, each instance on the canvas, and the Console when
   the PLC starts ("xANL101 runs the engineer's ST, not the original code").
-- Code running against an interface it was not written for. If the XEF's interface of a
-  type changed since the code was written, the code is kept but not run, and the engineer
-  is told.
+- Code running against an interface it was not written for. If a type's interface no
+  longer matches the one its code was written for, the code is kept but not run, and the
+  engineer is told.
 - Writing the same code once per instance.
+- A project that runs differently after saving and opening it than straight after the
+  XEF import.
 
 ## Constraints
 
@@ -93,6 +95,15 @@ The user's rules that shape this:
 - **C. Mirror Control Expert (chosen, the user's direction).** A locked type becomes an
   empty DFB type with its interface. The engineer adds sections and variables to
   the type, and every instance runs them.
+
+For the saved file:
+
+- **XEF plus the engineer's part.** The file holds the XEF's content as imported plus the
+  engineer's code, and opening it reuses the XEF import. A small job; the file is as big
+  as the XEF and carries everything ModbusForge does not use.
+- **Own layout, only what ModbusForge uses (chosen by the user).** Smaller and cleaner. A
+  bigger job: every part of the import needs a matching save and load, and future import
+  features need them too.
 
 ## Design
 
@@ -137,21 +148,35 @@ which would also run the exported LD sections.
 
 Saving writes a ModbusForge project file with its own extension, .xef_sf (the user's
 name). The XEF is only for the first import and is never changed; from then on the
-engineer opens the .xef_sf. The file holds, per type, the engineer's variables and
-sections, kept apart from the protected original, each type's with a fingerprint of the
-interface it was written for. It does not need to open in Control Expert.
+engineer opens the .xef_sf. The PLC tab gets Open, Save and Save As for it.
+
+The file has ModbusForge's own layout and holds only what ModbusForge uses after an XEF
+import: everything the PLC tab shows (programs and their canvas layout, DFB types,
+variables, tasks, the hardware) and everything the runtime needs (types, sections, the
+I/O map). A protected type is stored as a shell: its interface and a mark that its code
+is protected. The encrypted original is not carried, as ModbusForge cannot use it. The
+engineer's variables and sections are stored with their type. The file carries a format
+version, so later versions of ModbusForge can still open it. It does not need to open in
+Control Expert.
 
 ## Phases
 
 1. The Derived FB Types node: every type with its interface and sections, exported
    sections opening read-only (ST as text, FBD drawn), and locked types marked empty in
    the navigator, on the canvas, in the Console and in the status text.
-2. The .xef_sf project file, and the engineer's ST sections and variables for locked
-   types, saved in it and run per instance.
-3. The engineer's FBD sections.
-4. LD: an engine and a view, for exported LD sections and the engineer's.
+2. The .xef_sf project file: Open, Save and Save As on the PLC tab.
+3. The engineer's ST sections and variables for locked types, saved in the .xef_sf and run
+   per instance.
+4. The engineer's FBD sections.
+5. LD: an engine and a view, for exported LD sections and the engineer's.
 
-## Acceptance for phases 1 and 2
+## Acceptance for phases 1 to 3
+
+For each of the 23 corpus projects (phase 2):
+
+- Importing the XEF, saving the .xef_sf and opening it gives the same navigator, the same
+  canvases and the same runtime results as the import: the same blocks compute, and the
+  same scans give the same values.
 
 On SN6550 (exported types):
 
@@ -172,12 +197,8 @@ On LCPLC001 (locked types):
   (for example after the file was edited outside ModbusForge), the code is kept, not run,
   and the engineer is told.
 
-## Open questions
-
-1. What the .xef_sf holds: the XEF's content as imported plus the engineer's part, so
-   opening it reuses the XEF import; or only what ModbusForge uses, in its own layout.
-
 ## Left to the builder
 
-The layout of the engineer's part in the file, the fingerprint method, the exact layout
-of the type view, how compile errors are shown, and the tests.
+The .xef_sf encoding and layout, how a type's interface and its code are checked against
+each other, the exact layout of the type view, how compile errors are shown, and the
+tests.
