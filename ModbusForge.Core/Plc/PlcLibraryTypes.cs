@@ -31,7 +31,14 @@ namespace ModbusForge.Core.Plc
             // System Block Library, Schneider Electric 33002539.25: RRTC_DT_MS outputs (p. 247).
             yield return Structure("Display_NTPC", ("DT_value", "DT"), ("Milisecond", "INT"));
             yield return Structure("Calc_NTPC", ("Seconds", "UDINT"), ("Fraction_Second", "INT"));
+
+            // Communication Block Library, Schneider Electric 33002527.24: the address of
+            // READ_REG and the blocks like it, built by TCP_IP_ADDR (p. 348).
+            yield return Array("WordArr5", "ARRAY[1..5] OF WORD");
         }
+
+        private static (string, XElement) Array(string name, string definition)
+            => (name, new XElement("DDTSource", new XAttribute("DDTName", name), new XElement("array", definition)));
 
         private static (string, XElement) Structure(string name, params (string Field, string Type)[] fields)
             => (name, new XElement("DDTSource",

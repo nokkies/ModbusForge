@@ -95,6 +95,16 @@ namespace ModbusForge.Core.Plc
         /// <summary>What could not be compiled in DFB code, once per DFB type.</summary>
         public List<string> DfbProblems { get; } = new();
 
+        /// <summary>What blocks told the user (<see cref="PlcCall.Notice"/>), once per block type.</summary>
+        public List<string> Notices { get; } = new();
+
+        private readonly HashSet<string> _noticedTypes = new(StringComparer.OrdinalIgnoreCase);
+
+        internal void Notify(string typeName, string notice)
+        {
+            if (_noticedTypes.Add(typeName)) Notices.Add($"{typeName}: {notice}");
+        }
+
         /// <summary>
         /// Marks the next scan as the first cycle of every task (%S21 set), as a
         /// controller does when it goes to RUN.
@@ -397,6 +407,7 @@ namespace ModbusForge.Core.Plc
             }
             block.State = call.State;
             if (call.Overflow) RaiseOverflow();
+            if (call.Notice != null) Notify(block.TypeName, call.Notice);
 
             if (call.Failed)
             {
@@ -531,6 +542,7 @@ namespace ModbusForge.Core.Plc
             entry.Behavior.Execute(fbCall);
             _instanceStates[key] = fbCall.State;
             if (fbCall.Overflow) RaiseOverflow();
+            if (fbCall.Notice != null) Notify(type.Name, fbCall.Notice);
             if (fbCall.Failed)
             {
                 StErrors++;

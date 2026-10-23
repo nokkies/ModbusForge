@@ -111,6 +111,12 @@ namespace ModbusForge.Core.Plc
         public bool Overflow { get; set; }
 
         /// <summary>
+        /// Something the user should know about this block, told once per block type (for
+        /// example that a communication block has no remote device in the simulation).
+        /// </summary>
+        public string? Notice { get; set; }
+
+        /// <summary>
         /// The value an output carries before the block writes it. For a block that changes
         /// only part of its output variable (see <see cref="PlcBlockBehavior.ReadsOutputs"/>)
         /// this is the variable's current value.
@@ -134,6 +140,7 @@ namespace ModbusForge.Core.Plc
             Failed = false;
             Eno = true;
             Overflow = false;
+            Notice = null;
             Array.Clear(_written);
         }
 

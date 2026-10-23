@@ -221,6 +221,7 @@ namespace ModbusForge.Services
         private struct RuntimeReports
         {
             public int DfbProblems;
+            public int Notices;
             public bool StError;
             public bool BlockError;
             public bool IndexError;
@@ -228,8 +229,8 @@ namespace ModbusForge.Services
 
         /// <summary>
         /// Tells the user what the runtime could not do: DFB code it cannot execute
-        /// (found when an instance first runs) and the first run-time error of each kind.
-        /// Called on the scan thread, after the scan.
+        /// (found when an instance first runs), what blocks told the user, and the first
+        /// run-time error of each kind. Called on the scan thread, after the scan.
         /// </summary>
         private void ReportProblems(PlcRuntime runtime)
         {
@@ -237,6 +238,12 @@ namespace ModbusForge.Services
             for (; _reported.DfbProblems < problems.Count; _reported.DfbProblems++)
             {
                 Report($"DFB code not run: {problems[_reported.DfbProblems]}");
+            }
+
+            var notices = runtime.Notices;
+            for (; _reported.Notices < notices.Count; _reported.Notices++)
+            {
+                Report(notices[_reported.Notices]);
             }
 
             if (!_reported.StError && runtime.StErrors > 0)

@@ -603,7 +603,7 @@ namespace ModbusForge.Core.Plc.St
             }
 
             var result = outputNames.FindIndex(n => string.Equals(n, "OUT", StringComparison.OrdinalIgnoreCase));
-            return new StFunctionCall(behavior, inputNames.ToArray(), inputValues.ToArray(), outputNames.ToArray(), targets, result >= 0 ? result : 0);
+            return new StFunctionCall(name, behavior, inputNames.ToArray(), inputValues.ToArray(), outputNames.ToArray(), targets, result >= 0 ? result : 0);
         }
 
         /// <summary>

@@ -12,15 +12,17 @@ namespace ModbusForge.Core.Plc.St
     /// <summary>A standard function (EF): inputs by name or position, outputs to the <c>=&gt;</c> targets.</summary>
     internal sealed class StFunctionCall : StCall
     {
+        private readonly string _name;
         private readonly PlcBlockBehavior _behavior;
         private readonly PlcCall _call;
         private readonly PlcOperand[] _arguments;
         private readonly (int Output, PlcOperand Target)[] _targets;
         private readonly int _result;
 
-        public StFunctionCall(PlcBlockBehavior behavior, string[] inputNames, PlcOperand[] arguments, string[] outputNames,
+        public StFunctionCall(string name, PlcBlockBehavior behavior, string[] inputNames, PlcOperand[] arguments, string[] outputNames,
             IReadOnlyList<(int, PlcOperand)> targets, int result)
         {
+            _name = name;
             _behavior = behavior;
             _call = new PlcCall(inputNames, outputNames);
             _arguments = arguments;
@@ -45,6 +47,7 @@ namespace ModbusForge.Core.Plc.St
             }
             _behavior.Execute(_call);
             if (_call.Overflow) runtime.RaiseOverflow();
+            if (_call.Notice != null) runtime.Notify(_name, _call.Notice);
             if (_call.Failed)
             {
                 runtime.CountStError();

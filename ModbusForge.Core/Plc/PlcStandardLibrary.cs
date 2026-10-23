@@ -132,6 +132,9 @@ namespace ModbusForge.Core.Plc
             ["RRTC_DT"] = new ReadClock(),
             ["RRTC_DT_MS"] = new ReadClockMilliseconds(),
             ["DT_AS_BYTE"] = new DateTimeBytes(),
+            ["TCP_IP_ADDR"] = new TcpIpAddress(),
+            ["READ_REG"] = new RemoteExchange("REQ", "NDR", "ERROR", "STATUS", "read requests complete at once without reading data"),
+            ["XXMIT"] = new RemoteExchange("START", "DONE", "ERROR", "STATUS", "transmissions complete at once without a reply"),
         };
 
         /// <summary>The behaviour of a standard type, or null when the runtime does not simulate it.</summary>
@@ -1382,6 +1385,80 @@ namespace ModbusForge.Core.Plc
                 var value = PlcOps.Convert(call.Input("IN"), PlcType.DateAndTime).AsInteger();
                 for (var i = 0; i < 8; i++)
                     call.SetOutput("BYTE" + (i + 1), PlcValue.FromInteger(PlcType.Byte, (value >> (8 * i)) & 0xFF));
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Communication library, as the Communication Block Library manual
+        // describes it: Schneider Electric 33002527.24. The simulation has no
+        // remote devices to exchange with.
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// TCP_IP_ADDR: ADDRFLD (WordArr5) holds the slot of the Ethernet module in the high
+        /// byte and the MET map index in the low byte of word 1, then the bytes of the IP
+        /// address from IP_B4 (most significant) to IP_B1 in words 2 to 5 (pp. 346-349).
+        /// </summary>
+        private sealed class TcpIpAddress : FunctionBlock<NoState>
+        {
+            protected override void Execute(PlcCall call, NoState s)
+            {
+                if (call.OutputType("ADDRFLD") is not { } type) return;
+                long Byte(string pin) => PlcOps.Convert(call.Input(pin), PlcType.Byte).AsInteger();
+                var words = new[] { (Byte("SLOT_ID") << 8) | Byte("MAP_IDX"), Byte("IP_B4"), Byte("IP_B3"), Byte("IP_B2"), Byte("IP_B1") };
+                var bytes = new byte[type.Size];
+                for (var i = 0; i < words.Length && (2 * i) + 1 < bytes.Length; i++)
+                {
+                    bytes[2 * i] = (byte)words[i];
+                    bytes[(2 * i) + 1] = (byte)(words[i] >> 8);
+                }
+                call.SetOutput("ADDRFLD", PlcValue.Decode(type, bytes));
+            }
+        }
+
+        private sealed class ExchangeState
+        {
+            public bool PreviousRequest;
+        }
+
+        /// <summary>
+        /// READ_REG and XXMIT start an exchange with a remote device on a rising edge of their
+        /// request input (REQ, START) and report its end for one cycle (NDR, DONE) or an error
+        /// (ERROR, STATUS) (pp. 273-280, 423-470). With no remote device in the simulation the
+        /// exchange completes in the cycle it starts, without data and without an error: data
+        /// outputs (REG_READ, MSGIN) keep their values, and the user is told once.
+        /// </summary>
+        private sealed class RemoteExchange : FunctionBlock<ExchangeState>
+        {
+            private readonly string _request;
+            private readonly string _done;
+            private readonly string _error;
+            private readonly string _status;
+            private readonly string _notice;
+
+            public RemoteExchange(string request, string done, string error, string status, string notice)
+            {
+                _request = request;
+                _done = done;
+                _error = error;
+                _status = status;
+                _notice = "there are no remote devices in the simulation; " + notice;
+            }
+
+            protected override void Execute(PlcCall call, ExchangeState s)
+            {
+                var request = call.Input(_request).AsBool();
+                var started = request && !s.PreviousRequest;
+                s.PreviousRequest = request;
+
+                call.SetOutput(_done, PlcOps.FromBool(started));
+                call.SetOutput(_error, PlcOps.False);
+                call.SetOutput(_status, PlcValue.FromInteger(call.OutputType(_status) ?? PlcType.Word, 0));
+                // XXMIT only; SetOutput ignores pins a block does not have.
+                call.SetOutput("ACTIVE", PlcOps.False);
+                call.SetOutput("RECCOUNT", PlcValue.FromInteger(PlcType.Int, 0));
+                call.SetOutput("RETRY", PlcValue.FromInteger(PlcType.Int, 0));
+                if (started) call.Notice = _notice;
             }
         }
 
