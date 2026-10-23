@@ -73,8 +73,8 @@ namespace ModbusForge.Services
         public DataStore CurrentDataStore => EffectiveStore;
 
         /// <summary>
-        /// Something the runtime could not do, reported once: DFB code it cannot execute,
-        /// the protected DFB types (Start names them), or the first run-time error of a kind.
+        /// Something the runtime could not do: DFB code it cannot execute, or the first run-time error of a kind,
+        /// each reported once per loaded project. Start names the protected DFB types on every Start instead.
         /// Raised on the scan thread, and by Start on its caller's thread.
         /// </summary>
         public event Action<string>? ProblemReported;

@@ -892,7 +892,8 @@ namespace ModbusForge.Avalonia.ViewModels
         partial void OnIsDebugTabVisibleChanged(bool value) => EnsureSelectedTabIsVisible();
 
         // What the PLC runtime could not do (DFB code it cannot run, run-time errors).
-        // Raised on the scan thread; the console list belongs to the UI thread.
+        // Raised on the scan thread, or by Start on its caller's thread. The console list
+        // belongs to the UI thread.
         private void OnPlcRuntimeProblemReported(string message)
             => _ = _dispatcher.InvokeAsync(() => AppendConsoleMessage(PlcConsolePrefix + message));
 
