@@ -4031,8 +4031,14 @@ namespace ModbusForge.Avalonia.ViewModels
                     if (PlcEditorViewModel == null) return;
                     // Load through the program tree so every program/folder bookkeeping
                     // stays consistent and the canvas rebuilds as it does for .mfp loads.
+                    // The FBD sections of DFB types are editor programs too, named "type/section".
+                    var dfbCanvases = result.DfbTypes.SelectMany(t => t.Sections)
+                        .Where(s => s.Canvas != null)
+                        .Select(s => (s.EditorKey, s.Canvas!.Nodes, s.Canvas!.Connections));
                     PlcEditorViewModel.LoadImportedPrograms(
-                        result.Sections.Select(s => (s.Name, s.Nodes, s.Connections)).ToList());
+                        result.Sections.Select(s => (s.Name, s.Nodes, s.Connections))
+                            .Concat(dfbCanvases)
+                            .ToList());
 
                     // Run on the PLC tab executes the whole compiled project.
                     PlcEditorViewModel.LoadProject(result.Project);
@@ -4071,12 +4077,12 @@ namespace ModbusForge.Avalonia.ViewModels
         }
 
         /// <summary>
-        /// Selecting an FBD program in the PLC navigator switches the PLC editor's
-        /// canvas to that program.
+        /// Selecting an FBD program or DFB section in the PLC navigator switches the PLC
+        /// editor's canvas to that program.
         /// </summary>
         private void PlcProjectSelectionChanged(object? sender, PlcTreeNodeViewModel? node)
         {
-            if (node?.Kind != PlcNodeKind.ProgramFbd || string.IsNullOrEmpty(node.ProgramName)) return;
+            if (node?.IsFbdProgram != true || string.IsNullOrEmpty(node.ProgramName)) return;
             if (PlcEditorViewModel?.ActivateProgramByName(node.ProgramName) != true)
             {
                 StatusMessage = $"Program '{node.ProgramName}' has no FBD canvas in the loaded project.";
@@ -4100,7 +4106,7 @@ namespace ModbusForge.Avalonia.ViewModels
         /// </summary>
         public void OpenPlcProgram(PlcTreeNodeViewModel? node)
         {
-            if (node?.Kind != PlcNodeKind.ProgramFbd || string.IsNullOrEmpty(node.ProgramName)) return;
+            if (node?.IsFbdProgram != true || string.IsNullOrEmpty(node.ProgramName)) return;
             if (!PlcProjectViewModel.ActivateEditorProgram(PlcEditorViewModel, node.ProgramName))
             {
                 StatusMessage = $"Program '{node.ProgramName}' could not be opened in the editor.";

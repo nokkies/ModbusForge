@@ -9,8 +9,8 @@ namespace ModbusForge.Avalonia.ViewModels;
 
 /// <summary>
 /// Control Expert-style project navigator for a loaded Unity Pro (XEF) project:
-/// Application > Section/Programs (functional locations), Task Configuration,
-/// Device Configuration (hardware), and IO/Communication busses.
+/// Application > Section/Programs (functional locations), Data Management, Derived FB Types,
+/// Task Configuration, Device Configuration (hardware), and IO/Communication busses.
 /// </summary>
 public sealed partial class PlcProjectViewModel : ObservableObject
 {
@@ -28,7 +28,10 @@ public sealed partial class PlcProjectViewModel : ObservableObject
     /// <summary>Raised when the selection changes; the PLC page swaps its content area.</summary>
     public event EventHandler<PlcTreeNodeViewModel?>? SelectionChanged;
 
-    /// <summary>FBD sections by name, so the PLC page can hand the editor the right canvas.</summary>
+    /// <summary>
+    /// FBD canvases by editor name, so the PLC page can hand the editor the right canvas: program
+    /// sections by name, DFB type sections by "type/section".
+    /// </summary>
     public IReadOnlyDictionary<string, PlcXmlSection> SectionsByName { get; private set; }
         = new Dictionary<string, PlcXmlSection>();
 
@@ -44,6 +47,9 @@ public sealed partial class PlcProjectViewModel : ObservableObject
 
     /// <summary>True when the selection is an FBD program with a canvas.</summary>
     public bool HasFbdSelected { get; private set; }
+
+    /// <summary>Header of the canvas: "FBD program: name", or "DFB section: type/section", else empty.</summary>
+    public string CanvasCaption { get; private set; } = "";
 
     /// <summary>Source of the selected ST/IL program (shown as text, as Control Expert does), else null.</summary>
     public string? SelectedSourceText { get; private set; }
@@ -77,8 +83,13 @@ public sealed partial class PlcProjectViewModel : ObservableObject
 
     /// <summary>The variables matching <see cref="VariableFilter"/>.</summary>
     public IReadOnlyList<PlcXmlVariable> FilteredVariables => string.IsNullOrWhiteSpace(_variableFilter)
-        ? Variables
-        : Variables.Where(v => Matches(v.Name) || Matches(v.TypeName) || Matches(v.Address) || Matches(v.Comment)).ToList();
+        ? ShownVariables
+        : ShownVariables.Where(v => Matches(v.Name) || Matches(v.TypeName) || Matches(v.Address) || Matches(v.Comment)).ToList();
+
+    /// <summary>The list the variables grid shows: the selected Derived FB Types group's, else the project's.</summary>
+    private IReadOnlyList<PlcXmlVariable> ShownVariables => SelectedNode is { Kind: PlcNodeKind.DfbVariables, Variables: not null } group
+        ? group.Variables
+        : Variables;
 
     private bool Matches(string? text)
         => text != null && text.Contains(_variableFilter.Trim(), StringComparison.OrdinalIgnoreCase);
@@ -90,21 +101,27 @@ public sealed partial class PlcProjectViewModel : ObservableObject
         {
             if (!SetProperty(ref _selectedNode, value)) return;
 
-            // Only FBD program rows (not task-assignment rows) switch the canvas;
-            // ST/IL program rows open their source text instead.
-            SelectedFbdProgram = value != null && value.Kind == PlcNodeKind.ProgramFbd
-                ? value.ProgramName
-                : null;
+            // Only FBD rows (program or DFB section, not task-assignment rows) switch the canvas;
+            // ST/IL rows open their source text instead.
+            SelectedFbdProgram = value?.IsFbdProgram == true ? value.ProgramName : null;
             HasFbdSelected = !string.IsNullOrEmpty(SelectedFbdProgram);
-            SelectedSourceText = value?.Kind == PlcNodeKind.ProgramText ? value.SourceText : null;
+            CanvasCaption = value?.Kind switch
+            {
+                PlcNodeKind.ProgramFbd => $"FBD program: {SelectedFbdProgram}",
+                PlcNodeKind.DfbSectionFbd => $"DFB section: {SelectedFbdProgram}",
+                _ => ""
+            };
+            SelectedSourceText = value?.Kind is PlcNodeKind.ProgramText or PlcNodeKind.DfbSectionText ? value.SourceText : null;
             HasSourceSelected = SelectedSourceText != null;
-            HasVariablesSelected = value?.Kind == PlcNodeKind.DdtList;
+            HasVariablesSelected = value?.Kind is PlcNodeKind.DdtList or PlcNodeKind.DfbVariables;
 
             OnPropertyChanged(nameof(SelectedFbdProgram));
             OnPropertyChanged(nameof(HasFbdSelected));
+            OnPropertyChanged(nameof(CanvasCaption));
             OnPropertyChanged(nameof(SelectedSourceText));
             OnPropertyChanged(nameof(HasSourceSelected));
             OnPropertyChanged(nameof(HasVariablesSelected));
+            OnPropertyChanged(nameof(FilteredVariables));
             OnPropertyChanged(nameof(ShowsPlaceholder));
             SelectionChanged?.Invoke(this, value);
         }
@@ -176,7 +193,13 @@ public sealed partial class PlcProjectViewModel : ObservableObject
     public void LoadProject(PlcXmlImportResult result)
     {
         SourceFile = result.SourceFile;
-        SectionsByName = result.Sections.ToDictionary(s => s.Name, StringComparer.Ordinal);
+        var sections = result.Sections.ToDictionary(s => s.Name, StringComparer.Ordinal);
+        foreach (var dfbSection in result.DfbTypes.SelectMany(t => t.Sections).Where(s => s.Canvas != null))
+        {
+            // A repeated key keeps its first canvas, as the editor's name lookup does.
+            sections.TryAdd(dfbSection.EditorKey, dfbSection.Canvas!);
+        }
+        SectionsByName = sections;
         _hardware = result.Hardware;
         Variables = result.Variables;
         OnPropertyChanged(nameof(Variables));
@@ -278,8 +301,81 @@ public sealed partial class PlcProjectViewModel : ObservableObject
         {
             Detail = $"{result.Variables.Count} variables declared (name, type, address, initial value, comment)"
         });
+        app.Children.Add(BuildDfbTypesNode(result));
         return app;
     }
+
+    /// <summary>
+    /// Derived FB Types (as in Control Expert's Project Browser): every user function block type of
+    /// the project, in XEF order, with its interface groups and its code sections.
+    /// </summary>
+    private static PlcTreeNodeViewModel BuildDfbTypesNode(PlcXmlImportResult result)
+    {
+        var types = new PlcTreeNodeViewModel("Derived FB Types", PlcNodeKind.DfbTypesRoot)
+        {
+            Detail = $"{result.DfbTypes.Count} DFB types, {result.DfbTypes.Count(t => t.IsProtected)} with protected code"
+        };
+        foreach (var type in result.DfbTypes)
+        {
+            types.Children.Add(BuildDfbTypeNode(type));
+        }
+        return types;
+    }
+
+    private static PlcTreeNodeViewModel BuildDfbTypeNode(PlcXmlDfbType type)
+    {
+        var typeNode = new PlcTreeNodeViewModel(
+            type.IsProtected ? $"{type.Name} (protected, empty)" : type.Name, PlcNodeKind.DfbType);
+        typeNode.Children.Add(BuildDfbVariablesNode($"Inputs ({type.Inputs.Count})", type.Inputs));
+        typeNode.Children.Add(BuildDfbVariablesNode($"Outputs ({type.Outputs.Count})", type.Outputs));
+        typeNode.Children.Add(BuildDfbVariablesNode($"Inputs/Outputs ({type.InOuts.Count})", type.InOuts));
+        typeNode.Children.Add(BuildDfbVariablesNode($"Public variables ({type.PublicVariables.Count})", type.PublicVariables));
+        // A protected export carries no private variables, so the group says so instead of a count.
+        typeNode.Children.Add(BuildDfbVariablesNode(
+            type.IsProtected ? "Private variables (not in the export)" : $"Private variables ({type.PrivateVariables.Count})",
+            type.PrivateVariables));
+
+        // A protected type's code is not in the export: its one section is a locked, empty placeholder.
+        var sectionRows = type.IsProtected
+            ? new[] { BuildProtectedCodeNode() }
+            : type.Sections.Select(BuildDfbSectionNode).ToArray();
+        var sections = new PlcTreeNodeViewModel($"Sections ({sectionRows.Length})", PlcNodeKind.DfbSectionsRoot);
+        foreach (var row in sectionRows)
+        {
+            sections.Children.Add(row);
+        }
+        typeNode.Children.Add(sections);
+        return typeNode;
+    }
+
+    private static PlcTreeNodeViewModel BuildDfbVariablesNode(string title, IReadOnlyList<PlcXmlVariable> variables)
+        => new(title, PlcNodeKind.DfbVariables) { Variables = variables };
+
+    /// <summary>
+    /// One code section of a DFB type, opened as a program section is: an FBD canvas is drawn, ST or
+    /// IL text is shown, and any other language (LD, SFC) is listed only.
+    /// </summary>
+    private static PlcTreeNodeViewModel BuildDfbSectionNode(PlcXmlDfbSection section)
+    {
+        var title = $"{section.Name} [{section.Language}]";
+        if (section.Canvas != null)
+        {
+            return new PlcTreeNodeViewModel(title, PlcNodeKind.DfbSectionFbd) { ProgramName = section.EditorKey };
+        }
+        if (section.SourceText != null)
+        {
+            return new PlcTreeNodeViewModel(title, PlcNodeKind.DfbSectionText) { SourceText = section.SourceText };
+        }
+        return new PlcTreeNodeViewModel(title, PlcNodeKind.DfbSectionListed);
+    }
+
+    /// <summary>The placeholder section of a protected type: its code is encrypted in the export, so it is empty and locked.</summary>
+    private static PlcTreeNodeViewModel BuildProtectedCodeNode() => new("Protected code (empty)", PlcNodeKind.DfbProtectedCode)
+    {
+        IsLocked = true,
+        IsDimmed = true,
+        Detail = "Empty: the code is protected in the export"
+    };
 
     private static PlcTreeNodeViewModel BuildTaskNode(PlcXmlImportResult result)
     {
@@ -365,6 +461,14 @@ public enum PlcNodeKind
     ProgramText,
     ProgramReadOnly,
     DdtList,
+    DfbTypesRoot,
+    DfbType,
+    DfbVariables,
+    DfbSectionsRoot,
+    DfbSectionFbd,
+    DfbSectionText,
+    DfbSectionListed,
+    DfbProtectedCode,
     TaskConfigRoot,
     Task,
     AssignedProgram,
@@ -381,6 +485,9 @@ public enum PlcNodeKind
 /// <summary>One row of the PLC project tree.</summary>
 public sealed class PlcTreeNodeViewModel : ObservableObject
 {
+    /// <summary>Opacity of a dimmed row's title: an empty section has no code to show.</summary>
+    private const double DimmedTitleOpacity = 0.55;
+
     public PlcTreeNodeViewModel(string title, PlcNodeKind kind)
     {
         Title = title;
@@ -394,15 +501,28 @@ public sealed class PlcTreeNodeViewModel : ObservableObject
     /// <summary>Program name this node refers to (FBD sections, task assignments).</summary>
     public string? ProgramName { get; init; }
 
-    /// <summary>Program text of an ST/IL section (<see cref="PlcNodeKind.ProgramText"/> rows).</summary>
+    /// <summary>Program text of an ST/IL section (<see cref="PlcNodeKind.ProgramText"/> and <see cref="PlcNodeKind.DfbSectionText"/> rows).</summary>
     public string? SourceText { get; init; }
+
+    /// <summary>The variables a Derived FB Types group lists (<see cref="PlcNodeKind.DfbVariables"/> rows).</summary>
+    public IReadOnlyList<PlcXmlVariable>? Variables { get; init; }
+
+    /// <summary>True for a locked section: a lock icon precedes its title.</summary>
+    public bool IsLocked { get; init; }
+
+    /// <summary>True for a row whose title is greyed out.</summary>
+    public bool IsDimmed { get; init; }
+
+    /// <summary>Opacity of the title: <see cref="DimmedTitleOpacity"/> when dimmed, else fully opaque.</summary>
+    public double TitleOpacity => IsDimmed ? DimmedTitleOpacity : 1.0;
 
     /// <summary>Shown in the properties pane when this node is selected.</summary>
     public string Detail { get; init; } = "";
 
     public ObservableCollection<PlcTreeNodeViewModel> Children { get; }
 
-    public bool IsFbdProgram => Kind == PlcNodeKind.ProgramFbd;
+    /// <summary>True for a row that opens an FBD canvas: an FBD program, or an FBD section of a DFB type.</summary>
+    public bool IsFbdProgram => Kind is PlcNodeKind.ProgramFbd or PlcNodeKind.DfbSectionFbd;
     public bool IsHardware => Kind is PlcNodeKind.Cpu or PlcNodeKind.Supply or PlcNodeKind.Rack
         or PlcNodeKind.DiscreteModule or PlcNodeKind.AnalogModule or PlcNodeKind.Module;
 }
