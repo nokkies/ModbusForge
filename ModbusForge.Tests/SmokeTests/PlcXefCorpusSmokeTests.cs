@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
+using ModbusForge.Core.Plc;
 using ModbusForge.Models;
 using ModbusForge.Services;
 using ModbusForge.Tests.Helpers;
@@ -132,6 +133,132 @@ public class PlcXefCorpusSmokeTests
         _output.WriteLine($"{fileName}: {endpoints} link endpoints, {misplaced.Count} not on their drawn pin");
         Assert.True(misplaced.Count == 0,
             $"{misplaced.Count} of {endpoints} link endpoints miss their drawn pin, e.g. {string.Join("; ", misplaced.Take(3))}");
+    }
+
+    [Theory]
+    [MemberData(nameof(CorpusFiles))]
+    public void CorpusFile_ListsEveryDfbType(string fileName)
+    {
+        var path = Path.Combine(CorpusFolder, fileName);
+        if (!File.Exists(path))
+        {
+            _output.WriteLine($"XEF corpus not found at {CorpusFolder} - skipping.");
+            return;
+        }
+
+        var xml = XDocument.Load(path);
+        var fbSources = xml.Root!.Elements("FBSource").ToList();
+        var result = new PlcXmlImporter().Import(path);
+        _output.WriteLine($"{fileName}: {result.DfbTypes.Count} DFB types, " +
+                          $"{result.DfbTypes.Count(t => t.IsProtected)} protected, " +
+                          $"{result.DfbTypes.Sum(t => t.Sections.Count)} sections");
+        Assert.True(result.Success, string.Join("; ", result.Errors));
+
+        Assert.Equal(fbSources.Select(f => (string?)f.Attribute("nameOfFBType") ?? ""), result.DfbTypes.Select(t => t.Name));
+        Assert.Equal(
+            fbSources.Select(f => (IsProtected: f.Element("crypted") != null,
+                Inputs: InterfaceCount(f, "inputParameters"),
+                Outputs: InterfaceCount(f, "outputParameters"),
+                InOuts: InterfaceCount(f, "inOutParameters"))),
+            result.DfbTypes.Select(t => (IsProtected: t.IsProtected,
+                Inputs: t.Inputs.Count,
+                Outputs: t.Outputs.Count,
+                InOuts: t.InOuts.Count)));
+
+        // Every section in XEF order, with the blocks its FBD canvas draws (text boxes are comments, not blocks).
+        var expectedSections = fbSources.SelectMany(f => DfbSectionsOf(f).Select(s => (
+            Type: (string?)f.Attribute("nameOfFBType") ?? "",
+            Name: s.Name,
+            Language: s.Language,
+            Blocks: s.Language == "FBD" ? s.Source.Descendants("FFBBlock").Count() : (int?)null))).ToList();
+        var actualSections = result.DfbTypes.SelectMany(t => t.Sections.Select(s => (
+            Type: t.Name,
+            Name: s.Name,
+            Language: s.Language,
+            Blocks: s.Canvas?.Nodes.Count(n => n.ElementType != PlcElementType.PlcComment)))).ToList();
+        Assert.Equal(expectedSections, actualSections);
+    }
+
+    [Fact]
+    public void Lcplc001_ListsItsFourProtectedTypes()
+    {
+        var path = Path.Combine(CorpusFolder, "LCPLC001.XEF");
+        if (!File.Exists(path))
+        {
+            _output.WriteLine($"XEF corpus not found at {CorpusFolder} - skipping.");
+            return;
+        }
+
+        var result = new PlcXmlImporter().Import(path);
+        Assert.True(result.Success, string.Join("; ", result.Errors));
+
+        var protectedNames = result.DfbTypes.Where(t => t.IsProtected).Select(t => t.Name)
+            .OrderBy(n => n, StringComparer.Ordinal).ToList();
+        Assert.Equal(new[] { "xANL101", "xANL102", "zPLCInfo", "zScale" }, protectedNames);
+
+        var xanl101 = result.DfbTypes.Single(t => t.Name == "xANL101");
+        Assert.Equal(19, xanl101.Inputs.Count);
+        Assert.Equal(14, xanl101.Outputs.Count);
+        Assert.Equal(5, xanl101.InOuts.Count);
+
+        // Both xANL101 blocks in Analogs_IN are instances of a protected type.
+        var project = Assert.IsType<PlcProject>(result.Project);
+        var instances = project.Sections.Single(s => s.Name == "Analogs_IN").Blocks
+            .Where(b => b.TypeName == "xANL101").ToList();
+        Assert.Equal(2, instances.Count);
+        Assert.All(instances, b => Assert.True(b.IsProtectedDfb, $"{b.InstanceName} is not a protected DFB"));
+    }
+
+    [Fact]
+    public void Sn6550_OpensLcnDig101AndLcnXiLockSections()
+    {
+        var path = Path.Combine(CorpusFolder, "SN6550.XEF");
+        if (!File.Exists(path))
+        {
+            _output.WriteLine($"XEF corpus not found at {CorpusFolder} - skipping.");
+            return;
+        }
+
+        var result = new PlcXmlImporter().Import(path);
+        Assert.True(result.Success, string.Join("; ", result.Errors));
+
+        var command = result.DfbTypes.Single(t => t.Name == "LCN_DIG101").Sections.Single(s => s.Name == "Command_FBD");
+        Assert.NotNull(command.Canvas);
+        Assert.Contains(command.Canvas.Nodes, n => n.ElementType != PlcElementType.PlcComment);
+
+        var status = result.DfbTypes.Single(t => t.Name == "LCN_xILock").Sections.Single(s => s.Name == "Status");
+        Assert.False(string.IsNullOrWhiteSpace(status.SourceText));
+    }
+
+    /// <summary>
+    /// The code sections an XEF lists for a DFB type, in XEF order: each FBProgram with a *Source
+    /// child, as (name, language, source). A protected type lists none, as the importer does.
+    /// </summary>
+    private static IEnumerable<(string Name, string Language, XElement Source)> DfbSectionsOf(XElement fbSource)
+    {
+        if (fbSource.Element("crypted") != null) yield break;
+
+        foreach (var program in fbSource.Elements("FBProgram"))
+        {
+            var source = program.Elements().FirstOrDefault(e => e.Name.LocalName.EndsWith("Source", StringComparison.Ordinal));
+            if (source == null) continue;
+            yield return ((string?)program.Attribute("name") ?? "", source.Name.LocalName[..^"Source".Length], source);
+        }
+    }
+
+    /// <summary>
+    /// The distinct, named variables of one interface group, read from the FBSource and from its
+    /// ExternalToolsOnly child. A name seen first wins, as the importer does.
+    /// </summary>
+    private static int InterfaceCount(XElement fbSource, string group)
+    {
+        var holders = new[] { fbSource, fbSource.Element("ExternalToolsOnly") };
+        return holders.Where(h => h != null)
+            .SelectMany(h => h!.Element(group)?.Elements("variables") ?? Enumerable.Empty<XElement>())
+            .Select(v => (string?)v.Attribute("name"))
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.Ordinal)
+            .Count();
     }
 
     private static bool HasPin(VisualNode node, string? pin, bool isInput)
