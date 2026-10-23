@@ -26,14 +26,15 @@ The user's rules that shape this:
    listing every DFB type of the project with its Inputs, Outputs, Inputs/Outputs, Public
    variables, Private variables and Sections (Program Languages and Structure, 35006144.27,
    p. 352).
-2. A locked type shows its interface and one empty section, greyed with a lock and the
-   note "Empty: the code is protected in the export". Its instances on the canvas read
-   "empty (protected DFB)" instead of "not simulated".
+2. Only a DFB whose code is protected in the export becomes a shell: its interface and
+   one empty section, greyed with a lock and the note "Empty: the code is protected in
+   the export". Every other DFB is copied with its code. Instances of a shell read "empty
+   (protected DFB)" on the canvas instead of "not simulated".
 3. The engineer can give a locked type their own code in ST, FBD or LD, the languages a
    DFB section can have. It runs for every instance of the type, as a DFB section does in
    Control Expert.
-4. The engineer's code is stored on their machine next to the project file and comes back
-   when the same file is opened again.
+4. The engineer's code is saved inside the XEF, never in a separate file, and comes back
+   when the XEF is opened again.
 5. Types whose code is exported keep running it, as today. Their sections are part of the
    selection on the left: selecting one opens it read-only, as a program section opens.
 
@@ -100,10 +101,7 @@ Inputs, Outputs, Inputs/Outputs, Public variables and Private variables (name, t
 initial value, comment, in the Data Management grid), then Sections (name, language,
 protection). A locked type's original code is one greyed, locked section: "Empty: the
 code is protected in the export". The engineer's sections are listed beside it, marked as
-the engineer's. A section protected on its own in an otherwise exported type (possible in
-Control Expert, p. 359, though no project in the corpus has one) shows the same way, and
-the type is marked partly locked, so the rest of its code is never taken for the whole
-(my call).
+the engineer's.
 
 Selecting a section opens it as a program section opens: ST as text, FBD drawn on the
 canvas, LD listed until there is an LD view. Exported code opens read-only. A section
@@ -134,19 +132,20 @@ which would also run the exported LD sections.
 
 ### Storage
 
-The code belongs to the project file it was written for. One local, human-readable file
-next to that file (today an XEF or ZEF export, named after it with a fixed suffix) holds,
-per type: a fingerprint of the type's interface in the export, the engineer's variables,
-and the engineer's sections (name, language, code). Opening the project file loads it.
-Nothing is written into the export.
+The engineer's code is saved inside the XEF, never in a separate file. The protected
+original (`<crypted>`) stays untouched. The engineer's variables and sections go into a
+ModbusForge-only part of the type, never into Control Expert's own section elements:
+written as normal DFB code, the stand-in would replace the protected DFB if that XEF were
+imported into Control Expert. Each type's saved code carries a fingerprint of the
+interface it was written for.
 
 ## Phases
 
 1. The Derived FB Types node: every type with its interface and sections, exported
    sections opening read-only (ST as text, FBD drawn), and locked types marked empty in
    the navigator, on the canvas, in the Console and in the status text.
-2. The engineer's ST sections and variables for locked types, stored next to the project
-   file and run per instance.
+2. The engineer's ST sections and variables for locked types, saved in the XEF and run
+   per instance.
 3. The engineer's FBD sections.
 4. LD: an engine and a view, for exported LD sections and the engineer's.
 
@@ -165,11 +164,19 @@ On LCPLC001 (locked types):
 - ST written for xANL101 (for example fRealVal scaled from fAnaIn between nEngZero and
   nEngFull) makes both instances compute after Run, marked as the engineer's code, and
   the Console says so.
-- Closing and importing LCPLC001 again brings the xANL101 code back.
+- Saving LCPLC001 and opening it again brings the xANL101 code back, and the protected
+  original in the file is unchanged.
 - After xANL101's interface in the XEF changes, the code is kept, not run, and the
   engineer is told.
 
+## Open questions
+
+1. When saving, does ModbusForge write into the XEF that was opened, or into a copy of it
+   that leaves the client's export as received?
+2. Must the saved XEF still import into Control Expert? How Control Expert treats content
+   it does not know is not documented; it may refuse the file.
+
 ## Left to the builder
 
-The file format and suffix, the fingerprint method, the exact layout of the type view,
-how compile errors are shown, and the tests.
+The XML layout of the saved code, the fingerprint method, the exact layout of the type
+view, how compile errors are shown, and the tests.
