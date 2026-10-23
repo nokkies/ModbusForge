@@ -14,6 +14,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using ModbusForge.Avalonia.Services;
+using ModbusForge.Core.Plc;
 using ModbusForge.Helpers;
 using ModbusForge.Models;
 using ModbusForge.Services;
@@ -4039,7 +4040,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     // Fill the PLC project navigator (programs, tasks, hardware).
                     PlcProjectViewModel.LoadProject(result);
 
-                    var computed = result.Project?.Blocks.Count(b => b.IsSimulated) ?? 0;
+                    var counts = PlcBlockCounts.Of(result.Project?.Blocks ?? Enumerable.Empty<PlcBlock>());
 
                     // Run executes the FBD and ST sections of the cyclic tasks; the other
                     // programs (LD, SFC, IL, subroutines, event sections) are listed but not run.
@@ -4050,7 +4051,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     StatusMessage =
                         $"PLC import: {result.TotalNodes} blocks / {result.TotalConnections} wires across " +
                         $"{result.SectionsFound} sections ({result.TagCount} tags); " +
-                        $"Run computes {computed} blocks, {result.TotalNodes - computed} keep their outputs (protected DFB code or unsupported type)" +
+                        $"Run: {counts.Describe()}" +
                         (notRun > 0 ? $", {notRun} program(s) not run (LD, SFC, IL, subroutine or event section)" : "") + ".";
 
                     // Surface a sample of any warnings in the structured log.

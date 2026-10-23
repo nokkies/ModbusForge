@@ -140,10 +140,10 @@ namespace ModbusForge.Avalonia.Views
 
             DrawCentered(context, plc.TypeName, Bold, TypeNameFontSize, TextBrush, width / 2, plc.CellSize * 2);
 
-            // While running, say so on blocks the runtime does not compute.
-            if (live is { Simulated: false } && height >= plc.CellSize * 4)
+            // While running, say why the runtime does not compute a block.
+            if (IdleNote(live) is { } note && height >= plc.CellSize * 4)
             {
-                DrawCentered(context, "not simulated", Italic, ValueFontSize, NoteBrush, width / 2, plc.CellSize * 3);
+                DrawCentered(context, note, Italic, ValueFontSize, NoteBrush, width / 2, plc.CellSize * 3);
             }
 
             foreach (var pin in plc.Pins)
@@ -152,6 +152,20 @@ namespace ModbusForge.Avalonia.Views
                     : (pin.IsInput ? live.Inputs : live.Outputs).TryGetValue(pin.Name, out var text) ? text : null;
                 DrawPin(context, pin, width, inset, value);
             }
+        }
+
+        /// <summary>
+        /// Why the runtime leaves a block idle while the PLC tab runs; null when the
+        /// runtime computes the block or there is no live state.
+        /// </summary>
+        internal static string? IdleNote(PlcLiveState? live)
+        {
+            if (live is not { Simulated: false })
+            {
+                return null;
+            }
+
+            return live.ProtectedDfb ? "empty (protected DFB)" : "not simulated";
         }
 
         private static void DrawPin(DrawingContext context, PlcPin pin, double width, double inset, string? value)

@@ -217,5 +217,29 @@ Late := Hold.Q;</STSource></FBProgram>
             Assert.False(plc.BlockNamed("A1").IsProtectedDfb);
             Assert.Equal(new[] { "Secret" }, plc.Runtime.Project.Types!.ProtectedDfbTypes);
         }
+
+        [Fact]
+        public void BlockCounts_TellEmptyProtectedDfbsFromUnsupportedTypes()
+        {
+            var project = new XefBuilder().Raw(SecretDfb).Raw(AndDfb)
+                .Variable("S1", "Secret").Variable("A1", "MyAnd").Variable("Out", "BOOL").Variable("Q", "BOOL")
+                .Section("S", Block("S1", "Secret", 2, 2, "|Q=Out") + Block("A1", "MyAnd", 20, 2, "A=TRUE,B=TRUE|Q=Q")
+                    + Block(".3", "NO_SUCH_BLOCK", 40, 2, "IN=Q|OUT=Out"))
+                .Project();
+
+            var counts = PlcBlockCounts.Of(project.Blocks);
+
+            Assert.Equal(new PlcBlockCounts(3, 1, 1, 1), counts);
+            Assert.Equal("1 of 3 blocks computed, 1 empty (protected DFB), 1 not simulated (unsupported type)", counts.Describe());
+        }
+
+        [Theory]
+        [InlineData(2, 2, 0, 0, "2 of 2 blocks computed")]
+        [InlineData(2, 1, 1, 0, "1 of 2 blocks computed, 1 empty (protected DFB)")]
+        [InlineData(2, 1, 0, 1, "1 of 2 blocks computed, 1 not simulated (unsupported type)")]
+        public void BlockCounts_LeaveOutTheClausesWithNoBlocks(int total, int computed, int emptyProtectedDfb, int unsupported, string expected)
+        {
+            Assert.Equal(expected, new PlcBlockCounts(total, computed, emptyProtectedDfb, unsupported).Describe());
+        }
     }
 }

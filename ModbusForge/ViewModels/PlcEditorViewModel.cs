@@ -57,14 +57,7 @@ public sealed class PlcEditorViewModel : VisualNodeEditorViewModel
         }
 
         var sections = project.Sections.Count();
-        var blocks = project.Blocks.ToList();
-        var computed = blocks.Count(b => b.IsSimulated);
-        var text = $"Running {sections} sections: {computed} of {blocks.Count} blocks computed";
-        if (computed < blocks.Count)
-        {
-            text += $", {blocks.Count - computed} keep their outputs (protected DFB code or unsupported type)";
-        }
-        return text + $", {storeMode}";
+        return $"Running {sections} sections: {PlcBlockCounts.Of(project.Blocks).Describe()}, {storeMode}";
     }
 
     protected override string StoppedStatusText => "Stopped";
