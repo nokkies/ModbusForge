@@ -544,8 +544,10 @@ namespace ModbusForge.Core.Plc.St
 
         /// <summary>
         /// A function or procedure call. Informal arguments bind to the inputs in order
-        /// (an extensible function takes them all), then to the outputs, as a procedure
-        /// call lists them (WORD_AS_BYTE(w, lo, hi)).
+        /// (an extensible function takes them all), then to the in/outs, then to the
+        /// outputs, as a procedure call lists them (WORD_AS_BYTE(w, lo, hi),
+        /// ROL_ARINT(n, table), INC(v)). An in/out argument is read as an input and written
+        /// back as the output of the same name (35006144.27, pp. 343-346).
         /// </summary>
         private StCall FunctionCall(string name, PlcBlockBehavior behavior, List<Argument> arguments, int line)
         {
@@ -554,6 +556,15 @@ namespace ModbusForge.Core.Plc.St
             var inputCount = signature.Extensible ? positionalCount : Math.Min(positionalCount, signature.Inputs.Count);
             var positionalNames = signature.PositionalInputs(inputCount);
             var outputNames = signature.Outputs.Count > 0 ? signature.Outputs.ToList() : new List<string> { "OUT" };
+            var inOutNames = signature.InOuts;
+
+            int OutputIndex(string outputName)
+            {
+                var index = outputNames.FindIndex(n => string.Equals(n, outputName, StringComparison.OrdinalIgnoreCase));
+                if (index >= 0) return index;
+                outputNames.Add(outputName);
+                return outputNames.Count - 1;
+            }
 
             var inputNames = new List<string>();
             var inputValues = new List<PlcOperand>();
@@ -564,19 +575,26 @@ namespace ModbusForge.Core.Plc.St
                 var slot = argument.Name == null ? position++ : -1;
                 if (argument.Value == null) continue;
 
+                var inOutName = argument.Name != null
+                    ? argument.IsOutput ? null : inOutNames.FirstOrDefault(n => string.Equals(n, argument.Name, StringComparison.OrdinalIgnoreCase))
+                    : slot >= positionalNames.Count && slot - positionalNames.Count < inOutNames.Count ? inOutNames[slot - positionalNames.Count] : null;
+                if (inOutName != null)
+                {
+                    if (!argument.Value.IsWritable) throw new StSyntaxException($"in/out {inOutName} of {name} needs a variable", line);
+                    inputNames.Add(inOutName);
+                    inputValues.Add(argument.Value);
+                    targets.Add((OutputIndex(inOutName), argument.Value));
+                    continue;
+                }
+
                 if (argument.IsOutput || (slot >= 0 && slot >= positionalNames.Count))
                 {
+                    var outputSlot = slot - positionalNames.Count - inOutNames.Count;
                     var outputName = argument.Name
-                                     ?? (slot - positionalNames.Count < outputNames.Count ? outputNames[slot - positionalNames.Count] : null)
+                                     ?? (outputSlot >= 0 && outputSlot < outputNames.Count ? outputNames[outputSlot] : null)
                                      ?? throw new StSyntaxException($"too many arguments for {name}", line);
                     if (!argument.Value.IsWritable) throw new StSyntaxException($"output {outputName} of {name} needs a variable", line);
-                    var index = outputNames.FindIndex(n => string.Equals(n, outputName, StringComparison.OrdinalIgnoreCase));
-                    if (index < 0)
-                    {
-                        outputNames.Add(outputName);
-                        index = outputNames.Count - 1;
-                    }
-                    targets.Add((index, argument.Value));
+                    targets.Add((OutputIndex(outputName), argument.Value));
                     continue;
                 }
 
@@ -594,6 +612,13 @@ namespace ModbusForge.Core.Plc.St
         /// </summary>
         private static PlcSignature FallbackSignature(string name, int positional)
         {
+            // Library procedures that work on an in/out variable (33002519.20: INC and DEC
+            // pp. 247 and 261, ROL_AR* and ROR_AR* pp. 107-110).
+            if (name.Equals("INC", StringComparison.OrdinalIgnoreCase) || name.Equals("DEC", StringComparison.OrdinalIgnoreCase))
+                return new PlcSignature(Array.Empty<string>(), Array.Empty<string>(), new[] { "INOUT" }, false);
+            if (name.StartsWith("ROL_AR", StringComparison.OrdinalIgnoreCase) || name.StartsWith("ROR_AR", StringComparison.OrdinalIgnoreCase))
+                return new PlcSignature(new[] { "N" }, Array.Empty<string>(), new[] { "INOUT" }, false);
+
             var single = positional <= 1
                          || name.Contains("_TO_", StringComparison.OrdinalIgnoreCase)
                          || name.StartsWith("LENGTH_AR", StringComparison.OrdinalIgnoreCase)

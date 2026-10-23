@@ -38,7 +38,12 @@ namespace ModbusForge.Core.Plc.St
 
             _call.BeginCall();
             _call.Now = runtime.Now;
+            if (_behavior.ReadsOutputs)
+            {
+                foreach (var (output, target) in _targets) _call.SeedOutput(output, target.Read(runtime));
+            }
             _behavior.Execute(_call);
+            if (_call.Overflow) runtime.RaiseOverflow();
             if (_call.Failed)
             {
                 runtime.CountStError();

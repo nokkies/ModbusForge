@@ -76,6 +76,7 @@ namespace ModbusForge.Core.Plc
             ["ACOS"] = _ => new RealFunction(v => v is < -1 or > 1 ? null : Math.Acos(v)),
             ["ATAN"] = _ => new RealFunction(Math.Atan),
             ["EXPT"] = _ => new PowerFunction(),
+            ["AVE"] = t => new WeightedAverage(t),
             ["CTU"] = t => new UpCounter(t ?? PlcType.Int),
             ["CTD"] = t => new DownCounter(t ?? PlcType.Int),
             ["CTUD"] = t => new UpDownCounter(t ?? PlcType.Int),
@@ -121,6 +122,9 @@ namespace ModbusForge.Core.Plc
             ["LOOKUP_TABLE1"] = new LookupTable(),
             ["SCALING"] = new Scaling(),
             ["RAMP"] = new Ramp(),
+            ["INC"] = new StepFunction(+1),
+            ["DEC"] = new StepFunction(-1),
+            ["EXTRACT"] = new ExtractFunction(),
         };
 
         /// <summary>The behaviour of a standard type, or null when the runtime does not simulate it.</summary>
@@ -139,7 +143,12 @@ namespace ModbusForge.Core.Plc
                 return typed(suffixType);
             }
 
-            // Table functions: LENGTH_ARINT, SUM_ARREAL, MOVE_INT_ARINT, ...
+            // Table functions: LENGTH_ARINT, SUM_ARREAL, MOVE_INT_ARINT, FIND_GT_ARREAL, ROL_ARDINT, ...
+            if (TableFunction(name, "FIND_EQ_AR")) return new TableFindFunction(TableFindFunction.Kind.Eq);
+            if (TableFunction(name, "FIND_GT_AR")) return new TableFindFunction(TableFindFunction.Kind.Gt);
+            if (TableFunction(name, "FIND_LT_AR")) return new TableFindFunction(TableFindFunction.Kind.Lt);
+            if (TableFunction(name, "ROL_AR")) return new TableRotateFunction(left: true);
+            if (TableFunction(name, "ROR_AR")) return new TableRotateFunction(left: false);
             if (name.StartsWith("LENGTH_AR", StringComparison.OrdinalIgnoreCase)) return new TableLengthFunction();
             if (name.StartsWith("SUM_AR", StringComparison.OrdinalIgnoreCase) && TypeNames.TryGetValue(name[6..], out var sumType))
                 return new TableSumFunction(sumType);
@@ -159,6 +168,10 @@ namespace ModbusForge.Core.Plc
 
             return null;
         }
+
+        /// <summary>A table function name: the prefix followed by an element type (FIND_EQ_ARINT).</summary>
+        private static bool TableFunction(string name, string prefix)
+            => name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && TypeNames.ContainsKey(name[prefix.Length..]);
 
         // ------------------------------------------------------------------
         // Functions (EF): no memory; EN = 0 drives their output links to 0.
@@ -706,6 +719,254 @@ namespace ModbusForge.Core.Plc
                     sum = PlcOps.Add(_type, sum, PlcValue.Decode(element, bytes.AsSpan(i * element.Size, element.Size)));
                 }
                 call.SetOutput("OUT", sum);
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Standard library, as the Standard Block Library manual describes it:
+        // Schneider Electric 33002519.20, 09/2020.
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// FIND_EQ_AR*, FIND_GT_AR*, FIND_LT_AR*: OUT is the rank of the first element of the
+        /// table on IN1 equal to, greater than or less than IN2, -1 if there is none. The rank
+        /// counts from 0 at the start of the table, whatever its declared bounds. An invalid
+        /// REAL gives -2 and sets %S18 (pp. 52, 63-78).
+        /// </summary>
+        private sealed class TableFindFunction : Function
+        {
+            public enum Kind { Eq, Gt, Lt }
+
+            private readonly Kind _kind;
+            public TableFindFunction(Kind kind) => _kind = kind;
+
+            public override void Execute(PlcCall call)
+            {
+                var input = call.Input("IN1");
+                if (input.Type is not { Kind: PlcTypeKind.Array, ElementType: { } element } table)
+                {
+                    call.Fail();
+                    return;
+                }
+
+                var value = PlcOps.Convert(call.Input("IN2"), element);
+                var invalid = element.IsReal && !IsFinite(value.AsDouble());
+                var bytes = input.AsBytes();
+                var rank = -1;
+                for (var i = 0; i < table.Length && !invalid; i++)
+                {
+                    var item = PlcValue.Decode(element, bytes.AsSpan(i * element.Size, element.Size));
+                    if (element.IsReal && !IsFinite(item.AsDouble()))
+                    {
+                        invalid = true;
+                        break;
+                    }
+                    var order = PlcOps.Compare(element, item, value);
+                    if (_kind == Kind.Eq ? order == 0 : _kind == Kind.Gt ? order > 0 : order < 0)
+                    {
+                        rank = i;
+                        break;
+                    }
+                }
+
+                if (invalid)
+                {
+                    rank = -2;
+                    call.Overflow = true;
+                }
+                call.SetOutput("OUT", PlcValue.FromInteger(PlcType.Int, rank));
+            }
+        }
+
+        /// <summary>
+        /// ROL_AR* / ROR_AR*: the elements of the table on INOUT move N places towards the
+        /// higher (ROL) or lower (ROR) indexes, those pushed off one end coming back at the
+        /// other; N of 0 or less leaves the table as it is (pp. 107-110).
+        /// </summary>
+        private sealed class TableRotateFunction : Function
+        {
+            private readonly bool _left;
+            public TableRotateFunction(bool left) => _left = left;
+
+            public override void Execute(PlcCall call)
+            {
+                var input = call.Input("INOUT");
+                if (input.Type is not { Kind: PlcTypeKind.Array, ElementType: { } element } table || table.Length == 0)
+                {
+                    call.Fail();
+                    return;
+                }
+
+                var shift = PlcOps.Convert(call.Input("N"), PlcType.Int).AsInteger();
+                if (shift <= 0) return;
+
+                var length = table.Length;
+                var places = (int)(shift % length);
+                if (!_left) places = (length - places) % length;
+                var bytes = input.AsBytes();
+                var rotated = (byte[])bytes.Clone();
+                for (var i = 0; i < length; i++)
+                {
+                    bytes.AsSpan(i * element.Size, element.Size).CopyTo(rotated.AsSpan(((i + places) % length) * element.Size));
+                }
+                call.SetOutput("INOUT", PlcValue.FromBytes(table, rotated));
+            }
+        }
+
+        /// <summary>
+        /// INC / DEC: the integer on INOUT goes up (INC) or down (DEC) by one; on overrun it
+        /// wraps (32767 + 1 = -32768 for an INT) and %S18 is set (pp. 247 and 261).
+        /// </summary>
+        private sealed class StepFunction : Function
+        {
+            private readonly int _step;
+            public StepFunction(int step) => _step = step;
+
+            public override void Execute(PlcCall call)
+            {
+                var value = call.Input("INOUT");
+                var type = value.Type is { IsInteger: true } declared ? declared : call.OutputType("INOUT") ?? PlcType.Int;
+                var current = PlcOps.Convert(value, type).AsInteger();
+                var next = PlcValue.FromInteger(type, current + _step);
+                if (next.AsInteger() != current + _step) call.Overflow = true;
+                call.SetOutput("INOUT", next);
+            }
+        }
+
+        /// <summary>
+        /// AVE: the mean of X1, X2, ... weighted by K1, K2, ..., given in pairs on K_X1,
+        /// K_X2, ... (K1, X1, K2, X2, ...): (K1·X1 + K2·X2 + ...) / (K1 + K2 + ...), integers
+        /// dividing without a fraction. An overrun, a zero weight sum or an invalid REAL sets
+        /// %S18; an odd number of inputs is an error (pp. 297-299). Integer sums are taken
+        /// in 64 bits, so only the result is checked against the type's range.
+        /// </summary>
+        private sealed class WeightedAverage : Function
+        {
+            private readonly PlcType? _type;
+            public WeightedAverage(PlcType? type) => _type = type;
+
+            public override void Execute(PlcCall call)
+            {
+                var values = new List<(int Index, PlcValue Value)>();
+                for (var i = 0; i < call.InputCount; i++)
+                {
+                    var name = call.InputName(i);
+                    if (name.StartsWith("K_X", StringComparison.OrdinalIgnoreCase) && int.TryParse(name.AsSpan(3), out var index))
+                        values.Add((index, call.Input(i)));
+                }
+                values.Sort((a, b) => a.Index.CompareTo(b.Index));
+                if (values.Count == 0 || values.Count % 2 != 0)
+                {
+                    call.Fail();
+                    return;
+                }
+
+                var type = _type ?? PlcOps.OperatingType(values.Select(v => v.Value).ToArray());
+                if (type.IsReal)
+                {
+                    double weighted = 0, weights = 0;
+                    for (var i = 0; i < values.Count; i += 2)
+                    {
+                        var k = RealOf(values[i].Value);
+                        var x = RealOf(values[i + 1].Value);
+                        weighted += k * x;
+                        weights += k;
+                    }
+                    var mean = weighted / weights;
+                    if (weights == 0 || !IsFinite(mean))
+                    {
+                        call.Overflow = true;
+                        call.Eno = false;
+                        return;
+                    }
+                    call.SetOutput("Y", PlcValue.FromReal(mean));
+                }
+                else
+                {
+                    long weighted = 0, weights = 0;
+                    for (var i = 0; i < values.Count; i += 2)
+                    {
+                        var k = PlcOps.Convert(values[i].Value, type).AsInteger();
+                        weighted += k * PlcOps.Convert(values[i + 1].Value, type).AsInteger();
+                        weights += k;
+                    }
+                    if (weights == 0)
+                    {
+                        call.Overflow = true;
+                        call.Eno = false;
+                        return;
+                    }
+                    var mean = weighted / weights;
+                    var result = PlcValue.FromInteger(type, mean);
+                    if (result.AsInteger() != mean) call.Overflow = true;
+                    call.SetOutput("Y", result);
+                }
+            }
+        }
+
+        /// <summary>
+        /// EXTRACT: copies CPY_NELEM parts of SRC, starting at part SRC_POS, into DST
+        /// starting at part DST_POS; a part is SRC's memory size divided by SRC_NELEM and
+        /// positions count from 0. The rest of DST keeps its value. ERR: 0 copied; -1
+        /// SRC_NELEM is 0; -2 SRC's size is not a multiple of SRC_NELEM; -3 SRC_POS outside
+        /// SRC; -4 DST_POS outside DST (nothing copied for any of these); 1 CPY_NELEM is 0;
+        /// 2 the copy was shortened to fit (pp. 187-190).
+        /// </summary>
+        private sealed class ExtractFunction : Function
+        {
+            public override bool ReadsOutputs => true;
+
+            public override void Execute(PlcCall call)
+            {
+                var source = call.Input("SRC");
+                var current = call.CurrentOutput("DST");
+                if (source.Type is not { } sourceType || (call.OutputType("DST") ?? current.Type) is not { } targetType)
+                {
+                    call.Fail();
+                    return;
+                }
+
+                long Count(string pin) => PlcOps.Convert(call.Input(pin), PlcType.Udint).AsInteger();
+                var parts = Count("SRC_NELEM");
+                var sourcePosition = Count("SRC_POS");
+                var targetPosition = Count("DST_POS");
+                var copies = Count("CPY_NELEM");
+
+                int error;
+                if (parts == 0)
+                {
+                    error = -1;
+                }
+                else if (sourceType.Size % parts != 0)
+                {
+                    error = -2;
+                }
+                else
+                {
+                    var partSize = sourceType.Size / parts;
+                    if (sourcePosition >= parts)
+                    {
+                        error = -3;
+                    }
+                    else if (targetPosition * partSize >= targetType.Size)
+                    {
+                        error = -4;
+                    }
+                    else if (copies == 0)
+                    {
+                        error = 1;
+                    }
+                    else
+                    {
+                        var fit = Math.Min(copies, Math.Min(parts - sourcePosition, (targetType.Size - (targetPosition * partSize)) / partSize));
+                        var target = PlcValue.Encode(current.HasValue ? current : PlcValue.DefaultOf(targetType), targetType);
+                        source.AsBytes().AsSpan((int)(sourcePosition * partSize), (int)(fit * partSize))
+                            .CopyTo(target.AsSpan((int)(targetPosition * partSize)));
+                        call.SetOutput("DST", PlcValue.Decode(targetType, target));
+                        error = fit < copies ? 2 : 0;
+                    }
+                }
+                call.SetOutput("ERR", PlcValue.FromInteger(PlcType.Int, error));
             }
         }
 

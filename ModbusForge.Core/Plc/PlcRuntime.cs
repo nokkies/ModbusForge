@@ -23,8 +23,8 @@ namespace ModbusForge.Core.Plc
         // %S bits the runtime drives (Control Expert System Bits and Words, EIO0000002135):
         // %S0 cold start, %S4-%S7 time bases, %S10 IOERR and %S16 IOERRTSK (normally 1,
         // 0 on an I/O error; the simulation has none), %S12 PLCRUNNING, %S13 first cycle
-        // in RUN, %S20 INDEXOVF (set on an index overflow, reset by the application),
-        // %S21 first task cycle.
+        // in RUN, %S18 OVERFLOW and %S20 INDEXOVF (set on an arithmetic overrun or an
+        // index overflow, reset by the application), %S21 first task cycle.
         private const int ColdStartBit = 0;
         private const int TimeBase10MsBit = 4;
         private const int TimeBase100MsBit = 5;
@@ -34,6 +34,7 @@ namespace ModbusForge.Core.Plc
         private const int PlcRunningBit = 12;
         private const int FirstCycleInRunBit = 13;
         private const int TaskIoErrorBit = 16;
+        private const int OverflowBit = 18;
         private const int IndexOverflowBit = 20;
         private const int FirstTaskCycleBit = 21;
 
@@ -165,6 +166,9 @@ namespace ModbusForge.Core.Plc
             }
             return new PlcLocation(space, 0, variable.Type);
         }
+
+        /// <summary>A block hit an arithmetic overrun or an invalid value: %S18 goes to 1.</summary>
+        internal void RaiseOverflow() => Memory.SystemBits.WriteBit(OverflowBit, true);
 
         internal void CountIndexError()
         {
@@ -373,9 +377,10 @@ namespace ModbusForge.Core.Plc
             call.Now = Now;
             call.ColdStart = _coldStart;
             call.FirstTaskCycle = task.FirstCycle;
+            if (block.Behavior!.ReadsOutputs) SeedOutputs(block, call);
             try
             {
-                block.Behavior!.Execute(call);
+                block.Behavior.Execute(call);
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or OperationCanceledException))
             {
@@ -383,6 +388,7 @@ namespace ModbusForge.Core.Plc
                 call.Fail();
             }
             block.State = call.State;
+            if (call.Overflow) RaiseOverflow();
 
             if (call.Failed)
             {
@@ -405,6 +411,16 @@ namespace ModbusForge.Core.Plc
             block.LastEno = call.Eno;
             WriteEno(block);
             block.ExecutedLastScan = true;
+        }
+
+        /// <summary>The current values of a block's output variables, for a block that changes only part of them.</summary>
+        private void SeedOutputs(PlcBlock block, PlcCall call)
+        {
+            var outputs = block.OutputPins;
+            for (var i = 0; i < outputs.Length; i++)
+            {
+                if (outputs[i].Operand is { } operand) call.SeedOutput(i, operand.Read(this));
+            }
         }
 
         /// <summary>
@@ -505,6 +521,7 @@ namespace ModbusForge.Core.Plc
             fbCall.FirstTaskCycle = _currentTask?.FirstCycle ?? false;
             entry.Behavior.Execute(fbCall);
             _instanceStates[key] = fbCall.State;
+            if (fbCall.Overflow) RaiseOverflow();
             if (fbCall.Failed)
             {
                 StErrors++;

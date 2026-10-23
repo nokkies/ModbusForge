@@ -101,6 +101,25 @@ namespace ModbusForge.Core.Plc
         /// </summary>
         public bool Eno { get; set; } = true;
 
+        /// <summary>
+        /// Set when the block hit an arithmetic overrun or an invalid value: the runtime
+        /// raises %S18 (OVERFLOW, EIO0000002135), which the application resets.
+        /// </summary>
+        public bool Overflow { get; set; }
+
+        /// <summary>
+        /// The value an output carries before the block writes it. For a block that changes
+        /// only part of its output variable (see <see cref="PlcBlockBehavior.ReadsOutputs"/>)
+        /// this is the variable's current value.
+        /// </summary>
+        public PlcValue CurrentOutput(string name)
+        {
+            var index = IndexOf(_outputNames, name);
+            return index >= 0 ? _outputs[index] : default;
+        }
+
+        internal void SeedOutput(int index, PlcValue value) => _outputs[index] = value;
+
         internal void SetInput(int index, PlcValue value) => _inputs[index] = value;
 
         internal PlcValue Output(int index) => _outputs[index];
@@ -111,6 +130,7 @@ namespace ModbusForge.Core.Plc
         {
             Failed = false;
             Eno = true;
+            Overflow = false;
             Array.Clear(_written);
         }
 
@@ -138,6 +158,12 @@ namespace ModbusForge.Core.Plc
         public abstract bool IsFunctionBlock { get; }
 
         public virtual object? CreateState() => null;
+
+        /// <summary>
+        /// True for a block that changes only part of its output variable (EXTRACT): it is
+        /// handed the variable's current value first (<see cref="PlcCall.CurrentOutput"/>).
+        /// </summary>
+        public virtual bool ReadsOutputs => false;
 
         public abstract void Execute(PlcCall call);
     }
