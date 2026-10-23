@@ -292,7 +292,7 @@
                 <!-- ST / IL section: its program text, read-only, as Control Expert shows it. -->
                 <Grid RowDefinitions="Auto,*" IsVisible="{Binding PlcProjectViewModel.HasSourceSelected}">
                   <TextBlock Grid.Row="0"
-                             Text="{Binding PlcProjectViewModel.SelectedNode.Title, StringFormat='Program: {0}'}"
+                             Text="{Binding PlcProjectViewModel.SourceCaption}"
                              FontWeight="SemiBold" Margin="4,2,4,6" />
                   <TextBox Grid.Row="1" Text="{Binding PlcProjectViewModel.SelectedSourceText, Mode=OneWay}"
                            IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"

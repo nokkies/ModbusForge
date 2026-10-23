@@ -128,7 +128,8 @@ Late := Hold.Q;</STSource></FBProgram>
   </program>
 </FEFExchangeFile>";
 
-        // Secret's code is encrypted in the export, yet its XML still carries an FBD program named Body.
+        // Secret's code is encrypted in the export. No corpus file carries code under a protected type;
+        // this FBD program named Body is a defensive case.
         private const string SecretFbdProgram = @"<FBProgram name=""Body""><FBDSource><networkFBD>
   <FFBBlock instanceName="".1"" typeName=""AND"" enEnO=""false"" width=""7"" height=""6""><objPosition posX=""2"" posY=""2""/>
     <descriptionFFB execAfter="""">
@@ -137,6 +138,9 @@ Late := Hold.Q;</STSource></FBProgram>
       <outputVariable invertedPin=""false"" formalParameter=""OUT"" effectiveParameter=""Alarm""/>
     </descriptionFFB></FFBBlock>
 </networkFBD></FBDSource></FBProgram>";
+
+        // An ST program beside the FBD one, so the text header of a program can be checked.
+        private const string TextProgram = @"<program><identProgram name=""Cleanup"" type=""section"" task=""MAST""/><STSource>Alarm := FALSE;</STSource></program>";
 
         // TabItem index of the PLC tab (see PlcSimulationIsolationTests).
         private const int PlcTabIndex = 7;
@@ -199,7 +203,7 @@ Late := Hold.Q;</STSource></FBProgram>
             await main.LoadPlcXmlCommand.ExecuteAsync(null);
 
             Assert.Equal(
-                new[] { "Inputs (0)", "Outputs (1)", "Inputs/Outputs (0)", "Public variables (0)", "Private variables (not in the export)", "Sections (1)" },
+                new[] { "Inputs (0)", "Outputs (1)", "Inputs/Outputs (0)", "Public variables (0, may be incomplete)", "Private variables (not in the export)", "Sections (1)" },
                 Titles(Node(main, "Application", "Derived FB Types", "Secret (protected, empty)").Children));
             var code = Node(main, "Application", "Derived FB Types", "Secret (protected, empty)", "Sections (1)", "Protected code (empty)");
             Assert.Equal(PlcNodeKind.DfbProtectedCode, code.Kind);
@@ -260,6 +264,22 @@ Late := Hold.Q;</STSource></FBProgram>
         }
 
         [Fact]
+        public async Task TextSectionHeaders_NameTheDfbSectionOrTheProgram()
+        {
+            File.WriteAllText(_xefPath, FixtureXef.Replace("</FEFExchangeFile>", TextProgram + "</FEFExchangeFile>"));
+            using var simulation = CreateSimulationEditor();
+            using var plc = CreatePlcEditor();
+            using var main = CreateMainViewModel(simulation, plc);
+            await main.LoadPlcXmlCommand.ExecuteAsync(null);
+
+            main.PlcProjectViewModel.SelectedNode = Node(main, "Application", "Derived FB Types", "Counter", "Sections (1)", "Body [ST]");
+            Assert.Equal("DFB section: Counter/Body", main.PlcProjectViewModel.SourceCaption);
+
+            main.PlcProjectViewModel.SelectedNode = Node(main, "Application", "Section / Programs", "(unassigned)", "Cleanup [ST]");
+            Assert.Equal("Program: Cleanup [ST]", main.PlcProjectViewModel.SourceCaption);
+        }
+
+        [Fact]
         public async Task AProgramAndADfbSectionWithTheSameName_OpenTheirOwnCanvases()
         {
             using var simulation = CreateSimulationEditor();
@@ -310,6 +330,7 @@ Late := Hold.Q;</STSource></FBProgram>
             using var main = CreateMainViewModel(simulation, plc);
             await main.LoadPlcXmlCommand.ExecuteAsync(null);
             Assert.NotEmpty(Node(main, "Application", "Derived FB Types").Children);
+            Assert.Contains("MyAnd/Body", ProgramNames(plc.ProgramTree));
             File.WriteAllText(_xefPath, PlainXef);
 
             await main.LoadPlcXmlCommand.ExecuteAsync(null);

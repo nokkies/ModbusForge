@@ -54,6 +54,9 @@ public sealed partial class PlcProjectViewModel : ObservableObject
     /// <summary>Source of the selected ST/IL program (shown as text, as Control Expert does), else null.</summary>
     public string? SelectedSourceText { get; private set; }
 
+    /// <summary>Header of the text view: "Program: name", or "DFB section: type/section" for a DFB section, else empty.</summary>
+    public string SourceCaption { get; private set; } = "";
+
     /// <summary>True when the selection is a textual program with source to show.</summary>
     public bool HasSourceSelected { get; private set; }
 
@@ -113,6 +116,12 @@ public sealed partial class PlcProjectViewModel : ObservableObject
             };
             SelectedSourceText = value?.Kind is PlcNodeKind.ProgramText or PlcNodeKind.DfbSectionText ? value.SourceText : null;
             HasSourceSelected = SelectedSourceText != null;
+            SourceCaption = value?.Kind switch
+            {
+                PlcNodeKind.ProgramText => $"Program: {value.Title}",
+                PlcNodeKind.DfbSectionText => $"DFB section: {value.ProgramName}",
+                _ => ""
+            };
             HasVariablesSelected = value?.Kind is PlcNodeKind.DdtList or PlcNodeKind.DfbVariables;
 
             OnPropertyChanged(nameof(SelectedFbdProgram));
@@ -120,6 +129,7 @@ public sealed partial class PlcProjectViewModel : ObservableObject
             OnPropertyChanged(nameof(CanvasCaption));
             OnPropertyChanged(nameof(SelectedSourceText));
             OnPropertyChanged(nameof(HasSourceSelected));
+            OnPropertyChanged(nameof(SourceCaption));
             OnPropertyChanged(nameof(HasVariablesSelected));
             OnPropertyChanged(nameof(FilteredVariables));
             OnPropertyChanged(nameof(ShowsPlaceholder));
@@ -329,7 +339,12 @@ public sealed partial class PlcProjectViewModel : ObservableObject
         typeNode.Children.Add(BuildDfbVariablesNode($"Inputs ({type.Inputs.Count})", type.Inputs));
         typeNode.Children.Add(BuildDfbVariablesNode($"Outputs ({type.Outputs.Count})", type.Outputs));
         typeNode.Children.Add(BuildDfbVariablesNode($"Inputs/Outputs ({type.InOuts.Count})", type.InOuts));
-        typeNode.Children.Add(BuildDfbVariablesNode($"Public variables ({type.PublicVariables.Count})", type.PublicVariables));
+        // A protected export can leave public variables out, so its count is marked as possibly short.
+        typeNode.Children.Add(BuildDfbVariablesNode(
+            type.IsProtected
+                ? $"Public variables ({type.PublicVariables.Count}, may be incomplete)"
+                : $"Public variables ({type.PublicVariables.Count})",
+            type.PublicVariables));
         // A protected export carries no private variables, so the group says so instead of a count.
         typeNode.Children.Add(BuildDfbVariablesNode(
             type.IsProtected ? "Private variables (not in the export)" : $"Private variables ({type.PrivateVariables.Count})",
@@ -364,7 +379,7 @@ public sealed partial class PlcProjectViewModel : ObservableObject
         }
         if (section.SourceText != null)
         {
-            return new PlcTreeNodeViewModel(title, PlcNodeKind.DfbSectionText) { SourceText = section.SourceText };
+            return new PlcTreeNodeViewModel(title, PlcNodeKind.DfbSectionText) { SourceText = section.SourceText, ProgramName = section.EditorKey };
         }
         return new PlcTreeNodeViewModel(title, PlcNodeKind.DfbSectionListed);
     }
@@ -498,7 +513,7 @@ public sealed class PlcTreeNodeViewModel : ObservableObject
     public string Title { get; }
     public PlcNodeKind Kind { get; }
 
-    /// <summary>Program name this node refers to (FBD sections, task assignments).</summary>
+    /// <summary>Program name this node refers to: a program, a DFB section (its type/section key), or a task assignment.</summary>
     public string? ProgramName { get; init; }
 
     /// <summary>Program text of an ST/IL section (<see cref="PlcNodeKind.ProgramText"/> and <see cref="PlcNodeKind.DfbSectionText"/> rows).</summary>
