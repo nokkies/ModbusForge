@@ -182,6 +182,55 @@ namespace ModbusForge.Tests.Plc
         }
 
         [Fact]
+        public void Start_NamesTheProtectedDfbTypes_OnEveryStart()
+        {
+            var reports = new List<string>();
+            var (service, nodes) = Started(new XefBuilder().Raw(PlcDfbTests.SecretDfb).Variable("S1", "Secret").Variable("Out", "BOOL")
+                .Section("S", Block("S1", "Secret", 2, 2, "|Q=Out")), reports);
+            using var _ = service;
+            service.Stop();
+
+            service.Start(new VisualNodeEditorConfig { Nodes = nodes, ScanIntervalMs = 10_000 });
+
+            Assert.Equal(2, reports.Count(r => r.Contains("protected DFB types run empty")));
+        }
+
+        [Fact]
+        public void Start_NamesAProtectedTypeNoBlockUses()
+        {
+            var reports = new List<string>();
+            var (service, _) = Started(new XefBuilder().Raw(PlcDfbTests.SecretDfb).Variable("A", "INT").Variable("B", "INT")
+                .Section("S", Block(".1", "MOVE", 2, 2, "IN=A|OUT=B")), reports);
+            using var _ = service;
+
+            Assert.Single(reports, "protected DFB types run empty (their code is protected in the export): Secret");
+        }
+
+        [Fact]
+        public void AnExportedDfbInstance_IsNotTaggedAsProtected()
+        {
+            var reports = new List<string>();
+            var (service, nodes) = Started(new XefBuilder().Raw(PlcDfbTests.AndDfb).Variable("A1", "MyAnd").Variable("Q", "BOOL")
+                .Section("S", Block("A1", "MyAnd", 2, 2, "A=TRUE,B=TRUE|Q=Q")), reports);
+            using var _ = service;
+            service.Tick(Scan);
+
+            var live = Node(nodes, "MyAnd").PlcLive!;
+            Assert.True(live.Simulated);
+            Assert.False(live.ProtectedDfb);
+        }
+
+        [Fact]
+        public void LiveStates_DifferingOnlyInProtectedDfb_AreNotTheSame()
+        {
+            var none = new Dictionary<string, string>();
+            var plain = new PlcLiveState(none, none, true, false);
+
+            Assert.False(plain.SameAs(plain with { ProtectedDfb = true }));
+            Assert.True(plain.SameAs(plain with { }));
+        }
+
+        [Fact]
         public void Start_WithoutProtectedDfbs_SaysNothingAboutThem()
         {
             var reports = new List<string>();

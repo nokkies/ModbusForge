@@ -214,8 +214,21 @@ Late := Hold.Q;</STSource></FBProgram>
                 .Project());
 
             Assert.True(plc.BlockNamed("S1").IsProtectedDfb);
+            Assert.True(plc.BlockNamed("A1").IsSimulated);
             Assert.False(plc.BlockNamed("A1").IsProtectedDfb);
             Assert.Equal(new[] { "Secret" }, plc.Runtime.Project.Types!.ProtectedDfbTypes);
+        }
+
+        [Fact]
+        public void ProtectedDfbTypes_AreListedInXefOrder()
+        {
+            var alpha = SecretDfb.Replace(@"nameOfFBType=""Secret""", @"nameOfFBType=""Alpha""");
+            var project = new XefBuilder().Raw(alpha).Raw(AndDfb).Raw(SecretDfb)
+                .Variable("A1", "Alpha").Variable("Out", "BOOL")
+                .Section("S", Block("A1", "Alpha", 2, 2, "|Q=Out"))
+                .Project();
+
+            Assert.Equal(new[] { "Alpha", "Secret" }, project.Types!.ProtectedDfbTypes);
         }
 
         [Fact]

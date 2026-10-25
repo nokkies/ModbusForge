@@ -73,8 +73,8 @@ namespace ModbusForge.Services
         public DataStore CurrentDataStore => EffectiveStore;
 
         /// <summary>
-        /// Something the runtime could not do: DFB code it cannot execute, or the first run-time error of a kind,
-        /// each reported once per loaded project. Start names the protected DFB types on every Start instead.
+        /// Something the runtime could not do: DFB code it cannot execute, what blocks tell the user (each notice
+        /// once per block type), or the first run-time error of a kind, each reported once per loaded project. Start names the protected DFB types on every Start instead.
         /// Raised on the scan thread, and by Start on its caller's thread.
         /// </summary>
         public event Action<string>? ProblemReported;
@@ -129,13 +129,17 @@ namespace ModbusForge.Services
                 protectedDfbTypes = _runtime?.Project.Types?.ProtectedDfbTypes;
             }
 
-            if (protectedDfbTypes is { Count: > 0 })
-            {
-                Report($"protected DFB types run empty (their code is protected in the export): {string.Join(", ", protectedDfbTypes)}");
-            }
-
+            // Scanning is under way before any subscriber runs, so one that throws cannot leave IsRunning
+            // true with no timer.
             _timer.Start();
             _logger.LogInformation("PLC runtime started (scan {IntervalMs} ms, store: {StoreMode})", ScanIntervalMs, StoreMode);
+
+            if (protectedDfbTypes is { Count: > 0 })
+            {
+                // A fact about the project, not a fault: logged as information, shown in the Console.
+                Report($"protected DFB types run empty (their code is protected in the export): {string.Join(", ", protectedDfbTypes)}",
+                    LogLevel.Information);
+            }
         }
 
         /// <summary>Stops scanning; variables keep their values (a later Run is a warm restart).</summary>
@@ -271,9 +275,9 @@ namespace ModbusForge.Services
             }
         }
 
-        private void Report(string message)
+        private void Report(string message, LogLevel level = LogLevel.Warning)
         {
-            _logger.LogWarning("PLC: {Message}", message);
+            _logger.Log(level, "PLC: {Message}", message);
             ProblemReported?.Invoke(message);
         }
 

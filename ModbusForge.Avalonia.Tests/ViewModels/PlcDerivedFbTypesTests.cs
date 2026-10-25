@@ -340,6 +340,21 @@ Late := Hold.Q;</STSource></FBProgram>
         }
 
         [Fact]
+        public async Task TheStatusTexts_CountEmptyProtectedDfbsApartFromComputedBlocks()
+        {
+            using var simulation = CreateSimulationEditor();
+            using var plc = CreatePlcEditor();
+            using var main = CreateMainViewModel(simulation, plc);
+
+            await main.LoadPlcXmlCommand.ExecuteAsync(null);
+            Assert.Contains("empty (protected DFB)", main.StatusMessage);
+
+            plc.RunCommand.Execute(null);
+            Assert.Contains("empty (protected DFB)", plc.StatusText);
+            plc.StopCommand.Execute(null);
+        }
+
+        [Fact]
         public async Task AProjectWithoutProgramSections_DoesNotOpenOnADfbCanvas()
         {
             File.WriteAllText(_xefPath, System.Text.RegularExpressions.Regex.Replace(
