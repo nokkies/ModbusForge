@@ -4035,10 +4035,11 @@ namespace ModbusForge.Avalonia.ViewModels
                     // The FBD sections of DFB types are editor programs too, named "type/section".
                     var dfbCanvases = result.DfbCanvasSections
                         .Select(s => (s.EditorKey, s.Canvas!.Nodes, s.Canvas!.Connections));
-                    PlcEditorViewModel.LoadImportedPrograms(
-                        result.Sections.Select(s => (s.Name, s.Nodes, s.Connections))
-                            .Concat(dfbCanvases)
-                            .ToList());
+                    // The editor opens on the first program: with no program sections that must be an
+                    // empty one, not a DFB section.
+                    var programs = result.Sections.Select(s => (s.Name, s.Nodes, s.Connections)).ToList();
+                    if (programs.Count == 0) programs.Add(("PLC Program", new List<VisualNode>(), new List<NodeConnection>()));
+                    PlcEditorViewModel.LoadImportedPrograms(programs.Concat(dfbCanvases).ToList());
 
                     // Run on the PLC tab executes the whole compiled project.
                     PlcEditorViewModel.LoadProject(result.Project);

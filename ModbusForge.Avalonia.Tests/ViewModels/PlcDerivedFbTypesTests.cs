@@ -340,6 +340,22 @@ Late := Hold.Q;</STSource></FBProgram>
         }
 
         [Fact]
+        public async Task AProjectWithoutProgramSections_DoesNotOpenOnADfbCanvas()
+        {
+            File.WriteAllText(_xefPath, System.Text.RegularExpressions.Regex.Replace(
+                FixtureXef, "<program>.*?</program>", "", System.Text.RegularExpressions.RegexOptions.Singleline));
+            using var simulation = CreateSimulationEditor();
+            using var plc = CreatePlcEditor();
+            using var main = CreateMainViewModel(simulation, plc);
+
+            await main.LoadPlcXmlCommand.ExecuteAsync(null);
+
+            Assert.True(main.PlcProjectViewModel.HasProject);
+            Assert.Contains("MyAnd/Body", ProgramNames(plc.ProgramTree));
+            Assert.NotEqual("MyAnd/Body", plc.SelectedProgram?.Name);
+        }
+
+        [Fact]
         public async Task AProtectedTypeWithCodeInItsXml_AddsNoEditorProgram()
         {
             File.WriteAllText(_xefPath, FixtureXef.Replace("<crypted>00</crypted>", "<crypted>00</crypted>" + SecretFbdProgram));
