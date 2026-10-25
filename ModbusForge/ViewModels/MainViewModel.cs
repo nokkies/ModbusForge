@@ -4033,8 +4033,7 @@ namespace ModbusForge.Avalonia.ViewModels
                     // Load through the program tree so every program/folder bookkeeping
                     // stays consistent and the canvas rebuilds as it does for .mfp loads.
                     // The FBD sections of DFB types are editor programs too, named "type/section".
-                    var dfbCanvases = result.DfbTypes.SelectMany(t => t.Sections)
-                        .Where(s => s.Canvas != null)
+                    var dfbCanvases = result.DfbCanvasSections
                         .Select(s => (s.EditorKey, s.Canvas!.Nodes, s.Canvas!.Connections));
                     PlcEditorViewModel.LoadImportedPrograms(
                         result.Sections.Select(s => (s.Name, s.Nodes, s.Connections))

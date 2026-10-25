@@ -102,7 +102,9 @@ namespace ModbusForge.Core.Plc
                         _ddtSources.TryAdd(ddt, source);
                         break;
                     case "FBSource" when (string?)source.Attribute("nameOfFBType") is { Length: > 0 } fb:
-                        if (_fbSources.TryAdd(fb, source) && source.Element("crypted") != null) _protectedDfbTypes.Add(fb);
+                        // The first FBSource of a name wins, for the type and for the protected list alike.
+                        var firstOfName = _fbSources.TryAdd(fb, source);
+                        if (firstOfName && IsEncrypted(source)) _protectedDfbTypes.Add(fb);
                         _signatures.TryAdd(fb, ReadSignature(source));
                         break;
                     case "EFBSource" when (string?)source.Attribute("nameOfEFBType") is { Length: > 0 } efb:
@@ -118,6 +120,9 @@ namespace ModbusForge.Core.Plc
             // Library structures (Para_SCALING, ...) the XEF uses without defining them.
             foreach (var (name, source) in PlcLibraryTypes.Structures()) _ddtSources.TryAdd(name, source);
         }
+
+        /// <summary>True when an FBSource's code is encrypted in the export (it has a crypted child).</summary>
+        internal static bool IsEncrypted(XElement fbSource) => fbSource.Element("crypted") != null;
 
         private HashSet<string>? _dfbNames;
 
@@ -222,7 +227,7 @@ namespace ModbusForge.Core.Plc
             if (dfb)
             {
                 type.Dfb = ReadCode(name, source);
-                type.IsProtected = source.Element("crypted") != null;
+                type.IsProtected = IsEncrypted(source);
             }
             return type;
         }
@@ -230,7 +235,7 @@ namespace ModbusForge.Core.Plc
         /// <summary>The DFB's sections, or null when its code is encrypted or not exported.</summary>
         private static PlcDfbDefinition? ReadCode(string name, XElement source)
         {
-            if (source.Element("crypted") != null) return null;
+            if (IsEncrypted(source)) return null;
             var sections = new List<PlcDfbSection>();
             foreach (var program in source.Elements("FBProgram"))
             {

@@ -264,8 +264,7 @@ namespace ModbusForge.Services
             // AND across programs. The editor and the simulation engine both key by
             // global node id, so enforce uniqueness across the entire import here —
             // duplicate ids crash the engine when the graph loads.
-            var dfbCanvases = result.DfbTypes.SelectMany(t => t.Sections).Select(s => s.Canvas)
-                .OfType<PlcXmlSection>().ToList();
+            var dfbCanvases = result.DfbCanvasSections.Select(s => s.Canvas!).ToList();
             // Must run before CompileProject, which reads the node ids the runtime blocks are drawn as.
             EnsureGlobalNodeIdUniqueness(sections.Concat(dfbCanvases));
             foreach (var canvas in dfbCanvases)
@@ -806,7 +805,7 @@ namespace ModbusForge.Services
                 {
                     Name = typeName,
                     Version = (string?)fbSource.Attribute("version") ?? "",
-                    IsProtected = fbSource.Element("crypted") != null
+                    IsProtected = PlcTypeRegistry.IsEncrypted(fbSource)
                 };
 
                 var holders = new[] { fbSource, fbSource.Element("ExternalToolsOnly") };
@@ -1611,6 +1610,9 @@ namespace ModbusForge.Services
 
         /// <summary>User function block types, in XEF order. They are listed, not run.</summary>
         public List<PlcXmlDfbType> DfbTypes { get; } = new();
+
+        /// <summary>The DFB sections drawn as canvases (FBD sections), across all types.</summary>
+        public IEnumerable<PlcXmlDfbSection> DfbCanvasSections => DfbTypes.SelectMany(t => t.Sections).Where(s => s.Canvas != null);
 
         /// <summary>The project compiled for the PLC runtime (what Run executes); null when the import failed.</summary>
         public PlcProject? Project { get; set; }

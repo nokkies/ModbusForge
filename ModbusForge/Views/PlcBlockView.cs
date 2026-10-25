@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Threading;
+using ModbusForge.Core.Plc;
 using ModbusForge.Models;
 
 namespace ModbusForge.Avalonia.Views
@@ -170,7 +171,7 @@ namespace ModbusForge.Avalonia.Views
                 return null;
             }
 
-            return live.ProtectedDfb ? "empty (protected DFB)" : "not simulated";
+            return live.ProtectedDfb ? PlcBlockCounts.ProtectedDfbNote : PlcBlockCounts.UnsupportedNote;
         }
 
         /// <summary>Whether a text this wide fits inside a block frame this wide.</summary>

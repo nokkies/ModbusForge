@@ -204,7 +204,7 @@ public sealed partial class PlcProjectViewModel : ObservableObject
     {
         SourceFile = result.SourceFile;
         var sections = result.Sections.ToDictionary(s => s.Name, StringComparer.Ordinal);
-        foreach (var dfbSection in result.DfbTypes.SelectMany(t => t.Sections).Where(s => s.Canvas != null))
+        foreach (var dfbSection in result.DfbCanvasSections)
         {
             // A repeated key keeps its first canvas, as the editor's name lookup does.
             sections.TryAdd(dfbSection.EditorKey, dfbSection.Canvas!);

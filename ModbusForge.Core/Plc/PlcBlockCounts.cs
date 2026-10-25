@@ -26,6 +26,12 @@ namespace ModbusForge.Core.Plc
             return new PlcBlockCounts(total, computed, emptyProtectedDfb, unsupported);
         }
 
+        /// <summary>The idle note of a protected DFB instance (canvas and status text).</summary>
+        public const string ProtectedDfbNote = "empty (protected DFB)";
+
+        /// <summary>The idle note of a block the runtime does not simulate (canvas and status text).</summary>
+        public const string UnsupportedNote = "not simulated";
+
         /// <summary>
         /// The status wording, for example "1 of 3 blocks computed, 1 empty (protected DFB)".
         /// The two parts after the first appear only when their count is above 0.
@@ -33,8 +39,8 @@ namespace ModbusForge.Core.Plc
         public string Describe()
         {
             var text = $"{Computed} of {Total} blocks computed";
-            if (EmptyProtectedDfb > 0) text += $", {EmptyProtectedDfb} empty (protected DFB)";
-            if (Unsupported > 0) text += $", {Unsupported} not simulated (unsupported type)";
+            if (EmptyProtectedDfb > 0) text += $", {EmptyProtectedDfb} {ProtectedDfbNote}";
+            if (Unsupported > 0) text += $", {Unsupported} {UnsupportedNote} (unsupported type)";
             return text;
         }
     }
