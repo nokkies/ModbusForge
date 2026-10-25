@@ -801,6 +801,10 @@ namespace ModbusForge.Services
             foreach (var (fbSource, typeOrdinal) in xef.Root!.Elements("FBSource").Select((s, i) => (s, i)))
             {
                 var typeName = (string?)fbSource.Attribute("nameOfFBType") ?? "";
+                if (typeName.Length == 0)
+                    result.AddWarning($"DFB type #{typeOrdinal + 1} has no name; its sections open as \"/section\".");
+                else if (result.DfbTypes.Any(t => t.Name == typeName))
+                    result.AddWarning($"DFB type '{typeName}' is declared more than once; the runtime keeps the first.");
                 var type = new PlcXmlDfbType
                 {
                     Name = typeName,

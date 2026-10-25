@@ -196,6 +196,59 @@ namespace ModbusForge.Tests.Services
             Assert.Contains("DFB Blank: Section 'Body' produced no nodes.", result.Warnings);
         }
 
+        [Fact]
+        public void ARepeatedInterfaceName_KeepsTheFirstDeclaration()
+        {
+            var type = Import(new XefBuilder().Raw(@"<FBSource nameOfFBType=""Twice"">
+  <inputParameters><variables name=""A"" typeName=""BOOL""/></inputParameters>
+  <ExternalToolsOnly><inputParameters><variables name=""A"" typeName=""INT""/></inputParameters></ExternalToolsOnly>
+</FBSource>")).DfbTypes.Single();
+
+            var input = Assert.Single(type.Inputs);
+            Assert.Equal("BOOL", input.TypeName);
+        }
+
+        [Fact]
+        public void AnIlSection_KeepsItsText()
+        {
+            var section = Assert.Single(Import(new XefBuilder().Raw(@"<FBSource nameOfFBType=""Listing"">
+  <FBProgram name=""Body""><ILSource>LD A
+ST B</ILSource></FBProgram>
+</FBSource>")).DfbTypes.Single().Sections);
+
+            Assert.Equal("IL", section.Language);
+            Assert.Null(section.Canvas);
+            Assert.Equal("LD A" + (char)10 + "ST B", section.SourceText);
+        }
+
+        [Fact]
+        public void AnFbProgramWithoutASource_IsNotListed()
+        {
+            var type = Import(new XefBuilder().Raw(@"<FBSource nameOfFBType=""Noted"">
+  <FBProgram name=""Body""><comment>only a note</comment></FBProgram>
+</FBSource>")).DfbTypes.Single();
+
+            Assert.Empty(type.Sections);
+        }
+
+        [Fact]
+        public void ARepeatedTypeName_IsListedTwice_AndWarnedAbout()
+        {
+            var result = Import(new XefBuilder().Raw(PlcDfbTests.AndDfb).Raw(PlcDfbTests.AndDfb));
+
+            Assert.Equal(2, result.DfbTypes.Count);
+            Assert.Contains(result.Warnings, w => w.Contains("MyAnd") && w.Contains("declared more than once") && w.Contains("first"));
+        }
+
+        [Fact]
+        public void ATypeWithoutAName_IsListed_AndWarnedAbout()
+        {
+            var result = Import(new XefBuilder().Raw(@"<FBSource nameOfFBType=""""><inputParameters><variables name=""A"" typeName=""BOOL""/></inputParameters></FBSource>"));
+
+            Assert.Single(result.DfbTypes);
+            Assert.Contains(result.Warnings, w => w.Contains("no name"));
+        }
+
         private static PlcXmlImportResult Import(XefBuilder xef)
         {
             var result = new PlcXmlImporter().ImportFromXml(xef.Build(), "test.xef");
