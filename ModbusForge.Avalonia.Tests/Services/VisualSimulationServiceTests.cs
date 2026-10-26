@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -140,7 +141,7 @@ namespace ModbusForge.Avalonia.Tests.Services
                         Id = "ton1",
                         Name = "Timer1",
                         ElementType = PlcElementType.TON,
-                        TimerPresetMs = 1000
+                        TimerPresetMs = PresetMs
                     }
                 },
                 Connections = new ObservableCollection<NodeConnection>
@@ -155,24 +156,37 @@ namespace ModbusForge.Avalonia.Tests.Services
             Assert.NotNull(dataStore);
             dataStore!.CoilDiscretes[1] = true;
 
-            // Let ~500ms accumulate toward the 1000ms preset.
+            // Let some time accumulate toward the preset. The delays are real time, so the preset is
+            // far above them: a slow runner stretches a delay, but not past the preset.
             service.UpdateNodeValues();
-            await Task.Delay(500);
+            await Task.Delay(AccumulateMs);
             service.UpdateNodeValues();
             Assert.False(service.GetNodeValue("ton1"));
 
             // The rename forces a graph rebuild mid-run.
             config.Nodes[1].Name = "Timer renamed";
             service.UpdateNodeValues(); // rebuild happens here (fresh engine tick clock)
-            await Task.Delay(600);
-            service.UpdateNodeValues();
+            var sinceRebuild = Stopwatch.StartNew();
 
-            // ~1100ms total (> preset) => the TON completes only if its accumulator
-            // survived the rebuild. A state reset would leave ~600ms (< preset).
-            Assert.True(service.GetNodeValue("ton1"));
+            // A TON whose accumulator survived the rebuild completes about PresetMs - AccumulateMs
+            // after it; one that was reset needs the whole PresetMs. Wait for it, with a limit
+            // between the two.
+            while (!service.GetNodeValue("ton1") && sinceRebuild.ElapsedMilliseconds < PresetMs + 1000)
+            {
+                await Task.Delay(50);
+                service.UpdateNodeValues();
+            }
+
+            Assert.True(service.GetNodeValue("ton1"), "the TON did not complete");
+            Assert.True(sinceRebuild.ElapsedMilliseconds < ResetLimitMs,
+                $"the TON restarted from zero after the rebuild (completed after {sinceRebuild.ElapsedMilliseconds} ms)");
 
             service.Stop();
         }
+
+        private const int PresetMs = 4000;
+        private const int AccumulateMs = 1500;
+        private const int ResetLimitMs = 3500;
 
         /// <summary>
         /// Exposes the protected IsRunning setter so tests can run ticks
