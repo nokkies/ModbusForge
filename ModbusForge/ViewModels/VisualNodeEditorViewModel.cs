@@ -484,6 +484,34 @@ namespace ModbusForge.Avalonia.ViewModels
         }
 
         /// <summary>
+        /// Whether the Blocks list (left of the canvas) is shown. Not part of
+        /// <see cref="Config"/>: it is window chrome, and the PLC tab and the Simulation
+        /// tab each keep their own state.
+        /// </summary>
+        [ObservableProperty]
+        private bool _isBlocksListVisible = true;
+
+        /// <summary>Whether the Controls panel (right of the canvas) is shown.</summary>
+        [ObservableProperty]
+        private bool _isControlsPanelVisible = true;
+
+        /// <summary>Fold the Blocks list away to widen the canvas.</summary>
+        public IRelayCommand ToggleBlocksListCommand { get; }
+
+        /// <summary>Fold the Controls panel away to widen the canvas.</summary>
+        public IRelayCommand ToggleControlsPanelCommand { get; }
+
+        /// <summary>
+        /// Raised when either side panel is folded or unfolded, so the app can remember
+        /// the layout. The editor does not persist it itself: it has no settings service.
+        /// </summary>
+        public event EventHandler? PanelVisibilityChanged;
+
+        partial void OnIsBlocksListVisibleChanged(bool value) => PanelVisibilityChanged?.Invoke(this, EventArgs.Empty);
+
+        partial void OnIsControlsPanelVisibleChanged(bool value) => PanelVisibilityChanged?.Invoke(this, EventArgs.Empty);
+
+        /// <summary>
         /// Single source of truth for "is the simulation running": the Run/Stop buttons and
         /// the Live checkbox all flip this. Start/stop is handled in one place
         /// (<see cref="OnConfigPropertyChanged"/>) so the states can never diverge.
@@ -559,6 +587,8 @@ namespace ModbusForge.Avalonia.ViewModels
             ResetValuesCommand = new RelayCommand(ResetValues, () => Config.Nodes.Count > 0);
             RandomizeValuesCommand = new RelayCommand(RandomizeValues, () => Config.Nodes.Count > 0);
             ExportConfigCommand = new AsyncRelayCommand(ExportConfigAsync);
+            ToggleBlocksListCommand = new RelayCommand(() => IsBlocksListVisible = !IsBlocksListVisible);
+            ToggleControlsPanelCommand = new RelayCommand(() => IsControlsPanelVisible = !IsControlsPanelVisible);
 
             BuildPalette();
 

@@ -586,12 +586,34 @@ namespace ModbusForge.Avalonia.ViewModels
             SaveAllConfigCommand = new AsyncRelayCommand(SaveProjectAsync);
             ShowAllTabsCommand = new RelayCommand(ShowAllTabs);
             ResetTabsCommand = new RelayCommand(ResetTabs);
+            ToggleNavigationCommand = new RelayCommand(() => IsNavigationVisible = !IsNavigationVisible);
+            TogglePlcNavigatorCommand = new RelayCommand(() =>
+            {
+                PlcProjectViewModel.IsNavigatorVisible = !PlcProjectViewModel.IsNavigatorVisible;
+                if (_settingsService != null && _settingsService.ShowPlcNavigator != PlcProjectViewModel.IsNavigatorVisible)
+                {
+                    _settingsService.ShowPlcNavigator = PlcProjectViewModel.IsNavigatorVisible;
+                    _settingsService.Save();
+                }
+            });
             ClearConsoleCommand = new RelayCommand(() => ConsoleMessages.Clear());
             ClearDebugCommand = new RelayCommand(() => DebugMessages.Clear());
 
             if (_themeService != null)
             {
                 _themeService.ThemeChanged += ThemeService_ThemeChanged;
+            }
+
+            // Restore the folded-away panels from the last run.
+            if (_settingsService != null)
+            {
+                PlcProjectViewModel.IsNavigatorVisible = _settingsService.ShowPlcNavigator;
+                if (PlcEditorViewModel != null)
+                {
+                    PlcEditorViewModel.IsBlocksListVisible = _settingsService.ShowPlcBlocksList;
+                    PlcEditorViewModel.IsControlsPanelVisible = _settingsService.ShowPlcControlsPanel;
+                    PlcEditorViewModel.PanelVisibilityChanged += OnPlcPanelVisibilityChanged;
+                }
             }
 
             _connectionManager.ActiveProfileChanged += ConnectionManager_ActiveProfileChanged;
@@ -693,8 +715,29 @@ namespace ModbusForge.Avalonia.ViewModels
         public IAsyncRelayCommand SaveAllConfigCommand { get; }
         public ICommand ShowAllTabsCommand { get; }
         public ICommand ResetTabsCommand { get; }
+        public ICommand ToggleNavigationCommand { get; }
+        public ICommand TogglePlcNavigatorCommand { get; }
         public ICommand ClearConsoleCommand { get; }
         public ICommand ClearDebugCommand { get; }
+
+        /// <summary>
+        /// Whether the left Navigation panel is shown. Folding it gives the current
+        /// page the full width; the state is remembered between runs.
+        /// </summary>
+        public bool IsNavigationVisible
+        {
+            get => _settingsService?.ShowMainNavigation ?? true;
+            set
+            {
+                if (_settingsService != null && _settingsService.ShowMainNavigation != value)
+                {
+                    _settingsService.ShowMainNavigation = value;
+                    _settingsService.Save();
+                }
+
+                OnPropertyChanged();
+            }
+        }
 
         public bool IsDarkMode
         {
@@ -936,8 +979,24 @@ namespace ModbusForge.Avalonia.ViewModels
             }
         }
 
-        public void ShowAllTabs()
+        /// <summary>Remember which PLC editor panels are folded away.</summary>
+        private void OnPlcPanelVisibilityChanged(object? sender, EventArgs e)
         {
+            if (_settingsService == null || PlcEditorViewModel == null)
+            {
+                return;
+            }
+
+            if (_settingsService.ShowPlcBlocksList != PlcEditorViewModel.IsBlocksListVisible
+                || _settingsService.ShowPlcControlsPanel != PlcEditorViewModel.IsControlsPanelVisible)
+            {
+                _settingsService.ShowPlcBlocksList = PlcEditorViewModel.IsBlocksListVisible;
+                _settingsService.ShowPlcControlsPanel = PlcEditorViewModel.IsControlsPanelVisible;
+                _settingsService.Save();
+            }
+        }
+
+        public void ShowAllTabs()        {
             IsRegistersTabVisible = true;
             IsInputRegistersTabVisible = true;
             IsCoilsTabVisible = true;

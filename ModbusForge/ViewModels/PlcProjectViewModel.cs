@@ -21,6 +21,13 @@ public sealed partial class PlcProjectViewModel : ObservableObject
 
     public bool HasProject { get; private set; }
 
+    /// <summary>
+    /// Whether the Project navigator panel is shown. Folding it gives the canvas the
+    /// full width; the state is held here because the PLC page binds to this view model.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isNavigatorVisible = true;
+
     public string SourceFile { get; private set; } = "";
 
     public ObservableCollection<PlcTreeNodeViewModel> RootNodes { get; }

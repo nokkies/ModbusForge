@@ -13,6 +13,14 @@ public interface ISettingsService
     bool ShowConnectionDiagnosticsOnError { get; set; }
     bool ConfirmOnExit { get; set; }
 
+    // Panel layout. The navigation and the editor's side panels can each be folded
+    // away to give the working surface more room; the states are remembered so the
+    // window opens the way the engineer left it.
+    bool ShowMainNavigation { get; set; }
+    bool ShowPlcNavigator { get; set; }
+    bool ShowPlcBlocksList { get; set; }
+    bool ShowPlcControlsPanel { get; set; }
+
     // Logging settings
     bool EnableConsoleLogging { get; set; }
     int MaxConsoleMessages { get; set; }

@@ -37,6 +37,30 @@ public class SettingsService : ISettingsService
         set { _settings.ConfirmOnExit = value; OnSettingsChanged(); }
     }
 
+    public bool ShowMainNavigation
+    {
+        get => _settings.ShowMainNavigation;
+        set { _settings.ShowMainNavigation = value; OnSettingsChanged(); }
+    }
+
+    public bool ShowPlcNavigator
+    {
+        get => _settings.ShowPlcNavigator;
+        set { _settings.ShowPlcNavigator = value; OnSettingsChanged(); }
+    }
+
+    public bool ShowPlcBlocksList
+    {
+        get => _settings.ShowPlcBlocksList;
+        set { _settings.ShowPlcBlocksList = value; OnSettingsChanged(); }
+    }
+
+    public bool ShowPlcControlsPanel
+    {
+        get => _settings.ShowPlcControlsPanel;
+        set { _settings.ShowPlcControlsPanel = value; OnSettingsChanged(); }
+    }
+
     public bool EnableConsoleLogging
     {
         get => _settings.EnableConsoleLogging;
@@ -165,6 +189,10 @@ public class SettingsService : ISettingsService
         public int AutoReconnectIntervalMs { get; set; } = 5000;
         public bool ShowConnectionDiagnosticsOnError { get; set; } = true;
         public bool ConfirmOnExit { get; set; } = false;
+        public bool ShowMainNavigation { get; set; } = true;
+        public bool ShowPlcNavigator { get; set; } = true;
+        public bool ShowPlcBlocksList { get; set; } = true;
+        public bool ShowPlcControlsPanel { get; set; } = true;
         public bool EnableConsoleLogging { get; set; } = true;
         public int MaxConsoleMessages { get; set; } = 1000;
         // The REST API doubles as the MCP endpoint and is the app's main integration

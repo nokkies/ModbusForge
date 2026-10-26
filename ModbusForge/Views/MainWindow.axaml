@@ -21,13 +21,9 @@
     <KeyBinding Gesture="Ctrl+Q" Command="{Binding ExitCommand}" />
   </Window.KeyBindings>
 
-  <Grid RowDefinitions="Auto,Auto,*,Auto">
-    <!-- Title Bar -->
-    <Border Grid.Row="0" Background="#1E1E1E" Padding="16,8">
-      <TextBlock Text="ModbusForge" FontSize="24" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
-    </Border>
-
-    <Menu Grid.Row="1">
+  <Grid RowDefinitions="Auto,*,Auto">
+    <!-- No app-name banner: the window's own title bar already says ModbusForge. -->
+    <Menu Grid.Row="0">
         <MenuItem Header="_File">
           <MenuItem Header="_Save Project" Command="{Binding SaveProjectCommand}" InputGesture="Ctrl+S" />
           <MenuItem Header="_Load Project" Command="{Binding LoadProjectCommand}" />
@@ -50,6 +46,13 @@
           <MenuItem Header="_Dark Mode" ToggleType="CheckBox" IsChecked="{Binding IsDarkMode, Mode=TwoWay}" />
           <MenuItem Header="_Trends" Command="{Binding OpenTrendsCommand}" InputGesture="Ctrl+T" />
           <MenuItem Header="_Frame Inspector" Command="{Binding OpenFrameInspectorCommand}" />
+          <Separator />
+          <!-- Panels can be folded away to widen the working surface; the state is remembered. -->
+          <MenuItem Header="_Navigation Panel" ToggleType="CheckBox" InputGesture="Ctrl+B"
+                    Command="{Binding ToggleNavigationCommand}" IsChecked="{Binding IsNavigationVisible}" />
+          <MenuItem Header="PLC _Project Navigator" ToggleType="CheckBox"
+                    Command="{Binding TogglePlcNavigatorCommand}"
+                    IsChecked="{Binding PlcProjectViewModel.IsNavigatorVisible}" />
           <Separator />
           <MenuItem Header="_Registers" ToggleType="CheckBox" IsChecked="{Binding IsRegistersTabVisible}" />
           <MenuItem Header="_Input Registers" ToggleType="CheckBox" IsChecked="{Binding IsInputRegistersTabVisible}" />
@@ -86,10 +89,10 @@
       </Menu>
 
     <!-- Main Content -->
-    <views:MainView Grid.Row="2" />
+    <views:MainView Grid.Row="1" />
 
     <!-- Status Bar -->
-    <Border Grid.Row="3" Background="#1E1E1E" Padding="8,4">
+    <Border Grid.Row="2" Background="#1E1E1E" Padding="8,4">
       <TextBlock Text="{Binding StatusMessage}" AutomationProperties.AutomationId="StatusMessage" Foreground="White" VerticalAlignment="Center" />
     </Border>
   </Grid>

@@ -10,6 +10,10 @@ namespace ModbusForge.Avalonia.Tests.Fakes
         public int AutoReconnectIntervalMs { get; set; } = 1000;
         public bool ShowConnectionDiagnosticsOnError { get; set; }
         public bool ConfirmOnExit { get; set; }
+        public bool ShowMainNavigation { get; set; } = true;
+        public bool ShowPlcNavigator { get; set; } = true;
+        public bool ShowPlcBlocksList { get; set; } = true;
+        public bool ShowPlcControlsPanel { get; set; } = true;
         public bool EnableConsoleLogging { get; set; }
         public int MaxConsoleMessages { get; set; } = 100;
         public bool EnableApi { get; set; }

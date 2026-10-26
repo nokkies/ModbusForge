@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels" xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core" xmlns:shapes="using:Avalonia.Controls.Shapes" xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters" xmlns:views="clr-namespace:ModbusForge.Avalonia.Views" xmlns:behaviors="clr-namespace:ModbusForge.Avalonia.Behaviors" x:Class="ModbusForge.Avalonia.Views.PlcFbdCanvasView" x:DataType="vm:VisualNodeEditorViewModel" Focusable="True">
+﻿<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="clr-namespace:ModbusForge.Avalonia.ViewModels" xmlns:models="clr-namespace:ModbusForge.Models;assembly=ModbusForge.Core" xmlns:shapes="using:Avalonia.Controls.Shapes" xmlns:converters="clr-namespace:ModbusForge.Avalonia.Converters" xmlns:views="clr-namespace:ModbusForge.Avalonia.Views" xmlns:behaviors="clr-namespace:ModbusForge.Avalonia.Behaviors" x:Class="ModbusForge.Avalonia.Views.PlcFbdCanvasView" x:DataType="vm:VisualNodeEditorViewModel" Focusable="True">
 
   <!--
     PLC-project rendering of an imported FBD program. Deliberately slimmer than
@@ -107,7 +107,7 @@
           <TextBlock Text="View" Classes="ToolGroupHeader"/>
           <Button Content="Tag" Command="{Binding OpenTagBrowserCommand}" ToolTip.Tip="Open tag browser"/>
           <Button Content="Watch" Command="{Binding OpenWatchWindowCommand}" ToolTip.Tip="Open watch window"/>
-          <Button Content="−" Command="{Binding ZoomOutCommand}" Padding="4,2"/>
+          <Button Content="âˆ’" Command="{Binding ZoomOutCommand}" Padding="4,2"/>
           <TextBlock Text="{Binding ZoomText}" VerticalAlignment="Center" MinWidth="36" TextAlignment="Center"/>
           <Button Content="+" Command="{Binding ZoomInCommand}" Padding="4,2"/>
           <Button Content="100%" Command="{Binding ResetZoomCommand}" Padding="4,2"/>
@@ -160,13 +160,19 @@
       </Border>
     </WrapPanel>
 
-    <Grid Grid.Row="1" ColumnDefinitions="220,*,300">
+    <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto">
       <!-- Inline block list: pick a block type, click Add (or double-click) to drop
            it on the canvas. Keeps the edit capability without the Simulation tab's
            palette/POU panels. -->
-      <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="1" Padding="8" Margin="0,0,8,0">
+      <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="1" Padding="8" Margin="0,0,8,0"
+              Width="220" IsVisible="{Binding IsBlocksListVisible}">
         <Grid RowDefinitions="Auto,Auto,*">
-          <TextBlock Grid.Row="0" Text="Blocks" FontWeight="Bold" Margin="0,0,0,4"/>
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+            <TextBlock Grid.Column="0" Text="Blocks" FontWeight="Bold" VerticalAlignment="Center"/>
+            <Button Grid.Column="1" Content="&#x2039;" Command="{Binding ToggleBlocksListCommand}"
+                    Width="22" Height="22" MinHeight="0" Padding="0" FontSize="13"
+                    ToolTip.Tip="Hide the block list"/>
+          </Grid>
           <TextBox Grid.Row="1" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Watermark="Search blocks..." Margin="0,0,0,8">
             <TextBox.InnerRightContent>
               <Button Content="x" Padding="4,0" Command="{Binding ClearSearchCommand}" ToolTip.Tip="Clear search" IsVisible="{Binding SearchText, Converter={x:Static ObjectConverters.IsNotNull}}"/>
@@ -184,6 +190,12 @@
           </ListBox>
         </Grid>
       </Border>
+
+      <!-- Folded away: this strip brings the block list back. -->
+      <Button Grid.Column="0" Content="&#x203A;" Command="{Binding ToggleBlocksListCommand}"
+              Width="22" VerticalAlignment="Top" Margin="0,0,8,0" Padding="0" FontSize="13"
+              IsVisible="{Binding IsBlocksListVisible, Converter={x:Static converters:InvertBoolConverter.Instance}}"
+              ToolTip.Tip="Show the block list"/>
 
       <!-- Canvas -->
       <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="1" Margin="0">
@@ -430,10 +442,16 @@
       </Border>
 
       <!-- Controls -->
-      <Border Grid.Column="2" Grid.Row="1" Margin="8,0,0,0" BorderBrush="#DDD" BorderThickness="1" Padding="8">
+      <Border Grid.Column="2" Grid.Row="1" Margin="8,0,0,0" BorderBrush="#DDD" BorderThickness="1" Padding="8"
+              Width="300" IsVisible="{Binding IsControlsPanelVisible}">
         <ScrollViewer>
           <StackPanel Spacing="8">
-            <TextBlock Text="Controls" FontWeight="Bold" FontSize="14" Margin="0,0,0,4"/>
+            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+              <TextBlock Grid.Column="0" Text="Controls" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
+              <Button Grid.Column="1" Content="&#x203A;" Command="{Binding ToggleControlsPanelCommand}"
+                      Width="22" Height="22" MinHeight="0" Padding="0" FontSize="13"
+                      ToolTip.Tip="Hide the controls panel"/>
+            </Grid>
 
             <Expander Header="Selected Node" IsExpanded="True" IsVisible="{Binding SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}">
               <StackPanel Spacing="4" Margin="0,4,0,0" DataContext="{Binding SelectedNode}">
@@ -515,6 +533,12 @@
           </StackPanel>
         </ScrollViewer>
       </Border>
+
+      <!-- Folded away: this strip brings the controls panel back. -->
+      <Button Grid.Column="2" Content="&#x2039;" Command="{Binding ToggleControlsPanelCommand}"
+              Width="22" VerticalAlignment="Top" Margin="8,0,0,0" Padding="0" FontSize="13"
+              IsVisible="{Binding IsControlsPanelVisible, Converter={x:Static converters:InvertBoolConverter.Instance}}"
+              ToolTip.Tip="Show the controls panel"/>
     </Grid>
   </Grid>
 </UserControl>
