@@ -36,21 +36,30 @@
     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
       <TextBlock VerticalAlignment="Center" Text="Active profile:" />
       <TextBlock VerticalAlignment="Center" Text="{Binding ActiveProfile.Name, FallbackValue='None'}" FontWeight="SemiBold" MaxWidth="150" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ActiveProfile.DisplayName, FallbackValue='None'}" />
+      <!-- The bound string is the ToggleButton's own Content, so no ContentTemplate:
+           a template would be handed the string as its DataContext and render the
+           type name "Avalonia.Controls.TextBlock" instead of the address. No fixed
+           Width either, so a long summary cannot cover the Interface field. -->
       <ToggleButton x:Name="ServerIpsToggle"
                     VerticalAlignment="Center"
                     IsVisible="{Binding IsServerMode}"
-                    Width="200"
                     Height="24"
                     MinHeight="0"
-                    Padding="4,0"
+                    MaxWidth="240"
+                    Padding="6,0"
                     FontSize="10"
+                    Content="{Binding ServerIpAddressSummary}"
                     ToolTip.Tip="Click to see all server IP addresses">
-        <ToggleButton.ContentTemplate>
-          <DataTemplate>
-            <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-          </DataTemplate>
-        </ToggleButton.ContentTemplate>
-        <TextBlock Text="{Binding ServerIpAddressSummary}" />
+        <ToggleButton.Template>
+          <ControlTemplate TargetType="{x:Type ToggleButton}">
+            <Border Background="#22000000" BorderBrush="#55808080" BorderThickness="1" CornerRadius="4"
+                    Padding="{TemplateBinding Padding}">
+              <TextBlock Text="{TemplateBinding Content}" FontSize="{TemplateBinding FontSize}"
+                         MaxWidth="220" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                         VerticalAlignment="Center" />
+            </Border>
+          </ControlTemplate>
+        </ToggleButton.Template>
       </ToggleButton>
       <Popup IsOpen="{Binding IsChecked, ElementName=ServerIpsToggle, Mode=TwoWay}"
              PlacementTarget="{Binding #ServerIpsToggle}"
@@ -89,16 +98,23 @@
                 Width="100" Height="24" MinHeight="0" FontSize="10" VerticalAlignment="Center" VerticalContentAlignment="Center"
                 IsVisible="{Binding ShowServerFields}" />
       <Button Content="{Binding ToggleConnectionButtonText, FallbackValue='Connect'}" Command="{Binding ToggleConnectionCommand}" Width="100" Height="24" MinHeight="0" Padding="8,0" FontSize="10" VerticalAlignment="Center" VerticalContentAlignment="Center" />
-      <TextBlock Text="●" Foreground="#2E8B57" IsVisible="{Binding IsConnected}" VerticalAlignment="Center" FontSize="14" ToolTip.Tip="{Binding ConnectionStatusText}" />
-      <TextBlock Text="●" Foreground="#C62828" IsVisible="{Binding IsConnectionErrorVisible}" VerticalAlignment="Center" FontSize="14" ToolTip.Tip="{Binding ConnectionStatusText}" />
-      <TextBlock Text="○" Foreground="#777777" IsVisible="{Binding IsDisconnected}" VerticalAlignment="Center" FontSize="14" ToolTip.Tip="{Binding ConnectionStatusText}" />
+      <TextBlock Text="â—" Foreground="#2E8B57" IsVisible="{Binding IsConnected}" VerticalAlignment="Center" FontSize="14" ToolTip.Tip="{Binding ConnectionStatusText}" />
+      <TextBlock Text="â—" Foreground="#C62828" IsVisible="{Binding IsConnectionErrorVisible}" VerticalAlignment="Center" FontSize="14" ToolTip.Tip="{Binding ConnectionStatusText}" />
+      <TextBlock Text="â—‹" Foreground="#777777" IsVisible="{Binding IsDisconnected}" VerticalAlignment="Center" FontSize="14" ToolTip.Tip="{Binding ConnectionStatusText}" />
     </StackPanel>
 
-    <Grid Grid.Row="1" ColumnDefinitions="190,*">
-      <Border Grid.Column="0" BorderBrush="#40000000" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,12,0">
+    <Grid Grid.Row="1" ColumnDefinitions="Auto,*">
+      <Border Grid.Column="0" BorderBrush="#40000000" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,12,0"
+              IsVisible="{Binding IsNavigationVisible}">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="4">
-            <TextBlock Text="Navigation" FontSize="16" FontWeight="SemiBold" Margin="4,2,4,8" />
+            <Grid ColumnDefinitions="*,Auto" Margin="4,2,0,8">
+              <TextBlock Grid.Column="0" Text="Navigation" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <!-- Fold the panel away to give the page the full width. -->
+              <Button Grid.Column="1" Content="&#x2039;" Command="{Binding ToggleNavigationCommand}"
+                      Width="22" Height="22" MinHeight="0" Padding="0" FontSize="13"
+                      ToolTip.Tip="Hide the navigation panel" />
+            </Grid>
             <ListBox x:Name="NavigationList"
                      BorderThickness="0"
                      Background="Transparent"
@@ -117,6 +133,7 @@
               <ListBoxItem Content="Script Editor" />
               <ListBoxItem Content="Rules" />
               <ListBoxItem Content="Signal Generator" />
+              <ListBoxItem Content="PLC" />
               <ListBoxItem Content="Simulation" />
               <ListBoxItem Content="Registers" Margin="0,16,0,0" />
               <ListBoxItem Content="Input Registers" />
@@ -130,6 +147,13 @@
           </StackPanel>
         </ScrollViewer>
       </Border>
+
+      <!-- When the panel is folded away this narrow strip brings it back, so the
+           page is never left without a way to change it. -->
+      <Button Grid.Column="0" Content="&#x203A;" Command="{Binding ToggleNavigationCommand}"
+              Width="22" VerticalAlignment="Top" Margin="0,0,12,0" Padding="0" FontSize="13"
+              IsVisible="{Binding IsNavigationVisible, Converter={x:Static converters:InvertBoolConverter.Instance}}"
+              ToolTip.Tip="Show the navigation panel" />
 
       <TabControl x:Name="MainTabControl" Grid.Column="1" SelectedIndex="{Binding SelectedTabIndex}">
         <TabControl.Styles>
@@ -145,9 +169,9 @@
             <Border Grid.Row="1" Background="#12000000" CornerRadius="6" Padding="16" Margin="0,0,0,16">
               <Grid ColumnDefinitions="Auto,*,Auto">
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                  <TextBlock Text="●" Foreground="#2E8B57" IsVisible="{Binding IsConnected}" />
-                  <TextBlock Text="○" Foreground="#777777" IsVisible="{Binding IsDisconnected}" />
-                  <TextBlock Text="●" Foreground="#C62828" IsVisible="{Binding IsConnectionErrorVisible}" />
+                  <TextBlock Text="â—" Foreground="#2E8B57" IsVisible="{Binding IsConnected}" />
+                  <TextBlock Text="â—‹" Foreground="#777777" IsVisible="{Binding IsDisconnected}" />
+                  <TextBlock Text="â—" Foreground="#C62828" IsVisible="{Binding IsConnectionErrorVisible}" />
                   <TextBlock Text="{Binding ConnectionStatusText}" VerticalAlignment="Center" />
                 </StackPanel>
                 <TextBlock Grid.Column="1" Text="{Binding ActiveProfileDisplayName, StringFormat='Active profile: {0}', FallbackValue='Active profile: None'}" VerticalAlignment="Center" Margin="16,0" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ActiveProfileDisplayName}" />
@@ -188,13 +212,13 @@
                   <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="models:ConnectionProfile">
                       <StackPanel Orientation="Horizontal" Spacing="10" Margin="8,6">
-                        <TextBlock Text="●" FontSize="12" VerticalAlignment="Center"
+                        <TextBlock Text="â—" FontSize="12" VerticalAlignment="Center"
                                    Foreground="#2E8B57" IsVisible="{Binding IsConnected}"
                                    ToolTip.Tip="Connected" />
-                        <TextBlock Text="●" FontSize="12" VerticalAlignment="Center"
+                        <TextBlock Text="â—" FontSize="12" VerticalAlignment="Center"
                                    Foreground="#C62828" IsVisible="{Binding HasConnectionLost}"
                                    ToolTip.Tip="Connection lost" />
-                        <TextBlock Text="○" FontSize="12" VerticalAlignment="Center"
+                        <TextBlock Text="â—‹" FontSize="12" VerticalAlignment="Center"
                                    Foreground="#777777" IsVisible="{Binding IsIdle}"
                                    ToolTip.Tip="Not connected" />
                         <StackPanel Spacing="1">
@@ -236,6 +260,108 @@
 
       <TabItem x:Name="SignalGeneratorTab" Header="Signal Generator">
         <views:SignalGeneratorView DataContext="{Binding SignalGeneratorViewModel}" />
+      </TabItem>
+
+      <TabItem x:Name="PlcTab" Header="PLC">
+        <Grid RowDefinitions="Auto,Auto,*">
+          <!-- Import row: the PLC project comes from a Unity Pro / Control Expert export -->
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+            <Button Content="Load XEF..." Command="{Binding LoadPlcXmlCommand}" />
+            <TextBlock Text="{Binding PlcProjectViewModel.Summary}" VerticalAlignment="Center" Opacity="0.75" />
+          </StackPanel>
+
+          <Border Grid.Row="1" BorderBrush="#40000000" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,8">
+            <StackPanel Spacing="2">
+              <TextBlock Text="{Binding PlcProjectViewModel.SelectedNode.Title, FallbackValue='Properties'}" FontSize="16" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding PlcProjectViewModel.SelectedNode.Detail}" TextWrapping="Wrap" Opacity="0.85" />
+            </StackPanel>
+          </Border>
+
+          <!-- Control Expert layout: navigator left, program editor right. -->
+          <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*">
+            <Border Grid.Column="0" BorderBrush="#40000000" BorderThickness="1" CornerRadius="6" Padding="6" Margin="0,0,8,0"
+                    IsVisible="{Binding PlcProjectViewModel.IsNavigatorVisible}">
+              <Grid RowDefinitions="Auto,*">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="4,2,0,6">
+                  <TextBlock Grid.Column="0" Text="Project navigator" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <Button Grid.Column="1" Content="&#x2039;" Command="{Binding TogglePlcNavigatorCommand}"
+                          Width="22" Height="22" MinHeight="0" Padding="0" FontSize="13"
+                          ToolTip.Tip="Hide the project navigator" />
+                </Grid>
+                <TreeView Grid.Row="1"
+                          x:Name="PlcProjectTree"
+                          Width="348"
+                          ItemsSource="{Binding PlcProjectViewModel.RootNodes}"
+                          SelectedItem="{Binding PlcProjectViewModel.SelectedNode, Mode=TwoWay}">
+                  <TreeView.ItemTemplate>
+                    <TreeDataTemplate ItemsSource="{Binding Children}">
+                      <StackPanel Orientation="Horizontal">
+                        <!-- Lock for a protected section: its code is encrypted in the export. -->
+                        <PathIcon Data="M4,7 L4,5 C4,2.8 5.8,1 8,1 C10.2,1 12,2.8 12,5 L12,7 L13,7 L13,15 L3,15 L3,7 Z M6,7 L10,7 L10,5 C10,3.9 9.1,3 8,3 C6.9,3 6,3.9 6,5 Z"
+                                  Width="10" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"
+                                  IsVisible="{Binding IsLocked}" />
+                        <TextBlock Text="{Binding Title}" Opacity="{Binding TitleOpacity}" />
+                      </StackPanel>
+                    </TreeDataTemplate>
+                  </TreeView.ItemTemplate>
+                </TreeView>
+              </Grid>
+            </Border>
+
+            <!-- Folded away: this strip brings the navigator back. -->
+            <Button Grid.Column="0" Content="&#x203A;" Command="{Binding TogglePlcNavigatorCommand}"
+                    Width="22" VerticalAlignment="Top" Margin="0,0,8,0" Padding="0" FontSize="13"
+                    IsVisible="{Binding PlcProjectViewModel.IsNavigatorVisible, Converter={x:Static converters:InvertBoolConverter.Instance}}"
+                    ToolTip.Tip="Show the project navigator" />
+
+            <GridSplitter Grid.Column="1" Width="5" Margin="0,0,8,0"
+                          IsVisible="{Binding PlcProjectViewModel.IsNavigatorVisible}" />
+
+            <Border Grid.Column="2" BorderBrush="#40000000" BorderThickness="1" CornerRadius="6" Padding="6">
+              <Grid>
+                <Grid RowDefinitions="Auto,*" IsVisible="{Binding PlcProjectViewModel.HasFbdSelected}">
+                  <TextBlock Grid.Row="0"
+                             Text="{Binding PlcProjectViewModel.CanvasCaption}"
+                             FontWeight="SemiBold" Margin="4,2,4,6" />
+                  <!-- The PLC tab's own editor, never the Simulation tab's (VisualNodeEditorViewModel). -->
+                  <views:PlcFbdCanvasView Grid.Row="1" DataContext="{Binding PlcEditorViewModel}" />
+                </Grid>
+                <!-- ST / IL section: its program text, read-only, as Control Expert shows it. -->
+                <Grid RowDefinitions="Auto,*" IsVisible="{Binding PlcProjectViewModel.HasSourceSelected}">
+                  <TextBlock Grid.Row="0"
+                             Text="{Binding PlcProjectViewModel.SourceCaption}"
+                             FontWeight="SemiBold" Margin="4,2,4,6" />
+                  <TextBox Grid.Row="1" Text="{Binding PlcProjectViewModel.SelectedSourceText, Mode=OneWay}"
+                           IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                           FontFamily="Consolas, Cascadia Mono, Courier New, monospace" FontSize="12"
+                           ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                </Grid>
+                <!-- Data Management: the declared variables, as Control Expert's Data Editor lists them. -->
+                <Grid RowDefinitions="Auto,Auto,*" IsVisible="{Binding PlcProjectViewModel.HasVariablesSelected}">
+                  <TextBlock Grid.Row="0"
+                             Text="{Binding PlcProjectViewModel.FilteredVariables.Count, StringFormat='Variables: {0} shown'}"
+                             FontWeight="SemiBold" Margin="4,2,4,6" />
+                  <TextBox Grid.Row="1" Text="{Binding PlcProjectViewModel.VariableFilter, Mode=TwoWay}"
+                           Watermark="Filter by name, type, address or comment" Margin="0,0,0,6" />
+                  <DataGrid Grid.Row="2" ItemsSource="{Binding PlcProjectViewModel.FilteredVariables}"
+                            IsReadOnly="True" AutoGenerateColumns="False" CanUserResizeColumns="True" CanUserSortColumns="True"
+                            GridLinesVisibility="Horizontal">
+                    <DataGrid.Columns>
+                      <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" />
+                      <DataGridTextColumn Header="Type" Binding="{Binding TypeName}" Width="*" />
+                      <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*" />
+                      <DataGridTextColumn Header="Initial value" Binding="{Binding InitialValue}" Width="*" />
+                      <DataGridTextColumn Header="Comment" Binding="{Binding Comment}" Width="3*" />
+                    </DataGrid.Columns>
+                  </DataGrid>
+                </Grid>
+                <TextBlock Text="Select an FBD or ST program in the navigator to open its logic here.&#10;&#10;No PLC project loaded yet? Click 'Load XEF...' and pick a Unity Pro / Control Expert export (.XEF)."
+                           TextWrapping="Wrap" Opacity="0.6" Margin="6"
+                           IsVisible="{Binding PlcProjectViewModel.ShowsPlaceholder}" />
+              </Grid>
+            </Border>
+          </Grid>
+        </Grid>
       </TabItem>
 
       <TabItem x:Name="SimulationTab" Header="Simulation" IsVisible="{Binding IsSimulationTabVisible}">
@@ -612,3 +738,6 @@
 
   </Grid>
 </UserControl>
+
+
+

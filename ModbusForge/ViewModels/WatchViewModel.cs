@@ -181,6 +181,11 @@ namespace ModbusForge.Avalonia.ViewModels
             if (IsRunning)
                 return;
 
+            // Running before the monitor starts: the loop runs while IsRunning, so a
+            // loop scheduled first would otherwise see false and end before reading.
+            IsRunning = true;
+            StatusMessage = "Running";
+
             _updateTimer.Start();
 
             if (_connectionManager != null && _dispatcher != null)
@@ -189,9 +194,6 @@ namespace ModbusForge.Avalonia.ViewModels
                 _monitorCts = cts;
                 _ = Task.Run(() => MonitorLoopAsync(cts.Token), cts.Token);
             }
-
-            IsRunning = true;
-            StatusMessage = "Running";
         }
 
         private void Stop()

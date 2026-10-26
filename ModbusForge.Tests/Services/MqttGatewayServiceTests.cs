@@ -109,16 +109,24 @@ namespace ModbusForge.Tests.Services
             try
             {
                 // Wait for at least one failed reconnect attempt's heartbeat.
+                // Entries is appended by the service's background thread under its
+                // own lock, so always read a snapshot while polling/asserting.
                 var stopwatch = Stopwatch.StartNew();
-                while (logger.Entries.All(e => !e.Message.Contains("retrying", StringComparison.OrdinalIgnoreCase))
+                while (Snapshot().All(e => !e.Message.Contains("retrying", StringComparison.OrdinalIgnoreCase))
                        && stopwatch.Elapsed < TimeSpan.FromSeconds(5))
                 {
                     await Task.Delay(50);
                 }
 
-                Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information
+                var entries = Snapshot();
+                Assert.Contains(entries, e => e.Level == LogLevel.Information
                     && e.Message.Contains("unreachable; retrying", StringComparison.OrdinalIgnoreCase));
-                Assert.DoesNotContain(logger.Entries, e => e.Level >= LogLevel.Warning);
+                Assert.DoesNotContain(entries, e => e.Level >= LogLevel.Warning);
+
+                List<(LogLevel Level, string Message)> Snapshot()
+                {
+                    lock (logger.Entries) return logger.Entries.ToList();
+                }
             }
             finally
             {

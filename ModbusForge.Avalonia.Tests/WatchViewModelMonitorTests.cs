@@ -42,6 +42,37 @@ namespace ModbusForge.Avalonia.Tests
         }
 
         [Fact]
+        public async Task Start_ReadsEvenWhenTheMonitorLoopStartsFirst()
+        {
+            // The monitor loop runs while IsRunning. Holding Start() just before
+            // IsRunning turns true lets a loop that was already launched run first:
+            // it must still read, not see "not running" and end.
+            var (vm, tagService, _) = CreateViewModel(new ushort[] { 7 });
+            vm.PropertyChanging += (_, e) =>
+            {
+                if (e.PropertyName == nameof(WatchViewModel.IsRunning) && !vm.IsRunning)
+                    Thread.Sleep(500);
+            };
+
+            vm.StartCommand.Execute(null);
+            try
+            {
+                var deadline = DateTime.UtcNow.AddSeconds(5);
+                while (tagService.Tags[0].CurrentValue is not ushort && DateTime.UtcNow < deadline)
+                {
+                    await Task.Delay(50);
+                }
+
+                Assert.Equal((ushort)7, Assert.IsType<ushort>(tagService.Tags[0].CurrentValue));
+            }
+            finally
+            {
+                vm.StopCommand.Execute(null);
+                vm.Dispose();
+            }
+        }
+
+        [Fact]
         public async Task Start_DecodesMultiWordFloatTag()
         {
             // 12.5f == 0x41480000 -> registers 0x4148, 0x0000 at address 100.

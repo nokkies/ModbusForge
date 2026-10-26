@@ -226,7 +226,7 @@
     <!-- Main editor -->
     <!-- Preview canvas -->
     <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="1" Margin="0" Grid.Row="1">
-      <ScrollViewer x:Name="CanvasScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" PointerWheelChanged="CanvasScrollViewer_PointerWheelChanged">
+      <ScrollViewer x:Name="CanvasScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
         <Canvas x:Name="NodeCanvas" Focusable="True" Width="{Binding ScaledCanvasWidth}" Height="{Binding ScaledCanvasHeight}" Background="#F5F5F5" PointerPressed="Canvas_PointerPressed" PointerMoved="Canvas_PointerMoved" PointerReleased="Canvas_PointerReleased" PointerCaptureLost="Canvas_PointerCaptureLost" DragDrop.AllowDrop="True" RenderTransformOrigin="0,0">
           <Canvas.RenderTransform>
             <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
@@ -245,7 +245,7 @@
             </ItemsControl.ItemTemplate>
           <ItemsControl.Styles><Style Selector="ContentPresenter" x:DataType="vm:GridLine"><Setter Property="Canvas.Left" Value="{Binding Left}"/><Setter Property="Canvas.Top" Value="{Binding Top}"/></Style></ItemsControl.Styles></ItemsControl>
 
-          <ItemsControl ItemsSource="{Binding Config.Nodes}" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}">
+          <ItemsControl ItemsSource="{Binding Nodes}" Width="{Binding Config.CanvasWidth}" Height="{Binding Config.CanvasHeight}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
                 <Canvas/>
